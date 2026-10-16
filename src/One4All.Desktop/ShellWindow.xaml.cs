@@ -307,6 +307,19 @@ public partial class ShellWindow : Window, System.ComponentModel.INotifyProperty
         open?.Invoke();
     }
 
+    // A screen's list straight from its card, in its own window (the form is not opened).
+    private void List_Click(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (((FrameworkElement)sender).DataContext is Navigation.NavEntry { Operation: Operations.Operation operation } entry)
+        {
+            ShellViewModel vm = (ShellViewModel)DataContext;
+            string area = Navigation.NavCategory.Kinds.First(k => k.Area == entry.Area).Title;
+            OperationsViewModel model = new(_services, vm.UserId, operation, entry.Title, $"{entry.ModuleTitle}  ›  {area}  ›  {entry.GroupTitle}");
+            new OperationsListWindow(_services, model) { Owner = this }.Show();
+        }
+    }
+
     private void Entry_Click(object sender, RoutedEventArgs e)
     {
         if (((FrameworkElement)sender).DataContext is Navigation.NavEntry entry)

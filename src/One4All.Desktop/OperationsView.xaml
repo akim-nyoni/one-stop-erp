@@ -49,8 +49,6 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
                 <!-- Form -->
@@ -60,8 +58,13 @@
                             <TextBlock Text="{Binding Selected.Title, Converter={StaticResource Text}}" FontSize="15" FontWeight="SemiBold" Foreground="#1E3A2E" />
                             <TextBlock Text="{Binding Selected.Description, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                         </StackPanel>
-                        <Button DockPanel.Dock="Bottom" Content="{Binding RunText}" HorizontalAlignment="Right" Padding="22,7" Margin="0,8,0,0" MinWidth="110"
-                                Background="#DDEFE0" FontWeight="SemiBold" Command="{Binding RunCommand}" IsDefault="True" />
+                        <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="False">
+                            <Button DockPanel.Dock="Right" Content="{Binding RunText}" Padding="22,7" MinWidth="110" Background="#DDEFE0" FontWeight="SemiBold" Command="{Binding RunCommand}" IsDefault="True" />
+                            <Button DockPanel.Dock="Left" Padding="14,7" Click="ShowList_Click" ToolTip="Opens the records in their own window"
+                                    Visibility="{Binding Selected.HasList, Converter={StaticResource Visible}}">
+                                <TextBlock><Run Text="📋  Show the list: " /><Run Text="{Binding Selected.ListTitle, Mode=OneWay, Converter={StaticResource Text}}" /></TextBlock>
+                            </Button>
+                        </DockPanel>
                         <ScrollViewer MaxHeight="300" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Fields}">
                                 <ItemsControl.ItemsPanel>
@@ -106,23 +109,6 @@
                     </TextBox.Style>
                 </TextBox>
 
-                <!-- List -->
-                <DockPanel Grid.Row="2" Margin="0,8,0,4">
-                    <Button DockPanel.Dock="Right" Content="{loc:T 'Refresh'}" Padding="12,4" Command="{Binding RefreshCommand}" />
-                    <Button DockPanel.Dock="Right" Content="{loc:T 'Next ▶'}" Padding="10,4" Margin="0,0,6,0" Command="{Binding NextPageCommand}" />
-                    <TextBlock DockPanel.Dock="Right" Text="{Binding PageText}" Foreground="#667" VerticalAlignment="Center" Margin="0,0,6,0" />
-                    <Button DockPanel.Dock="Right" Content="{loc:T '◀ Previous'}" Padding="10,4" Margin="0,0,6,0" Command="{Binding PreviousPageCommand}" />
-                    <TextBlock Text="{Binding Selected.ListTitle, Converter={StaticResource Text}}" FontWeight="SemiBold" Foreground="#445" VerticalAlignment="Center" />
-                </DockPanel>
-                <DataGrid x:Name="ListGrid" Grid.Row="3" ItemsSource="{Binding List}" AutoGenerateColumns="True" IsReadOnly="True" CanUserAddRows="False"
-                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" Background="White" BorderBrush="#D9E0D9"
-                          RowBackground="White" AlternatingRowBackground="#F7FAF7" AutoGeneratingColumn="ListGrid_AutoGeneratingColumn">
-                    <DataGrid.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="{loc:T 'Who touched this record?'}" Click="WhoTouched_Click" />
-                        </ContextMenu>
-                    </DataGrid.ContextMenu>
-                </DataGrid>
             </Grid>
         </Grid>
     </DockPanel>

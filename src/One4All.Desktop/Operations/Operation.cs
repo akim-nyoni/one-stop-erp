@@ -84,6 +84,9 @@ public sealed class Operation
     /// <summary>Gets the list's caption.</summary>
     public string? ListTitle { get; init; }
 
+    /// <summary>Gets a value indicating whether the operation has a list (shown in its own window).</summary>
+    public bool HasList => List is not null;
+
     /// <summary>Gets a value indicating whether the result is a printable document (shown in full, monospaced).</summary>
     public bool IsDocument { get; init; }
 

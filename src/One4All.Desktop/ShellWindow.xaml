@@ -375,6 +375,8 @@
                                                                 <DockPanel Margin="14,12,14,10">
                                                                     <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
                                                                         <TextBlock DockPanel.Dock="Right" Text="Open  ›" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource BrandBrush}" VerticalAlignment="Center" />
+                                                                        <Button DockPanel.Dock="Right" Content="📋 List" FontSize="11" Padding="8,1" Margin="0,0,10,0" VerticalAlignment="Center" Click="List_Click"
+                                                                                ToolTip="Open the list of records in its own window" Visibility="{Binding HasList, Converter={StaticResource Visible}}" />
                                                                         <Border Background="#F0F2F0" CornerRadius="9" Padding="8,1" HorizontalAlignment="Left">
                                                                             <TextBlock Text="{Binding GroupTitle}" FontSize="11" Foreground="#667" />
                                                                         </Border>

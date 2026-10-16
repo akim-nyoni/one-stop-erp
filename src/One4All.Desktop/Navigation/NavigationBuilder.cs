@@ -18,6 +18,9 @@ public sealed class NavEntry
     /// <summary>Gets the action, or null for a window.</summary>
     public Operation? Operation { get; init; }
 
+    /// <summary>Gets a value indicating whether the screen has a list of records (opened in its own window).</summary>
+    public bool HasList => Operation?.HasList == true;
+
     /// <summary>Gets the window's key, or null for an action.</summary>
     public string? WindowKey { get; init; }
 

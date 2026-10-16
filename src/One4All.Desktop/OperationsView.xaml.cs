@@ -22,19 +22,24 @@ public partial class OperationsView : UserControl
     /// <summary>Gets or sets the application service provider.</summary>
     public IServiceProvider? Services { get; set; }
 
-    // The selected row's Id (and the record type to choose) in the record-history window.
-    private void WhoTouched_Click(object sender, RoutedEventArgs e)
+    private OperationsListWindow? _list;
+
+    // The list opens in its own window, one per form, and comes to the front if it is already open.
+    private void ShowList_Click(object sender, RoutedEventArgs e)
     {
-        if (Services is null)
+        if (Services is null || DataContext is not OperationsViewModel viewModel)
         {
             return;
         }
 
-        string? id = ListGrid.SelectedItem is System.Data.DataRowView row && row.Row.Table.Columns.Contains("Id") ? Convert.ToString(row["Id"], System.Globalization.CultureInfo.InvariantCulture) : null;
-        new RecordHistoryWindow(Services, null, id) { Owner = Window.GetWindow(this) }.Show();
-    }
+        if (_list is { IsLoaded: true })
+        {
+            _list.Activate();
+            return;
+        }
 
-    // The list's column headers in the company's language (the table keeps its English column names for the code that reads them).
-    private void ListGrid_AutoGeneratingColumn(object sender, DataGridAutoGeneratingColumnEventArgs e)
-        => e.Column.Header = Localization.UiText.T(e.PropertyName);
+        _list = new OperationsListWindow(Services, viewModel) { Owner = Window.GetWindow(this) };
+        _list.Closed += (_, _) => _list = null;
+        _list.Show();
+    }
 }

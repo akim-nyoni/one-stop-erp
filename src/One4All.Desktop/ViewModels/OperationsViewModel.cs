@@ -130,8 +130,11 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>Gets the line under the heading: plain instructions for one screen, the console's own line otherwise.</summary>
     public string Subtitle => IsSingle
-        ? (SingleContext is null ? string.Empty : SingleContext + "  —  ") + "Fill in the boxes (those marked * must be filled) and press Go. What happened shows underneath; the list at the bottom shows the records."
+        ? (SingleContext is null ? string.Empty : SingleContext + "  —  ") + "Fill in the boxes (those marked * must be filled) and press Go. What happened shows underneath; \"Show the list\" opens the records in their own window."
         : Localization.UiText.T("Choose an action, fill the form and run it. Records are looked up by their codes; every rule is enforced by the posting services.");
+
+    /// <summary>Gets the line under the list window's title: where the screen sits.</summary>
+    public string ListContext => SingleContext ?? Localization.UiText.T(Module);
 
     /// <summary>Gets the button's text.</summary>
     public string RunText => IsSingle ? "✔  Go" : Localization.UiText.T("Run");
