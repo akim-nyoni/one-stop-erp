@@ -542,6 +542,55 @@ public sealed class ReportDesignSession
         }
     }
 
+    /// <summary>Elements as clipboard text, to paste into this or another report (<see cref="Paste"/>).</summary>
+    /// <param name="names">The elements.</param>
+    /// <returns>The text (JSON), empty when nothing was chosen.</returns>
+    public string Copy(IEnumerable<string> names)
+    {
+        List<(ReportElement Element, ReportBand Band)> chosen = Resolve(names);
+        return chosen.Count == 0 ? string.Empty
+            : ReportDefinitionSerializer.Serialize(new ReportDefinition { Code = "clipboard", Name = "clipboard", Bands = [new ReportBand { Elements = [.. chosen.Select(c => c.Element)] }] });
+    }
+
+    /// <summary>Pastes elements copied with <see cref="Copy"/> into a band, each renamed uniquely, stepped off its place and kept inside the band.</summary>
+    /// <param name="bandType">The band to paste into.</param>
+    /// <param name="clipboard">The clipboard text.</param>
+    /// <returns>The pasted elements' names; empty when the text is not a copy.</returns>
+    public IReadOnlyList<string> Paste(BandType bandType, string clipboard)
+    {
+        ReportDefinition copied;
+        try
+        {
+            copied = ReportDefinitionSerializer.Deserialize(clipboard ?? string.Empty);
+        }
+        catch (Exception ex) when (ex is System.Text.Json.JsonException or ArgumentException or NotSupportedException)
+        {
+            return [];
+        }
+
+        List<ReportElement> elements = [.. copied.Bands.SelectMany(b => b.Elements)];
+        if (elements.Count == 0)
+        {
+            return [];
+        }
+
+        ReportBand band = Definition.BandOfType(bandType) ?? AddBand(bandType);
+        Checkpoint();
+        List<string> names = [];
+        double step = Grid > 0 ? Grid * 2 : 8;
+        foreach (ReportElement element in elements)
+        {
+            element.Name = UniqueName(element.Kind.ToString());
+            element.X = Snap(element.X + step);
+            element.Y = Snap(element.Y + step);
+            Contain(element, band);
+            band.Elements.Add(element);
+            names.Add(element.Name);
+        }
+
+        return names;
+    }
+
     /// <summary>The fields a data source offers, from a sample row and the fields the report already uses.</summary>
     /// <param name="sample">A sample row (may be null when there is no data yet).</param>
     /// <returns>The field names, sorted.</returns>

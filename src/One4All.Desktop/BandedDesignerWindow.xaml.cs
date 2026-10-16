@@ -45,6 +45,7 @@ public partial class BandedDesignerWindow : Window
         _services = services;
         InitializeComponent();
         PropertyList.ItemsSource = _properties;
+        System.Windows.Data.CollectionViewSource.GetDefaultView(_properties).GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(PropertyRow.Category)));
         BandBox.ItemsSource = Enum.GetValues<BandType>();
         BandBox.SelectedItem = BandType.Detail;
         GridBox.ItemsSource = new[] { 0d, 2d, 4d, 8d };
@@ -124,9 +125,10 @@ public partial class BandedDesignerWindow : Window
         }
 
         double width = _session.PrintableWidth * Zoom;
+        BandsPanel.Children.Add(new Border { Child = Ruler(width, true), Margin = new Thickness(RulerSize, 0, 0, 2), ToolTip = "Millimetres across the printable width" });
         foreach (ReportBand band in _session.Definition.Bands)
         {
-            DockPanel strip = new() { Background = new SolidColorBrush(Color.FromRgb(0xDD, 0xE6, 0xDD)), Width = width };
+            DockPanel strip = new() { Background = new SolidColorBrush(Color.FromRgb(0xDD, 0xE6, 0xDD)), Width = width, Margin = new Thickness(RulerSize, 0, 0, 0) };
             TextBox height = new() { Text = band.Height.ToString("0.#", CultureInfo.InvariantCulture), Width = 44, Tag = band.Type, ToolTip = "Band height (points)" };
             height.KeyDown += BandHeight_KeyDown;
             DockPanel.SetDock(height, Dock.Right);
@@ -162,7 +164,7 @@ public partial class BandedDesignerWindow : Window
                 canvas.Children.Add(ElementVisual(element));
             }
 
-            BandsPanel.Children.Add(canvas);
+            BandsPanel.Children.Add(new StackPanel { Orientation = Orientation.Horizontal, Children = { Ruler(band.Height * Zoom, false), canvas } });
         }
 
         ShowProperties();
@@ -202,7 +204,7 @@ public partial class BandedDesignerWindow : Window
             ElementKind.SubReport => $"⧉ sub-report {element.SubReportCode ?? "(set SubReportCode)"} {ReportDesignSession.FormatLinks(element.SubReportLinks)}",
             _ => element.Text ?? string.Empty,
         };
-        Grid visual = new() { Width = Math.Max(4, element.Width * Zoom), Height = Math.Max(element.Kind == ElementKind.Line ? 3 : 6, element.Height * Zoom), Tag = element.Name, Cursor = Cursors.SizeAll };
+        Grid visual = new() { Width = Math.Max(4, element.Width * Zoom), Height = Math.Max(element.Kind == ElementKind.Line ? 3 : 6, element.Height * Zoom), Tag = element.Name, Cursor = Cursors.SizeAll, Focusable = true };
         visual.Children.Add(new Border
         {
             BorderBrush = selected ? Brushes.DodgerBlue : new SolidColorBrush(Color.FromRgb(0xB0, 0xB8, 0xC0)), BorderThickness = new Thickness(selected ? 2 : 1),
@@ -256,6 +258,8 @@ public partial class BandedDesignerWindow : Window
         }
 
         _resizing = e.OriginalSource is System.Windows.Shapes.Rectangle { Tag: "grip" };
+        _snap = new GuideSnap(0, 0, [], []);
+        visual.Focus();
         _dragging = visual;
         _dragStart = e.GetPosition(BandsPanel);
         visual.CaptureMouse();
@@ -282,8 +286,25 @@ public partial class BandedDesignerWindow : Window
         }
 
         Vector moved = e.GetPosition(BandsPanel) - _dragStart;
-        _dragging.RenderTransform = _resizing ? new ScaleTransform(Math.Max(0.1, (_dragging.ActualWidth + moved.X) / Math.Max(1, _dragging.ActualWidth)),
-            Math.Max(0.1, (_dragging.ActualHeight + moved.Y) / Math.Max(1, _dragging.ActualHeight))) : new TranslateTransform(moved.X, moved.Y);
+        if (_resizing)
+        {
+            _dragging.RenderTransform = new ScaleTransform(Math.Max(0.1, (_dragging.ActualWidth + moved.X) / Math.Max(1, _dragging.ActualWidth)),
+                Math.Max(0.1, (_dragging.ActualHeight + moved.Y) / Math.Max(1, _dragging.ActualHeight)));
+            return;
+        }
+
+        // Guides: the dragged element snaps to the edges and centres of the others in its band, and the lines it lines up with are shown.
+        _snap = new GuideSnap(moved.X / Zoom, moved.Y / Zoom, [], []);
+        if (_session is not null && _dragging.Tag is string name && _session.Find(name) is (ReportElement element, ReportBand band) && _dragging.Parent is Canvas canvas)
+        {
+            DesignRect self = new(element.X, element.Y, element.Width, element.Height);
+            IEnumerable<DesignRect> others = band.Elements.Where(o => !_selected.Contains(o.Name)).Select(o => new DesignRect(o.X, o.Y, o.Width, o.Height));
+            _snap = DesignGuides.Snap(self, moved.X / Zoom, moved.Y / Zoom, others, 3 / Zoom);
+            ShowGuides(canvas, _snap);
+            Status.Text = $"x {(element.X + _snap.Dx) / PointsPerMm:0.0} mm · y {(element.Y + _snap.Dy) / PointsPerMm:0.0} mm · {element.Width / PointsPerMm:0.0} × {element.Height / PointsPerMm:0.0} mm";
+        }
+
+        _dragging.RenderTransform = new TranslateTransform(_snap.Dx * Zoom, _snap.Dy * Zoom);
     }
 
     private void Element_MouseUp(object sender, MouseButtonEventArgs e)
@@ -309,7 +330,8 @@ public partial class BandedDesignerWindow : Window
         }
         else
         {
-            _session.Move(_selected, moved.X / Zoom, moved.Y / Zoom);
+            _session.Move(_selected, _snap.VerticalGuides.Count > 0 || _snap.HorizontalGuides.Count > 0 ? _snap.Dx : moved.X / Zoom,
+                _snap.VerticalGuides.Count > 0 || _snap.HorizontalGuides.Count > 0 ? _snap.Dy : moved.Y / Zoom);
         }
 
         Render();
@@ -474,7 +496,10 @@ public partial class BandedDesignerWindow : Window
 
     // ---- Expression editor ----
     private void Expression_Changed(object sender, TextChangedEventArgs e)
-        => ExpressionResult.Text = string.IsNullOrWhiteSpace(ExpressionBox.Text) ? string.Empty : "= " + ReportDesignSession.Preview(ExpressionBox.Text, _sample.FirstOrDefault(), _parameters);
+    {
+        ExpressionResult.Text = string.IsNullOrWhiteSpace(ExpressionBox.Text) ? string.Empty : "= " + ReportDesignSession.Preview(ExpressionBox.Text, _sample.FirstOrDefault(), _parameters);
+        UpdateCompletion();
+    }
 
     private void UseExpression_Click(object sender, RoutedEventArgs e)
     {
@@ -819,7 +844,243 @@ public partial class BandedDesignerWindow : Window
     /// <summary>A row of the property panel.</summary>
     /// <param name="Name">The property.</param>
     /// <param name="Value">Its value as text.</param>
-    private sealed record PropertyRow(string Name, string Value);
+    private sealed record PropertyRow(string Name, string Value)
+    {
+        // The property grid's categories (brief §13.2): position and size, text and font, colours and borders, data, then the rest.
+        public string Category => Name switch
+        {
+            "X" or "Y" or "Width" or "Height" or "Rotation" or "Padding" => "Position and size",
+            "Text" or "FontFamily" or "FontSize" or "Bold" or "Italic" or "Underline" or "HAlign" or "VAlign" or "WordWrap" or "AutoShrink" or "NullText" => "Text and font",
+            "Foreground" or "Background" or "BorderThickness" or "BorderColor" or "BorderLeft" or "BorderTop" or "BorderRight" or "BorderBottom" => "Colours and borders",
+            "FieldName" or "Expression" or "Format" or "Aggregate" or "AggregateField" or "ChartCategoryField" or "SubReportCode" or "SubReportLinks" or "BarcodeSymbology" => "Data",
+            _ => "More",
+        };
+    }
+
+    /// <summary>Duplicates the selected elements (Ctrl+D).</summary>
+    public static RoutedCommand DuplicateCommand { get; } = new("Duplicate", typeof(BandedDesignerWindow));
+
+    private const string ClipboardFormat = "One4All.ReportElements";
+    private const double PointsPerMm = 72 / 25.4;
+    private const double RulerSize = 18;
+    private GuideSnap _snap;
+
+    // ---- Clipboard: copy, cut and paste elements here or into another report (another designer window) ----
+    private void Copy_Click(object sender, RoutedEventArgs e)
+    {
+        if (Keyboard.FocusedElement is TextBox box)
+        {
+            box.Copy();
+            return;
+        }
+
+        if (_session is null || _selected.Count == 0)
+        {
+            return;
+        }
+
+        string json = _session.Copy(_selected);
+        DataObject data = new();
+        data.SetData(ClipboardFormat, json);
+        data.SetText(json);
+        Clipboard.SetDataObject(data, true);
+        Status.Text = $"{_selected.Count} element(s) copied.";
+    }
+
+    private void Cut_Click(object sender, RoutedEventArgs e)
+    {
+        if (Keyboard.FocusedElement is TextBox box)
+        {
+            box.Cut();
+            return;
+        }
+
+        if (_session is null || _selected.Count == 0)
+        {
+            return;
+        }
+
+        Copy_Click(sender, e);
+        Act(s => s.Delete(_selected));
+        Status.Text = "Cut; paste with Ctrl+V.";
+    }
+
+    private void Paste_Click(object sender, RoutedEventArgs e)
+    {
+        if (Keyboard.FocusedElement is TextBox box)
+        {
+            box.Paste();
+            return;
+        }
+
+        if (_session is null)
+        {
+            return;
+        }
+
+        string? json = Clipboard.ContainsData(ClipboardFormat) ? Clipboard.GetData(ClipboardFormat) as string : Clipboard.ContainsText() ? Clipboard.GetText() : null;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            Status.Text = "Nothing to paste: copy elements first (Ctrl+C).";
+            return;
+        }
+
+        BandType target = _selected.Count > 0 && _session.Find(_selected[0]).Band is ReportBand band ? band.Type : TargetBand;
+        IReadOnlyList<string> pasted = _session.Paste(target, json);
+        if (pasted.Count == 0)
+        {
+            Status.Text = "The clipboard does not hold report elements.";
+            return;
+        }
+
+        _selected.Clear();
+        _selected.AddRange(pasted);
+        Status.Text = $"{pasted.Count} element(s) pasted into {target}.";
+        Render();
+    }
+
+    // ---- Rulers: millimetres across the printable width and down each band ----
+    private Canvas Ruler(double length, bool horizontal)
+    {
+        Canvas ruler = new() { Width = horizontal ? length : RulerSize, Height = horizontal ? RulerSize : length, Background = new SolidColorBrush(Color.FromRgb(0xF4, 0xF6, 0xF4)) };
+        double mmPixels = PointsPerMm * Zoom;
+        for (int mm = 0; mm * mmPixels <= length; mm += 5)
+        {
+            double at = mm * mmPixels;
+            double tick = mm % 10 == 0 ? 8 : 4;
+            ruler.Children.Add(horizontal
+                ? new System.Windows.Shapes.Line { X1 = at, X2 = at, Y1 = RulerSize - tick, Y2 = RulerSize, Stroke = Brushes.Gray, StrokeThickness = 1 }
+                : new System.Windows.Shapes.Line { Y1 = at, Y2 = at, X1 = RulerSize - tick, X2 = RulerSize, Stroke = Brushes.Gray, StrokeThickness = 1 });
+            if (mm % 10 == 0 && mm > 0 && (horizontal || mm * mmPixels + 10 < length))
+            {
+                TextBlock label = new() { Text = mm.ToString(CultureInfo.InvariantCulture), FontSize = 7.5, Foreground = Brushes.DimGray };
+                Canvas.SetLeft(label, horizontal ? at + 2 : 1);
+                Canvas.SetTop(label, horizontal ? 0 : at + 1);
+                ruler.Children.Add(label);
+            }
+        }
+
+        return ruler;
+    }
+
+    // ---- Alignment guides while dragging ----
+    private void ShowGuides(Canvas canvas, GuideSnap snap)
+    {
+        foreach (UIElement old in canvas.Children.OfType<FrameworkElement>().Where(c => Equals(c.Tag, "guide")).ToList())
+        {
+            canvas.Children.Remove(old);
+        }
+
+        foreach (double x in snap.VerticalGuides)
+        {
+            canvas.Children.Add(new System.Windows.Shapes.Line { X1 = x * Zoom, X2 = x * Zoom, Y1 = 0, Y2 = canvas.Height, Stroke = Brushes.OrangeRed, StrokeThickness = 1, StrokeDashArray = [3, 2], Tag = "guide", IsHitTestVisible = false });
+        }
+
+        foreach (double y in snap.HorizontalGuides)
+        {
+            canvas.Children.Add(new System.Windows.Shapes.Line { Y1 = y * Zoom, Y2 = y * Zoom, X1 = 0, X2 = canvas.Width, Stroke = Brushes.OrangeRed, StrokeThickness = 1, StrokeDashArray = [3, 2], Tag = "guide", IsHitTestVisible = false });
+        }
+    }
+
+    // ---- Property filter ----
+    private void PropertyFilter_Changed(object sender, TextChangedEventArgs e)
+    {
+        System.ComponentModel.ICollectionView view = System.Windows.Data.CollectionViewSource.GetDefaultView(_properties);
+        string filter = PropertyFilter.Text.Trim();
+        view.Filter = filter.Length == 0 ? null : item => item is PropertyRow row && row.Name.Contains(filter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ---- Expression completion: fields, functions and built-in values matching the word at the caret ----
+    private void UpdateCompletion()
+    {
+        if (_session is null)
+        {
+            CompletionPopup.IsOpen = false;
+            return;
+        }
+
+        (int start, string prefix) = WordAtCaret();
+        if (prefix.Length == 0)
+        {
+            CompletionPopup.IsOpen = false;
+            return;
+        }
+
+        List<string> candidates =
+        [
+            .. _session.Fields(_sample.FirstOrDefault()).Where(f => f.All(ch => char.IsLetterOrDigit(ch) || ch == '_')),
+            .. One4All.Reporting.Expressions.ReportExpressionEngine.Builtins,
+            .. One4All.Reporting.Expressions.ReportExpressionEngine.Accessors.Concat(One4All.Reporting.Expressions.ReportExpressionEngine.Functions).Select(f => f + "("),
+        ];
+        List<string> matches = [.. candidates.Where(c => c.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) && !c.Equals(prefix, StringComparison.Ordinal)).Distinct().Take(14)];
+        if (matches.Count == 0)
+        {
+            CompletionPopup.IsOpen = false;
+            return;
+        }
+
+        CompletionList.ItemsSource = matches;
+        CompletionList.SelectedIndex = 0;
+        CompletionList.Tag = start;
+        CompletionPopup.IsOpen = true;
+    }
+
+    private (int Start, string Prefix) WordAtCaret()
+    {
+        int caret = ExpressionBox.CaretIndex;
+        string text = ExpressionBox.Text;
+        int start = caret;
+        while (start > 0 && (char.IsLetterOrDigit(text[start - 1]) || text[start - 1] == '_'))
+        {
+            start--;
+        }
+
+        return (start, text[start..caret]);
+    }
+
+    private void AcceptCompletion()
+    {
+        if (!CompletionPopup.IsOpen || CompletionList.SelectedItem is not string chosen || CompletionList.Tag is not int start)
+        {
+            return;
+        }
+
+        int caret = ExpressionBox.CaretIndex;
+        ExpressionBox.Text = ExpressionBox.Text[..start] + chosen + ExpressionBox.Text[caret..];
+        ExpressionBox.CaretIndex = start + chosen.Length;
+        CompletionPopup.IsOpen = false;
+        ExpressionBox.Focus();
+    }
+
+    private void Expression_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!CompletionPopup.IsOpen)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.Down:
+                CompletionList.SelectedIndex = Math.Min(CompletionList.Items.Count - 1, CompletionList.SelectedIndex + 1);
+                e.Handled = true;
+                break;
+            case Key.Up:
+                CompletionList.SelectedIndex = Math.Max(0, CompletionList.SelectedIndex - 1);
+                e.Handled = true;
+                break;
+            case Key.Tab or Key.Enter:
+                AcceptCompletion();
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                CompletionPopup.IsOpen = false;
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void Completion_DoubleClick(object sender, MouseButtonEventArgs e) => AcceptCompletion();
 }
 
 /// <summary>Helpers for the designer's visuals.</summary>

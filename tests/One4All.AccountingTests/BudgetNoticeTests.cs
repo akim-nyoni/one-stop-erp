@@ -61,7 +61,7 @@ public sealed class BudgetNoticeTests
         (await notices.AlertAsync(companyId, new DateOnly(2026, 3, 21))).Value.Items.Should().Be(0, "already alerted at 80");
         await Spend(200m);
         (await notices.AlertAsync(companyId, new DateOnly(2026, 3, 22))).Value.Items.Should().Be(1, "105% crosses 100");
-        List<OutboundMessage> alerts = await db.Set<OutboundMessage>().AsNoTracking().Where(m => m.CompanyId == companyId && m.Recipient == "finance@example.com").ToListAsync();
+        List<OutboundMessage> alerts = await db.Set<OutboundMessage>().AsNoTracking().Where(m => m.CompanyId == companyId && m.Recipient == "finance@example.com").OrderBy(m => m.Id).ToListAsync(); // in the order sent: the database returns rows in no promised order
         alerts.Should().HaveCount(2);
         alerts.Last().Body.Should().Contain("6800").And.Contain("past 100%");
 

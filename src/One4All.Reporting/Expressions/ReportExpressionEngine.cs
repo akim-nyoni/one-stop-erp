@@ -42,6 +42,15 @@ public sealed class ReportExpressionContext
 /// </summary>
 public sealed class ReportExpressionEngine
 {
+    /// <summary>The functions an expression can call, for the designer's completion (each takes brackets).</summary>
+    public static IReadOnlyList<string> Functions { get; } = ["Upper", "Lower", "Trim", "Left", "Right", "Mid", "Replace", "Len", "Proper", "Abs", "Round", "Min", "Max", "Ceiling", "Floor", "Today", "AddDays", "AddMonths", "Year", "Month", "Day", "EndOfMonth", "DateDiff", "DateDiffIn", "FiscalPeriod", "FiscalYear", "If", "IsNull", "Coalesce", "Case", "Case2", "Case3", "Format", "NumberToWords", "AmountToWords", "NumberToWordsPt", "AmountToWordsPt"];
+
+    /// <summary>The values an expression can name without brackets: the page, the print date, the user and the company.</summary>
+    public static IReadOnlyList<string> Builtins { get; } = ["PageNumber", "TotalPages", "PrintDate", "UserName", "CompanyName"];
+
+    /// <summary>The functions that read a named field or parameter: <c>Field("x")</c>, <c>Param("x")</c>, <c>ToBase(amount, "USD", date)</c>.</summary>
+    public static IReadOnlyList<string> Accessors { get; } = ["Field", "Param", "ToBase"];
+
     private readonly Interpreter _interpreter;
 
     /// <summary>Creates the engine and registers the function library.</summary>

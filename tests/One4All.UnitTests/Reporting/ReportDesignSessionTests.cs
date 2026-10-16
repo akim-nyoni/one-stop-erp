@@ -129,6 +129,48 @@ public sealed class ReportDesignSessionTests
     }
 
     [Fact]
+    public void Copied_elements_paste_into_another_report_renamed_and_stepped()
+    {
+        ReportDesignSession from = Session();
+        string a = from.AddElement(BandType.Detail, ElementKind.Field, 0, 0, "Amount");
+        string b = from.AddElement(BandType.Detail, ElementKind.Label, 100, 0, "Total");
+        from.SetProperty(b, nameof(ReportElement.Bold), "True");
+        string clipboard = from.Copy([a, b]);
+        clipboard.Should().Contain("Amount").And.Contain("Total");
+        from.Copy([]).Should().BeEmpty();
+
+        ReportDesignSession to = Session();
+        IReadOnlyList<string> pasted = to.Paste(BandType.PageHeader, clipboard);
+        pasted.Should().HaveCount(2);
+        List<ReportElement> elements = [.. pasted.Select(n => to.Find(n).Element!)];
+        elements.Select(e => e.Name).Should().OnlyHaveUniqueItems();
+        elements[0].Should().Match<ReportElement>(e => e.FieldName == "Amount" && e.X == 8 && e.Y == 4, "stepped off its place by two grid units, then kept inside the 20 pt band");
+        elements[1].Should().Match<ReportElement>(e => e.Text == "Total" && e.Bold);
+        to.Find(pasted[0]).Band!.Type.Should().Be(BandType.PageHeader);
+        to.Paste(BandType.Detail, "not a copy").Should().BeEmpty();
+        to.Undo().Should().BeTrue();
+        to.Definition.BandOfType(BandType.PageHeader)!.Elements.Should().BeEmpty("pasting is one undoable step");
+    }
+
+    [Fact]
+    public void Dragging_snaps_to_the_edges_and_centres_of_the_other_elements()
+    {
+        DesignRect moving = new(0, 0, 50, 10);
+        DesignRect[] others = [new(102, 40, 60, 10), new(300, 0, 20, 10)];
+
+        GuideSnap near = DesignGuides.Snap(moving, 100, 29, others);
+        (near.Dx, near.Dy).Should().Be((102d, 30d), "the left edge is within 3 pt of the other's left edge, and the top within 3 pt of its bottom");
+        near.VerticalGuides.Should().Equal(102);
+        near.HorizontalGuides.Should().Equal(40d); // the guide is drawn on the edge reached: the other's top
+
+        GuideSnap far = DesignGuides.Snap(moving, 40, 15, others);
+        (far.Dx, far.Dy, far.VerticalGuides.Count, far.HorizontalGuides.Count).Should().Be((40d, 15d, 0, 0), "nothing is within 3 pt");
+
+        GuideSnap centre = DesignGuides.Snap(moving, 106, 0, others);
+        centre.Dx.Should().Be(107, "the moving centre (131) lines up with the other's centre (132)");
+    }
+
+    [Fact]
     public void Elements_can_be_brought_to_the_front_or_sent_to_the_back()
     {
         ReportDesignSession session = new(new ReportDefinition { Code = "Z", Bands = [new ReportBand { Type = BandType.Detail, Height = 20 }] });
