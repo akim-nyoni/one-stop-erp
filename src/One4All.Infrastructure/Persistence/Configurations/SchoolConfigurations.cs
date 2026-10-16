@@ -87,6 +87,7 @@ internal sealed class StudentConfiguration : IEntityTypeConfiguration<Student>
         b.Property(x => x.FullName).HasMaxLength(200);
         b.Property(x => x.Grade).HasMaxLength(40);
         b.Property(x => x.BursaryType).HasConversion<int>();
+        b.Property(x => x.Gender).HasConversion<int>();
         b.HasIndex(x => new { x.CompanyId, x.AdmissionNumber }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.CompanyId, x.Grade });
         b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);

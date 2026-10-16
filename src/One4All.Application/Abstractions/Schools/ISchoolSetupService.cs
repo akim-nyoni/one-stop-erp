@@ -18,7 +18,20 @@ public interface ISchoolSetupService
 
     /// <summary>Admits a student under a guardian's account (a customer).</summary>
     /// <returns>The student's id.</returns>
-    Task<Result<long>> AdmitStudentAsync(long companyId, string admissionNumber, string fullName, string grade, string guardianCustomerCode, DateOnly admittedOn, CancellationToken ct = default);
+    Task<Result<long>> AdmitStudentAsync(long companyId, string admissionNumber, string fullName, string grade, string guardianCustomerCode, DateOnly admittedOn, CancellationToken ct = default)
+        => AdmitStudentAsync(companyId, admissionNumber, fullName, grade, guardianCustomerCode, admittedOn, Core.Payroll.Gender.Unspecified, ct);
+
+    /// <summary>Admits a student, recording their gender (for the headcount split).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="admissionNumber">The admission number.</param>
+    /// <param name="fullName">The student's name.</param>
+    /// <param name="grade">The grade.</param>
+    /// <param name="guardianCustomerCode">The guardian's customer code.</param>
+    /// <param name="admittedOn">The admission date.</param>
+    /// <param name="gender">The student's gender.</param>
+    /// <param name="ct">Cancellation.</param>
+    /// <returns>The student's id.</returns>
+    Task<Result<long>> AdmitStudentAsync(long companyId, string admissionNumber, string fullName, string grade, string guardianCustomerCode, DateOnly admittedOn, Core.Payroll.Gender gender, CancellationToken ct = default);
 
     /// <summary>Creates or updates a hostel (boarding house) with its capacity and fee per term.</summary>
     Task<Result<long>> SaveHostelAsync(long companyId, string code, string name, int capacity, decimal feePerTerm, string revenueAccountCode, CancellationToken ct = default);

@@ -30,9 +30,9 @@ public static class OperationsReports
         yield return Listing("SC179", "Sponsor Account Statement", "School", "Per sponsor: the students they sponsor, fees billed to them and receipts in the period, and the balance they owe at the end of it.",
             "OpsSponsors", [new Column("Sponsor", "Sponsor", 150), new Column("Students", "Students", 220), new Column("Billed", "Billed", 95), new Column("Received", "Received", 95), new Column("Balance", "Balance", 95, true)],
             [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
-        yield return Listing("SC180", "Enrolment & Headcount", "School", "Per grade: enrolled, boarders, day scholars, bursary holders and students no longer enrolled.",
+        yield return Listing("SC180", "Enrolment & Headcount", "School", "Per grade: enrolled, boarders, day scholars, bursary holders, students no longer enrolled, and the enrolled split by gender.",
             "OpsEnrolment", [new Column("Grade", "Grade", 70), new Column("Enrolled", "Enrolled", 60), new Column("Boarders", "Boarders", 60), new Column("Day", "Day", 50), new Column("Bursary", "On bursary", 65),
-             new Column("Left", "Not enrolled", 75)], []);
+             new Column("Left", "Not enrolled", 75), new Column("Female", "Female", 55), new Column("Male", "Male", 55)], []);
         yield return Listing("SC181", "Deferred Fee Income Schedule", "School", "Fees billed in advance per invoice: billed, recognised to date as the term runs, and still deferred.",
             "OpsDeferredFees", [new Column("Invoice", "Invoice", 100), new Column("Description", "Description", 200), new Column("Term", "Term", 160), new Column("Billed", "Billed", 90), new Column("Recognised", "Recognised", 90),
              new Column("Deferred", "Deferred", 95, true)], []);

@@ -26,7 +26,8 @@ public static class DashboardReports
         yield return Listing("DB255", "Trend & Seasonality Analysis", "System", "Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before.",
             "DashTrend", [new Column("Month", "Month", 70), new Column("Revenue", "Revenue", 100), new Column("Expenses", "Expenses", 100), new Column("LastYear", "Revenue a year before", 120),
              new Column("YearOnYear", "YoY", 60), new Column("Profit", "Profit", 100, true)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("DB256", "Municipal Executive Dashboard", "Municipal", "Billed and collected this year, collection rate, debtors and over-90s, indigent households, disconnections, open faults and licences due.",
+        yield return Listing("DB256", "Municipal Executive Dashboard", "Municipal", "Billed and collected this year, collection rate, debtors and over-90s, indigent households, disconnections, open faults and licences due; "
+            + "water bought in bulk against water metered to consumers this year (the loss), and ratepayer arrears at each of the last six month-ends.",
             "DashMunicipal", [new Column("Measure", "Measure", 260), new Column("Value", "Value", 160)], [("AsAtDate", ParameterType.Date)]);
     }
 }

@@ -69,6 +69,15 @@ public sealed class SqlReportSourceTests
 
         (await sql.GetRowsAsync(companyId, "view:rpt.aged_debt", new Dictionary<string, object?>())).Should().NotContain(r => (long)r["company_id"]! != companyId);
 
+        // A source past the cap ends with a visible notice row rather than stopping short in silence.
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> capped = await sql.GetRowsAsync(companyId,
+            $"sql:SELECT n AS number, 'x' AS label FROM generate_series(1, {SqlReportDataProvider.MaxRows + 5}) AS s(n) WHERE @CompanyId > 0", new Dictionary<string, object?>());
+        capped.Should().HaveCount(SqlReportDataProvider.MaxRows + 1);
+        capped[^1]["number"].Should().Be(SqlReportDataProvider.CapNoticeText);
+        capped[^1]["label"].Should().BeNull();
+        (await sql.GetRowsAsync(companyId, $"sql:SELECT n FROM generate_series(1, {SqlReportDataProvider.MaxRows}) AS s(n) WHERE @CompanyId > 0", new Dictionary<string, object?>()))
+            .Should().HaveCount(SqlReportDataProvider.MaxRows);
+
         Func<Task> sneaky = () => sql.GetRowsAsync(companyId, "sql:WITH gone AS (DELETE FROM gl.account WHERE company_id = @CompanyId RETURNING 1) SELECT * FROM gone",
             new Dictionary<string, object?>());
         (await sneaky.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().BeOneOf("25006", "0A000");

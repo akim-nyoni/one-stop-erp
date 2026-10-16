@@ -210,6 +210,33 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
         DateOnly soon = asAt.AddDays(30);
         int licences = await _db.Set<CouncilLicence>().CountAsync(l => l.CompanyId == companyId && l.Status == CouncilLicenceStatus.Active && l.ExpiresOn >= asAt && l.ExpiresOn <= soon, ct).ConfigureAwait(false);
         decimal roll = await _db.Properties.AsNoTracking().Where(p => p.CompanyId == companyId).SumAsync(p => p.Valuation, ct).ConfigureAwait(false);
+
+        // Water losses: what the bulk-supply meters took in this year against what consumer water meters were billed for. Bulk meters are typed "bulk".
+        HashSet<long> waterMeters = [.. await _db.Properties.AsNoTracking().Where(p => p.CompanyId == companyId).SelectMany(p => p.Services)
+            .Where(s => s.ServiceType == ServiceType.Water && s.MeterId != null).Select(s => s.MeterId!.Value).Distinct().ToListAsync(ct).ConfigureAwait(false)];
+        Dictionary<long, bool> bulk = await _db.Set<Meter>().AsNoTracking().Where(m => m.CompanyId == companyId && m.MeterType != null)
+            .ToDictionaryAsync(m => m.Id, m => m.MeterType!.Contains("bulk", StringComparison.OrdinalIgnoreCase), ct).ConfigureAwait(false);
+        var readings = await _db.MeterReadings.AsNoTracking().Where(r => r.CompanyId == companyId && r.Accepted && r.ReadingDate >= yearStart && r.ReadingDate <= asAt)
+            .Select(r => new { r.MeterId, r.Consumption, r.BilledConsumption }).ToListAsync(ct).ConfigureAwait(false);
+        decimal bulkSupplied = readings.Where(r => bulk.GetValueOrDefault(r.MeterId)).Sum(r => r.Consumption);
+        decimal metered = readings.Where(r => !bulk.GetValueOrDefault(r.MeterId) && waterMeters.Contains(r.MeterId)).Sum(r => r.BilledConsumption);
+        decimal lost = bulkSupplied - metered;
+
+        // Arrears trend: ratepayer debtors over 30 days at each of the last six month-ends.
+        List<IReadOnlyDictionary<string, object?>> trend = [];
+        for (int back = 5; back >= 0; back--)
+        {
+            DateOnly monthEnd = new DateOnly(asAt.Year, asAt.Month, 1).AddMonths(-back + 1).AddDays(-1);
+            if (monthEnd > asAt)
+            {
+                monthEnd = asAt;
+            }
+
+            List<OpenItemAsAt> then = back == 0 ? items : [.. (await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsReceivable, monthEnd, ct).ConfigureAwait(false)).Where(i => ratepayers.Contains(i.Item.TraderId))];
+            decimal arrears = then.Where(i => i.Signed(LedgerSign.Debit) > 0m && DebtorAgeing.Band(i.Item.DueDate, monthEnd) >= 2).Sum(i => i.Signed(LedgerSign.Debit));
+            trend.Add(Row(("Measure", $"Arrears (over 30 days) at {monthEnd:yyyy-MM-dd}"), ("Value", Money(arrears))));
+        }
+
         return
         [
             Row(("Measure", $"Billed {asAt.Year} to date"), ("Value", Money(billed))), Row(("Measure", "Collected from ratepayers to date"), ("Value", Money(collected))),
@@ -217,6 +244,9 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
             Row(("Measure", "of which over 90 days"), ("Value", Money(over90))), Row(("Measure", "Valuation roll total"), ("Value", Money(roll))),
             Row(("Measure", "Indigent households"), ("Value", indigent.ToString(CultureInfo.InvariantCulture))), Row(("Measure", "Disconnection orders open"), ("Value", disconnections.ToString(CultureInfo.InvariantCulture))),
             Row(("Measure", "Open fault tickets"), ("Value", faults.ToString(CultureInfo.InvariantCulture))), Row(("Measure", "Licences expiring within 30 days"), ("Value", licences.ToString(CultureInfo.InvariantCulture))),
+            Row(("Measure", $"Water bought in bulk {asAt.Year} to date (units)"), ("Value", Money(bulkSupplied))), Row(("Measure", "Water metered to consumers to date (units)"), ("Value", Money(metered))),
+            Row(("Measure", "Water losses (units)"), ("Value", Money(lost))), Row(("Measure", "Water losses as a share of supply"), ("Value", bulkSupplied == 0m ? "—" : Percent(lost, bulkSupplied))),
+            .. trend,
         ];
     }
 

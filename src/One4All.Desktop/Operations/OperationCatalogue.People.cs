@@ -1351,7 +1351,7 @@ public static partial class OperationCatalogue
             Description = "Admit a student under their guardian's account (the customer billed); set up a hostel or transport route with its capacity and fee per term; place a "
                 + "student in a hostel and on a route (blank takes them out) within capacity.",
             Fields = [Pick("Step", "Step", ["Admit", "Hostel", "Route", "Place"]), Opt("Student", "Admission number"), Opt("Name", "Name"), Opt("Grade", "Grade"), Opt("Guardian", "Guardian (customer code)"),
-                Opt("Code", "Hostel / route code"), Num("Capacity", "Capacity", "0"), Num("Fee", "Fee per term", "0"), Opt("Revenue", "Revenue account"), Opt("HostelCode", "Hostel (place)"),
+                Pick("Gender", "Gender", Enum.GetNames<Core.Payroll.Gender>()), Opt("Code", "Hostel / route code"), Num("Capacity", "Capacity", "0"), Num("Fee", "Fee per term", "0"), Opt("Revenue", "Revenue account"), Opt("HostelCode", "Hostel (place)"),
                 Opt("RouteCode", "Route (place)"), Today()],
             Run = async (c, i) =>
             {
@@ -1364,12 +1364,12 @@ public static partial class OperationCatalogue
                         i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true))}).",
                     "Place" => Check(await setup.PlaceStudentAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("HostelCode"), i.Optional("RouteCode")).ConfigureAwait(true), "Student placed."),
                     _ => $"Student admitted (id {Check(await setup.AdmitStudentAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Optional("Grade") ?? string.Empty,
-                        i.Optional("Guardian") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))}).",
+                        i.Optional("Guardian") ?? string.Empty, i.Date("Date"), Enum.TryParse(i.Optional("Gender"), out Core.Payroll.Gender gender) ? gender : Core.Payroll.Gender.Unspecified).ConfigureAwait(true))}).",
                 };
             },
             List = async c => Table(await c.Db.Students.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.AdmissionNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
-                ("Admission", s => s.AdmissionNumber), ("Name", s => s.ShownName(false)), ("Grade", s => s.Grade), ("Boarder", s => s.IsBoarder ? "yes" : string.Empty),
-                ("Enrolled", s => s.IsEnrolled ? "yes" : "left")),
+                ("Admission", s => s.AdmissionNumber), ("Name", s => s.ShownName(false)), ("Grade", s => s.Grade), ("Gender", s => s.Gender == Core.Payroll.Gender.Unspecified ? string.Empty : s.Gender.ToString()),
+                ("Boarder", s => s.IsBoarder ? "yes" : string.Empty), ("Enrolled", s => s.IsEnrolled ? "yes" : "left")),
         };
         yield return new Operation
         {

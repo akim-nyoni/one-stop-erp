@@ -149,7 +149,8 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EnrolmentAsync(long companyId, CancellationToken ct)
         => [.. (await StudentsAsync(companyId, ct).ConfigureAwait(false)).Values.GroupBy(s => s.Grade).OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => Row(("Grade", g.Key), ("Enrolled", g.Count(s => s.IsEnrolled)), ("Boarders", g.Count(s => s.IsEnrolled && s.IsBoarder)), ("Day", g.Count(s => s.IsEnrolled && !s.IsBoarder)),
-                ("Bursary", g.Count(s => s.IsEnrolled && s.BursaryType != BursaryType.None)), ("Left", g.Count(s => !s.IsEnrolled))))];
+                ("Bursary", g.Count(s => s.IsEnrolled && s.BursaryType != BursaryType.None)), ("Left", g.Count(s => !s.IsEnrolled)),
+                ("Female", g.Count(s => s.IsEnrolled && s.Gender == Core.Payroll.Gender.Female)), ("Male", g.Count(s => s.IsEnrolled && s.Gender == Core.Payroll.Gender.Male))))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StudentBalancesAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {

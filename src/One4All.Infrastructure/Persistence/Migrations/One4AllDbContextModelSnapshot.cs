@@ -29984,6 +29984,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(200)")
                         .HasColumnName("full_name");
 
+                    b.Property<int>("Gender")
+                        .HasColumnType("integer")
+                        .HasColumnName("gender");
+
                     b.Property<string>("Grade")
                         .IsRequired()
                         .HasMaxLength(40)

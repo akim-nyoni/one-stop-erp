@@ -97,14 +97,37 @@ public sealed partial class SqlReportDataProvider : IReportDataProvider, IReport
         await connection.OpenAsync(ct).ConfigureAwait(false);
         await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, ct).ConfigureAwait(false);
         await connection.ExecuteAsync(new CommandDefinition("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15s'", transaction: transaction, cancellationToken: ct)).ConfigureAwait(false);
-        IEnumerable<dynamic> rows = await connection.QueryAsync(new CommandDefinition($"SELECT * FROM ({sql}) AS report_rows LIMIT {MaxRows}", bound, transaction, cancellationToken: ct))
+        // One row past the cap tells us whether the cap cut the result; the reader then sees a notice row instead of a silently short report.
+        IEnumerable<dynamic> rows = await connection.QueryAsync(new CommandDefinition($"SELECT * FROM ({sql}) AS report_rows LIMIT {MaxRows + 1}", bound, transaction, cancellationToken: ct))
             .ConfigureAwait(false);
-        List<IReadOnlyDictionary<string, object?>> result = [.. rows.Select(r => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(
+        List<IReadOnlyDictionary<string, object?>> result = [.. rows.Take(MaxRows).Select(r => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(
             ((IDictionary<string, object?>)r).Select(kv => new KeyValuePair<string, object?>(kv.Key, kv.Value is DateTime dt && dt.TimeOfDay == TimeSpan.Zero ? DateOnly.FromDateTime(dt) : kv.Value)),
             StringComparer.OrdinalIgnoreCase))];
         await transaction.RollbackAsync(ct).ConfigureAwait(false);
+        if (result.Count == MaxRows && rows.Skip(MaxRows).Any())
+        {
+            result.Add(CapNotice(result[0].Keys));
+        }
+
         return result;
     }
+
+    /// <summary>The notice row appended when a source has more rows than <see cref="MaxRows"/>: the first column carries the message, the rest are empty.</summary>
+    /// <param name="columns">The result's columns.</param>
+    /// <returns>The row.</returns>
+    public static IReadOnlyDictionary<string, object?> CapNotice(IEnumerable<string> columns)
+    {
+        Dictionary<string, object?> row = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string column in columns)
+        {
+            row[column] = row.Count == 0 ? CapNoticeText : null;
+        }
+
+        return row;
+    }
+
+    /// <summary>The text of the notice row.</summary>
+    public static string CapNoticeText => $"Only the first {MaxRows:N0} rows are shown; narrow the parameters or filter the source to see the rest.";
 
     /// <inheritdoc />
     public async Task<Core.Common.Result<IReadOnlyList<ReportFieldInfo>>> DescribeAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)

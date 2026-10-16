@@ -41,8 +41,8 @@ public sealed class OperationsReportsTests
         structure.AddItem("Levy", 100m, true);
         db.FeeStructures.Add(structure);
         await db.SaveChangesAsync();
-        Student full = new(companyId, "OP-001", "Student One", "G1", guardianA.Id);
-        Student bursary = new(companyId, "OP-002", "Student Two", "G1", guardianB.Id);
+        Student full = new(companyId, "OP-001", "Student One", "G1", guardianA.Id) { Gender = One4All.Core.Payroll.Gender.Female };
+        Student bursary = new(companyId, "OP-002", "Student Two", "G1", guardianB.Id) { Gender = One4All.Core.Payroll.Gender.Male };
         bursary.GrantBursary(BursaryType.Percentage, 25m);
         db.Students.AddRange(full, bursary);
         await db.SaveChangesAsync();
@@ -60,7 +60,7 @@ public sealed class OperationsReportsTests
         (await Render("SC175")).Should().Contain("Term 1,G1,2,0,1750");
         (await Render("SC176")).Should().Contain("G1,Student One (OP-001),Guardian A,1,").And.Contain("Student Two (OP-002)");
         (await Render("SC178")).Should().Contain("Student Two (OP-002),G1,Percentage,25%,\"1,000.00\",250");
-        (await Render("SC180")).Should().Contain("G1,2,0,2,1,0");
+        (await Render("SC180")).Should().Contain("G1,2,0,2,1,0,1,1");
         (await Render("SC182")).Should().Contain("OP-001,Student One,G1,Guardian A,Enrolled,1000").And.Contain("OP-002,Student Two,G1,Guardian B,Enrolled,750");
 
         foreach (string code in OperationsReports.All().Select(r => r.Code))

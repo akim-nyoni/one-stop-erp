@@ -84,6 +84,9 @@ public sealed class Student : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the student is currently enrolled.</summary>
     public bool IsEnrolled { get; private set; }
 
+    /// <summary>The student's gender (unspecified when not recorded).</summary>
+    public Payroll.Gender Gender { get; set; }
+
     /// <summary>The staff member whose child this is (fees take the staff-child discount while they are employed); null: none.</summary>
     public long? StaffEmployeeId { get; set; }
 

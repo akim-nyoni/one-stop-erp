@@ -68,7 +68,7 @@ public sealed class SchoolSetupService : ISchoolSetupService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> AdmitStudentAsync(long companyId, string admissionNumber, string fullName, string grade, string guardianCustomerCode, DateOnly admittedOn, CancellationToken ct = default)
+    public async Task<Result<long>> AdmitStudentAsync(long companyId, string admissionNumber, string fullName, string grade, string guardianCustomerCode, DateOnly admittedOn, Core.Payroll.Gender gender, CancellationToken ct = default)
     {
         string number = Code(admissionNumber);
         if (number.Length == 0 || string.IsNullOrWhiteSpace(fullName) || string.IsNullOrWhiteSpace(grade))
@@ -88,7 +88,7 @@ public sealed class SchoolSetupService : ISchoolSetupService
             return Error.NotFound("School.GuardianNotFound", $"Guardian account {guardian} not found.");
         }
 
-        Student student = new(companyId, number, fullName.Trim(), grade.Trim(), guardianId.Value) { AdmittedOn = admittedOn };
+        Student student = new(companyId, number, fullName.Trim(), grade.Trim(), guardianId.Value) { AdmittedOn = admittedOn, Gender = gender };
         _db.Students.Add(student);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return student.Id;
