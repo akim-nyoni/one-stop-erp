@@ -176,6 +176,29 @@ internal static class MunicipalCharges
         }, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Posts several bills as one batch (all or nothing) through the ledger's batch path; refused when a bill needs the single path, and the
+    /// caller then posts one by one.
+    /// </summary>
+    /// <param name="ar">The sales ledger.</param>
+    /// <param name="company">The council.</param>
+    /// <param name="date">The bill date.</param>
+    /// <param name="bills">The bills: ratepayer, bill number, charge, revenue account and narrative.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result per bill, in order.</returns>
+    public static Task<Result<IReadOnlyList<TradingPostingResult>>> PostManyAsync(ISalesLedgerService ar, Company company, DateOnly date,
+        IReadOnlyList<(long RatepayerCustomerId, string InvoiceNumber, decimal Charge, string RevenueAccountCode, string Narrative)> bills, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(ar);
+        ArgumentNullException.ThrowIfNull(company);
+        ArgumentNullException.ThrowIfNull(bills);
+        return ar.PostInvoicesAsync([.. bills.Select(b => new SalesInvoiceRequest
+        {
+            CompanyId = company.Id, CustomerId = b.RatepayerCustomerId, DocumentNumber = b.InvoiceNumber, DocumentDate = date, Currency = company.BaseCurrency,
+            NetAmount = b.Charge, TaxAmount = 0m, SalesAccountCode = b.RevenueAccountCode, Narrative = b.Narrative,
+        })], ct);
+    }
+
     /// <summary>The bill numbers among the candidates already on the receivables ledger.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="companyId">The council.</param>

@@ -57,6 +57,149 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         }, ct);
 
     /// <inheritdoc />
+    public Task<Result<IReadOnlyList<TradingPostingResult>>> PostInvoicesAsync(IReadOnlyList<SalesInvoiceRequest> requests, CancellationToken ct = default)
+        => _db.AtomicAsync(() => PostInvoicesCoreAsync(requests, ct), ct);
+
+    // One unit of work for a batch of invoices: the checks of the single path done once per batch where they can be, then the engine's batch path.
+    private async Task<Result<IReadOnlyList<TradingPostingResult>>> PostInvoicesCoreAsync(IReadOnlyList<SalesInvoiceRequest> requests, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0)
+        {
+            return Array.Empty<TradingPostingResult>();
+        }
+
+        long companyId = requests[0].CompanyId;
+        Company company = await _db.Companies.FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (requests.Any(r => r.CompanyId != companyId || r.Currency != company.BaseCurrency || r.DeliveryDate is not null || r.CreditLimitOverrideByUserId is not null))
+        {
+            return Error.Rule("Ar.BatchUnsupported", "Invoices in a foreign currency, with a delivery-date tax point or a credit-limit override post one at a time.");
+        }
+
+        foreach (SalesInvoiceRequest request in requests.Where(r => r.RevenueLines.Count > 0 && (r.RevenueLines.Sum(l => l.NetAmount) != r.NetAmount || r.RevenueLines.Any(l => string.IsNullOrWhiteSpace(l.AccountCode)))))
+        {
+            return Error.Validation("Ar.RevenueLinesMismatch", $"Invoice {request.DocumentNumber}: the revenue lines must each name an account and add up to the net amount.");
+        }
+
+        List<long> customerIds = [.. requests.Select(r => r.CustomerId).Distinct()];
+        Dictionary<long, Customer> customers = await _db.Customers.Where(c => c.CompanyId == companyId && customerIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
+        foreach (SalesInvoiceRequest request in requests)
+        {
+            if (!customers.TryGetValue(request.CustomerId, out Customer? customer))
+            {
+                return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
+            }
+
+            if (customer.OnHold)
+            {
+                return Error.Rule("Ar.CustomerOnHold", $"Customer {customer.Code} is on hold; no new invoices can be posted.");
+            }
+
+            if (customer.CreditLimit > 0m && customer.CreditLimitPolicy != CreditLimitPolicy.Ignore)
+            {
+                return Error.Rule("Ar.BatchUnsupported", $"Customer {customer.Code} has a credit limit to check: the invoice posts on its own.");
+            }
+        }
+
+        // Exemption certificates and exempt tax codes, read once for the batch.
+        DateOnly earliest = requests.Min(r => r.DocumentDate), latest = requests.Max(r => r.DocumentDate);
+        List<TaxExemptionCertificate> certificates = await _db.TaxExemptionCertificates.AsNoTracking()
+            .Where(c => c.CompanyId == companyId && c.Ledger == TradingLedger.AccountsReceivable && customerIds.Contains(c.TraderId) && c.ValidFrom <= latest && c.ValidTo >= earliest)
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<string> taxCodes = [.. requests.Where(r => r.TaxCode is not null).Select(r => r.TaxCode!).Distinct()];
+        HashSet<string> exemptCodes = taxCodes.Count == 0 ? [] : [.. await _db.TaxCodes.Where(t => t.CompanyId == companyId && taxCodes.Contains(t.Code) && t.Type == TaxType.Exempt).Select(t => t.Code).ToListAsync(ct).ConfigureAwait(false)];
+        string? mainControl = null;
+        List<JournalRequest> journals = [];
+        List<(Customer Customer, decimal Gross, decimal BaseGross)> heads = [];
+        foreach (SalesInvoiceRequest request in requests)
+        {
+            Customer customer = customers[request.CustomerId];
+            bool certified = certificates.Any(c => c.TraderId == customer.Id && c.ValidFrom <= request.DocumentDate && c.ValidTo >= request.DocumentDate && (c.RevokedOn == null || c.RevokedOn > request.DocumentDate));
+            if (certified && request.TaxAmount != 0m)
+            {
+                return Error.Rule("Tax.CustomerExempt", $"Customer {customer.Code} holds a valid tax exemption certificate: invoice without tax.");
+            }
+
+            if (!certified && request.TaxCode is string taxCode && exemptCodes.Contains(taxCode))
+            {
+                return Error.Rule("Tax.CertificateRequired", $"Customer {customer.Code} has no valid exemption certificate on {request.DocumentDate:yyyy-MM-dd}, so {taxCode} cannot be used.");
+            }
+
+            string control;
+            if (customer.ReceivableControlAccountCode is string own)
+            {
+                control = own;
+            }
+            else
+            {
+                if (mainControl is null)
+                {
+                    Result<string> controlResult = await ControlCodeAsync(companyId, ControlAccountType.AccountsReceivable, ct).ConfigureAwait(false);
+                    if (controlResult.IsFailure)
+                    {
+                        return controlResult.Error;
+                    }
+
+                    mainControl = controlResult.Value;
+                }
+
+                control = mainControl;
+            }
+
+            const decimal rate = 1m;
+            decimal gross = request.NetAmount + request.TaxAmount;
+            decimal baseNet = Round(request.NetAmount), baseTax = Round(request.TaxAmount), baseGross = baseNet + baseTax;
+            List<JournalLineRequest> lines = [Line(control, JournalSide.Debit, gross, rate, baseGross)];
+            if (request.RevenueLines.Count == 0)
+            {
+                lines.Add(Analysed(Line(request.SalesAccountCode, JournalSide.Credit, request.NetAmount, rate, baseNet), request));
+            }
+            else
+            {
+                decimal baseLeft = baseNet;
+                for (int i = 0; i < request.RevenueLines.Count; i++)
+                {
+                    RevenueLine revenue = request.RevenueLines[i];
+                    decimal baseShare = i == request.RevenueLines.Count - 1 ? baseLeft : Round(revenue.NetAmount);
+                    baseLeft -= baseShare;
+                    lines.Add(Analysed(Line(revenue.AccountCode, JournalSide.Credit, revenue.NetAmount, rate, baseShare), request, revenue));
+                }
+            }
+
+            if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
+            {
+                lines.Add(Line(request.TaxAccountCode, JournalSide.Credit, request.TaxAmount, rate, baseTax, request.TaxCode));
+            }
+
+            journals.Add(new JournalRequest
+            {
+                CompanyId = companyId, SourceModule = "AR", PostingDate = request.DocumentDate, TransactionCurrency = request.Currency, EnforceManualJournalRules = false,
+                DocumentType = DocumentTypeFor(TradingLedger.AccountsReceivable, OpenItemType.Invoice), DocumentNumber = request.DocumentNumber, Narrative = request.Narrative, Lines = lines,
+            });
+            heads.Add((customer, gross, baseGross));
+        }
+
+        Result<IReadOnlyList<PostingReceipt>> posted = await _postingEngine.PostBatchAsync(journals, ct).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted.Error;
+        }
+
+        List<OpenItem> items = [];
+        for (int i = 0; i < requests.Count; i++)
+        {
+            SalesInvoiceRequest request = requests[i];
+            (Customer customer, decimal gross, decimal baseGross) = heads[i];
+            items.Add(new OpenItem(companyId, TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice, LedgerSign.Debit, request.DocumentNumber, request.DocumentDate,
+                customer.DueDateFor(request.DocumentDate), request.Currency, 1m, gross, baseGross) { JournalEntryId = posted.Value[i].JournalId, Narrative = request.Narrative });
+        }
+
+        _db.OpenItems.AddRange(items);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return items.Select((item, i) => new TradingPostingResult(item.Id, posted.Value[i].JournalNumber, heads[i].BaseGross)).ToList();
+    }
+
+    /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PostDebitNoteAsync(SalesInvoiceRequest request, string originalInvoiceNumber, CancellationToken ct = default)
         => _db.AtomicAsync<TradingPostingResult>(async () =>
         {

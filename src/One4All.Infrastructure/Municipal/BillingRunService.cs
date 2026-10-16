@@ -392,6 +392,7 @@ public sealed class BillingRunService : IBillingRunService
         int chunkSize = Math.Clamp(options.ChunkSize, 1, 5_000);
         _db.ChangeTracker.Clear(); // the run and lines loaded to approve it would otherwise shadow what the bills' own units of work record
         var header = await _db.Set<BillingRun>().AsNoTracking().Where(r => r.Id == runId).Select(r => new { r.RunNumber, r.BillDate }).SingleAsync(ct).ConfigureAwait(false);
+        Core.System.Company council = await _db.Companies.AsNoTracking().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         int total = await _db.Set<BillingRunLine>().CountAsync(l => l.BillingRunId == runId && l.Included, ct).ConfigureAwait(false);
         int handled = 0;
         while (options.MaxBills is not int cap || handled < cap)
@@ -432,7 +433,45 @@ public sealed class BillingRunService : IBillingRunService
             {
                 await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction transaction = await _db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
                 List<(BillingRunLine Line, Result<TradingPostingResult>? Posted)> outcomes = [];
-                foreach (BillingRunLine line in batch)
+
+                // First the whole batch as one posting (the ledger's batch path reads the shared data once and saves once); when a bill in it
+                // cannot post that way or fails, the batch is rolled back and the bills post one by one, so the bad bill fails alone.
+                List<BillingRunLine> fresh = [.. batch.Where(l => !existing.ContainsKey(l.InvoiceNumber))];
+                bool batched = false;
+                if (fresh.Count > 1)
+                {
+                    await transaction.CreateSavepointAsync("batch", ct).ConfigureAwait(false);
+                    Result<IReadOnlyList<TradingPostingResult>> bulk;
+                    try
+                    {
+                        bulk = await MunicipalCharges.PostManyAsync(_ar, council, header.BillDate,
+                            [.. fresh.Select(l => (l.RatepayerCustomerId, l.InvoiceNumber, l.Charge, l.RevenueAccountCode, l.Narrative))], ct).ConfigureAwait(false);
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        bulk = Error.Failure("Mun.PostFailed", ex.InnerException?.Message ?? ex.Message);
+                    }
+
+                    if (bulk.IsSuccess)
+                    {
+                        for (int i = 0; i < fresh.Count; i++)
+                        {
+                            outcomes.Add((fresh[i], bulk.Value[i]));
+                        }
+
+                        outcomes.AddRange(batch.Where(l => existing.ContainsKey(l.InvoiceNumber)).Select(l => (l, (Result<TradingPostingResult>?)null)));
+                        batched = true;
+                    }
+                    else
+                    {
+                        await transaction.RollbackToSavepointAsync("batch", ct).ConfigureAwait(false);
+                        _db.ChainHeads = null;
+                    }
+
+                    _db.ChangeTracker.Clear();
+                }
+
+                foreach (BillingRunLine line in batched ? Array.Empty<BillingRunLine>() : batch)
                 {
                     Result<TradingPostingResult>? posted = null;
                     if (!existing.ContainsKey(line.InvoiceNumber))

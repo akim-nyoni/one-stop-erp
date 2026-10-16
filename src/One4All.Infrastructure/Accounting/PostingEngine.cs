@@ -106,6 +106,79 @@ public sealed class PostingEngine : IPostingEngine
 
         (FiscalYear fiscalYear, FiscalPeriod fiscalPeriod) = periodResult.Value;
 
+        Result<(JournalEntry Journal, decimal TotalBaseDebit)> built = await BuildJournalAsync(request, company, idempotencyKey, ct).ConfigureAwait(false);
+        if (built.IsFailure)
+        {
+            return built.Error;
+        }
+
+        (JournalEntry journal, decimal totalBaseDebit) = built.Value;
+
+        // A bank account reconciled and signed off to a date takes no more entries on or before it.
+        List<string> lineAccounts = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
+        string? lockedBank = await _db.Set<Core.Banking.BankAccount>()
+            .Where(b => b.CompanyId == request.CompanyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= request.PostingDate)
+            .Select(b => b.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (lockedBank is not null)
+        {
+            return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} is reconciled past {request.PostingDate:yyyy-MM-dd}; post the entry in an open period.");
+        }
+
+        // Fund control: no expenditure against a vote without an appropriation.
+        if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, ct).ConfigureAwait(false) is { } unappropriated)
+        {
+            JournalLine refused = journal.Lines.First(l => l.AccountCode == unappropriated.Account && l.BaseDebit > 0m);
+            BudgetControlEvent decision = new(request.CompanyId, BudgetControlOutcome.Blocked, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit,
+                $"{request.DocumentType} {request.DocumentNumber}".Trim());
+            bool overridden = !string.IsNullOrWhiteSpace(request.BudgetOverrideReason) && request.BudgetOverrideAuthorisedByUserId is long by && by != request.SubmittedByUserId;
+            if (!overridden)
+            {
+                await RecordBlockAsync(decision, ct).ConfigureAwait(false);
+                return unappropriated.Error;
+            }
+
+            BudgetControlEvent overrideEvent = new(request.CompanyId, BudgetControlOutcome.Overridden, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit, decision.Document)
+            {
+                Reason = request.BudgetOverrideReason!.Trim(), AuthorisedByUserId = request.BudgetOverrideAuthorisedByUserId,
+            };
+            _db.Set<BudgetControlEvent>().Add(overrideEvent);
+        }
+
+        // Allocate the gapless journal number (increment persists in this transaction).
+        string journalNumber = await AllocateJournalNumberAsync(request.CompanyId, request.PostingDate.Year, ct).ConfigureAwait(false);
+
+        DateTimeOffset entryDate = DateTimeOffset.UtcNow;
+        bool held = request.Deferred || request.SubmittedByUserId is not null;
+        if (held)
+        {
+            journal.MarkDeferred(journalNumber, fiscalYear.Id, fiscalPeriod.Id, entryDate);
+            if (request.SubmittedByUserId is long preparer)
+            {
+                journal.HoldForApproval(preparer);
+            }
+        }
+        else
+        {
+            journal.MarkPosted(journalNumber, fiscalYear.Id, fiscalPeriod.Id, entryDate);
+            await UpdatePeriodBalancesAsync(request.CompanyId, fiscalYear.Id, fiscalPeriod.Id, journal, ct).ConfigureAwait(false);
+        }
+
+        _db.Journals.Add(journal);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (!held)
+        {
+            await Security.SemanticAudit.RecordAsync(_audit, _caller, request.CompanyId, journal.SourceModule, "JournalEntry", journalNumber, Core.Audit.AuditAction.Post,
+                $"{request.DocumentType} {request.DocumentNumber} {totalBaseDebit:0.00}".Trim(), ct: ct).ConfigureAwait(false);
+        }
+
+        return new PostingReceipt(journal.Id, journalNumber, request.PostingDate, totalBaseDebit, held);
+    }
+
+    // The journal built from a request and checked: its lines against the accounts, the balance in base and per currency, the funds, the reporting
+    // amounts and the maker-checker threshold. Shared by the single and the batch paths.
+    private async Task<Result<(JournalEntry Journal, decimal TotalBaseDebit)>> BuildJournalAsync(JournalRequest request, Company company, string? idempotencyKey, CancellationToken ct)
+    {
+        CurrencyCode baseCurrency = company.BaseCurrency;
         // Build and validate the lines.
         JournalEntry journal = new(request.CompanyId, request.SourceModule, request.PostingDate, baseCurrency, request.TransactionCurrency)
         {
@@ -193,64 +266,155 @@ public sealed class PostingEngine : IPostingEngine
                 $"Manual journals over {threshold:0.00} {baseCurrency} need a second user's approval: submit the journal for approval.");
         }
 
-        // A bank account reconciled and signed off to a date takes no more entries on or before it.
-        List<string> lineAccounts = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
+        return (journal, totalBaseDebit);
+    }
+
+    /// <inheritdoc />
+    public Task<Result<IReadOnlyList<PostingReceipt>>> PostBatchAsync(IReadOnlyList<JournalRequest> requests, CancellationToken ct = default)
+        => _licence?.CanPost() is { IsFailure: true } refused ? Task.FromResult<Result<IReadOnlyList<PostingReceipt>>>(refused.Error) : _db.AtomicAsync(() => PostBatchCoreAsync(requests, ct), ct);
+
+    // Several journals as one unit of work: the company, the periods and the accounts are read once, the journal counter is locked once and
+    // allocates every number, the period balances the batch touches are read in one query and updated in memory, and one save writes the lot
+    // (one audit chain extension). What needs the single path's per-journal checks is refused, and the caller posts those one by one.
+    private async Task<Result<IReadOnlyList<PostingReceipt>>> PostBatchCoreAsync(IReadOnlyList<JournalRequest> requests, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(requests);
+        if (requests.Count == 0)
+        {
+            return Array.Empty<PostingReceipt>();
+        }
+
+        long companyId = requests[0].CompanyId;
+        foreach (JournalRequest request in requests)
+        {
+            if (request.CompanyId != companyId || request.Lines.Count == 0 || request.Deferred || request.SubmittedByUserId is not null || request.EnforceManualJournalRules
+                || request.ToAdjustmentPeriod || !string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.BudgetOverrideReason is not null)
+            {
+                return Error.Rule("Posting.BatchUnsupported", "A deferred, submitted, manual, adjustment-period, keyed or budget-overridden journal posts on its own.");
+            }
+        }
+
+        Company? company = await _db.Companies.FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Error.NotFound("Posting.CompanyNotFound", $"Company {companyId} not found.");
+        }
+
+        if (company.FundControlEnabled)
+        {
+            return Error.Rule("Posting.BatchUnsupported", "Fund control checks each journal's appropriation on its own.");
+        }
+
+        CurrencyCode baseCurrency = company.BaseCurrency;
+        if (requests.Any(r => r.TransactionCurrency != baseCurrency || r.Lines.Any(l => l.Currency is CurrencyCode lineCurrency && lineCurrency != baseCurrency))
+            && Licensing.LicenceFeatureGate.Check(_licence, One4All.Licensing.Core.LicenceFeatures.MultiCurrency, "Posting in a foreign currency") is { IsFailure: true } foreign)
+        {
+            return foreign.Error;
+        }
+
+        // Back-dating is checked once per person for the oldest date they post.
+        if (company.BackDateAllowanceDays is int allowance)
+        {
+            DateOnly today = DateOnly.FromDateTime((_clock?.UtcNow ?? DateTimeOffset.UtcNow).UtcDateTime);
+            foreach (IGrouping<long, JournalRequest> byActor in requests.Where(r => (r.PostedByUserId ?? r.SubmittedByUserId) is not null).GroupBy(r => (r.PostedByUserId ?? r.SubmittedByUserId)!.Value))
+            {
+                DateOnly oldest = byActor.Min(r => r.PostingDate);
+                if (oldest < today.AddDays(-allowance)
+                    && (_permissions is null || !(await _permissions.ResolveAsync(byActor.Key, ct).ConfigureAwait(false)).Has("GeneralLedger.Journal", Core.Security.OperationFlags.BackDate)))
+                {
+                    return Error.Forbidden("Posting.BackDateNotAllowed",
+                        $"{oldest:yyyy-MM-dd} is more than {allowance} day(s) back: only a user with the back-date permission may post it.");
+                }
+            }
+        }
+
+        // One period per module and date.
+        Dictionary<(string Module, DateOnly Date), (FiscalYear Year, FiscalPeriod Period)> periods = [];
+        foreach (JournalRequest request in requests)
+        {
+            if (periods.ContainsKey((request.SourceModule, request.PostingDate)))
+            {
+                continue;
+            }
+
+            Result<(FiscalYear year, FiscalPeriod period)> periodResult = await ResolvePeriodAsync(request.CompanyId, request.SourceModule, request.PostingDate, company.AllowFuturePeriodPosting, ct,
+                false, request.PostedByUserId ?? request.SubmittedByUserId).ConfigureAwait(false);
+            if (periodResult.IsFailure)
+            {
+                return periodResult.Error;
+            }
+
+            periods[(request.SourceModule, request.PostingDate)] = periodResult.Value;
+        }
+
+        List<(JournalRequest Request, JournalEntry Journal, decimal TotalBaseDebit)> built = [];
+        foreach (JournalRequest request in requests)
+        {
+            Result<(JournalEntry Journal, decimal TotalBaseDebit)> journal = await BuildJournalAsync(request, company, null, ct).ConfigureAwait(false);
+            if (journal.IsFailure)
+            {
+                return journal.Error;
+            }
+
+            built.Add((request, journal.Value.Journal, journal.Value.TotalBaseDebit));
+        }
+
+        // A bank account reconciled and signed off to a date takes no more entries on or before it: one check for the batch's accounts and dates.
+        List<string> lineAccounts = [.. built.SelectMany(b => b.Journal.Lines.Select(l => l.AccountCode)).Distinct()];
+        DateOnly earliest = requests.Min(r => r.PostingDate);
         string? lockedBank = await _db.Set<Core.Banking.BankAccount>()
-            .Where(b => b.CompanyId == request.CompanyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= request.PostingDate)
+            .Where(b => b.CompanyId == companyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= earliest)
             .Select(b => b.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (lockedBank is not null)
         {
-            return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} is reconciled past {request.PostingDate:yyyy-MM-dd}; post the entry in an open period.");
+            return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} is reconciled past {earliest:yyyy-MM-dd}; post the entries in an open period.");
         }
 
-        // Fund control: no expenditure against a vote without an appropriation.
-        if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, ct).ConfigureAwait(false) is { } unappropriated)
+        // The period balances the batch touches, read once; the rest are made.
+        List<long> periodIds = [.. periods.Values.Select(v => v.Period.Id).Distinct()];
+        foreach (GlPeriodBalance tracked in _db.PeriodBalances.Local.Where(b => b.CompanyId == companyId && periodIds.Contains(b.FiscalPeriodId)).ToList())
         {
-            JournalLine refused = journal.Lines.First(l => l.AccountCode == unappropriated.Account && l.BaseDebit > 0m);
-            BudgetControlEvent decision = new(request.CompanyId, BudgetControlOutcome.Blocked, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit,
-                $"{request.DocumentType} {request.DocumentNumber}".Trim());
-            bool overridden = !string.IsNullOrWhiteSpace(request.BudgetOverrideReason) && request.BudgetOverrideAuthorisedByUserId is long by && by != request.SubmittedByUserId;
-            if (!overridden)
-            {
-                await RecordBlockAsync(decision, ct).ConfigureAwait(false);
-                return unappropriated.Error;
-            }
-
-            BudgetControlEvent overrideEvent = new(request.CompanyId, BudgetControlOutcome.Overridden, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit, decision.Document)
-            {
-                Reason = request.BudgetOverrideReason!.Trim(), AuthorisedByUserId = request.BudgetOverrideAuthorisedByUserId,
-            };
-            _db.Set<BudgetControlEvent>().Add(overrideEvent);
+            ForgetIfUnchanged(tracked);
         }
 
-        // Allocate the gapless journal number (increment persists in this transaction).
-        string journalNumber = await AllocateJournalNumberAsync(request.CompanyId, request.PostingDate.Year, ct).ConfigureAwait(false);
+        Dictionary<(long Period, string Account, string CostCentre, string Department), GlPeriodBalance> balances = (await _db.PeriodBalances
+                .Where(b => b.CompanyId == companyId && periodIds.Contains(b.FiscalPeriodId) && lineAccounts.Contains(b.AccountCode)).ToListAsync(ct).ConfigureAwait(false))
+            .ToDictionary(b => (b.FiscalPeriodId, b.AccountCode, b.CostCentre, b.Department));
 
+        NumberSequence sequence = await JournalSequenceAsync(companyId, ct).ConfigureAwait(false);
         DateTimeOffset entryDate = DateTimeOffset.UtcNow;
-        bool held = request.Deferred || request.SubmittedByUserId is not null;
-        if (held)
+        List<PostingReceipt> receipts = [];
+        foreach ((JournalRequest request, JournalEntry journal, decimal totalBaseDebit) in built)
         {
-            journal.MarkDeferred(journalNumber, fiscalYear.Id, fiscalPeriod.Id, entryDate);
-            if (request.SubmittedByUserId is long preparer)
+            (FiscalYear year, FiscalPeriod period) = periods[(request.SourceModule, request.PostingDate)];
+            string journalNumber = sequence.Allocate(request.PostingDate.Year);
+            journal.MarkPosted(journalNumber, year.Id, period.Id, entryDate);
+            foreach (JournalLine line in journal.Lines)
             {
-                journal.HoldForApproval(preparer);
+                AccountKey key = line.Key;
+                if (!balances.TryGetValue((period.Id, key.AccountCode, key.CostCentre, key.Department), out GlPeriodBalance? balance))
+                {
+                    balance = new GlPeriodBalance(companyId, year.Id, period.Id, key);
+                    _db.PeriodBalances.Add(balance);
+                    balances[(period.Id, key.AccountCode, key.CostCentre, key.Department)] = balance;
+                }
+
+                balance.AddMovement(line.BaseDebit, line.BaseCredit, line.ReportingDebit, line.ReportingCredit);
             }
-        }
-        else
-        {
-            journal.MarkPosted(journalNumber, fiscalYear.Id, fiscalPeriod.Id, entryDate);
-            await UpdatePeriodBalancesAsync(request.CompanyId, fiscalYear.Id, fiscalPeriod.Id, journal, ct).ConfigureAwait(false);
+
+            _db.Journals.Add(journal);
+            receipts.Add(new PostingReceipt(0, journalNumber, request.PostingDate, totalBaseDebit, false));
         }
 
-        _db.Journals.Add(journal);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        if (!held)
+        for (int i = 0; i < receipts.Count; i++)
         {
-            await Security.SemanticAudit.RecordAsync(_audit, _caller, request.CompanyId, journal.SourceModule, "JournalEntry", journalNumber, Core.Audit.AuditAction.Post,
-                $"{request.DocumentType} {request.DocumentNumber} {totalBaseDebit:0.00}".Trim(), ct: ct).ConfigureAwait(false);
+            receipts[i] = receipts[i] with { JournalId = built[i].Journal.Id };
         }
 
-        return new PostingReceipt(journal.Id, journalNumber, request.PostingDate, totalBaseDebit, held);
+        await Security.SemanticAudit.RecordAsync(_audit, _caller, companyId, requests[0].SourceModule, "JournalEntry", $"{receipts[0].JournalNumber}..{receipts[^1].JournalNumber}", Core.Audit.AuditAction.Post,
+            $"{receipts.Count} journals {requests[0].DocumentType} {built.Sum(b => b.TotalBaseDebit):0.00}".Trim(), ct: ct).ConfigureAwait(false);
+        return receipts;
     }
 
     /// <inheritdoc />
@@ -741,6 +905,10 @@ public sealed class PostingEngine : IPostingEngine
     }
 
     private async Task<string> AllocateJournalNumberAsync(long companyId, int year, CancellationToken ct)
+        => (await JournalSequenceAsync(companyId, ct).ConfigureAwait(false)).Allocate(year);
+
+    // The company's journal counter, locked for the rest of the unit of work and read afresh.
+    private async Task<NumberSequence> JournalSequenceAsync(long companyId, CancellationToken ct)
     {
         // Inside a unit of work the company's journal counter is locked until it commits, so postings made at the same moment (a billing run
         // posting several bills at once, two cashiers) queue for the next number instead of colliding and retrying.
@@ -761,7 +929,7 @@ public sealed class PostingEngine : IPostingEngine
             _db.NumberSequences.Add(sequence);
         }
 
-        return sequence.Allocate(year);
+        return sequence;
     }
 
     /// <summary>

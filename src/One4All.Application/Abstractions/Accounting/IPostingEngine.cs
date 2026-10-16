@@ -47,6 +47,18 @@ public interface IPostingEngine
     /// <param name="reason">The mandatory reason.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reversal journal's receipt, or an error.</returns>
+    /// <summary>
+    /// Posts several journals as one all-or-nothing batch (a billing run's bills): the company, periods and accounts are read once, the journal
+    /// numbers are allocated under one lock, period balances are updated once per account and one save writes the lot. Refused with
+    /// <c>Posting.BatchUnsupported</c> when a journal needs the single path's own checks (deferred, submitted, manual, adjustment period, keyed,
+    /// budget override, fund control) — the caller then posts one by one.
+    /// </summary>
+    /// <param name="requests">The journals, all of one company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A receipt per journal, in order.</returns>
+    Task<Result<IReadOnlyList<PostingReceipt>>> PostBatchAsync(IReadOnlyList<JournalRequest> requests, CancellationToken ct = default)
+        => Task.FromResult(Result<IReadOnlyList<PostingReceipt>>.Failure(Error.Rule("Posting.BatchUnsupported", "This posting engine posts one journal at a time.")));
+
     Task<Result<PostingReceipt>> ReverseAsync(long companyId, long journalId, DateOnly date, string reason, CancellationToken ct = default);
 
     /// <summary>

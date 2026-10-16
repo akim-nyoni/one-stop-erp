@@ -35,6 +35,17 @@ public interface ISalesLedgerService
     Task<Result<TradingPostingResult>> PostInvoiceAsync(SalesInvoiceRequest request, CancellationToken ct = default);
 
     /// <summary>
+    /// Posts several sales invoices as one all-or-nothing batch (a billing run): customers, certificates and the control account are read once
+    /// and the journals post through the engine's batch path. Refused with <c>Ar.BatchUnsupported</c> when an invoice needs the single path (a
+    /// credit-limit policy, a foreign currency, a delivery-date tax point) — the caller then posts one by one. Per-invoice webhooks are not raised.
+    /// </summary>
+    /// <param name="requests">The invoices, all of one company.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>A result per invoice, in order.</returns>
+    Task<Result<IReadOnlyList<TradingPostingResult>>> PostInvoicesAsync(IReadOnlyList<SalesInvoiceRequest> requests, CancellationToken ct = default)
+        => Task.FromResult(Result<IReadOnlyList<TradingPostingResult>>.Failure(Error.Rule("Ar.BatchUnsupported", "This ledger posts one invoice at a time.")));
+
+    /// <summary>
     /// Posts a debit note to a customer (brief §4.4): a further charge against an invoice already raised — an undercharge, a price adjustment,
     /// a re-delivery — posted like an invoice and kept as a debit-note open item referring to the original.
     /// </summary>
