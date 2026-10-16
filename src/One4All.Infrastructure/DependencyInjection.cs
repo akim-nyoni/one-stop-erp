@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddSingleton(new FieldEncryptionStatus(keys.ActiveKeyId!, developmentKey));
         services.AddScoped<IFieldEncryptionService, FieldEncryptionService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, ReencryptFieldsTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Persistence.LinePartitionsTask>();
 
         // Cross-cutting.
         services.AddSingleton<IClock, SystemClock>();

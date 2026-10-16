@@ -709,6 +709,12 @@ public class One4AllDbContext : DbContext
     public DbSet<Core.Receipting.StationeryBook> StationeryBooks => Set<Core.Receipting.StationeryBook>();
 
     /// <inheritdoc />
+    /// <summary>The entities stored in partitioned tables (by year), which carry no xmin row version.</summary>
+    public static readonly IReadOnlySet<Type> PartitionedEntityTypes = new HashSet<Type>
+    {
+        typeof(Core.Audit.ChangeLogEntry), typeof(Core.Municipal.MeterReading), typeof(Core.Accounting.JournalLine), typeof(Core.Pos.SaleLine), typeof(Core.Payroll.PayslipLine),
+    };
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -716,8 +722,8 @@ public class One4AllDbContext : DbContext
         // Map the xmin system column as the concurrency token for every entity deriving from Entity.
         foreach (Microsoft.EntityFrameworkCore.Metadata.IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes())
         {
-            // Not the partitioned tables (the audit log and meter readings): PostgreSQL cannot return xmin from an insert into a partitioned table.
-            if (typeof(Entity).IsAssignableFrom(entityType.ClrType) && entityType.ClrType != typeof(Core.Audit.ChangeLogEntry) && entityType.ClrType != typeof(Core.Municipal.MeterReading))
+            // Not the partitioned tables (the audit log, meter readings and the journal, sale and payslip lines): PostgreSQL cannot return xmin from an insert into a partitioned table.
+            if (typeof(Entity).IsAssignableFrom(entityType.ClrType) && !PartitionedEntityTypes.Contains(entityType.ClrType))
             {
                 modelBuilder.Entity(entityType.ClrType)
                     .Property<uint>(nameof(Entity.RowVersion))
@@ -730,8 +736,10 @@ public class One4AllDbContext : DbContext
 
         // Entity type configurations (IEntityTypeConfiguration<T>) are discovered here as modules land.
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(One4AllDbContext).Assembly);
-        modelBuilder.Entity<Core.Audit.ChangeLogEntry>().Ignore(e => e.RowVersion);
-        modelBuilder.Entity<Core.Municipal.MeterReading>().Ignore(e => e.RowVersion);
+        foreach (Type partitioned in PartitionedEntityTypes)
+        {
+            modelBuilder.Entity(partitioned).Ignore(nameof(Entity.RowVersion));
+        }
 
         // Every company-scoped root entity: CompanyScope == null || CompanyId == CompanyScope, read from this context at query time.
         System.Linq.Expressions.MemberExpression scope = System.Linq.Expressions.Expression.Property(System.Linq.Expressions.Expression.Constant(this), nameof(CompanyScope));

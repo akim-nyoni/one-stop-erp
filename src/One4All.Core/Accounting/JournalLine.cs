@@ -43,6 +43,21 @@ public sealed class JournalLine : Entity
     /// <summary>The owning journal id.</summary>
     public long JournalEntryId { get; private set; }
 
+    /// <summary>The company, as on the journal: the line table is partitioned by year and read by company without a join.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>The posting date, as on the journal: the partition key of the line table.</summary>
+    public DateOnly PostingDate { get; private set; }
+
+    /// <summary>Stamps the journal's company and posting date on the line (called by the journal when the line is added).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="postingDate">The posting date.</param>
+    internal void Stamp(long companyId, DateOnly postingDate)
+    {
+        CompanyId = companyId;
+        PostingDate = postingDate;
+    }
+
     /// <summary>The base nominal account code.</summary>
     public string AccountCode { get; private set; }
 

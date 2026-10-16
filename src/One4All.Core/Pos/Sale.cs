@@ -99,7 +99,12 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
 
     /// <summary>Adds a sale line.</summary>
     /// <param name="line">The line.</param>
-    public void AddLine(SaleLine line) => _lines.Add(line);
+    public void AddLine(SaleLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        line.Stamp(CompanyId, SaleDate);
+        _lines.Add(line);
+    }
 
     /// <summary>Adds a tender.</summary>
     /// <param name="tender">The tender.</param>
@@ -178,6 +183,21 @@ public sealed class SaleLine : Entity
     {
         Description = string.Empty;
         RevenueAccountCode = string.Empty;
+    }
+
+    /// <summary>The company, as on the sale: the line table is partitioned by year and read by company without a join.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>The sale date, as on the sale: the partition key of the line table.</summary>
+    public DateOnly SaleDate { get; private set; }
+
+    /// <summary>Stamps the sale's company and date on the line (called by the sale when the line is added).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="saleDate">The sale date.</param>
+    internal void Stamp(long companyId, DateOnly saleDate)
+    {
+        CompanyId = companyId;
+        SaleDate = saleDate;
     }
 
     /// <summary>Creates a sale line.</summary>

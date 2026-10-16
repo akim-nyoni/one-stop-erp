@@ -141,7 +141,12 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
 
     /// <summary>Adds a posting line.</summary>
     /// <param name="line">The line to add.</param>
-    public void AddLine(JournalLine line) => _lines.Add(line);
+    public void AddLine(JournalLine line)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        line.Stamp(CompanyId, PostingDate);
+        _lines.Add(line);
+    }
 
     /// <summary>Marks the journal posted, stamping its number, period and status. Called only by the posting engine.</summary>
     /// <param name="journalNumber">The gapless journal number.</param>

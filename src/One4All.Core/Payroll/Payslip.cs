@@ -90,7 +90,9 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
     /// <param name="workings">How the amount was worked out at the time (brief §4.15.7: a full trace per employee per element).</param>
     public void AddLine(string elementCode, string description, PayElementType type, decimal amount, bool taxable, string? workings = null)
     {
-        _lines.Add(new PayslipLine(elementCode, description, type, amount, taxable) { Workings = workings is null ? null : workings.Length > 1000 ? workings[..1000] : workings });
+        PayslipLine line = new(elementCode, description, type, amount, taxable) { Workings = workings is null ? null : workings.Length > 1000 ? workings[..1000] : workings };
+        line.Stamp(CompanyId, PayDate);
+        _lines.Add(line);
         switch (type)
         {
             case PayElementType.Earning:
@@ -132,6 +134,21 @@ public sealed class PayslipLine : Entity
 
     /// <summary>The owning payslip id.</summary>
     public long PayslipId { get; private set; }
+
+    /// <summary>The company, as on the payslip: the line table is partitioned by year and read by company without a join.</summary>
+    public long CompanyId { get; private set; }
+
+    /// <summary>The pay date, as on the payslip: the partition key of the line table.</summary>
+    public DateOnly PayDate { get; private set; }
+
+    /// <summary>Stamps the payslip's company and pay date on the line (called by the payslip when the line is added).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="payDate">The pay date.</param>
+    internal void Stamp(long companyId, DateOnly payDate)
+    {
+        CompanyId = companyId;
+        PayDate = payDate;
+    }
 
     /// <summary>Gets how the amount was worked out when the run was calculated: the basis, the values it used and any limits applied.</summary>
     public string? Workings { get; init; }

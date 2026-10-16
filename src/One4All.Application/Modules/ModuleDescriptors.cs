@@ -58,7 +58,7 @@ public static class BuiltInModules
     /// <summary>Gets every built-in module.</summary>
     public static IReadOnlyList<IModuleDescriptor> All { get; } =
     [
-        new ModuleDescriptor("System", "System Manager", LicenceModules.Core, "⚙", "#455A64", ["system", "offline"], ["system.backup", "messages.despatch", "security.reencrypt-fields", "system.idempotency-purge", "workflow.escalate"],
+        new ModuleDescriptor("System", "System Manager", LicenceModules.Core, "⚙", "#455A64", ["system", "offline"], ["system.backup", "messages.despatch", "security.reencrypt-fields", "system.idempotency-purge", "workflow.escalate", "system.partitions"],
             ["System Manager", "Approvals", "Documents"]),
         new ModuleDescriptor("Security", "Users & Security", LicenceModules.Core, "\U0001F510", "#546E7A", ["audit"], [], []),
         new ModuleDescriptor("GeneralLedger", "General Ledger", LicenceModules.GeneralLedger, "\U0001F4D8", "#1565C0", ["gl", "accounting", "interco", "consolidation"], ["tax.certificate-expiry", "gl.recurring-journals"], ["General Ledger"]),
