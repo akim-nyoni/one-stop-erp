@@ -154,7 +154,13 @@ public sealed class ReceiptingService : IReceiptingService
         }
 
         CashierStation station = await _db.Set<CashierStation>().FirstAsync(s => s.Id == session.StationId, ct).ConfigureAwait(false);
-        string receiptNumber = await NextReceiptNumberAsync(request.CompanyId, station, ct).ConfigureAwait(false);
+        Result<string> number = await NextReceiptNumberAsync(request.CompanyId, station, ct).ConfigureAwait(false);
+        if (number.IsFailure)
+        {
+            return number.Error;
+        }
+
+        string receiptNumber = number.Value;
         CurrencyCode currency = request.Currency ?? company.BaseCurrency;
 
         // A pending receipt (a claimed bank transfer/cheque) posts to the uncleared-effects control until the
@@ -1001,9 +1007,11 @@ public sealed class ReceiptingService : IReceiptingService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    private async Task<string> NextReceiptNumberAsync(long companyId, CashierStation station, CancellationToken ct)
+    // Gapless per station; a field collector's handheld numbers from its issued range and stops at the range's end (brief §RCP-8).
+    private async Task<Result<string>> NextReceiptNumberAsync(long companyId, CashierStation station, CancellationToken ct)
     {
         int count = await _db.Set<Receipt>().CountAsync(r => r.CompanyId == companyId && r.StationId == station.Id, ct).ConfigureAwait(false);
-        return $"{station.ReceiptPrefix}-{count + 1:D6}";
+        return station.ReceiptNumber(count + 1) is string number ? number
+            : Error.Rule("Rcp.RangeExhausted", $"Station {station.Code} has used its receipt range {station.ReceiptRangeFrom}–{station.ReceiptRangeTo}; issue the collector a new range.");
     }
 }

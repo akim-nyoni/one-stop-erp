@@ -13,6 +13,7 @@ internal sealed class CashierStationConfiguration : IEntityTypeConfiguration<Cas
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.ReceiptPrefix).HasMaxLength(10);
+        b.Property(x => x.RouteCode).HasMaxLength(30);
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(One4AllDbContext.SoftDeleteFilter, x => !x.IsDeleted);
     }

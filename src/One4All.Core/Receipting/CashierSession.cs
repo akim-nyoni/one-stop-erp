@@ -42,6 +42,27 @@ public sealed class CashierStation : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Whether the station is active.</summary>
     public bool IsActive { get; set; }
+
+    /// <summary>Gets or sets a value indicating whether the station is a field collector's handheld (rent, market stalls, parking…) rather than a counter (brief §RCP-8).</summary>
+    public bool IsFieldCollector { get; set; }
+
+    /// <summary>Gets or sets the route the collector works (for the route performance report).</summary>
+    public string? RouteCode { get; set; }
+
+    /// <summary>Gets or sets the first number of the pre-numbered receipt range issued to the collector (null: numbered from 1 without a cap).</summary>
+    public int? ReceiptRangeFrom { get; set; }
+
+    /// <summary>Gets or sets the last number of the range; a receipt past it is refused until a new range is issued.</summary>
+    public int? ReceiptRangeTo { get; set; }
+
+    /// <summary>The receipt number for the n-th receipt (1-based) at this station, or null when the range is used up.</summary>
+    /// <param name="ordinal">How many receipts the station has issued, plus one.</param>
+    /// <returns>The number, or null.</returns>
+    public string? ReceiptNumber(int ordinal)
+    {
+        int number = (ReceiptRangeFrom ?? 1) + ordinal - 1;
+        return ReceiptRangeTo is int last && number > last ? null : $"{ReceiptPrefix}-{number:D6}";
+    }
 }
 
 /// <summary>The lifecycle of a cashier session (brief §RCP-3 lifecycle).</summary>

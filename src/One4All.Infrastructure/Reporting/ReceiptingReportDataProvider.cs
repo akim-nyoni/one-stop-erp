@@ -66,6 +66,8 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC44" => await DormantAccountsAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC45" => await AgentReconciliationAsync(companyId, ct).ConfigureAwait(false),
             "RC46" => await AgentAgeingAsync(companyId, ct).ConfigureAwait(false),
+            "RC47" => await FieldCollectorReconciliationAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC48" => await RoutePerformanceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC19" => await AllocationOverridesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC49" => await CollectionEfficiencyAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC51" => await CollectionTrendAsync(companyId, parameters, ct).ConfigureAwait(false),
@@ -90,6 +92,40 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             ["Reason"] = $"{r.AllocationOverride}: {r.AllocationOverrideReason}",
             ["Amount"] = r.Lines.Where(l => l.Type == ReceiptLineType.DebtorPayment).Sum(l => l.Amount),
         }))];
+    }
+
+    // RC47: each field collector's day — receipts issued, their value, and the cash-up variance of the session (0 while it is still open).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FieldCollectorReconciliationAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        DateOnly date = ReportParameters.Date(parameters, "Date");
+        List<CashierStation> collectors = await _db.CashierStations.AsNoTracking().Where(s => s.CompanyId == companyId && s.IsFieldCollector).OrderBy(s => s.Code).ToListAsync(ct).ConfigureAwait(false);
+        List<long> ids = [.. collectors.Select(c => c.Id)];
+        List<CashierSession> sessions = await _db.CashierSessions.AsNoTracking().Where(s => s.CompanyId == companyId && ids.Contains(s.StationId) && s.OpenedOn == date).ToListAsync(ct).ConfigureAwait(false);
+        List<Receipt> receipts = (await CommittedReceiptsAsync(companyId, date, date, ct).ConfigureAwait(false)).Where(r => ids.Contains(r.StationId)).ToList();
+        return [.. collectors.Select(c =>
+        {
+            List<Receipt> issued = [.. receipts.Where(r => r.StationId == c.Id)];
+            List<CashierSession> theirs = [.. sessions.Where(s => s.StationId == c.Id)];
+            string state = theirs.Count == 0 ? "no session" : theirs.All(s => s.ClosedOn != null) ? "returned" : "out";
+            return Row(new()
+            {
+                ["Collector"] = $"{c.Code} — {c.Name}" + (c.RouteCode is null ? string.Empty : $" ({c.RouteCode})") + $" · {state}",
+                ["Receipts"] = issued.Count,
+                ["Value"] = issued.Sum(r => r.TenderTotal),
+                ["Variance"] = theirs.Sum(s => s.CashUpVarianceBase),
+            });
+        })];
+    }
+
+    // RC48: collections by route over the period (receipts of the field collectors assigned to each route).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RoutePerformanceAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        Dictionary<long, string> routes = await _db.CashierStations.AsNoTracking().Where(s => s.CompanyId == companyId && s.IsFieldCollector)
+            .ToDictionaryAsync(s => s.Id, s => s.RouteCode ?? "(no route)", ct).ConfigureAwait(false);
+        List<Receipt> receipts = (await CommittedReceiptsAsync(companyId, from, to, ct).ConfigureAwait(false)).Where(r => routes.ContainsKey(r.StationId)).ToList();
+        return [.. receipts.GroupBy(r => routes[r.StationId]).OrderByDescending(g => g.Sum(r => r.TenderTotal))
+            .Select(g => Row(new() { ["Route"] = g.Key, ["Collections"] = g.Count(), ["Amount"] = g.Sum(r => r.TenderTotal) }))];
     }
 
     private async Task<List<Receipt>> CommittedReceiptsAsync(long companyId, DateOnly from, DateOnly to, CancellationToken ct) =>

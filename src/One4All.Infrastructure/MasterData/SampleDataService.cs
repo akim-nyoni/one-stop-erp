@@ -119,7 +119,8 @@ public sealed class SampleDataService : ISampleDataService
         if (!await _db.CashierStations.AnyAsync(s => s.CompanyId == companyId, ct).ConfigureAwait(false))
         {
             _db.CashierStations.Add(new CashierStation(companyId, "CASH1", "Counter 1", "RC"));
-            loaded.Add("1 cashier station (CASH1)");
+            _db.CashierStations.Add(new CashierStation(companyId, "FLD1", "Field collector — markets", "FC") { IsFieldCollector = true, RouteCode = "R-NORTH", ReceiptRangeFrom = 1, ReceiptRangeTo = 500 });
+            loaded.Add("1 cashier station (CASH1), 1 field collector (FLD1, route R-NORTH, receipts 1–500)");
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

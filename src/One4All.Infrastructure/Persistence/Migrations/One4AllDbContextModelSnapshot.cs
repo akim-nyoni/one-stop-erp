@@ -25251,6 +25251,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsFieldCollector")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_field_collector");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -25270,6 +25274,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("receipt_prefix");
+
+                    b.Property<int?>("ReceiptRangeFrom")
+                        .HasColumnType("integer")
+                        .HasColumnName("receipt_range_from");
+
+                    b.Property<int?>("ReceiptRangeTo")
+                        .HasColumnType("integer")
+                        .HasColumnName("receipt_range_to");
+
+                    b.Property<string>("RouteCode")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("route_code");
 
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()

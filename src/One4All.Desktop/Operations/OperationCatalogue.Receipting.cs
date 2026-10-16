@@ -92,6 +92,45 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Cashier stations and field collectors", ListTitle = "Stations and collectors",
+            Description = "A counter (station) cashiers open their sessions at, or a field collector's handheld for rent, market stalls, parking and pound fees: tick Field collector, "
+                + "give the route and the pre-numbered receipt range issued to the collector (receipts stop at the end of the range until a new one is issued). "
+                + "The collector opens a session like a cashier and hands the cash back at close; RC47 shows each collector's day and RC48 the routes.",
+            Fields = [Req("Code", "Station code"), Req("Name", "Name"), Req("Prefix", "Receipt prefix", "RC"), Tick("Field", "Field collector"), Opt("Route", "Route (field collector)"),
+                OptNum("From", "Receipt range from (field collector)"), OptNum("To", "Receipt range to"), Tick("Active", "Active", true)],
+            Run = async (c, i) =>
+            {
+                string code = i.Text("Code").Trim().ToUpperInvariant();
+                CashierStation? station = await c.Db.CashierStations.FirstOrDefaultAsync(s => s.CompanyId == c.CompanyId && s.Code == code).ConfigureAwait(true);
+                bool created = station is null;
+                if (station is null)
+                {
+                    station = new CashierStation(c.CompanyId, code, i.Text("Name").Trim(), i.Text("Prefix").Trim().ToUpperInvariant());
+                    c.Db.CashierStations.Add(station);
+                }
+
+                int? from = (int?)i.OptionalNumber("From"), to = (int?)i.OptionalNumber("To");
+                if (from is int f && to is int t && t < f)
+                {
+                    throw new OperationException("The receipt range must end at or after it starts.");
+                }
+
+                station.Name = i.Text("Name").Trim();
+                station.IsActive = i.Flag("Active");
+                station.IsFieldCollector = i.Flag("Field");
+                station.RouteCode = i.Flag("Field") ? i.Optional("Route")?.Trim().ToUpperInvariant() : null;
+                station.ReceiptRangeFrom = i.Flag("Field") ? from : null;
+                station.ReceiptRangeTo = i.Flag("Field") ? to : null;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{(station.IsFieldCollector ? "Field collector" : "Station")} {code} {(created ? "added" : "changed")}"
+                    + (station.ReceiptRangeFrom is int rf ? $"; receipts {station.ReceiptPrefix}-{rf:D6} to {station.ReceiptPrefix}-{station.ReceiptRangeTo ?? rf:D6}." : ".");
+            },
+            List = async c => Table(await c.Db.CashierStations.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", s => s.Code), ("Name", s => s.Name), ("Prefix", s => s.ReceiptPrefix), ("Kind", s => s.IsFieldCollector ? "Field collector" : "Counter"), ("Route", s => s.RouteCode ?? "-"),
+                ("Range", s => s.ReceiptRangeFrom is int f ? $"{f}–{s.ReceiptRangeTo}" : "-"), ("Active", s => s.IsActive)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Open or close my session", ListTitle = "Cashier sessions",
             Description = "Open a session at a station with the float, or close yours by declaring the cash counted (shortages and overs are posted). "
                 + "Type the amount, or count note by note: 50x10 + 20x5 + 1x7 is ten 50s, five 20s and seven 1s; each note or coin must be one of the currency's.",

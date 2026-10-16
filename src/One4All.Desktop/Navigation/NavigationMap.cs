@@ -196,7 +196,8 @@ public static class NavigationMap
             G("Cash office", O("Receipting: Cash office drawer"), O("Receipting: Banking", "Bank the takings")),
             G("Accounts", O("Receipting: Arrangements, dishonours and refunds")),
             G("Setup",
-                O("Receipting: Collection agents"), O("Receipting: Manual receipt books"), O("Receipting: Cashiers' own and related accounts"), O("Receipting: Import receipts from a file"), O("Receipting: Receipt matching rules", "Matching rules for imported payments")),
+                O("Receipting: Cashier stations and field collectors", "Counters and field collectors"), O("Receipting: Collection agents"), O("Receipting: Manual receipt books"),
+                O("Receipting: Cashiers' own and related accounts"), O("Receipting: Import receipts from a file"), O("Receipting: Receipt matching rules", "Matching rules for imported payments")),
         ]),
         new("Budgets", "\U0001F4CA", "#1B5E20", "Preparing, approving, changing and monitoring budgets.", ["Budgeting"],
         [
