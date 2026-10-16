@@ -837,6 +837,11 @@ internal sealed class LandAcquisitionConfiguration : IEntityTypeConfiguration<La
         b.Navigation(x => x.Checks).UsePropertyAccessMode(PropertyAccessMode.Field);
         b.HasMany(x => x.Costs).WithOne().HasForeignKey(x => x.LandAcquisitionId).OnDelete(DeleteBehavior.Restrict);
         b.Navigation(x => x.Costs).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.HasMany(x => x.Offers).WithOne().HasForeignKey(x => x.LandAcquisitionId).OnDelete(DeleteBehavior.Cascade);
+        b.Navigation(x => x.Offers).UsePropertyAccessMode(PropertyAccessMode.Field);
+        b.Property(x => x.Negotiation).HasConversion<int>();
+        b.Property(x => x.AgreedPrice).HasPrecision(19, 4);
+        b.Property(x => x.BreakOffReason).HasMaxLength(300);
         b.HasIndex(x => new { x.CompanyId, x.AcquisitionNumber }).IsUnique();
     }
 }
@@ -850,6 +855,19 @@ internal sealed class DueDiligenceCheckConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.Item).HasConversion<int>();
         b.Property(x => x.Finding).HasMaxLength(1000);
         b.HasIndex(x => new { x.LandAcquisitionId, x.Item }).IsUnique();
+    }
+}
+
+internal sealed class NegotiationOfferConfiguration : IEntityTypeConfiguration<NegotiationOffer>
+{
+    public void Configure(EntityTypeBuilder<NegotiationOffer> b)
+    {
+        b.ToTable("acquisition_offer", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Party).HasConversion<int>();
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.Note).HasMaxLength(300);
+        b.HasIndex(x => x.LandAcquisitionId);
     }
 }
 

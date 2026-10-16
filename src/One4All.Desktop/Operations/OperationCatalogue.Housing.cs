@@ -533,7 +533,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Land acquisition", ListTitle = "Acquisitions",
             Description = "Open an acquisition (method, counterparty, authorising resolution), record its valuation, sign off each due-diligence item, capitalise costs into land WIP, "
                 + "see its position (cost build-up and what still blocks it), complete it into the land bank, or abandon it (costs written off).",
-            Fields = [Pick("Step", "Step", ["Open", "Valuation", "Sign off", "Add cost", "Position", "Complete", "Abandon"]), Opt("Acquisition", "Acquisition number"),
+            Fields = [Pick("Step", "Step", ["Open", "Valuation", "Council offer", "Counterparty offer", "Agree price", "Break off talks", "Sign off", "Add cost", "Position", "Complete", "Abandon"]),
+                Opt("Acquisition", "Acquisition number"),
                 Opt("Parcel", "Parcel number (open)"), Opt("Description", "Description / finding / reference"), Num("Area", "Area m² (open)", "0"), Pick("Method", "Method (open)", Enum.GetNames<AcquisitionMethod>()),
                 Opt("Party", "Counterparty / valuer"), Opt("Resolution", "Resolution (open) / reason (abandon)"), Num("Amount", "Value / cost", "0"),
                 Pick("Item", "Due-diligence item", Enum.GetNames<DueDiligenceItem>()), Tick("Acceptable", "Acceptable", true), Pick("Component", "Cost component", Enum.GetNames<AcquisitionCostComponent>()),
@@ -554,6 +555,15 @@ public static partial class OperationCatalogue
                         return $"Acquisition {opened} opened.";
                     case "Valuation":
                         return Check(await land.RecordValuationAsync(c.CompanyId, acquisition, i.Optional("Party") ?? string.Empty, date, i.Number("Amount")).ConfigureAwait(true), "Valuation recorded.");
+                    case "Council offer":
+                    case "Counterparty offer":
+                        NegotiationParty party = i.Text("Step") == "Council offer" ? NegotiationParty.Council : NegotiationParty.Counterparty;
+                        return Check(await land.OfferAsync(c.CompanyId, acquisition, party, i.Number("Amount"), date, i.Optional("Description")).ConfigureAwait(true),
+                            n => $"Offer {n} recorded: {party} {M(i.Number("Amount"))}. Agree price accepts the latest offer.");
+                    case "Agree price":
+                        return Check(await land.AgreePriceAsync(c.CompanyId, acquisition, date).ConfigureAwait(true), price => $"Price agreed at {M(price)}; capitalise it as the purchase price cost.");
+                    case "Break off talks":
+                        return Check(await land.BreakOffAsync(c.CompanyId, acquisition, i.Optional("Resolution") ?? i.Optional("Description") ?? string.Empty).ConfigureAwait(true), "Talks broken off.");
                     case "Sign off":
                         return Check(await land.SignOffAsync(c.CompanyId, acquisition, Enum.Parse<DueDiligenceItem>(i.Text("Item")), i.Optional("Description") ?? string.Empty, i.Flag("Acceptable"), c.UserId, date)
                             .ConfigureAwait(true), "Signed off.");

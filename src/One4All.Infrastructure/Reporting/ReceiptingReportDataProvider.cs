@@ -70,6 +70,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             "RC48" => await RoutePerformanceAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC19" => await AllocationOverridesAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC49" => await CollectionEfficiencyAsync(companyId, parameters, ct).ConfigureAwait(false),
+            "RC50" => await CollectionVsBudgetAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC51" => await CollectionTrendAsync(companyId, parameters, ct).ConfigureAwait(false),
             "RC52" => await PrepaidTokensAsync(companyId, parameters, ct).ConfigureAwait(false),
             _ => [],
@@ -126,6 +127,42 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
         List<Receipt> receipts = (await CommittedReceiptsAsync(companyId, from, to, ct).ConfigureAwait(false)).Where(r => routes.ContainsKey(r.StationId)).ToList();
         return [.. receipts.GroupBy(r => routes[r.StationId]).OrderByDescending(g => g.Sum(r => r.TenderTotal))
             .Select(g => Row(new() { ["Route"] = g.Key, ["Collections"] = g.Count(), ["Amount"] = g.Sum(r => r.TenderTotal) }))];
+    }
+
+    // RC50: what was collected against each income vote (sundry and deposit receipt lines coded to it) against the in-force revenue budget for the
+    // fiscal periods the dates fall in; a vote with a budget but nothing collected still shows, with its shortfall.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CollectionVsBudgetAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
+    {
+        (DateOnly from, DateOnly to) = Range(parameters);
+        Dictionary<string, string> names = await AccountNamesAsync(companyId, ct).ConfigureAwait(false);
+        HashSet<string> income = [.. await _db.Accounts.Where(a => a.CompanyId == companyId && a.Type == Core.Accounting.AccountType.Income).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)];
+
+        Dictionary<string, decimal> actual = (await CommittedReceiptsAsync(companyId, from, to, ct).ConfigureAwait(false)).SelectMany(r => r.Lines)
+            .Where(l => l.Type != ReceiptLineType.DebtorPayment && l.AccountCode is not null && income.Contains(l.AccountCode))
+            .GroupBy(l => l.AccountCode!).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount));
+
+        // The fiscal periods the range covers, year by year, then the in-force budgets' income lines for those periods.
+        Dictionary<string, decimal> budget = new(StringComparer.Ordinal);
+        List<Core.System.FiscalYear> years = await _db.FiscalYears.Include(y => y.Periods).Where(y => y.CompanyId == companyId && y.StartDate <= to && y.EndDate >= from).ToListAsync(ct).ConfigureAwait(false);
+        foreach (Core.System.FiscalYear year in years)
+        {
+            HashSet<int> periods = [.. year.Periods.Where(p => p.StartDate <= to && p.EndDate >= from).Select(p => p.PeriodNumber)];
+            List<Core.Budgeting.Budget> inForce = await _db.Budgets.Include(b => b.Lines)
+                .Where(b => b.CompanyId == companyId && b.FiscalYearId == year.Id && b.IsActive && b.Type != Core.Budgeting.BudgetType.DraftSubmission
+                    && (b.Status == Core.Budgeting.BudgetStatus.Approved || b.Status == Core.Budgeting.BudgetStatus.Active)).ToListAsync(ct).ConfigureAwait(false);
+            foreach (Core.Budgeting.BudgetLine line in inForce.SelectMany(b => b.Lines).Where(l => periods.Contains(l.Period) && income.Contains(l.AccountCode)))
+            {
+                budget[line.AccountCode] = budget.GetValueOrDefault(line.AccountCode) + line.Amount;
+            }
+        }
+
+        return [.. budget.Keys.Union(actual.Keys).OrderBy(code => code, StringComparer.Ordinal).Select(code => Row(new()
+        {
+            ["Vote"] = $"{code} — {names.GetValueOrDefault(code, string.Empty)}",
+            ["Budget"] = budget.GetValueOrDefault(code),
+            ["Actual"] = actual.GetValueOrDefault(code),
+            ["Variance"] = actual.GetValueOrDefault(code) - budget.GetValueOrDefault(code),
+        }))];
     }
 
     private async Task<List<Receipt>> CommittedReceiptsAsync(long companyId, DateOnly from, DateOnly to, CancellationToken ct) =>

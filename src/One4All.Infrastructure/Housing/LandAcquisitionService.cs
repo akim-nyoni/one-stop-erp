@@ -158,6 +158,68 @@ public sealed class LandAcquisitionService : ILandAcquisitionService
     }
 
     /// <inheritdoc />
+    public async Task<Result<int>> OfferAsync(long companyId, string acquisitionNumber, NegotiationParty party, decimal amount, DateOnly date, string? note, CancellationToken ct = default)
+    {
+        if (amount <= 0m)
+        {
+            return Error.Validation("Hse.OfferAmount", "An offer must be more than zero.");
+        }
+
+        Result<LandAcquisition> found = await OpenCaseAsync(companyId, acquisitionNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        NegotiationOffer? offer = found.Value.Offer(party, amount, date, string.IsNullOrWhiteSpace(note) ? null : note.Trim());
+        if (offer is null)
+        {
+            return Error.Rule("Hse.NegotiationClosed", $"The negotiation on {found.Value.AcquisitionNumber} is {found.Value.Negotiation}; no more offers are taken.");
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return offer.Sequence;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<decimal>> AgreePriceAsync(long companyId, string acquisitionNumber, DateOnly date, CancellationToken ct = default)
+    {
+        Result<LandAcquisition> found = await OpenCaseAsync(companyId, acquisitionNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        decimal? agreed = found.Value.Agree(date);
+        if (agreed is null)
+        {
+            return Error.Rule("Hse.NoOffer", "There is no open offer to accept: record the offer first (the latest one is the price agreed).");
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return agreed.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> BreakOffAsync(long companyId, string acquisitionNumber, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Hse.BreakOffReason", "Give the reason the talks failed."));
+        }
+
+        Result<LandAcquisition> found = await OpenCaseAsync(companyId, acquisitionNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return Result.Failure(found.Error);
+        }
+
+        found.Value.BreakOff(reason.Trim());
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public Task<Result<long>> CompleteAsync(long companyId, string acquisitionNumber, DateOnly date, CancellationToken ct = default)
         => _db.AtomicAsync(() => CompleteCoreAsync(companyId, acquisitionNumber, date, ct), ct);
 
@@ -219,8 +281,21 @@ public sealed class LandAcquisitionService : ILandAcquisitionService
         return total;
     }
 
+    // The readiness rules, plus the negotiation: once offers have been made a purchase cannot complete until the price is agreed (or if talks broke off).
     private static IReadOnlyList<string> Problems(LandAcquisition acquisition, IReadOnlyList<CostElement> buildUp)
-        => AcquisitionReadiness.Problems(acquisition.Method, [.. acquisition.Checks.Select(c => new SignedOffItem(c.Item, c.Acceptable))], acquisition.ValuedAt is not null, buildUp);
+    {
+        List<string> problems = [.. AcquisitionReadiness.Problems(acquisition.Method, [.. acquisition.Checks.Select(c => new SignedOffItem(c.Item, c.Acceptable))], acquisition.ValuedAt is not null, buildUp)];
+        if (acquisition.Negotiation == NegotiationStatus.Open)
+        {
+            problems.Add($"Price not agreed: {acquisition.Offers.Count} offer(s) on the table, the latest {acquisition.Offers[^1].Party} at {acquisition.Offers[^1].Amount:N2}.");
+        }
+        else if (acquisition.Negotiation == NegotiationStatus.BrokenOff)
+        {
+            problems.Add($"Negotiation broken off: {acquisition.BreakOffReason}.");
+        }
+
+        return problems;
+    }
 
     private async Task<Result<PostingReceipt>> PostAsync(long companyId, DateOnly date, string documentType, string documentNumber, string narrative, string debitAccount, string creditAccount, decimal amount, CancellationToken ct)
     {

@@ -113,6 +113,33 @@ public interface ILandAcquisitionService
     /// <returns>The position, or why there is none.</returns>
     Task<Result<AcquisitionPosition>> PositionAsync(long companyId, string acquisitionNumber, CancellationToken ct = default);
 
+    /// <summary>Records an offer or counter-offer in the price negotiation (brief §4.10.1); the first offer opens it.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="acquisitionNumber">The acquisition.</param>
+    /// <param name="party">Who offers.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="date">When.</param>
+    /// <param name="note">What was said.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The offer's place in the exchange, or why it was refused (<c>Hse.NegotiationClosed</c> once agreed or broken off).</returns>
+    Task<Result<int>> OfferAsync(long companyId, string acquisitionNumber, NegotiationParty party, decimal amount, DateOnly date, string? note, CancellationToken ct = default);
+
+    /// <summary>Settles the negotiation at the latest offer; a purchase then completes at that price.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="acquisitionNumber">The acquisition.</param>
+    /// <param name="date">When.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The agreed price, or why not (<c>Hse.NoOffer</c>).</returns>
+    Task<Result<decimal>> AgreePriceAsync(long companyId, string acquisitionNumber, DateOnly date, CancellationToken ct = default);
+
+    /// <summary>Breaks the negotiation off with the reason; the acquisition stays open to be abandoned or renegotiated by resolution.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="acquisitionNumber">The acquisition.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> BreakOffAsync(long companyId, string acquisitionNumber, string reason, CancellationToken ct = default);
+
     /// <summary>Completes the acquisition: the parcel enters the land bank at its total cost.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="acquisitionNumber">The acquisition.</param>

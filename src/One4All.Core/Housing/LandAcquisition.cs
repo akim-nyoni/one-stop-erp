@@ -30,6 +30,73 @@ public enum AcquisitionMethod
     Regularisation = 8,
 }
 
+/// <summary>Who made an offer in a land price negotiation.</summary>
+public enum NegotiationParty
+{
+    /// <summary>The council.</summary>
+    Council = 1,
+
+    /// <summary>The owner or their agent.</summary>
+    Counterparty = 2,
+}
+
+/// <summary>Where a price negotiation stands.</summary>
+public enum NegotiationStatus
+{
+    /// <summary>No offer made yet (a grant, swap or regularisation may never need one).</summary>
+    None = 0,
+
+    /// <summary>Offers are going back and forth.</summary>
+    Open = 1,
+
+    /// <summary>A price is agreed.</summary>
+    Agreed = 2,
+
+    /// <summary>Talks failed.</summary>
+    BrokenOff = 3,
+}
+
+/// <summary>An offer or counter-offer in a land price negotiation (<c>housing.acquisition_offer</c>).</summary>
+public sealed class NegotiationOffer : Entity
+{
+    private NegotiationOffer()
+    {
+    }
+
+    /// <summary>Creates the offer.</summary>
+    /// <param name="party">Who offers.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="offeredOn">When.</param>
+    /// <param name="note">What was said.</param>
+    /// <param name="sequence">Its place in the exchange.</param>
+    public NegotiationOffer(NegotiationParty party, decimal amount, DateOnly offeredOn, string? note, int sequence)
+    {
+        Party = party;
+        Amount = amount;
+        OfferedOn = offeredOn;
+        Note = note;
+        Sequence = sequence;
+    }
+
+    /// <summary>Gets the acquisition.</summary>
+    public long LandAcquisitionId { get; private set; }
+
+    /// <summary>Gets who offered.</summary>
+    public NegotiationParty Party { get; private set; }
+
+    /// <summary>Gets the amount.</summary>
+    public decimal Amount { get; private set; }
+
+    /// <summary>Gets when.</summary>
+    public DateOnly OfferedOn { get; private set; }
+
+    /// <summary>Gets what was said.</summary>
+    public string? Note { get; private set; }
+
+    /// <summary>Gets its place in the exchange (1 is the first offer).</summary>
+    public int Sequence { get; private set; }
+}
+
 /// <summary>A due-diligence check that must be signed off before an acquisition completes (brief §4.10.1).</summary>
 public enum DueDiligenceItem
 {
@@ -114,6 +181,7 @@ public sealed class LandAcquisition : AuditableEntity, ICompanyScoped
 {
     private readonly List<DueDiligenceCheck> _checks = [];
     private readonly List<AcquisitionCost> _costs = [];
+    private readonly List<NegotiationOffer> _offers = [];
 
     /// <summary>Parameterless constructor for ORM materialization.</summary>
     private LandAcquisition()
@@ -203,6 +271,64 @@ public sealed class LandAcquisition : AuditableEntity, ICompanyScoped
 
     /// <summary>The costs capitalised.</summary>
     public IReadOnlyList<AcquisitionCost> Costs => _costs.AsReadOnly();
+
+    /// <summary>Gets the offers made in the price negotiation, oldest first (brief §4.10.1).</summary>
+    public IReadOnlyList<NegotiationOffer> Offers => _offers.AsReadOnly();
+
+    /// <summary>Gets where the negotiation stands.</summary>
+    public NegotiationStatus Negotiation { get; private set; }
+
+    /// <summary>Gets the price agreed, once the negotiation is settled.</summary>
+    public decimal? AgreedPrice { get; private set; }
+
+    /// <summary>Gets when the price was agreed.</summary>
+    public DateOnly? AgreedOn { get; private set; }
+
+    /// <summary>Gets why the negotiation was broken off, if it was.</summary>
+    public string? BreakOffReason { get; private set; }
+
+    /// <summary>Records an offer or counter-offer; the negotiation is open from the first offer.</summary>
+    /// <param name="party">Who offers.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="date">When.</param>
+    /// <param name="note">What was said.</param>
+    /// <returns>The offer, or null when the negotiation is settled or broken off.</returns>
+    public NegotiationOffer? Offer(NegotiationParty party, decimal amount, DateOnly date, string? note)
+    {
+        if (Negotiation is NegotiationStatus.Agreed or NegotiationStatus.BrokenOff)
+        {
+            return null;
+        }
+
+        NegotiationOffer offer = new(party, amount, date, note, _offers.Count + 1);
+        _offers.Add(offer);
+        Negotiation = NegotiationStatus.Open;
+        return offer;
+    }
+
+    /// <summary>Settles the negotiation at the latest offer's amount.</summary>
+    /// <param name="date">When.</param>
+    /// <returns>The agreed price, or null when there is no offer to accept or the negotiation is not open.</returns>
+    public decimal? Agree(DateOnly date)
+    {
+        if (Negotiation != NegotiationStatus.Open || _offers.Count == 0)
+        {
+            return null;
+        }
+
+        AgreedPrice = _offers[^1].Amount;
+        AgreedOn = date;
+        Negotiation = NegotiationStatus.Agreed;
+        return AgreedPrice;
+    }
+
+    /// <summary>Breaks the negotiation off (the acquisition is then abandoned or reopened by resolution).</summary>
+    /// <param name="reason">Why.</param>
+    public void BreakOff(string reason)
+    {
+        Negotiation = NegotiationStatus.BrokenOff;
+        BreakOffReason = reason;
+    }
 
     /// <summary>The total cost capitalised.</summary>
     public decimal TotalCost => _costs.Sum(c => c.Amount);
