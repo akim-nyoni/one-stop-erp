@@ -220,6 +220,7 @@ public static partial class ScreenPermissions
         ("System Manager", @"api keys|webhook|offline", "System.Integration"),
         ("System Manager", @"back up", "System.Backup"),
         ("System Manager", @"audit|direct database", "Security.AuditTrail"),
+        ("System Manager", @"house style", "System.Company"),
         ("System Manager", @"subscription|burst", "Reporting.Schedule"),
         ("System Manager", @"report|snapshot", "Reporting.Report"),
         ("System Manager", @"import", "System.Import"),

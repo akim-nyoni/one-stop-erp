@@ -411,6 +411,58 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Report house style", ListTitle = "House style",
+            Description = "The company's house style for every report in one click: the font and size for standard text, the colour of report titles, the colour of column-heading strips, "
+                + "the colour of lines, a footer line on every page, and whether the logo is placed top-right on reports that do not place it themselves. Colours are #RRGGBB. "
+                + "A report's own choices stay; Clear returns every report to its own design.",
+            Fields = [Pick("Step", "Step", ["Apply", "Clear"]), Opt("Font", "Font family (e.g. Calibri)"), OptNum("Size", "Standard text size (pt)"), Opt("Title", "Title colour"),
+                Opt("HeadBack", "Column-heading background"), Opt("HeadText", "Column-heading text colour"), Opt("Accent", "Line colour"), Opt("Footer", "Footer line on every page"), Tick("Logo", "Place the logo top-right")],
+            Run = async (c, i) =>
+            {
+                Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                if (i.Text("Step") == "Clear")
+                {
+                    company.ReportThemeJson = null;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return "House style cleared: every report prints with its own design.";
+                }
+
+                One4All.Reporting.Model.ReportHouseStyle theme = new()
+                {
+                    FontFamily = i.Optional("Font"), BaseFontSize = i.OptionalNumber("Size") is decimal size ? (double)size : null, TitleColour = i.Optional("Title")?.Trim(),
+                    HeadingBackground = i.Optional("HeadBack")?.Trim(), HeadingForeground = i.Optional("HeadText")?.Trim(), AccentColour = i.Optional("Accent")?.Trim(),
+                    FooterText = i.Optional("Footer"), ShowLogo = i.Flag("Logo"),
+                };
+                if (theme.BadColours() is { Count: > 0 } bad)
+                {
+                    throw new OperationException($"Colours are #RRGGBB (e.g. #1B5E20): check {string.Join(", ", bad)}.");
+                }
+
+                if (theme.BaseFontSize is < 6 or > 24)
+                {
+                    throw new OperationException("The standard text size is between 6 and 24 pt.");
+                }
+
+                if (theme.IsEmpty)
+                {
+                    throw new OperationException("Fill in at least one setting, or choose Clear.");
+                }
+
+                company.ReportThemeJson = theme.ToJson();
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return "House style applied to every report.";
+            },
+            List = async c =>
+            {
+                string? json = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.ReportThemeJson).FirstOrDefaultAsync().ConfigureAwait(true);
+                One4All.Reporting.Model.ReportHouseStyle theme = One4All.Reporting.Model.ReportHouseStyle.Parse(json) ?? new();
+                return Table(new[] { theme }, ("Font", t => t.FontFamily ?? "(report's own)"), ("Size", t => t.BaseFontSize?.ToString(CultureInfo.InvariantCulture) ?? "(report's own)"),
+                    ("Title colour", t => t.TitleColour ?? "-"), ("Heading background", t => t.HeadingBackground ?? "-"), ("Heading text", t => t.HeadingForeground ?? "-"),
+                    ("Line colour", t => t.AccentColour ?? "-"), ("Footer", t => t.FooterText ?? "-"), ("Logo top-right", t => t.ShowLogo));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set the company logo", ListTitle = "Company",
             Description = "A PNG or JPEG (up to 512 KB) that report layouts show wherever they place the Logo (an image element with expression CompanyLogo). Leave the path blank to remove it.",
             Fields = [Opt("Path", "Picture file path")],

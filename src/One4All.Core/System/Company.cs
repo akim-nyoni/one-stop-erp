@@ -186,6 +186,9 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>The company's logo (PNG or JPEG) for report layouts (expression <c>CompanyLogo</c>).</summary>
     public byte[]? Logo { get; set; }
 
+    /// <summary>The company's report house style (fonts, colours, footer, logo placement) as JSON, applied to every report; null for none.</summary>
+    public string? ReportThemeJson { get; set; }
+
     /// <summary>Gets or sets the most a refund without a receipt may pay out (null: such refunds are not allowed).</summary>
     public decimal? UnreceiptedRefundLimit { get; set; }
 

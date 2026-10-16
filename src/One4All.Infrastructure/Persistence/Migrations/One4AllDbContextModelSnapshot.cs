@@ -31426,6 +31426,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(60)")
                         .HasColumnName("registration_number");
 
+                    b.Property<string>("ReportThemeJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("report_theme_json");
+
                     b.Property<string>("ReportingCurrency")
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")

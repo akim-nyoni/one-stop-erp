@@ -371,6 +371,7 @@ public static class NavigationMap
                 W("report-viewer", "Run a report", "Choose a report, fill its options and view, print or export it.", MenuArea.Enquiries),
                 W("report-designer", "Design a report", "Change a report's layout or make a new one.", MenuArea.Maintenance),
                 W("quick-layout", "Quick column layout", "Pick and order the columns of a simple listing.", MenuArea.Maintenance),
+                O("System Manager: Report house style"),
                 O("System Manager: Report version history"), O("System Manager: Report subscription", "Email a report on a schedule"),
                 O("System Manager: Burst a report by email", "Email a report to each customer or supplier"), O("System Manager: Refresh reporting snapshots"),
                 O("System Manager: Stock valuation and sales snapshots")),

@@ -44,11 +44,11 @@ public sealed class ReportEngine
                 }
             }
 
-            return Columns.Arrange(model);
+            return ReportHouseStyles.Apply(Columns.Arrange(model), input);
         }
 
         BuildGrouped(def, input, detail, model);
-        return Columns.Arrange(model);
+        return ReportHouseStyles.Apply(Columns.Arrange(model), input);
     }
 
     // The page with its watermark for this run: an expression's text when it gives one, else the fixed watermark.
@@ -336,7 +336,7 @@ public sealed class ReportEngine
         {
             Definition = child.Definition, Rows = child.Rows, Parameters = child.Parameters, UserName = input.UserName, CompanyName = input.CompanyName, PrintDate = input.PrintDate,
             ToBase = child.ToBase ?? input.ToBase, Culture = child.Culture ?? input.Culture, Terminology = child.Terminology ?? input.Terminology, SubReports = child.SubReports ?? input.SubReports,
-            Depth = input.Depth + 1, CompanyLogo = input.CompanyLogo,
+            Depth = input.Depth + 1, CompanyLogo = input.CompanyLogo, HouseStyle = input.HouseStyle,
         });
         (List<RenderCell> cells, double height) = SubReports.Place(element, built);
         band.Cells.AddRange(cells);

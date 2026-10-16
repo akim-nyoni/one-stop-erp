@@ -88,7 +88,7 @@ public sealed class ReportRunner : IReportRunner
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = Application.Reporting.ReportRowScope.Apply(
             await RowsAsync(companyId, reportCode, definition, parameters, hiddenFields, ct).ConfigureAwait(false), access.Scope);
 
-        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo, c.ReportThemeJson }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
             .ToDictionaryAsync(t => t.Term, t => t.Replacement, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
 
@@ -102,6 +102,7 @@ public sealed class ReportRunner : IReportRunner
             Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null,
             Terminology = terms,
             CompanyLogo = company?.Logo,
+            HouseStyle = ReportHouseStyle.Parse(company?.ReportThemeJson),
             SubReports = await SubReportsAsync(companyId, definition, rows, parameters, access, 0, new SubReportBudget(), ct).ConfigureAwait(false),
         };
     }
@@ -133,7 +134,7 @@ public sealed class ReportRunner : IReportRunner
             return Error.Validation("Rpt.BurstKey", $"Report {reportCode} has no field {keyField.Trim()} to split by.");
         }
 
-        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo, c.ReportThemeJson }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
             .ToDictionaryAsync(t => t.Term, t => t.Replacement, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
         Func<string, IReadOnlyDictionary<string, object?>, ReportInput?>? subReports = await SubReportsAsync(companyId, definition, rows, parameters, access, 0, new SubReportBudget(), ct).ConfigureAwait(false);
@@ -145,7 +146,7 @@ public sealed class ReportRunner : IReportRunner
             ReportInput input = new()
             {
                 Definition = definition, Rows = slice, CompanyName = company?.Name ?? string.Empty, Parameters = parameters,
-                Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null, Terminology = terms, CompanyLogo = company?.Logo, SubReports = subReports,
+                Culture = company?.Locale is string locale ? System.Globalization.CultureInfo.GetCultureInfo(locale) : null, Terminology = terms, CompanyLogo = company?.Logo, HouseStyle = ReportHouseStyle.Parse(company?.ReportThemeJson), SubReports = subReports,
             };
             string safeKey = new([.. group.Key.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '-')]);
             Result<RenderedDocument> rendered = Render(input, format, $"{reportCode.ToLowerInvariant()}-{safeKey.ToLowerInvariant()}");

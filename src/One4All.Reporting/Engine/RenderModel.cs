@@ -40,6 +40,9 @@ public sealed class ReportInput
 
     /// <summary>The company's logo (PNG or JPEG), for image elements whose expression is <c>CompanyLogo</c>.</summary>
     public byte[]? CompanyLogo { get; init; }
+
+    /// <summary>The company's house style, applied after layout (null: the report's own design only).</summary>
+    public ReportHouseStyle? HouseStyle { get; init; }
 }
 
 /// <summary>A resolved, positioned cell ready to render.</summary>
