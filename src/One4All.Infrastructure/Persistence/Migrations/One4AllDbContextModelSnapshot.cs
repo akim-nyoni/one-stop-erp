@@ -19316,6 +19316,12 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("payment_method");
 
+                    b.Property<string>("PayslipPassword")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("payslip_password")
+                        .HasAnnotation("One4All:Encrypted", true);
+
                     b.Property<string>("Phone")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
@@ -31388,6 +31394,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("payroll_second_approval_variance_percent");
+
+                    b.Property<string>("PayslipLayoutCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("payslip_layout_code");
 
                     b.Property<int>("PayslipPasswordRule")
                         .HasColumnType("integer")

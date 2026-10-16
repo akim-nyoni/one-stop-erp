@@ -69,6 +69,26 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SetPayslipPasswordAsync(long userId, string password, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(password) || password.Trim().Length < 8)
+        {
+            return Result.Failure(Error.Validation("Ess.PayslipPassword", "The payslip password needs at least 8 characters."));
+        }
+
+        Result<Employee> me = await MeAsync(userId, ct).ConfigureAwait(false);
+        if (me.IsFailure)
+        {
+            return Result.Failure(me.Error);
+        }
+
+        Employee employee = await _db.Employees.FirstAsync(e => e.Id == me.Value.Id, ct).ConfigureAwait(false);
+        employee.PayslipPassword = password.Trim();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<string>> PayslipTextAsync(long userId, string periodLabel, CancellationToken ct = default)
     {
         Result<Employee> me = await MeAsync(userId, ct).ConfigureAwait(false);

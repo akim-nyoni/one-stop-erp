@@ -52,6 +52,26 @@ public sealed class ReportRunner : IReportRunner
     public async Task<Result<RenderedDocument>> RenderAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format,
         Application.Reporting.ReportAccess access, CancellationToken ct = default)
     {
+        Result<ReportInput> input = await InputAsync(companyId, reportCode, parameters, access, ct).ConfigureAwait(false);
+        return input.IsSuccess ? Render(input.Value, format, reportCode.ToLowerInvariant()) : input.Error;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<RenderedPages>> RenderPageImagesAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, int dpi = 150, CancellationToken ct = default)
+    {
+        Result<ReportInput> input = await InputAsync(companyId, reportCode, parameters, Application.Reporting.ReportAccess.Unrestricted, ct).ConfigureAwait(false);
+        if (input.IsFailure)
+        {
+            return input.Error;
+        }
+
+        (IReadOnlyList<byte[]> jpegs, double width) = new PdfReportRenderer().RenderImages(_engine.Build(input.Value), dpi);
+        return new RenderedPages(jpegs, width);
+    }
+
+    // The report's definition, rows and company context, ready to render in any format.
+    private async Task<Result<ReportInput>> InputAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, Application.Reporting.ReportAccess access, CancellationToken ct)
+    {
         IReadOnlySet<Application.Security.SensitiveField> hiddenFields = access.Hidden;
         ReportDefinition? definition = await ResolveDefinitionAsync(companyId, reportCode, ct).ConfigureAwait(false)
             ?? BuiltInDefinition(reportCode);
@@ -73,7 +93,7 @@ public sealed class ReportRunner : IReportRunner
             .ToDictionaryAsync(t => t.Term, t => t.Replacement, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
 
         // The company's locale formats numbers and dates and picks label translations; its terms replace the standard words on labels.
-        ReportInput input = new()
+        return new ReportInput
         {
             Definition = definition,
             Rows = rows,
@@ -84,8 +104,6 @@ public sealed class ReportRunner : IReportRunner
             CompanyLogo = company?.Logo,
             SubReports = await SubReportsAsync(companyId, definition, rows, parameters, access, 0, new SubReportBudget(), ct).ConfigureAwait(false),
         };
-
-        return Render(input, format, reportCode.ToLowerInvariant());
     }
 
     /// <inheritdoc />
@@ -345,6 +363,6 @@ public sealed class ReportRunner : IReportRunner
         SystemReports.WastageCode => SystemReports.Wastage(),
         SystemReports.BillsCode => SystemReports.Bills(),
         SystemReports.MenuCostCode => SystemReports.MenuCost(),
-        _ => ReceiptingReports.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
+        _ => SystemReportCatalogue.All().FirstOrDefault(r => string.Equals(r.Code, code, StringComparison.OrdinalIgnoreCase)),
     };
 }

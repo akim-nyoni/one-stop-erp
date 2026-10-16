@@ -71,6 +71,37 @@ public sealed partial class PdfTextDocumentTests
         Encoding.Latin1.GetString(aes.DecryptCbc(stream[16..], stream[..16], PaddingMode.PKCS7)).Should().Contain("(Net pay        1,234.50) Tj").And.Contain("(Payslip 2026-09 \\(Pat\\)) Tj");
     }
 
+    // A JPEG of nothing but a start-of-frame marker: 16 × 16 pixels, three components.
+    private static readonly byte[] TinyJpeg = [0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 0x00, 0x10, 0x00, 0x10, 0x03, 0x01, 0x11, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01, 0xFF, 0xD9];
+
+    [Fact]
+    public void Picture_pages_are_sized_from_the_jpeg_and_protected_the_same_way()
+    {
+        PdfTextDocument.JpegSize(TinyJpeg).Should().Be((16, 16, 3));
+
+        string open = Encoding.Latin1.GetString(PdfTextDocument.BuildFromImages([TinyJpeg, TinyJpeg], 595));
+        open.Should().StartWith("%PDF-1.6").And.Contain("/Count 2").And.Contain("/MediaBox [0 0 595 595]").And.Contain("/Filter /DCTDecode").And.Contain("/Im1 Do").And.NotContain("/Encrypt");
+
+        byte[] pdf = PdfTextDocument.BuildFromImages([TinyJpeg], 595, "secret-99");
+        string text = Encoding.Latin1.GetString(pdf);
+        text.Should().Contain("/Filter /Standard /V 4 /R 4").And.Contain("/Encrypt 6 0 R");
+        Match values = EncryptValues().Match(text);
+        byte[] owner = Convert.FromHexString(values.Groups[1].Value), user = Convert.FromHexString(values.Groups[2].Value), id = Convert.FromHexString(FileId().Match(text).Groups[1].Value);
+        int permissions = int.Parse(values.Groups[3].Value, System.Globalization.CultureInfo.InvariantCulture);
+        UserMatches(Key("secret-99", owner, permissions, id), id, user).Should().BeTrue();
+        UserMatches(Key("secret-98", owner, permissions, id), id, user).Should().BeFalse();
+
+        // The picture stream (object 5) decrypts back to the JPEG.
+        Match image = Regex.Match(text, @"5 0 obj\n<< /Type /XObject [^>]*/Length (\d+) >>\nstream\n");
+        int length = int.Parse(image.Groups[1].Value, System.Globalization.CultureInfo.InvariantCulture);
+        byte[] stream = pdf[(image.Index + image.Length)..(image.Index + image.Length + length)];
+        stream.Take(TinyJpeg.Length).Should().NotEqual(TinyJpeg);
+        byte[] objectKey = MD5Hash([.. Key("secret-99", owner, permissions, id), 5, 0, 0, 0, 0, (byte)'s', (byte)'A', (byte)'l', (byte)'T'])[..16];
+        using Aes aes = Aes.Create();
+        aes.Key = objectKey;
+        aes.DecryptCbc(stream[16..], stream[..16], PaddingMode.PKCS7).Should().Equal(TinyJpeg);
+    }
+
     [Fact]
     public void Long_text_runs_onto_more_pages()
     {

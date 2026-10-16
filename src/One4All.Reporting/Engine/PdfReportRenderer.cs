@@ -20,7 +20,40 @@ public sealed class PdfReportRenderer : IReportRenderer
     public string FileExtension => "pdf";
 
     /// <inheritdoc />
-    public byte[] Render(RenderModel model)
+    public byte[] Render(RenderModel model) => Compose(model).GeneratePdf();
+
+    /// <summary>Renders each page as a JPEG picture (a designed document that is wrapped and protected afterwards).</summary>
+    /// <param name="model">The report.</param>
+    /// <param name="dpi">The resolution.</param>
+    /// <returns>The pages and the page width in points.</returns>
+    public (IReadOnlyList<byte[]> Jpegs, double WidthPoints) RenderImages(RenderModel model, int dpi = 150)
+    {
+        ArgumentNullException.ThrowIfNull(model);
+        IEnumerable<byte[]> images = Compose(model).GenerateImages(new ImageGenerationSettings { ImageFormat = ImageFormat.Jpeg, ImageCompressionQuality = ImageCompressionQuality.High, RasterDpi = dpi });
+        return ([.. images], PageWidthPoints(model.Page));
+    }
+
+    /// <summary>The page width in points for a page setup.</summary>
+    /// <param name="setup">The page setup.</param>
+    /// <returns>The width.</returns>
+    public static double PageWidthPoints(PageSetup setup)
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        bool landscape = setup.Orientation == ReportOrientation.Landscape;
+        return setup.PaperSize switch
+        {
+            PaperSize.A4 => landscape ? PageSizes.A4.Height : PageSizes.A4.Width,
+            PaperSize.Letter => landscape ? PageSizes.Letter.Height : PageSizes.Letter.Width,
+            PaperSize.Legal => landscape ? PageSizes.Legal.Height : PageSizes.Legal.Width,
+            PaperSize.A5 => PageSizes.A5.Width,
+            PaperSize.Receipt58 => 164,
+            PaperSize.Receipt80 => 227,
+            PaperSize.Custom => setup.CustomWidth,
+            _ => PageSizes.A4.Width,
+        };
+    }
+
+    private static Document Compose(RenderModel model)
     {
         return Document.Create(container =>
         {
@@ -78,7 +111,7 @@ public sealed class PdfReportRenderer : IReportRenderer
                     page.Footer().Element(e => RenderBand(e, model.PageFooter));
                 }
             });
-        }).GeneratePdf();
+        });
     }
 
     // A base64 picture or data URI as bytes (null when absent or unreadable).

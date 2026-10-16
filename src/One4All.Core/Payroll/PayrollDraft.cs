@@ -188,4 +188,7 @@ public enum PayslipPasswordRule
 
     /// <summary>No password.</summary>
     None = 3,
+
+    /// <summary>A password the employee set themselves (self-service), or HR set for them.</summary>
+    EmployeeSet = 4,
 }

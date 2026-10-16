@@ -2829,6 +2829,11 @@ api.MapPost("/api/ess/leave", async (string leaveType, DateOnly fromDate, DateOn
 .RequireAuthorization()
 .WithName("EssApplyForLeave");
 
+api.MapPost("/api/ess/payslip-password", async (PayslipPasswordRequest body, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
+    SignedInUser(user) is long id ? ActionResponse(await ess.SetPayslipPasswordAsync(id, body.Password, ct).ConfigureAwait(false)) : Results.Unauthorized())
+.RequireAuthorization()
+.WithName("EssPayslipPassword");
+
 api.MapPost("/api/ess/detail-change", async (string field, string newValue, ClaimsPrincipal user, One4All.Application.Abstractions.Payroll.IEmployeeSelfService ess, CancellationToken ct) =>
     SignedInUser(user) is long id ? ValueResponse(await ess.RequestDetailChangeAsync(id, field, newValue, ct).ConfigureAwait(false)) : Results.Unauthorized())
 .RequireAuthorization()
@@ -3097,3 +3102,5 @@ internal sealed record LoginRequest(string Username, string Password, string? On
 /// <param name="CurrentPassword">The current password.</param>
 /// <param name="NewPassword">The new password.</param>
 internal sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+
+internal sealed record PayslipPasswordRequest(string Password);

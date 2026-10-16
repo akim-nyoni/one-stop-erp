@@ -35,6 +35,7 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         b.Property(x => x.BankBranch).Encrypted();
         b.Property(x => x.BankAccountNumber).Encrypted();
         b.Property(x => x.MobileMoneyNumber).Encrypted();
+        b.Property(x => x.PayslipPassword).Encrypted();
         b.Property(x => x.TerminationReason).HasMaxLength(300);
         b.Property(x => x.HoldReason).HasMaxLength(300);
         b.HasMany(x => x.PayElements).WithOne().HasForeignKey(x => x.EmployeeId).OnDelete(DeleteBehavior.Cascade);

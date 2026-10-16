@@ -121,6 +121,12 @@ public sealed class Company : SoftDeletableEntity
     public Payroll.PayslipPasswordRule PayslipPasswordRule { get; set; }
 
     /// <summary>
+    /// Gets or sets the report whose layout prints the payslip (the company's own design in the report designer, e.g. a copy of PR74), or
+    /// null for the standard text payslip. The report runs for one employee and the pay date, and its pages become the PDF.
+    /// </summary>
+    public string? PayslipLayoutCode { get; set; }
+
+    /// <summary>
     /// Gets or sets the smallest cash amount the tills deal in (e.g. 0.05) when coins are scarce: a cash sale may be tendered up to half of
     /// it away from the exact total, the difference posted to <see cref="CashRoundingAccountCode"/> (brief §4.1). Null: no rounding.
     /// </summary>

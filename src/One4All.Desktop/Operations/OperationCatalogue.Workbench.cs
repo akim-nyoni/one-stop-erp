@@ -147,12 +147,53 @@ public static partial class OperationCatalogue
         {
             Module = people, Title = "Payslips: save or email",
             Description = "Saves one employee's payslip for a period as a (password-protected) PDF, or emails every payslip of a payroll run to the employees, listing who has no "
-                + "email address or payslip password.",
-            Fields = [Pick("Step", "Step", ["Save PDF", "Email a run"]), Opt("Employee", "Employee number (PDF)"), Opt("Period", "Period, e.g. 2026-09 (PDF)"), Opt("File", "Save to file path (PDF)"),
-                Opt("Run", "Payroll run number (email)")],
+                + "email address or payslip password. Payslip settings choose what opens the PDF (national ID, date of birth, employee number, a password the employee sets, or none) "
+                + "and the report whose layout prints it (the company's own design in the report designer, e.g. a copy of PR74; blank for the standard text payslip). "
+                + "Set password keeps a password for an employee who cannot set their own in self-service.",
+            Fields = [Pick("Step", "Step", ["Save PDF", "Email a run", "Payslip settings", "Set password"]), Opt("Employee", "Employee number (PDF / password)"), Opt("Period", "Period, e.g. 2026-09 (PDF)"),
+                Opt("File", "Save to file path (PDF)"), Opt("Run", "Payroll run number (email)"),
+                Pick("Rule", "Opens the PDF with (settings)", ["National ID", "Date of birth", "Employee number", "Password the employee sets", "No password"]),
+                Opt("Layout", "Payslip layout report code (settings; blank: standard text)"), Opt("Password", "Payslip password (set password; 8+ characters)")],
             Run = async (c, i) =>
             {
                 IPayslipDistributionService payslips = c.Get<IPayslipDistributionService>();
+                if (i.Text("Step") == "Payslip settings")
+                {
+                    Core.System.Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                    company.PayslipPasswordRule = i.Text("Rule") switch
+                    {
+                        "Date of birth" => Core.Payroll.PayslipPasswordRule.DateOfBirth,
+                        "Employee number" => Core.Payroll.PayslipPasswordRule.EmployeeNumber,
+                        "Password the employee sets" => Core.Payroll.PayslipPasswordRule.EmployeeSet,
+                        "No password" => Core.Payroll.PayslipPasswordRule.None,
+                        _ => Core.Payroll.PayslipPasswordRule.NationalId,
+                    };
+                    string? layout = i.Optional("Layout")?.Trim().ToUpperInvariant();
+                    if (layout is not null && !await c.Db.ReportDefinitions.AnyAsync(r => r.Code == layout).ConfigureAwait(true) && One4All.Reporting.SystemReportCatalogue.All().All(r => r.Code != layout))
+                    {
+                        throw new OperationException($"No report {layout}. Design the payslip in the report designer (start from PR74) and give its code here.");
+                    }
+
+                    company.PayslipLayoutCode = layout;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Payslips open with {i.Text("Rule").ToLowerInvariant()}; layout: {layout ?? "standard text payslip"}.";
+                }
+
+                if (i.Text("Step") == "Set password")
+                {
+                    string password = i.Optional("Password")?.Trim() ?? string.Empty;
+                    if (password.Length < 8)
+                    {
+                        throw new OperationException("The payslip password needs at least 8 characters.");
+                    }
+
+                    long employeeId = await EmployeeAsync(c, i.Optional("Employee") ?? string.Empty).ConfigureAwait(true);
+                    Core.Payroll.Employee employee = await c.Db.Employees.FirstAsync(e => e.Id == employeeId).ConfigureAwait(true);
+                    employee.PayslipPassword = password;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Payslip password set for {employee.EmployeeNumber} (it is stored encrypted and not shown again).";
+                }
+
                 if (i.Text("Step") == "Save PDF")
                 {
                     byte[] pdf = Check(await payslips.PayslipPdfAsync(c.CompanyId, await EmployeeAsync(c, i.Optional("Employee") ?? string.Empty).ConfigureAwait(true), i.Optional("Period") ?? string.Empty).ConfigureAwait(true));

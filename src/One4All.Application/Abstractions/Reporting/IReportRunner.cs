@@ -60,7 +60,22 @@ public interface IReportRunner
     Task<Result<IReadOnlyList<BurstSlice>>> BurstAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, ReportFormat format, string keyField,
         One4All.Application.Reporting.ReportAccess access, CancellationToken ct = default)
         => Task.FromResult(Result<IReadOnlyList<BurstSlice>>.Failure(Error.Rule("Rpt.BurstUnsupported", "This report runner cannot burst.")));
+
+    /// <summary>Runs a report and returns its pages as pictures (for a document that is then wrapped and protected, such as a designed payslip).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reportCode">The report.</param>
+    /// <param name="parameters">Its parameters.</param>
+    /// <param name="dpi">The picture resolution.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The pages.</returns>
+    Task<Result<RenderedPages>> RenderPageImagesAsync(long companyId, string reportCode, IReadOnlyDictionary<string, object?> parameters, int dpi = 150, CancellationToken ct = default)
+        => Task.FromResult(Result<RenderedPages>.Failure(Error.Rule("Rpt.PagesUnsupported", "This report runner cannot render pages as pictures.")));
 }
+
+/// <summary>A report's pages as JPEG pictures, with the page width in points.</summary>
+/// <param name="Jpegs">One JPEG per page.</param>
+/// <param name="WidthPoints">The page width in points.</param>
+public sealed record RenderedPages(IReadOnlyList<byte[]> Jpegs, double WidthPoints);
 
 /// <summary>One key's share of a burst report.</summary>
 /// <param name="Key">The key value.</param>

@@ -25,16 +25,18 @@ public sealed class PayslipDistributionService : IPayslipDistributionService
     /// <param name="db">The database context.</param>
     /// <param name="notifications">The messaging service the e-mails are queued through.</param>
     public PayslipDistributionService(One4AllDbContext db, INotificationService notifications, Application.Abstractions.Security.IAuditService? audit = null,
-        Application.Abstractions.Security.ICurrentUser? user = null)
+        Application.Abstractions.Security.ICurrentUser? user = null, Application.Abstractions.Reporting.IReportRunner? reports = null)
     {
         _audit = audit;
         _user = user;
         _db = db;
         _notifications = notifications;
+        _reports = reports;
     }
 
     /// <inheritdoc />
     private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Reporting.IReportRunner? _reports;
     private readonly Application.Abstractions.Security.ICurrentUser? _user;
 
     // Every export of personal or payroll data is recorded (brief §4.15.10: a payroll export is a data-breach risk).
@@ -128,6 +130,7 @@ public sealed class PayslipDistributionService : IPayslipDistributionService
             PayslipPasswordRule.NationalId => Normalise(employee.NationalIdNumber),
             PayslipPasswordRule.DateOfBirth => employee.DateOfBirth?.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture),
             PayslipPasswordRule.EmployeeNumber => employee.EmployeeNumber,
+            PayslipPasswordRule.EmployeeSet => employee.PayslipPassword,
             _ => null,
         };
         if (company.PayslipPasswordRule != PayslipPasswordRule.None && string.IsNullOrEmpty(password))
@@ -136,7 +139,30 @@ public sealed class PayslipDistributionService : IPayslipDistributionService
         }
 
         string? text = await StoredPayslips.TextAsync(_db, employee, period, ct).ConfigureAwait(false);
-        return text is null ? Error.NotFound("Ess.NoPayslip", $"No payslip for {period}.") : PdfTextDocument.Build(text, password);
+        if (text is null)
+        {
+            return Error.NotFound("Ess.NoPayslip", $"No payslip for {period}.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(company.PayslipLayoutCode) && _reports is not null)
+        {
+            // The company's own design: the layout report runs for this employee and the period's pay dates, and its pages become the PDF.
+            List<DateOnly> payDates = await _db.Payslips.AsNoTracking().Where(p => p.CompanyId == company.Id && p.EmployeeId == employee.Id && p.PeriodLabel == period)
+                .Select(p => p.PayDate).ToListAsync(ct).ConfigureAwait(false);
+            Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["FromDate"] = payDates.Min(), ["ToDate"] = payDates.Max(), ["EmployeeNumber"] = employee.EmployeeNumber, ["Period"] = period,
+            };
+            Result<Application.Abstractions.Reporting.RenderedPages> pages = await _reports.RenderPageImagesAsync(company.Id, company.PayslipLayoutCode.Trim(), parameters, 150, ct).ConfigureAwait(false);
+            if (pages.IsFailure)
+            {
+                return pages.Error;
+            }
+
+            return PdfTextDocument.BuildFromImages(pages.Value.Jpegs, pages.Value.WidthPoints, password);
+        }
+
+        return PdfTextDocument.Build(text, password);
     }
 
     // National IDs are typed with and without dashes and spaces; the password is the letters and digits only, upper case.
@@ -147,6 +173,7 @@ public sealed class PayslipDistributionService : IPayslipDistributionService
         PayslipPasswordRule.NationalId => "Open it with your national ID number (letters and digits only).",
         PayslipPasswordRule.DateOfBirth => "Open it with your date of birth as YYYYMMDD.",
         PayslipPasswordRule.EmployeeNumber => "Open it with your employee number.",
+        PayslipPasswordRule.EmployeeSet => "Open it with the payslip password you set (self-service, or ask HR).",
         _ => string.Empty,
     };
 }

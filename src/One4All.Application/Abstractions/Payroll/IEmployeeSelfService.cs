@@ -73,6 +73,16 @@ public interface IEmployeeSelfService
     /// <returns>The payslip text.</returns>
     Task<Result<string>> PayslipTextAsync(long userId, string periodLabel, CancellationToken ct = default);
 
+    /// <summary>
+    /// Sets the password that opens the user's payslip PDFs, for a company whose rule is <see cref="One4All.Core.Payroll.PayslipPasswordRule.EmployeeSet"/>
+    /// (8 or more characters). Stored encrypted; never shown again.
+    /// </summary>
+    /// <param name="userId">The signed-in user.</param>
+    /// <param name="password">The new password.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetPayslipPasswordAsync(long userId, string password, CancellationToken ct = default);
+
     /// <summary>The user's tax certificate figures for a year (by pay date).</summary>
     /// <param name="userId">The signed-in user.</param>
     /// <param name="year">The year.</param>

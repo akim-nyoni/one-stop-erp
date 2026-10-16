@@ -104,6 +104,122 @@ public static class PdfTextDocument
         return pdf.ToArray();
     }
 
+    /// <summary>
+    /// Builds a PDF whose pages are pictures (a designed payslip rendered page by page), protected like <see cref="Build"/>. Each page is
+    /// as wide as given and as tall as its picture's proportions make it.
+    /// </summary>
+    /// <param name="jpegPages">One JPEG per page.</param>
+    /// <param name="pageWidth">The page width in points (595 for A4).</param>
+    /// <param name="userPassword">The password needed to open it, or null for an open file.</param>
+    /// <returns>The PDF bytes.</returns>
+    public static byte[] BuildFromImages(IReadOnlyList<byte[]> jpegPages, double pageWidth, string? userPassword = null)
+    {
+        ArgumentNullException.ThrowIfNull(jpegPages);
+        if (jpegPages.Count == 0)
+        {
+            throw new ArgumentException("At least one page is needed.", nameof(jpegPages));
+        }
+
+        byte[] fileId = RandomNumberGenerator.GetBytes(16);
+        byte[]? key = null;
+        byte[]? owner = null;
+        byte[]? user = null;
+        if (userPassword is not null)
+        {
+            owner = OwnerValue(Convert.ToHexString(RandomNumberGenerator.GetBytes(16)), userPassword);
+            key = FileKey(userPassword, owner, Permissions, fileId);
+            user = UserValue(key, fileId);
+        }
+
+        using MemoryStream pdf = new();
+        List<long> offsets = [];
+        void Write(string s) => pdf.Write(Encoding.Latin1.GetBytes(s));
+        void Object(int number, string body)
+        {
+            offsets.Add(pdf.Position);
+            Write(string.Create(CultureInfo.InvariantCulture, $"{number} 0 obj\n{body}\nendobj\n"));
+        }
+
+        void Stream(int number, string dictionary, byte[] data)
+        {
+            if (key is not null)
+            {
+                data = Encrypt(key, number, data);
+            }
+
+            offsets.Add(pdf.Position);
+            Write(string.Create(CultureInfo.InvariantCulture, $"{number} 0 obj\n<< {dictionary} /Length {data.Length} >>\nstream\n"));
+            pdf.Write(data);
+            Write("\nendstream\nendobj\n");
+        }
+
+        Write("%PDF-1.6\n%âãÏÓ\n");
+        int encryptObject = 3 + (jpegPages.Count * 3);
+        Object(1, "<< /Type /Catalog /Pages 2 0 R >>");
+        Object(2, $"<< /Type /Pages /Kids [{string.Join(' ', Enumerable.Range(0, jpegPages.Count).Select(i => $"{3 + (i * 3)} 0 R"))}] /Count {jpegPages.Count} >>");
+        for (int i = 0; i < jpegPages.Count; i++)
+        {
+            int pageObject = 3 + (i * 3), contentObject = pageObject + 1, imageObject = pageObject + 2;
+            (int width, int height, int components) = JpegSize(jpegPages[i]);
+            double pageHeight = Math.Round(pageWidth * height / Math.Max(1, width), 2);
+            Object(pageObject, string.Create(CultureInfo.InvariantCulture,
+                $"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {pageWidth:0.##} {pageHeight:0.##}] /Resources << /XObject << /Im1 {imageObject} 0 R >> >> /Contents {contentObject} 0 R >>"));
+            Stream(contentObject, string.Empty, Encoding.Latin1.GetBytes(string.Create(CultureInfo.InvariantCulture, $"q {pageWidth:0.##} 0 0 {pageHeight:0.##} 0 0 cm /Im1 Do Q")));
+            Stream(imageObject, string.Create(CultureInfo.InvariantCulture,
+                $"/Type /XObject /Subtype /Image /Width {width} /Height {height} /ColorSpace {(components == 1 ? "/DeviceGray" : components == 4 ? "/DeviceCMYK" : "/DeviceRGB")} /BitsPerComponent 8 /Filter /DCTDecode"), jpegPages[i]);
+        }
+
+        if (key is not null)
+        {
+            Object(encryptObject, $"<< /Filter /Standard /V 4 /R 4 /Length 128 /CF << /StdCF << /CFM /AESV2 /AuthEvent /DocOpen /Length 16 >> >> /StmF /StdCF /StrF /StdCF " +
+                $"/O <{Convert.ToHexString(owner!)}> /U <{Convert.ToHexString(user!)}> /P {Permissions.ToString(CultureInfo.InvariantCulture)} >>");
+        }
+
+        long xref = pdf.Position;
+        Write(string.Create(CultureInfo.InvariantCulture, $"xref\n0 {offsets.Count + 1}\n0000000000 65535 f \n"));
+        foreach (long offset in offsets)
+        {
+            Write(string.Create(CultureInfo.InvariantCulture, $"{offset:D10} 00000 n \n"));
+        }
+
+        string id = Convert.ToHexString(fileId);
+        Write(string.Create(CultureInfo.InvariantCulture,
+            $"trailer\n<< /Size {offsets.Count + 1} /Root 1 0 R /ID [<{id}> <{id}>]{(key is null ? string.Empty : $" /Encrypt {encryptObject} 0 R")} >>\nstartxref\n{xref}\n%%EOF\n"));
+        return pdf.ToArray();
+    }
+
+    /// <summary>The pixel size and colour components of a JPEG, from its start-of-frame marker.</summary>
+    /// <param name="jpeg">The JPEG bytes.</param>
+    /// <returns>Width, height and the number of components (1 grey, 3 colour, 4 CMYK).</returns>
+    public static (int Width, int Height, int Components) JpegSize(byte[] jpeg)
+    {
+        ArgumentNullException.ThrowIfNull(jpeg);
+        if (jpeg.Length < 4 || jpeg[0] != 0xFF || jpeg[1] != 0xD8)
+        {
+            throw new ArgumentException("Not a JPEG.", nameof(jpeg));
+        }
+
+        int pos = 2;
+        while (pos + 9 < jpeg.Length && jpeg[pos] == 0xFF)
+        {
+            byte marker = jpeg[pos + 1];
+            if (marker is >= 0xC0 and <= 0xCF and not 0xC4 and not 0xC8 and not 0xCC)
+            {
+                return ((jpeg[pos + 7] << 8) | jpeg[pos + 8], (jpeg[pos + 5] << 8) | jpeg[pos + 6], jpeg[pos + 9]);
+            }
+
+            if (marker is 0xD8 or (>= 0xD0 and <= 0xD7) or 0x01)
+            {
+                pos += 2;
+                continue;
+            }
+
+            pos += 2 + ((jpeg[pos + 2] << 8) | jpeg[pos + 3]);
+        }
+
+        throw new ArgumentException("The JPEG has no start-of-frame marker.", nameof(jpeg));
+    }
+
     // The page's text operators: Courier, one line per row, top to bottom.
     private static byte[] Content(IReadOnlyList<string> lines)
     {

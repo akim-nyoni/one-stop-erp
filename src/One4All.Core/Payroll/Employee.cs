@@ -242,6 +242,9 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets the e-mail address payslips are sent to.</summary>
     public string? Email { get; set; }
 
+    /// <summary>Gets or sets the password that opens the employee's payslip PDF when the company's rule is <see cref="PayslipPasswordRule.EmployeeSet"/> (stored encrypted).</summary>
+    public string? PayslipPassword { get; set; }
+
     /// <summary>Gets or sets the residential (physical) address.</summary>
     public string? PhysicalAddress { get; set; }
 

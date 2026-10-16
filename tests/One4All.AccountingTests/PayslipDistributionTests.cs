@@ -60,5 +60,17 @@ public sealed class PayslipDistributionTests
         company.PayslipPasswordRule = PayslipPasswordRule.None;
         await db.SaveChangesAsync();
         Encoding.Latin1.GetString((await payslips.PayslipPdfAsync(companyId, cal.Id, "2026-09")).Value).Should().NotContain("/Encrypt").And.Contain("Basic Salary");
+
+        // The employee's own password, and the company's designed layout: the report's pages become the (protected) PDF.
+        company.PayslipPasswordRule = PayslipPasswordRule.EmployeeSet;
+        company.PayslipLayoutCode = "PR74";
+        ada.PayslipPassword = "ada-opens-2026";
+        await db.SaveChangesAsync();
+        (await payslips.PayslipPdfAsync(companyId, cal.Id, "2026-09")).Error.Code.Should().Be("Payroll.NoPassword");
+        One4All.Core.Common.Result<byte[]> designedPdf = await payslips.PayslipPdfAsync(companyId, ada.Id, "2026-09");
+        designedPdf.IsSuccess.Should().BeTrue(designedPdf.IsFailure ? designedPdf.Error.Code + ": " + designedPdf.Error.Message : string.Empty);
+        string designed = Encoding.Latin1.GetString(designedPdf.Value);
+        designed.Should().StartWith("%PDF-1.6").And.Contain("/Encrypt").And.Contain("/Subtype /Image").And.Contain("/Filter /DCTDecode").And.NotContain("Basic Salary");
+        (await payslips.EmailRunAsync(companyId, "PD-09")).Value.Queued.Should().Be(1);
     }
 }
