@@ -111,6 +111,30 @@ public interface IVerticalImportService
     /// </summary>
     Task<ImportReport> ImportRentalUnitsAsync(long companyId, string csv, DateOnly asAt, bool commit, CancellationToken ct = default);
 
+    /// <summary>
+    /// Ownership history of stands already on the register: <c>stand, date, change, holder</c> (optional <c>customer, consideration</c>); change is Allocation, Sale, Cession,
+    /// Surrender or Repossession. The rows join each stand's hash chain in date order; a stand that already has history beyond its origination is skipped.
+    /// </summary>
+    Task<ImportReport> ImportOwnershipHistoryAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Waiting-list applicants with their legacy numbers and seniority: <c>id_number, name, number, registered</c> (optional <c>category, date_of_birth, resident_since,
+    /// dependants, disability, income, tenure, status, marital, regime, spouse_id, spouse_name, verified</c>). An ID number already on the list is skipped.
+    /// </summary>
+    Task<ImportReport> ImportApplicantsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Municipal tariffs: <c>code, name, service, type, effective, revenue_account</c> (optional <c>fixed, rate, minimum, rate_per_valuation_cents, rate_per_sqm, category, ward,
+    /// blocks</c> as <c>0-10:0.5;10-30:0.8;30-:1.2</c> for stepped tariffs). A code already on the register is skipped.
+    /// </summary>
+    Task<ImportReport> ImportTariffsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Price lists: <c>price_list, item, price</c> (optional <c>name, currency, min_qty, effective</c>). A price list not yet on file is created (name and currency from its
+    /// first row, the company's base currency when none); an item already priced on the list at that quantity and date is skipped.
+    /// </summary>
+    Task<ImportReport> ImportPriceListsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
+
     /// <summary>The fixed-asset and staff-loan registers against the accounts they are held in.</summary>
     Task<Result<IReadOnlyList<RegisterCheck>>> ReconcileRegistersAsync(long companyId, CancellationToken ct = default);
 }

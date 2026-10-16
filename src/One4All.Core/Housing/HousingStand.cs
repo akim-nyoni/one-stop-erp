@@ -495,6 +495,33 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
         return true;
     }
 
+    /// <summary>Whether the stand's chain holds only its origination record (so migrated history can be laid onto it).</summary>
+    public bool HasNoOwnershipHistory => _ownership.Count <= 1;
+
+    /// <summary>
+    /// Appends a migrated ownership change (opening-balance take-on, brief §10): the record joins the hash chain like any other, so the history is
+    /// tamper-evident from the day it is loaded. Dates must not run backwards.
+    /// </summary>
+    /// <param name="changeType">The kind of change (not origination, which every stand already has).</param>
+    /// <param name="holderCustomerId">The holder's account, if any.</param>
+    /// <param name="holderName">The holder's name.</param>
+    /// <param name="date">The effective date.</param>
+    /// <param name="consideration">The consideration.</param>
+    public void ImportOwnership(OwnershipChangeType changeType, long? holderCustomerId, string holderName, DateOnly date, decimal consideration)
+    {
+        if (changeType == OwnershipChangeType.Origination)
+        {
+            throw new InvalidOperationException("A stand's origination is recorded when it is created; history starts from the first change after it.");
+        }
+
+        if (_ownership.Count > 1 && date < _ownership[^1].EffectiveDate)
+        {
+            throw new InvalidOperationException($"Ownership history for stand {StandNumber} must be in date order.");
+        }
+
+        AppendOwnership(changeType, holderCustomerId, holderName.Trim(), date, consideration);
+    }
+
     private void AppendOwnership(OwnershipChangeType changeType, long? holderId, string holderName, DateOnly date, decimal consideration)
     {
         int sequence = _ownership.Count + 1;

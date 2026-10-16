@@ -4,6 +4,7 @@ using One4All.Application.Abstractions.Onboarding;
 using One4All.Application.Onboarding;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
+using System.Globalization;
 using One4All.Core.FixedAssets;
 using One4All.Core.Municipal;
 using One4All.Core.Payroll;
@@ -1022,6 +1023,319 @@ public sealed class VerticalImportService : IVerticalImportService
         ];
         return checks;
     }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportOwnershipHistoryAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "stand", "date", "change", "holder");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        Dictionary<string, long> customers = await _db.Customers.Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Code, c => c.Id, ct).ConfigureAwait(false);
+        List<Core.Housing.HousingStand> stands = await _db.HousingStands.Include(s => s.Ownership).Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, Core.Housing.HousingStand> byNumber = stands.ToDictionary(s => s.StandNumber, StringComparer.OrdinalIgnoreCase);
+        List<ImportError> errors = [];
+        List<(string Stand, DateOnly Date, Core.Housing.OwnershipChangeType Change, long? Customer, string Holder, decimal Consideration, int Line)> history = [];
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string stand = Code(row.Text("stand")), holder = row.Text("holder") ?? string.Empty, customer = Code(row.Text("customer"));
+                DateOnly? date = row.Date("date");
+                decimal consideration = row.Number("consideration") ?? 0m;
+                if (stand.Length == 0 || holder.Length == 0 || date is null || consideration < 0m
+                    || !Enum.TryParse(row.Text("change"), true, out Core.Housing.OwnershipChangeType change) || change == Core.Housing.OwnershipChangeType.Origination)
+                {
+                    return "An ownership change needs a stand, a date, a change (Allocation, Sale, Cession, Surrender or Repossession), a holder and a consideration not below zero.";
+                }
+
+                if (!byNumber.TryGetValue(stand, out Core.Housing.HousingStand? known))
+                {
+                    return $"Stand {stand} is not on the register.";
+                }
+
+                long? customerId = null;
+                if (customer.Length > 0)
+                {
+                    if (!customers.TryGetValue(customer, out long id))
+                    {
+                        return $"Customer {customer} is not on file.";
+                    }
+
+                    customerId = id;
+                }
+
+                if (!known.HasNoOwnershipHistory)
+                {
+                    skipped++;
+                    return null;
+                }
+
+                history.Add((stand, date.Value, change, customerId, holder, consideration, row.LineNumber));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            int written = 0;
+            foreach (IGrouping<string, (string Stand, DateOnly Date, Core.Housing.OwnershipChangeType Change, long? Customer, string Holder, decimal Consideration, int Line)> group
+                in history.GroupBy(h => h.Stand, StringComparer.OrdinalIgnoreCase))
+            {
+                Core.Housing.HousingStand stand = byNumber[group.Key];
+                foreach ((_, DateOnly date, Core.Housing.OwnershipChangeType change, long? customer, string holder, decimal consideration, _) in group.OrderBy(h => h.Date).ThenBy(h => h.Line))
+                {
+                    stand.ImportOwnership(change, customer, holder, date, consideration);
+                    written++;
+                }
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return written;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportApplicantsAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "id_number", "name", "number", "registered");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        HashSet<string> existingIds = [.. await _db.HousingApplicants.Where(a => a.CompanyId == companyId).Select(a => a.IdNumber).ToListAsync(ct).ConfigureAwait(false)];
+        HashSet<string> existingNumbers = new(await _db.HousingApplicants.Where(a => a.CompanyId == companyId && a.WaitingListNumber != null).Select(a => a.WaitingListNumber!).ToListAsync(ct)
+            .ConfigureAwait(false), StringComparer.OrdinalIgnoreCase);
+        List<ImportError> errors = [];
+        List<Core.Housing.HousingApplicant> toCreate = [];
+        HashSet<string> seenIds = new(StringComparer.OrdinalIgnoreCase), seenNumbers = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string id = Code(row.Text("id_number")), name = row.Text("name") ?? string.Empty, number = Code(row.Text("number"));
+                DateOnly? registered = row.Date("registered");
+                Core.Housing.HousingCategory category = Core.Housing.HousingCategory.HighDensity;
+                Core.Housing.CurrentTenure tenure = Core.Housing.CurrentTenure.Tenant;
+                Core.Housing.ApplicantStatus status = Core.Housing.ApplicantStatus.Active;
+                Core.Housing.MaritalStatus marital = Core.Housing.MaritalStatus.Single;
+                Core.Housing.MaritalRegime regime = default;
+                decimal income = row.Number("income") ?? 0m, dependants = row.Number("dependants") ?? 0m;
+                if (id.Length == 0 || name.Length == 0 || number.Length == 0 || registered is null || income < 0m || dependants < 0m
+                    || (row.Text("category") is string c && !Enum.TryParse(c, true, out category))
+                    || (row.Text("tenure") is string t && !Enum.TryParse(t, true, out tenure))
+                    || (row.Text("status") is string s && !Enum.TryParse(s, true, out status))
+                    || (row.Text("marital") is string m && !Enum.TryParse(m, true, out marital))
+                    || (row.Text("regime") is string r && !Enum.TryParse(r, true, out regime)))
+                {
+                    return "An applicant needs an ID number, a name, a waiting-list number and a registration date; category (HighDensity, MediumDensity, LowDensity), tenure (Lodger, Tenant, "
+                        + "Homeless), status (Active, Suspended, Removed), marital status and regime must be one of their values; income and dependants not below zero.";
+                }
+
+                if (!seenIds.Add(id))
+                {
+                    return $"ID number {id} appears twice.";
+                }
+
+                if (existingIds.Contains(id))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                if (!seenNumbers.Add(number) || existingNumbers.Contains(number))
+                {
+                    return $"Waiting-list number {number} is already in use.";
+                }
+
+                Core.Housing.HousingApplicant applicant = new(companyId, id, name.Trim(), registered.Value);
+                applicant.SetDetails(category, row.Date("date_of_birth") ?? registered.Value.AddYears(-30), row.Date("resident_since") ?? registered.Value, (int)dependants,
+                    Flag(row.Text("disability")), income, tenure);
+                applicant.SetSpouse(marital, row.Text("regime") is null ? null : regime, row.Text("spouse_id"), row.Text("spouse_name"));
+                applicant.Register(number, registered.Value);
+                applicant.SetStatus(status);
+                if (Flag(row.Text("verified")))
+                {
+                    applicant.Verify();
+                }
+
+                toCreate.Add(applicant);
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.HousingApplicants.AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportTariffsAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "name", "service", "type", "effective", "revenue_account");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        HashSet<string> accounts = await AccountsAsync(companyId, ct).ConfigureAwait(false);
+        HashSet<string> existing = new(await _db.Tariffs.Where(t => t.CompanyId == companyId).Select(t => t.Code).ToListAsync(ct).ConfigureAwait(false), StringComparer.OrdinalIgnoreCase);
+        List<ImportError> errors = [];
+        List<Tariff> toCreate = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string code = Code(row.Text("code")), name = row.Text("name") ?? string.Empty, account = (row.Text("revenue_account") ?? string.Empty).Trim();
+                DateOnly? effective = row.Date("effective");
+                ConsumerCategory category = ConsumerCategory.Domestic;
+                if (code.Length == 0 || name.Length == 0 || effective is null || !Enum.TryParse(row.Text("service"), true, out ServiceType service)
+                    || !Enum.TryParse(row.Text("type"), true, out TariffType type) || (row.Text("category") is string c && !Enum.TryParse(c, true, out category)))
+                {
+                    return "A tariff needs a code, a name, a service (" + string.Join(", ", Enum.GetNames<ServiceType>()) + "), a type (" + string.Join(", ", Enum.GetNames<TariffType>())
+                        + "), an effective date and a revenue account.";
+                }
+
+                if (!accounts.Contains(account))
+                {
+                    return $"Revenue account {account} does not exist.";
+                }
+
+                if (!seen.Add(code))
+                {
+                    return $"Tariff {code} appears twice.";
+                }
+
+                if (existing.Contains(code))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                Tariff tariff = new(companyId, code, name.Trim(), service, type, effective.Value, account)
+                {
+                    FixedCharge = row.Number("fixed") ?? 0m, PerUnitRate = row.Number("rate") ?? 0m, MinimumCharge = row.Number("minimum") ?? 0m,
+                    RatePerValuationCents = row.Number("rate_per_valuation_cents") ?? 0m, RatePerSquareMetre = row.Number("rate_per_sqm") ?? 0m, Category = category, Ward = row.Text("ward"),
+                };
+                if (row.Text("blocks") is string blocks)
+                {
+                    foreach (string block in blocks.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                    {
+                        string[] parts = block.Split(':');
+                        string[] range = parts.Length == 2 ? parts[0].Split('-') : [];
+                        if (range.Length != 2 || !decimal.TryParse(range[0], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal from)
+                            || !decimal.TryParse(parts[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal rate)
+                            || (range[1].Length > 0 && !decimal.TryParse(range[1], NumberStyles.Number, CultureInfo.InvariantCulture, out _)))
+                        {
+                            return $"Block \"{block}\" is not from-to:rate (leave \"to\" empty for the top block, e.g. 30-:1.2).";
+                        }
+
+                        tariff.AddBlock(from, range[1].Length == 0 ? null : decimal.Parse(range[1], NumberStyles.Number, CultureInfo.InvariantCulture), rate);
+                    }
+                }
+
+                toCreate.Add(tariff);
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            _db.Tariffs.AddRange(toCreate);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toCreate.Count;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportPriceListsAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "price_list", "item", "price");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
+        Dictionary<string, long> items = await _db.Items.Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Code, i => i.Id, ct).ConfigureAwait(false);
+        Dictionary<string, Core.Inventory.PriceList> lists = (await _db.PriceLists.Include(p => p.Lines).Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .ToDictionary(p => p.Code, StringComparer.OrdinalIgnoreCase);
+        List<ImportError> errors = [];
+        List<(string List, string? Name, CurrencyCode Currency, long Item, decimal MinimumQuantity, decimal Price, DateOnly? Effective)> toWrite = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string list = Code(row.Text("price_list")), item = Code(row.Text("item"));
+                decimal price = row.Number("price") ?? -1m, minimum = row.Number("min_qty") ?? 1m;
+                CurrencyCode currency = baseCurrency;
+                if (list.Length == 0 || item.Length == 0 || price < 0m || minimum < 1m || (row.Text("currency") is string given && !CurrencyCode.TryParse(given, out currency)))
+                {
+                    return "A price needs a price list, an item, a price not below zero, a minimum quantity of at least 1 and, if given, a valid currency.";
+                }
+
+                if (!items.TryGetValue(item, out long itemId))
+                {
+                    return $"Item {item} is not on file.";
+                }
+
+                DateOnly? effective = row.Date("effective");
+                if (!seen.Add($"{list}|{item}|{minimum}|{effective}"))
+                {
+                    return $"Item {item} is priced twice on {list} for the same quantity and date.";
+                }
+
+                if (lists.TryGetValue(list, out Core.Inventory.PriceList? known))
+                {
+                    if (known.Currency != currency && row.Text("currency") is not null)
+                    {
+                        return $"Price list {list} is in {known.Currency}.";
+                    }
+
+                    if (known.Lines.Any(l => l.ItemId == itemId && l.MinimumQuantity == minimum && l.EffectiveFrom == effective))
+                    {
+                        skipped++;
+                        return null;
+                    }
+                }
+
+                toWrite.Add((list, row.Text("name"), currency, itemId, minimum, price, effective));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            foreach ((string list, string? name, CurrencyCode currency, long itemId, decimal minimum, decimal price, DateOnly? effective) in toWrite)
+            {
+                if (!lists.TryGetValue(list, out Core.Inventory.PriceList? target))
+                {
+                    target = new Core.Inventory.PriceList(companyId, list, name ?? list, currency) { IsActive = true };
+                    _db.PriceLists.Add(target);
+                    lists[list] = target;
+                }
+
+                target.SetPrice(itemId, minimum, price, effective);
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return toWrite.Count;
+        }).ConfigureAwait(false);
+    }
+
+    private static bool Flag(string? value) => value is not null && (value.Equals("yes", StringComparison.OrdinalIgnoreCase) || value.Equals("true", StringComparison.OrdinalIgnoreCase) || value == "1");
 
     private static string Code(string? value) => (value ?? string.Empty).Trim().ToUpperInvariant();
 
