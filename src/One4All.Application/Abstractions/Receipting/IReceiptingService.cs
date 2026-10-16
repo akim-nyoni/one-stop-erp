@@ -135,6 +135,9 @@ public sealed class ReceiptRequest
 
     /// <summary>The tenders (how it was paid).</summary>
     public IReadOnlyList<ReceiptTenderRequest> Tenders { get; init; } = [];
+
+    /// <summary>When the cashier started the receipt (the payer chosen or the first amount keyed), so RC10 can show the handling time; null when not timed.</summary>
+    public DateTimeOffset? StartedAtUtc { get; init; }
 }
 
 /// <summary>The result of posting a receipt.</summary>

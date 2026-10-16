@@ -168,7 +168,10 @@ public sealed class ReceiptingService : IReceiptingService
         bool pending = request.Pending && !string.IsNullOrWhiteSpace(request.PendingAccountCode);
         string cashCode = pending ? request.PendingAccountCode! : request.CashAccountCode;
 
-        Receipt receipt = new(request.CompanyId, session.Id, session.StationId, session.CashierUserId, receiptNumber, request.Date, request.PayerKind, request.PayerAccountId, currency);
+        Receipt receipt = new(request.CompanyId, session.Id, session.StationId, session.CashierUserId, receiptNumber, request.Date, request.PayerKind, request.PayerAccountId, currency)
+        {
+            StartedOnUtc = request.StartedAtUtc,
+        };
         foreach (ReceiptLineRequest line in request.Lines)
         {
             receipt.AddLine(line.Type, line.Amount, line.AccountCode, line.Narrative, line.Service);

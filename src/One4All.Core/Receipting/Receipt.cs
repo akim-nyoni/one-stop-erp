@@ -134,6 +134,9 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public ReceiptStatus Status { get; private set; }
 
+    /// <summary>When the cashier started this receipt (the payer chosen or the first amount keyed), for the handling time on RC10; null when the till did not say.</summary>
+    public DateTimeOffset? StartedOnUtc { get; set; }
+
     /// <summary>The GL journal number (coded lines).</summary>
     public string? JournalNumber { get; set; }
 

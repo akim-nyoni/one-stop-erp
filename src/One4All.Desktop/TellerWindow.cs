@@ -55,6 +55,7 @@ public sealed class TellerWindow : Window
     private CurrencyCode _base = CurrencyCode.Parse("USD");
     private TillCurrency? _currency;
     private PayerHit? _selected;
+    private DateTimeOffset? _startedAt; // when this receipt began (payer chosen or first digit keyed), for RC10's handling time
     private long _companyId;
     private bool _sessionOpen;
     private CancellationTokenSource? _typing;
@@ -167,6 +168,7 @@ public sealed class TellerWindow : Window
             string digit = key;
             k.Click += (_, _) =>
             {
+                _startedAt ??= DateTimeOffset.UtcNow;
                 _amount.Text = digit == "⌫" ? (_amount.Text.Length > 0 ? _amount.Text[..^1] : string.Empty) : _amount.Text + digit;
             };
             pad.Children.Add(k);
@@ -372,6 +374,15 @@ public sealed class TellerWindow : Window
     private void Select(PayerHit? hit)
     {
         _selected = hit;
+        if (hit is null)
+        {
+            _startedAt = null;
+        }
+        else
+        {
+            _startedAt ??= DateTimeOffset.UtcNow;
+        }
+
         Refresh();
         RefreshGuide();
     }
@@ -535,6 +546,7 @@ public sealed class TellerWindow : Window
             Currency = _currency.Code == _base ? null : _currency.Code,
             Lines = [new ReceiptLineRequest(ReceiptLineType.DebtorPayment, amount)],
             Tenders = tenders,
+            StartedAtUtc = _startedAt,
         }).ConfigureAwait(true);
         if (posted.IsFailure)
         {

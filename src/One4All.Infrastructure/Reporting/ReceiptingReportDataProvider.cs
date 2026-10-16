@@ -278,7 +278,8 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .Where(s => s.CompanyId == companyId)
             .ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
 
-        // Hour comes from the capture timestamp (receipts carry a business Date only).
+        // Hour comes from the capture timestamp (receipts carry a business Date only); the handling time is from the till's start stamp
+        // (the payer chosen or the first amount keyed) to the receipt's capture, averaged over the receipts that carry one.
         return receipts
             .GroupBy(r => new { Hour = r.CreatedOnUtc.UtcDateTime.Hour, r.StationId })
             .OrderBy(g => g.Key.Hour).ThenBy(g => g.Key.StationId)
@@ -287,9 +288,18 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
                 ["Hour"] = $"{g.Key.Hour:D2}:00",
                 ["Station"] = stations.GetValueOrDefault(g.Key.StationId, g.Key.StationId.ToString()),
                 ["Transactions"] = g.Count(),
-                ["AvgSeconds"] = 0,
+                ["AvgSeconds"] = AverageHandlingSeconds(g),
             }))
             .ToList();
+    }
+
+    /// <summary>The average seconds from the till's start stamp to capture over the receipts that carry one (null when none do).</summary>
+    /// <param name="receipts">The receipts.</param>
+    /// <returns>The average, rounded, or null.</returns>
+    public static int? AverageHandlingSeconds(IEnumerable<Receipt> receipts)
+    {
+        List<double> timed = [.. receipts.Where(r => r.StartedOnUtc is not null && r.CreatedOnUtc >= r.StartedOnUtc).Select(r => (r.CreatedOnUtc - r.StartedOnUtc!.Value).TotalSeconds)];
+        return timed.Count == 0 ? null : (int)Math.Round(timed.Average());
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashierProductivityAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)

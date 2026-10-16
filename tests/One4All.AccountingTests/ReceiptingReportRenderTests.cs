@@ -70,6 +70,7 @@ public sealed class ReceiptingReportRenderTests
                 CompanyId = companyId, SessionId = sessionId, PayerKind = PayerKind.ArCustomer, PayerAccountId = overpayerId, Date = new DateOnly(2026, 3, 10), CashAccountCode = "1000",
                 Lines = [new ReceiptLineRequest(ReceiptLineType.DebtorPayment, 100m)],
                 Tenders = [new ReceiptTenderRequest(TenderType.Cash, 100m)],
+                StartedAtUtc = DateTimeOffset.UtcNow.AddSeconds(-45), // the till timed this one: about 45 s from payer chosen to capture
             })).IsSuccess.Should().BeTrue();
         }
 
@@ -94,7 +95,9 @@ public sealed class ReceiptingReportRenderTests
             (await Html(runner, companyId, "RC39", asAt)).Should().Contain("OVP").And.Contain("100.00");                 // credit balances
             (await Html(runner, companyId, "RC51", range)).Should().Contain("2026-03");                                  // collection trend
             (await Html(runner, companyId, "RC17", new())).Should().Contain("RP");                                       // gap analysis (station code)
-            (await Html(runner, companyId, "RC10", new() { ["Date"] = new DateOnly(2026, 3, 10) })).Should().Contain(":00").And.Contain("TILL-RPT"); // hourly volume by capture hour
+            string hourly = await Html(runner, companyId, "RC10", new() { ["Date"] = new DateOnly(2026, 3, 10) });
+            hourly.Should().Contain(":00").And.Contain("TILL-RPT"); // hourly volume by capture hour
+            System.Text.RegularExpressions.Regex.IsMatch(hourly, @">4[4-9]<|>5[0-9]<").Should().BeTrue("the timed receipt gives the hour an average handling time of about 45 s");
         }
     }
 
