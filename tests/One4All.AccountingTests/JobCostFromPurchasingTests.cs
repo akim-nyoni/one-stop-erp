@@ -40,6 +40,7 @@ public sealed class JobCostFromPurchasingTests
         Item soap = new(companyId, "JP-SOAP", "Soap") { CostOfSalesAccountCode = "5000" };
         Warehouse store = new(companyId, "JP-WH", "Store");
         db.AddRange(client, supplier, cement, soap, store);
+        (await db.Companies.SingleAsync(c => c.Id == companyId)).InvoicePriceTolerancePercent = 10m;
         await db.SaveChangesAsync();
         IJobCostingService jobs = scope.ServiceProvider.GetRequiredService<IJobCostingService>();
         long contract = (await jobs.CreateContractAsync(companyId, "JP-1", "Clinic", client.Id, 10_000m, 8_000m, 5m, "4300")).Value;

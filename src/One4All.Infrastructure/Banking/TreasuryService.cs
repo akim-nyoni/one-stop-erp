@@ -74,8 +74,8 @@ public sealed class TreasuryService : ITreasuryService
             return Error.Validation("Treasury.CrossCurrency", "A transfer between currencies needs the amount received, a clearing account and exchange gain and loss accounts.");
         }
 
-        decimal? rateFrom = await ExchangeRateResolver.FindAsync(_db, from.Currency, baseCurrency, ExchangeRateType.Daily, request.Date, ct).ConfigureAwait(false);
-        decimal? rateTo = await ExchangeRateResolver.FindAsync(_db, to.Currency, baseCurrency, ExchangeRateType.Daily, request.Date, ct).ConfigureAwait(false);
+        decimal? rateFrom = await ExchangeRateResolver.PolicyRateAsync(_db, request.CompanyId, from.Currency, baseCurrency, "Treasury", "CB", request.Date, ct).ConfigureAwait(false);
+        decimal? rateTo = await ExchangeRateResolver.PolicyRateAsync(_db, request.CompanyId, to.Currency, baseCurrency, "Treasury", "CB", request.Date, ct).ConfigureAwait(false);
         if (rateFrom is null || rateTo is null)
         {
             return Error.Rule("Treasury.NoRate", $"There is no daily rate for {from.Currency} or {to.Currency} on {request.Date:yyyy-MM-dd}.");

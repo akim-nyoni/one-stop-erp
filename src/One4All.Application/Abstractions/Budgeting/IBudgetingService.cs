@@ -121,12 +121,16 @@ public interface IBudgetingService
     /// <returns>The record id.</returns>
     Task<Result<long>> RecordActualVolumeAsync(long companyId, string accountCode, string? department, DateOnly date, decimal quantity, string reference, CancellationToken ct = default);
 
-    /// <summary>Activates a budget version, superseding the prior active one for the same year/type/department.</summary>
+    /// <summary>
+    /// Activates a budget version, superseding the prior active one for the same year/type/department. Where the company requires approval the version must be approved,
+    /// and the activating user (when given) may be neither its submitter nor its approver (brief §4.18.4 segregation).
+    /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="budgetId">The budget to activate.</param>
+    /// <param name="activatedByUserId">Who activates it (recorded on the version); null for a system activation.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
-    Task<Result> ActivateAsync(long companyId, long budgetId, CancellationToken ct = default);
+    Task<Result> ActivateAsync(long companyId, long budgetId, long? activatedByUserId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Compares the active budget to actuals by fund, project or branch and account, to an as-at period (brief §4.18.1: budget lines key on the

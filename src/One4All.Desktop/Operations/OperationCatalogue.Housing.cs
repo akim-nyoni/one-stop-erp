@@ -475,10 +475,10 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Transfer of ownership", ListTitle = "Transfer applications",
             Description = "Lodge a transfer (sale, cession, inheritance, donation, court order) to a new holder; verify each requirement with its document; the checklist shows what is "
-                + "outstanding (rates and housing account clearances are checked live); submit, approve (by someone else), complete or reject.",
-            Fields = [Pick("Step", "Step", ["Lodge", "Verify", "Checklist", "Submit", "Approve", "Complete", "Reject"]), Opt("Application", "Application number"), Opt("Stand", "Stand number (lodge)"),
+                + "outstanding (rates and housing account clearances are checked live); an approving officer may record that the transferee assumes the housing balance; submit, approve (by someone else), complete or reject.",
+            Fields = [Pick("Step", "Step", ["Lodge", "Verify", "Checklist", "Assume balance", "Submit", "Approve", "Complete", "Reject"]), Opt("Application", "Application number"), Opt("Stand", "Stand number (lodge)"),
                 Pick("Type", "Transfer type", Enum.GetNames<TransferType>()), Opt("To", "New holder customer code (lodge)"), Num("Consideration", "Consideration", "0"),
-                Pick("Requirement", "Requirement (verify)", Enum.GetNames<TransferRequirement>()), Opt("Document", "Document reference / reason"), Today()],
+                Pick("Requirement", "Requirement (verify)", Enum.GetNames<TransferRequirement>()), Opt("Document", "Document reference / reason"), Opt("Clearing", "Clearing account (assume balance)"), Today()],
             Run = async (c, i) =>
             {
                 ITransferApplicationService transfers = c.Get<ITransferApplicationService>();
@@ -501,6 +501,10 @@ public static partial class OperationCatalogue
                     case "Checklist":
                         IReadOnlyList<TransferChecklistLine> lines = Check(await transfers.ChecklistAsync(c.CompanyId, application, date).ConfigureAwait(true));
                         return string.Join(Environment.NewLine, lines.Select(l => $"{(l.Satisfied ? "OK " : "-- ")} {l.Requirement}{(l.IsLive ? " (live)" : string.Empty)}{(l.Detail is null ? string.Empty : ": " + l.Detail)}"));
+                    case "Assume balance":
+                        decimal assumed = Check(await transfers.AssumeBalanceAsync(c.CompanyId, application, c.UserId, i.Optional("Clearing") ?? throw new OperationException("Give the clearing account the balance passes through."), date)
+                            .ConfigureAwait(true));
+                        return $"Balance of {M(assumed)} assumed by the transferee (approved); it moves to them, with any instalment agreement, when the transfer completes.";
                     case "Submit":
                         return Check(await transfers.SubmitAsync(c.CompanyId, application, c.UserId, date).ConfigureAwait(true), "Submitted for approval.");
                     case "Approve":

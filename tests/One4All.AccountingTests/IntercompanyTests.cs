@@ -97,6 +97,18 @@ public sealed class IntercompanyTests
             partial.IntercompanyEliminated.Should().Be(0m);
             partial.IntercompanyUnmatched.Should().Be(1000m);
             partial.Rows.Should().Contain(r => r.AccountCode == DueFrom);
+
+            // Sides that do not net exactly are eliminated to the extent they match; the residue stays visible on the account (thirteenth audit #9).
+            IPostingEngine engine = scope.ServiceProvider.GetRequiredService<IPostingEngine>();
+            (await engine.PostAsync(new JournalRequest
+            {
+                CompanyId = parent, SourceModule = "GL", PostingDate = new DateOnly(2026, 3, 20), TransactionCurrency = Scenario.Usd, DocumentNumber = "IC-ONE-SIDED",
+                Lines = [new JournalLineRequest { AccountCode = DueFrom, Side = JournalSide.Debit, TransactionAmount = 400m }, new JournalLineRequest { AccountCode = "1100", Side = JournalSide.Credit, TransactionAmount = 400m }],
+            })).IsSuccess.Should().BeTrue();
+            ConsolidatedTrialBalance mostly = (await consolidation.ConsolidatedTrialBalanceAsync([parent, subsidiary], new DateOnly(2026, 3, 31), [DueFrom, DueTo])).Value;
+            (mostly.IntercompanyEliminated, mostly.IntercompanyUnmatched).Should().Be((1000m, 400m));
+            mostly.Rows.Should().Contain(r => r.AccountCode == DueFrom && r.Debit == 400m).And.NotContain(r => r.AccountCode == DueTo);
+            mostly.IsBalanced.Should().BeTrue();
         }
     }
 

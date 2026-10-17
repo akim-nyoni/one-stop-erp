@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using One4All.Application.Abstractions.Trading;
+using One4All.Core.Trading;
 
 namespace One4All.Application.Trading;
 
@@ -53,7 +54,7 @@ public sealed record StatementAgeing(decimal Current, decimal Days1To30, decimal
                 continue;
             }
 
-            int overdue = asAt.DayNumber - line.DueDate.DayNumber;
+            int overdue = asAt.DayNumber - (statement.AgeingBasis == AgeingBasis.InvoiceDate ? line.Date : line.DueDate).DayNumber;
             if (overdue <= 0)
             {
                 current += line.Outstanding;

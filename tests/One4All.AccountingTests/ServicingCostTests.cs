@@ -77,4 +77,39 @@ public sealed class ServicingCostTests
         costs.Should().Equal(new StandCostEntry("SV-1", 5900m, 4900m), new StandCostEntry("SV-2", 10800m, 8800m), new StandCostEntry("SV-3", 1000m, 0m));
         (await db.Set<ServicingCharge>().Where(c => c.CompanyId == companyId).SumAsync(c => c.Amount)).Should().Be(13700m);
     }
+
+    [SkippableFact]
+    public async Task Stands_still_being_serviced_take_their_share_of_the_cost()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Customer client = new(companyId, "SU-CON", "Council works", Scenario.Usd);
+        db.Customers.Add(client);
+        LandParcel parcel = new(companyId, $"LP-SU-{companyId}", "Servicing parcel", 3000m, 30000m);
+        HousingScheme scheme = new(companyId, $"SCH-SU-{companyId}", "Under-servicing Scheme", SchemeType.CouncilDelivered);
+        db.LandParcels.Add(parcel);
+        db.HousingSchemes.Add(scheme);
+        await db.SaveChangesAsync();
+        HousingStand available = new(companyId, parcel.Id, scheme.Id, "SU-1", 300m, 1000m);
+        HousingStand underServicing = new(companyId, parcel.Id, scheme.Id, "SU-2", 300m, 1000m, initialStatus: StandStatus.UnderServicing);
+        HousingStand sold = new(companyId, parcel.Id, scheme.Id, "SU-3", 300m, 1000m);
+        db.HousingStands.AddRange(available, underServicing, sold);
+        await db.SaveChangesAsync();
+        sold.Sell(client.Id, client.Name, 5000m, new DateOnly(2026, 1, 20));
+        await db.SaveChangesAsync();
+
+        IJobCostingService jobs = scope.ServiceProvider.GetRequiredService<IJobCostingService>();
+        long roads = (await jobs.CreateContractAsync(companyId, $"SUC-R-{companyId}", "Roads", client.Id, 100_000m, 90_000m, 0m, "4300")).Value;
+        (await jobs.CaptureCostAsync(companyId, roads, "Earthworks", JobCostSource.Subcontractor, 900m, new DateOnly(2026, 3, 15), "RU-1")).IsSuccess.Should().BeTrue();
+        IServicingCostService servicing = scope.ServiceProvider.GetRequiredService<IServicingCostService>();
+        (await servicing.LinkAsync(companyId, scheme.Id, roads, ServicingBasis.Equal)).IsSuccess.Should().BeTrue();
+        (await servicing.ApportionAsync(companyId, scheme.Id, new DateOnly(2026, 3, 31), "1450", "1460")).Value.Single().Apportioned.Should().Be(900m);
+
+        // The stand still under servicing shares the cost equally with the available one; the sold stand takes none.
+        IReadOnlyList<StandCostEntry> costs = await servicing.CostPerStandAsync(companyId, scheme.Id);
+        costs.Should().Equal(new StandCostEntry("SU-1", 1450m, 450m), new StandCostEntry("SU-2", 1450m, 450m), new StandCostEntry("SU-3", 1000m, 0m));
+    }
 }

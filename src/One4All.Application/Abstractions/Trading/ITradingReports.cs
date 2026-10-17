@@ -41,7 +41,7 @@ public sealed record StatementLineRow(DateOnly Date, OpenItemType DocumentType, 
 /// <param name="Currency">The trading currency.</param>
 /// <param name="Lines">The statement lines.</param>
 /// <param name="Balance">The outstanding balance in transaction currency.</param>
-public sealed record TraderStatement(string TraderCode, string TraderName, string Currency, IReadOnlyList<StatementLineRow> Lines, decimal Balance);
+public sealed record TraderStatement(string TraderCode, string TraderName, string Currency, IReadOnlyList<StatementLineRow> Lines, decimal Balance, AgeingBasis AgeingBasis = AgeingBasis.DueDate);
 
 /// <summary>One customer's credit-control exposure (base currency).</summary>
 /// <param name="CustomerCode">The customer code.</param>

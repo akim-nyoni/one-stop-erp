@@ -50,9 +50,9 @@ public sealed class FxRevaluationService : IFxRevaluationService
             return Error.Rule("Fx.NoGainLossAccounts", "FX gain and/or FX loss control accounts are not configured.");
         }
 
-        // Foreign monetary accounts to revalue.
+        // Foreign monetary accounts to revalue (IAS 21: non-monetary items such as stock or prepayments held in a currency stay at their historical rate).
         List<LedgerAccount> accounts = await _db.Accounts
-            .Where(a => a.CompanyId == companyId && a.CurrencyRestriction != null && a.CurrencyRestriction != baseCurrency &&
+            .Where(a => a.CompanyId == companyId && a.CurrencyRestriction != null && a.CurrencyRestriction != baseCurrency && a.IsMonetary &&
                         (a.Type == AccountType.Asset || a.Type == AccountType.Liability))
             .ToListAsync(ct)
             .ConfigureAwait(false);
@@ -123,6 +123,7 @@ public sealed class FxRevaluationService : IFxRevaluationService
                 PostingDate = asAtDate,
                 TransactionCurrency = currency,
                 EnforceManualJournalRules = false,
+                ValuationOnly = true,
                 DocumentType = "FxRevaluation",
                 Narrative = $"FX revaluation ({currency}) as at {asAtDate:yyyy-MM-dd}",
                 Lines = lines,
@@ -146,6 +147,7 @@ public sealed class FxRevaluationService : IFxRevaluationService
                 PostingDate = asAtDate.AddDays(1),
                 TransactionCurrency = currency,
                 EnforceManualJournalRules = false,
+                ValuationOnly = true,
                 DocumentType = "FxRevaluationReversal",
                 Narrative = $"FX revaluation ({currency}) reversal of {asAtDate:yyyy-MM-dd}",
                 Lines = reversalLines,

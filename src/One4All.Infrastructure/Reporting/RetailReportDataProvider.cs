@@ -62,6 +62,8 @@ public sealed class RetailReportDataProvider : IReportDataProvider
                 ("Sale", e.SaleNumber ?? "—"), ("Description", e.Description), ("List", Money(e.OriginalAmount ?? 0m)), ("Keyed", Money(e.Amount)), ("Reason", e.Reason ?? string.Empty), ("Difference", e.Amount - (e.OriginalAmount ?? 0m))), ct)
                 .ConfigureAwait(false),
             "RETLNOSALE" => await NoSaleAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "RETLGIFTCARDS" => await GiftCardsAsync(companyId, toDate, ct).ConfigureAwait(false),
+            "RETLALLOWANCEVOUCHERS" => await AllowanceVouchersAsync(companyId, toDate, ct).ConfigureAwait(false),
             "RETLPARKED" => await ParkedAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLLOYALTY" => await LoyaltyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLREPRINTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Reprint], (e, n) => Row(("Printed", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
@@ -179,6 +181,27 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             running += x.Net;
             return Row(("Rank", ++rank), ("Item", items.GetValueOrDefault(x.Id, "?")), ("Quantity", Qty(x.Quantity)), ("Share", Percent(x.Net, total)), ("Cumulative", Percent(running, total)), ("Net", x.Net));
         })];
+    }
+
+    // Gift cards still carrying value (the liability), aged from issue: the older the balance, the likelier it is breakage (brief §4.8).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GiftCardsAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<GiftCard> cards = await _db.GiftCards.AsNoTracking().Where(c => c.CompanyId == companyId && c.Balance > 0m && c.Status != GiftCardStatus.Redeemed && c.IssuedDate <= asAt)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. cards.Select(c => (Card: c, Age: asAt.DayNumber - c.IssuedDate.DayNumber)).OrderByDescending(x => x.Age).ThenBy(x => x.Card.CardNumber, StringComparer.Ordinal)
+            .Select(x => Row(("Card", x.Card.CardNumber), ("Currency", x.Card.Currency.Value), ("Issued", Date(x.Card.IssuedDate)), ("Expires", x.Card.ExpiryDate is DateOnly expiry ? Date(expiry) : "—"),
+                ("Status", x.Card.Status.ToString()), ("AgeDays", x.Age), ("Band", x.Age <= 90 ? "0–90" : x.Age <= 180 ? "91–180" : x.Age <= 365 ? "181–365" : "Over 365"),
+                ("Original", Money(x.Card.OriginalValue)), ("Balance", x.Card.Balance)))];
+    }
+
+    // Allowance vouchers issued and not yet redeemed or cancelled, per holder and kind.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AllowanceVouchersAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        List<AllowanceVoucher> open = await _db.Set<AllowanceVoucher>().AsNoTracking().Where(v => v.CompanyId == companyId && v.Status == AllowanceVoucherStatus.Issued && v.IssuedOn <= asAt)
+            .ToListAsync(ct).ConfigureAwait(false);
+        return [.. open.GroupBy(v => (v.IssuedTo, v.Kind)).OrderBy(g => g.Key.IssuedTo, StringComparer.Ordinal).ThenBy(g => g.Key.Kind)
+            .Select(g => Row(("IssuedTo", g.Key.IssuedTo), ("Kind", g.Key.Kind.ToString()), ("Count", g.Count()), ("Expired", g.Count(v => v.ExpiresOn < asAt)),
+                ("Serials", $"{g.Min(v => v.Serial)} – {g.Max(v => v.Serial)}"), ("Value", g.Sum(v => v.FaceValue))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PromotionsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

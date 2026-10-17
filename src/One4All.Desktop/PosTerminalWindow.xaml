@@ -285,8 +285,9 @@
                                 <Button Content="Recall" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ResumeCommand}" ToolTip="Bring back a parked sale (choose it under More functions)" />
                                 <Button Content="." Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="." />
                                 <Button Content="0" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="0" />
-                                <Button Content="Void" Style="{StaticResource FunctionButton}" Height="54" Background="#F5D6D3" Command="{Binding VoidSaleCommand}" ToolTip="Void a completed sale: type its number in the PLU box; a supervisor authorises" />
+                                <Button Content="Void" Style="{StaticResource FunctionButton}" Height="54" Background="#F5D6D3" Command="{Binding VoidSaleCommand}" ToolTip="Void a completed sale: type its number in the PLU box and the reason in the note box; a supervisor authorises and is recorded" />
                                 <Button Content="Receipt" Style="{StaticResource FunctionButton}" Height="54" Click="PrintReceipt_Click" ToolTip="Print the last receipt" />
+                                <Button Content="No sale" Style="{StaticResource FunctionButton}" Height="54" Background="#F5EBD3" Command="{Binding NoSaleCommand}" ToolTip="Open the drawer without a sale: type the reason in the note box; a supervisor authorises and the opening is logged" />
                             </UniformGrid>
                         </StackPanel>
                         <StackPanel Grid.Column="1">
@@ -426,6 +427,7 @@
                         <WrapPanel>
                             <Button Content="🧾 New sale" Style="{StaticResource FunctionButton}" Width="104" Command="{Binding NewSaleCommand}" />
                             <Button Content="% Discount" Style="{StaticResource FunctionButton}" Width="104" Command="{Binding DiscountSaleCommand}" ToolTip="Type the % on the keypad, then press. Line % off and Price override are under More" />
+                            <Button Content="Amount off" Style="{StaticResource FunctionButton}" Width="104" Command="{Binding DiscountSaleAmountCommand}" ToolTip="Type the amount on the keypad, then press: a value off the whole sale, spread over its lines" />
                             <Button Content="✂ Split bill" Style="{StaticResource FunctionButton}" Width="104" Click="SplitBill_Click" />
                             <Button Content="💳 On account" Style="{StaticResource FunctionButton}" Width="104" Command="{Binding TenderAccountCommand}" ToolTip="Charge to the customer account typed under More" />
                             <Button Content="🎁 Tip" Style="{StaticResource FunctionButton}" Width="80" Command="{Binding AddTipCommand}" ToolTip="Type the tip in the PLU box, then press" />
@@ -447,6 +449,7 @@
                                     </UniformGrid>
                                     <WrapPanel Margin="0,4,0,0">
                                         <Button Content="Line % off" Style="{StaticResource FunctionButton}" Height="36" Width="100" Command="{Binding DiscountLineCommand}" ToolTip="Tap the line, type the % on the keypad, press" />
+                                        <Button Content="Line amount off" Style="{StaticResource FunctionButton}" Height="36" Width="120" Command="{Binding DiscountLineAmountCommand}" ToolTip="Tap the line, type the amount on the keypad, press" />
                                         <Button Content="Price override" Style="{StaticResource FunctionButton}" Height="36" Width="110" Command="{Binding OverridePriceCommand}" ToolTip="Tap the line, type the price on the keypad, press (supervisor)" />
                                         <Button Content="Clear tenders" Style="{StaticResource FunctionButton}" Height="36" Width="110" Command="{Binding ClearTendersCommand}" />
                                         <TextBox Width="150" Text="{Binding CouponEntry, UpdateSourceTrigger=PropertyChanged}" ToolTip="Coupon code" Margin="8,0,2,0" VerticalContentAlignment="Center" />

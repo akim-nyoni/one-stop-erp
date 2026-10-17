@@ -22,6 +22,43 @@ internal static class ExchangeRateResolver
     /// <param name="date">The date the rate must be in force on.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The rate, or null.</returns>
+    /// <summary>The rate type the company's exchange-rate policy names for a document type (else its source module), or null when there is no policy.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="documentType">The document type.</param>
+    /// <param name="sourceModule">The source module.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rate type, or null.</returns>
+    public static async Task<ExchangeRateType?> PolicyTypeAsync(One4AllDbContext db, long companyId, string? documentType, string? sourceModule, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        List<string> keys = [.. new[] { documentType, sourceModule }.Where(k => !string.IsNullOrWhiteSpace(k)).Select(k => k!)];
+        if (keys.Count == 0)
+        {
+            return null;
+        }
+
+        List<ExchangeRatePolicy> policies = await db.ExchangeRatePolicies.AsNoTracking().Where(p => p.CompanyId == companyId && keys.Contains(p.DocumentType)).ToListAsync(ct).ConfigureAwait(false);
+        return (policies.FirstOrDefault(p => p.DocumentType == documentType) ?? policies.FirstOrDefault(p => p.DocumentType == sourceModule))?.RateType;
+    }
+
+    /// <summary>The rate the company's policy prefers for a document (its rate type, else the daily rate), or null when none is captured.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="from">The currency converted from.</param>
+    /// <param name="to">The currency converted to.</param>
+    /// <param name="documentType">The document type.</param>
+    /// <param name="sourceModule">The source module.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rate, or null.</returns>
+    public static async Task<decimal?> PolicyRateAsync(One4AllDbContext db, long companyId, CurrencyCode from, CurrencyCode to, string? documentType, string? sourceModule, DateOnly date, CancellationToken ct)
+    {
+        ExchangeRateType? preferred = await PolicyTypeAsync(db, companyId, documentType, sourceModule, ct).ConfigureAwait(false);
+        decimal? rate = preferred is ExchangeRateType own && own != ExchangeRateType.Daily ? await FindAsync(db, from, to, own, date, ct).ConfigureAwait(false) : null;
+        return rate ?? await FindAsync(db, from, to, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+    }
+
     public static async Task<decimal?> FindAsync(One4AllDbContext db, CurrencyCode from, CurrencyCode to, ExchangeRateType type, DateOnly date, CancellationToken ct)
     {
         if (from == to)

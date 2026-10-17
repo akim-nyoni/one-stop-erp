@@ -148,6 +148,8 @@ public sealed class MasterDataService : IMasterDataService
         LedgerAccount created = new(account.CompanyId, key, account.Name.Trim(), account.Type, string.IsNullOrWhiteSpace(account.ReportCategory) ? null : account.ReportCategory.Trim())
         {
             DefaultTaxCode = string.IsNullOrWhiteSpace(account.DefaultTaxCode) ? null : account.DefaultTaxCode.Trim().ToUpperInvariant(),
+            AllowManualJournal = account.AllowManualJournal,
+            IsMonetary = account.IsMonetary,
         };
         if (account.ControlType is ControlAccountType control)
         {

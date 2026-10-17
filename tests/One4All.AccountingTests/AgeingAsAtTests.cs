@@ -55,6 +55,13 @@ public sealed class AgeingAsAtTests
 
             // 30 April: settled.
             (await reports.AgedDebtorsAsync(companyId, new DateOnly(2026, 4, 30))).Rows.Should().NotContain(r => r.TraderCode == "AGA-C");
+
+            // Aged by invoice date instead (the customer's own basis, thirteenth audit #12): 75 days since 15 January puts the same debt in 61–90.
+            One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            (await db.Customers.SingleAsync(c => c.CompanyId == companyId && c.Code == "AGA-C")).AgeingBasis = AgeingBasis.InvoiceDate;
+            await db.SaveChangesAsync();
+            (await reports.AgedDebtorsAsync(companyId, new DateOnly(2026, 3, 31))).Rows.Single(r => r.TraderCode == "AGA-C").Days61To90.Should().Be(1_000m);
+            (await reports.CustomerStatementAsync(companyId, (await db.Customers.AsNoTracking().SingleAsync(c => c.CompanyId == companyId && c.Code == "AGA-C")).Id))!.AgeingBasis.Should().Be(AgeingBasis.InvoiceDate);
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

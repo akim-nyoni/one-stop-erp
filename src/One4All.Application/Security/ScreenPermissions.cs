@@ -40,7 +40,7 @@ public static partial class ScreenPermissions
         ("Budgeting", @"re-phase", "Budget.Rephase"),
         ("Budgeting", @"assumption|driver|actual volumes", "Budget.Assumptions"),
         ("Budgeting", @"methods and forecasts", "Budget.Forecast"),
-        ("Budgeting", @"through preparation", "Budget.Review"),
+        ("Budgeting", @"through preparation|activate", "Budget.Review"),
         ("Budgeting", @"archive", "Budget.Archive"),
         ("Budgeting", @"carry|year-end commitments", "Budget.Reservation"),
         ("Budgeting", @"deadlines|alerts", "Budget.Target"),

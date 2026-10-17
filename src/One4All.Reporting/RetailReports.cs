@@ -86,5 +86,13 @@ public static class RetailReports
         yield return Listing("POS121", "Fiscal Submission Log", "PointOfSale", "Sales submitted to the fiscal device or revenue authority in the period, with the fiscal receipt reference and outcome.",
             "RetlFiscal", [new Column("Submitted", "Submitted", 115), new Column("Till", "Till", 60), new Column("Sale", "Sale", 90), new Column("Reference", "Fiscal reference", 120), new Column("Outcome", "Outcome", 200),
              new Column("Amount", "Value", 90, true)], Period);
+        yield return Listing("POS122", "Gift Card Liability by Age", "PointOfSale", "Every gift card still carrying value as at the To date, aged from issue (0–90, 91–180, 181–365, over 365 days) with its "
+            + "expiry and status: the liability on the books, and where breakage is likely.",
+            "RetlGiftCards", [new Column("Card", "Card", 110), new Column("Currency", "Ccy", 45), new Column("Issued", "Issued", 75), new Column("Expires", "Expires", 75), new Column("Status", "Status", 65),
+             new Column("AgeDays", "Days", 50), new Column("Band", "Band", 70), new Column("Original", "Original", 80), new Column("Balance", "Balance", 90, true)], Period);
+        yield return Listing("POS123", "Allowance Vouchers Outstanding", "PointOfSale", "Fuel, meal and other allowance vouchers issued and not yet redeemed or cancelled as at the To date, per holder and kind, "
+            + "with how many of them have expired.",
+            "RetlAllowanceVouchers", [new Column("IssuedTo", "Issued to", 140), new Column("Kind", "Kind", 70), new Column("Count", "Count", 55), new Column("Expired", "Expired", 60), new Column("Serials", "Serials", 150),
+             new Column("Value", "Value", 90, true)], Period);
     }
 }

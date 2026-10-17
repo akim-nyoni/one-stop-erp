@@ -23,6 +23,7 @@ Banking	Stop a standing order or mandate	False
 Banking	Transfer between bank accounts	False	
 Banking	Void a cheque leaf	False	
 Banking	Write payroll bank files	True	
+Budgeting	Activate a budget version	False	
 Budgeting	Add a driver-based line	False	
 Budgeting	Budget methods and forecasts	False	
 Budgeting	Budget vs actual by fund, project or branch	False	
@@ -125,6 +126,7 @@ Fixed Assets	Start an asset count	False
 General Ledger	Accounting vouchers	False	
 General Ledger	Accruals and prepayments	False	
 General Ledger	Close or reopen a period	False	
+General Ledger	Deferred posting	False	
 General Ledger	Exchange-rate policy	False	
 General Ledger	Funds, projects and fund accounting	False	
 General Ledger	Hyperinflation (IAS 29)	False	
@@ -287,6 +289,7 @@ Purchasing	Amend a purchase order	False
 Purchasing	Check or reserve budget	False	
 Purchasing	Framework agreements	False	
 Purchasing	Match a supplier invoice	False	
+Purchasing	Matching tolerances	False	
 Purchasing	Purchase order	False	
 Purchasing	Purchase requisition	False	
 Purchasing	Quality inspection of a receipt	False	

@@ -227,9 +227,10 @@ public interface IPosService
     /// <param name="date">The void date.</param>
     /// <param name="reason">The mandatory reason.</param>
     /// <param name="taxAccountCode">The output-tax account (required when the sale had tax).</param>
+    /// <param name="authorisedByUserId">The supervisor who authorised the void (kept on the till event).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reversal journal number.</returns>
-    Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, CancellationToken ct = default);
+    Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, long? authorisedByUserId = null, CancellationToken ct = default);
 
     /// <summary>Produces an X-read (mid-shift, non-resetting) for a session.</summary>
     /// <param name="tillSessionId">The session.</param>

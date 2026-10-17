@@ -94,6 +94,34 @@ public sealed class ProcurementTests
             match.Value.InvoiceValue.Should().Be(200m);
         }
 
+        // The match rules (thirteenth audit #3): a clerk cannot widen the company's price rule; a supplier's own rule applies; the invoice quantity may exceed the
+        // receipt only within the quantity tolerance.
+        await using (AsyncServiceScope scope = provider.CreateAsyncScope())
+        {
+            IProcurementService pop = scope.ServiceProvider.GetRequiredService<IProcurementService>();
+            One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            long po2 = (await pop.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
+            {
+                CompanyId = companyId, SupplierId = supplierId, OrderNumber = "PO-2", OrderDate = new DateOnly(2026, 3, 9), Currency = Scenario.Usd, Lines = [new PurchaseOrderLineRequest(itemId, "Bolt", 10m, 2.00m)],
+            })).Value.PurchaseOrderId;
+            long line2 = db.Set<Core.Procurement.PurchaseOrderLine>().First(l => l.PurchaseOrderId == po2).Id;
+            (await pop.ReceiveGoodsAsync(new ReceiveGoodsRequest { CompanyId = companyId, PurchaseOrderId = po2, WarehouseId = warehouseId, GrnNumber = "GRN-2", Date = new DateOnly(2026, 3, 9), Lines = [new ReceiveLine(line2, 10m)] }))
+                .IsSuccess.Should().BeTrue();
+            MatchInvoiceRequest At(string number, decimal quantity, decimal price, decimal? tolerance = null) => new()
+            {
+                CompanyId = companyId, PurchaseOrderId = po2, InvoiceNumber = number, Date = new DateOnly(2026, 3, 10), TolerancePercent = tolerance, PriceVarianceAccountCode = "6100",
+                Lines = [new InvoiceMatchLine(line2, quantity, price)],
+            };
+            (await pop.MatchInvoiceAsync(At("SINV-WIDE", 10m, 3.00m, 60m))).Error.Code.Should().Be("Pop.ToleranceAboveRule", "a clerk cannot widen the company's 5% rule");
+            (await pop.MatchInvoiceAsync(At("SINV-WIDE", 10m, 3.00m))).Error.Code.Should().Be("Pop.PriceMismatch", "the company's 5% rule applies when none is given");
+            (await db.Suppliers.SingleAsync(s => s.Id == supplierId)).InvoicePriceTolerancePercent = 60m;
+            (await db.Companies.SingleAsync(c => c.Id == companyId)).InvoiceQuantityTolerancePercent = 2m;
+            await db.SaveChangesAsync();
+            (await pop.MatchInvoiceAsync(At("SINV-QTY", 10.5m, 2.00m))).Error.Code.Should().Be("Pop.QuantityMismatch", "5% over the receipt is beyond the 2% quantity tolerance");
+            var wide = await pop.MatchInvoiceAsync(At("SINV-WIDE", 10.2m, 3.00m));
+            wide.IsSuccess.Should().BeTrue(wide.IsFailure ? wide.Error.ToString() : null, "within the supplier's own 60% price rule and the 2% quantity tolerance");
+        }
+
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             ITradingReports reports = scope.ServiceProvider.GetRequiredService<ITradingReports>();

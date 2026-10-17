@@ -265,10 +265,18 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     }
 
     /// <summary>Activates this version as the live budget, sealing it if it was not already.</summary>
-    public void Activate()
+    /// <summary>Gets who activated the version.</summary>
+    public long? ActivatedByUserId { get; private set; }
+
+    /// <summary>Gets when the version was activated.</summary>
+    public DateOnly? ActivatedOn { get; private set; }
+
+    public void Activate(long? userId = null, DateOnly? on = null)
     {
         Status = BudgetStatus.Active;
         IsActive = true;
+        ActivatedByUserId = userId ?? ActivatedByUserId;
+        ActivatedOn = on ?? ActivatedOn;
         SealHash ??= ComputeSeal();
     }
 

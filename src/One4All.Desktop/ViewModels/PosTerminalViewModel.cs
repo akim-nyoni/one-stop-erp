@@ -1841,6 +1841,51 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await AfterAdjustmentAsync(applied, PosEventKind.LineDiscount, $"{row.Line.Description}: {percent:0.##}% off", row.Line.LineNet, before, supervisor).ConfigureAwait(true);
     }
 
+    /// <summary>Takes the amount on the pad off the selected line (brief §4.1 "Discount amount").</summary>
+    [RelayCommand]
+    private async Task DiscountLineAmountAsync()
+    {
+        if (SelectedCartLine is not PosCartLineVm row || !TryEntry(out decimal amount))
+        {
+            StatusMessage = "Select a line and type the amount off on the pad.";
+            return;
+        }
+
+        decimal percent = row.Line.LineNetBeforeDiscount == 0m ? 0m : amount * 100m / row.Line.LineNetBeforeDiscount;
+        long? supervisor = percent > UnsupervisedDiscountLimit ? await SupervisorAsync("Pos.Sale", OperationFlags.OverrideDiscount).ConfigureAwait(true) : null;
+        if (percent > UnsupervisedDiscountLimit && supervisor is null)
+        {
+            return;
+        }
+
+        decimal before = row.Line.LineNet;
+        Result applied = _ticket.DiscountLineAmount(row.Line, amount, UnsupervisedDiscountLimit, supervisor is not null);
+        await AfterAdjustmentAsync(applied, PosEventKind.LineDiscount, $"{row.Line.Description}: {amount:0.00} off", row.Line.LineNet, before, supervisor).ConfigureAwait(true);
+    }
+
+    /// <summary>Takes the amount on the pad off the whole sale, spread over its lines.</summary>
+    [RelayCommand]
+    private async Task DiscountSaleAmountAsync()
+    {
+        if (_ticket.Lines.Count == 0 || !TryEntry(out decimal amount))
+        {
+            StatusMessage = "Type the amount off the sale on the pad.";
+            return;
+        }
+
+        decimal before = _ticket.Lines.Sum(l => l.LineNetBeforeDiscount);
+        decimal percent = before == 0m ? 0m : amount * 100m / before;
+        long? supervisor = percent > UnsupervisedDiscountLimit ? await SupervisorAsync("Pos.Sale", OperationFlags.OverrideDiscount).ConfigureAwait(true) : null;
+        if (percent > UnsupervisedDiscountLimit && supervisor is null)
+        {
+            return;
+        }
+
+        decimal subtotalBefore = _ticket.SubtotalNet;
+        Result applied = _ticket.DiscountSaleAmount(amount, UnsupervisedDiscountLimit, supervisor is not null);
+        await AfterAdjustmentAsync(applied, PosEventKind.LineDiscount, $"Sale discount {amount:0.00}", _ticket.SubtotalNet, subtotalBefore, supervisor).ConfigureAwait(true);
+    }
+
     /// <summary>Discounts the whole sale by the percentage on the pad.</summary>
     [RelayCommand]
     private async Task DiscountSaleAsync()
@@ -2039,6 +2084,40 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
             // The adjustment stands; the event log catches up with the next online action.
+        }
+    }
+
+    /// <summary>Opens the drawer without a sale (change, a float top-up, a dropped coin): a supervisor with the No-Sale permission authorises, the reason is the note box, and the event is logged.</summary>
+    [RelayCommand]
+    private async Task NoSaleAsync()
+    {
+        if (NullIfBlank(LineNoteEntry) is not string reason)
+        {
+            StatusMessage = "Type the reason for opening the drawer in the note box first.";
+            return;
+        }
+
+        if (await SupervisorAsync("Pos.NoSale", OperationFlags.Create).ConfigureAwait(true) is not long supervisor)
+        {
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
+        string? opened = devices.Drawer is ICashDrawer drawer ? await drawer.OpenAsync().ConfigureAwait(true) : null;
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<IPosEventService>().RecordAsync(new PosEventRequest
+            {
+                CompanyId = _companyId, TerminalId = _terminalId, TillSessionId = TillSessionId == 0 ? null : TillSessionId, CashierUserId = _cashierUserId, Kind = PosEventKind.NoSale,
+                Date = DateOnly.FromDateTime(DateTime.Today), Description = "Drawer opened without a sale", Amount = 0m, Reason = reason, AuthorisedByUserId = supervisor,
+            }).ConfigureAwait(true);
+            StatusMessage = $"Drawer opened: {reason} (authorised).{(opened is null ? string.Empty : " " + opened)}";
+            LineNoteEntry = string.Empty;
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = "Drawer opened; the till is offline, so the no-sale is logged when it reconnects (record it under Till events).";
         }
     }
 
@@ -2407,9 +2486,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         {
             await using AsyncServiceScope scope = _services.CreateAsyncScope();
             Result<string> voided = await scope.ServiceProvider.GetRequiredService<IPosService>()
-                .VoidSaleAsync(_companyId, sale.Id, DateOnly.FromDateTime(DateTime.Today), $"Voided at till {_terminalId}", TaxAccountCode.Length > 0 ? TaxAccountCode : null).ConfigureAwait(true);
+                .VoidSaleAsync(_companyId, sale.Id, DateOnly.FromDateTime(DateTime.Today), NullIfBlank(LineNoteEntry) ?? $"Voided at till {_terminalId}", TaxAccountCode.Length > 0 ? TaxAccountCode : null, supervisor)
+                .ConfigureAwait(true);
             StatusMessage = voided.IsSuccess ? $"Sale {sale.SaleNumber} voided (journal {voided.Value})." : voided.Error.Message;
             ScanEntry = string.Empty;
+            if (voided.IsSuccess)
+            {
+                LineNoteEntry = string.Empty;
+            }
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
@@ -2431,7 +2515,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     private async Task QueueVoidAsync(string saleNumber, long supervisor)
     {
-        PosVoidEnvelope envelope = new(_companyId, saleNumber, DateOnly.FromDateTime(DateTime.Today), $"Voided at till {_terminalId} (offline)", TaxAccountCode.Length > 0 ? TaxAccountCode : null, supervisor);
+        PosVoidEnvelope envelope = new(_companyId, saleNumber, DateOnly.FromDateTime(DateTime.Today), NullIfBlank(LineNoteEntry) ?? $"Voided at till {_terminalId} (offline)", TaxAccountCode.Length > 0 ? TaxAccountCode : null, supervisor);
         await LocalQueue.EnqueueAsync(new LocalOfflineEntry(Guid.NewGuid(), _companyId, PosVoidEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow)).ConfigureAwait(true);
         PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
         UpdateSyncState();

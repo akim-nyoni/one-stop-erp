@@ -28,6 +28,7 @@ public sealed class TradingReports : ITradingReports
         List<OpenItemAsAt> items = await OpenItemsAsAt.LoadAsync(_db, companyId, ledger, asAtDate, ct).ConfigureAwait(false);
 
         Dictionary<long, (string Code, string Name)> traders = await LoadTradersAsync(companyId, ledger, ct).ConfigureAwait(false);
+        Dictionary<long, AgeingBasis> bases = await LoadAgeingBasesAsync(companyId, ledger, ct).ConfigureAwait(false);
 
         // The "balance owed" is debit-positive for receivables and credit-positive for payables.
         LedgerSign positiveSign = ledger == TradingLedger.AccountsReceivable ? LedgerSign.Debit : LedgerSign.Credit;
@@ -40,7 +41,9 @@ public sealed class TradingReports : ITradingReports
                 foreach (OpenItemAsAt entry in g)
                 {
                     decimal signed = entry.Signed(positiveSign);
-                    int age = asAtDate.DayNumber - entry.Item.DueDate.DayNumber;
+                    // Each trader ages by its own basis: days past due, or days since the invoice (thirteenth audit #12).
+                    DateOnly from = bases.GetValueOrDefault(g.Key) == AgeingBasis.InvoiceDate ? entry.Item.DocumentDate : entry.Item.DueDate;
+                    int age = asAtDate.DayNumber - from.DayNumber;
                     if (age <= 0) { current += signed; }
                     else if (age <= 30) { d30 += signed; }
                     else if (age <= 60) { d60 += signed; }
@@ -80,7 +83,7 @@ public sealed class TradingReports : ITradingReports
             .ToList();
 
         decimal balance = lines.Sum(l => l.Outstanding);
-        return new TraderStatement(customer.Code, customer.Name, customer.Currency.Value, lines, balance);
+        return new TraderStatement(customer.Code, customer.Name, customer.Currency.Value, lines, balance, customer.AgeingBasis);
     }
 
     public async Task<TraderStatement?> SupplierStatementAsync(long companyId, long supplierId, CancellationToken ct = default)
@@ -105,7 +108,7 @@ public sealed class TradingReports : ITradingReports
             .ToList();
 
         decimal balance = lines.Sum(l => l.Outstanding);
-        return new TraderStatement(supplier.Code, supplier.Name, supplier.Currency.Value, lines, balance);
+        return new TraderStatement(supplier.Code, supplier.Name, supplier.Currency.Value, lines, balance, supplier.AgeingBasis);
     }
 
     public async Task<RemittanceAdvice?> RemittanceAdviceAsync(long companyId, long paymentOpenItemId, CancellationToken ct = default)
@@ -231,6 +234,11 @@ public sealed class TradingReports : ITradingReports
 
         return new PaymentsDueReport(asAtDate, rows, rows.Sum(r => r.Outstanding));
     }
+
+    private async Task<Dictionary<long, AgeingBasis>> LoadAgeingBasesAsync(long companyId, TradingLedger ledger, CancellationToken ct)
+        => ledger == TradingLedger.AccountsReceivable
+            ? await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.AgeingBasis, ct).ConfigureAwait(false)
+            : await _db.Suppliers.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.AgeingBasis, ct).ConfigureAwait(false);
 
     private async Task<Dictionary<long, (string, string)>> LoadTradersAsync(long companyId, TradingLedger ledger, CancellationToken ct)
     {

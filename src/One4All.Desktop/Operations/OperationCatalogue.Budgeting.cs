@@ -177,6 +177,16 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Activate a budget version", ListTitle = "Budgets in preparation",
+            Description = "Puts an approved version into force for its year, type and department, superseding the version active before it. Where the company requires approval only an approved "
+                + "version can be activated, and whoever submitted or approved it cannot be the one to activate it.",
+            Fields = [Num("Budget", "Budget id")],
+            Run = async (c, i) => Check(await c.Get<IBudgetingService>().ActivateAsync(c.CompanyId, (long)i.Number("Budget"), c.UserId).ConfigureAwait(true),
+                "Activated; the version active before it for the year, type and department is superseded."),
+            List = BudgetsInPreparationAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Propose or revise a figure", ListTitle = "Budgets in preparation",
             Description = "Finance proposes a figure on a budget under review (kept beside the department's request); the department revises a draft or returned one.",
             Fields = [Num("Budget", "Budget id"), Req("Account", "Account"), Num("Period", "Period", "1"), Num("Amount", "Amount"), Opt("CostCentre", "Cost centre"), Opt("Comment", "Why"),

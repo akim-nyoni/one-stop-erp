@@ -2050,9 +2050,24 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Shelf labels", Description = "Prints shelf labels at a price list's prices (all items, or a comma-separated list).", IsDocument = true,
-            Fields = [Req("PriceList", "Price list code"), Opt("Items", "Item codes (comma-separated)"), Num("PerRow", "Labels per row", "2")],
-            Run = async (c, i) => Check(await c.Get<IDocumentLayoutService>().ShelfLabelsAsync(c.CompanyId, i.Text("PriceList"),
-                i.Optional("Items")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), i.Whole("PerRow")).ConfigureAwait(true)),
+            Fields = [Req("PriceList", "Price list code"), Opt("Items", "Item codes (comma-separated)"), Num("PerRow", "Labels per row", "2"), Tick("Print", "Send to the label printer (System Manager › Devices)")],
+            Run = async (c, i) =>
+            {
+                string labels = Check(await c.Get<IDocumentLayoutService>().ShelfLabelsAsync(c.CompanyId, i.Text("PriceList"),
+                    i.Optional("Items")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), i.Whole("PerRow")).ConfigureAwait(true));
+                if (!i.Flag("Print"))
+                {
+                    return labels;
+                }
+
+                if (c.Get<Application.Abstractions.Pos.IDeviceProvider>().LabelPrinter is not Application.Abstractions.Pos.ILabelPrinter printer)
+                {
+                    throw new OperationException("No label printer is set up (System Manager › Devices).");
+                }
+
+                string? outcome = await printer.PrintAsync(System.Text.Encoding.UTF8.GetBytes(labels + Environment.NewLine)).ConfigureAwait(true);
+                return labels + Environment.NewLine + (outcome ?? "Sent to the label printer.");
+            },
         };
     }
 }

@@ -108,7 +108,8 @@ public sealed class MatchInvoiceRequest
     public DateOnly Date { get; init; }
 
     /// <summary>The allowed price tolerance as a percentage (e.g. 5 = 5%).</summary>
-    public decimal TolerancePercent { get; init; } = 5m;
+    /// <summary>A price tolerance (percent) for this match; null uses the supplier's (else the company's) rule, and a value above that rule is refused.</summary>
+    public decimal? TolerancePercent { get; init; }
 
     /// <summary>Gets who approved a budget overrun on the invoice, if it needs approval.</summary>
     public long? BudgetApprovedByUserId { get; init; }

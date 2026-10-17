@@ -91,6 +91,21 @@ public interface ITransferApplicationService
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> CompleteAsync(long companyId, string applicationNumber, DateOnly date, CancellationToken ct = default);
 
+    /// <summary>
+    /// Records that the transferee formally assumes the transferor's housing balance (brief §4.10.6 pre-condition 2), approved by an officer with the ownership-approval
+    /// permission who did not submit the application: the housing-account check then passes, and on completion the transferor's outstanding items move to the
+    /// transferee through the clearing account (credit notes to the one, an invoice to the other, netting to nil) and any running instalment agreement on the stand
+    /// gets the transferee as its buyer.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="applicationNumber">The application.</param>
+    /// <param name="approverUserId">The approving officer.</param>
+    /// <param name="clearingAccountCode">The account the balance passes through.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The balance assumed, or why it was refused.</returns>
+    Task<Result<decimal>> AssumeBalanceAsync(long companyId, string applicationNumber, long approverUserId, string clearingAccountCode, DateOnly date, CancellationToken ct = default);
+
     /// <summary>Rejects an open application.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="applicationNumber">The application.</param>

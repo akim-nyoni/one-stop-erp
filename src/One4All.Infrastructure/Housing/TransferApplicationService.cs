@@ -3,9 +3,11 @@ using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Municipal;
 using One4All.Application.Abstractions.Numbering;
 using One4All.Application.Abstractions.Security;
+using One4All.Application.Abstractions.Trading;
 using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Housing;
 using One4All.Application.Municipal;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Housing;
 using One4All.Core.Municipal;
@@ -26,6 +28,8 @@ public sealed class TransferApplicationService : ITransferApplicationService
     private readonly IPermissionService _permissions;
     private readonly IHousingService _housing;
     private readonly IOwnershipService _ownership;
+    private readonly ISalesLedgerService _ar;
+    private readonly Application.Abstractions.Trading.IAllocationService _allocations;
     private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
@@ -34,10 +38,14 @@ public sealed class TransferApplicationService : ITransferApplicationService
     /// <param name="permissions">The permission resolver.</param>
     /// <param name="housing">The stand register.</param>
     /// <param name="ownership">The municipal owner register.</param>
+    /// <param name="ar">The sales ledger, for a balance assumed by the transferee.</param>
+    /// <param name="allocations">The allocations, to match the credit notes to the items they clear.</param>
     public TransferApplicationService(One4AllDbContext db, INumberSequenceService numbers, IPermissionService permissions, IHousingService housing, IOwnershipService ownership,
-        Lazy<IWorkflowService>? workflow = null)
+        ISalesLedgerService ar, Application.Abstractions.Trading.IAllocationService allocations, Lazy<IWorkflowService>? workflow = null)
     {
         _workflow = workflow;
+        _ar = ar;
+        _allocations = allocations;
         _db = db;
         _numbers = numbers;
         _permissions = permissions;
@@ -279,6 +287,15 @@ public sealed class TransferApplicationService : ITransferApplicationService
             return transferred;
         }
 
+        if (application.BalanceAssumed)
+        {
+            Result moved = await MoveHousingBalanceAsync(application, stand.StandNumber, date, ct).ConfigureAwait(false);
+            if (moved.IsFailure)
+            {
+                return moved;
+            }
+        }
+
         if (clearance.PropertyId is long propertyId && application.TransferType is not (TransferType.ChangeOfName or TransferType.Correction))
         {
             Result municipal = await _ownership.TransferAsync(companyId, propertyId, [new OwnerShare(application.ToCustomerId, 100m, true)], date, clearance.CertificateNumber!, null, ct).ConfigureAwait(false);
@@ -330,7 +347,8 @@ public sealed class TransferApplicationService : ITransferApplicationService
             else if (requirement == TransferRequirement.HousingAccountClear)
             {
                 string? problem = await HousingAccountProblemAsync(application, ct).ConfigureAwait(false);
-                lines.Add(new TransferChecklistLine(requirement, true, problem is null, problem ?? "Clear"));
+                lines.Add(new TransferChecklistLine(requirement, true, problem is null,
+                    problem ?? (application.BalanceAssumed ? $"Balance of {application.BalanceAssumedAmount:N2} assumed by the transferee (approved)" : "Clear")));
             }
             else
             {
@@ -364,6 +382,11 @@ public sealed class TransferApplicationService : ITransferApplicationService
     // The outgoing holder's housing account: nothing owing net of credits, and no instalment sale still running on the stand.
     private async Task<string?> HousingAccountProblemAsync(TransferApplication application, CancellationToken ct)
     {
+        if (application.BalanceAssumed)
+        {
+            return null; // Formally assumed by the transferee with approval: moved on completion.
+        }
+
         decimal owing = await _db.OpenItems.Where(i => i.CompanyId == application.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == application.FromCustomerId)
             .SumAsync(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase, ct).ConfigureAwait(false);
         if (owing > 0m)
@@ -374,6 +397,114 @@ public sealed class TransferApplicationService : ITransferApplicationService
         return await _db.Set<InstalmentAgreement>().AnyAsync(a => a.StandId == application.StandId && a.Status == InstalmentAgreementStatus.Active, ct).ConfigureAwait(false)
             ? "An instalment sale on the stand is still running"
             : null;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<decimal>> AssumeBalanceAsync(long companyId, string applicationNumber, long approverUserId, string clearingAccountCode, DateOnly date, CancellationToken ct = default)
+    {
+        string clearing = (clearingAccountCode ?? string.Empty).Trim().ToUpperInvariant();
+        if (clearing.Length == 0)
+        {
+            return Error.Validation("Hse.ClearingAccount", "Give the account the assumed balance passes through.");
+        }
+
+        if (!await AllowedAsync(approverUserId, ApprovePermission, OperationFlags.Approve, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Hse.NotAuthorised", "Only an officer with the ownership-approval permission can approve the transferee's assumption of the balance.");
+        }
+
+        Result<TransferApplication> found = await FindAsync(companyId, applicationNumber, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        TransferApplication application = found.Value;
+        if (application.Status is TransferStatus.Completed or TransferStatus.Rejected)
+        {
+            return Error.Rule("Hse.TransferClosed", $"{application.ApplicationNumber} is already {application.Status}.");
+        }
+
+        if (application.SubmittedByUserId == approverUserId || application.Checks.Any(c => c.VerifiedByUserId == approverUserId))
+        {
+            return Error.Rule("Hse.ApproverVerified", "An officer who verified or submitted the transfer cannot approve the assumption of its balance (SOD-HSE-05).");
+        }
+
+        if (!await _db.Accounts.AnyAsync(a => a.CompanyId == companyId && a.AccountCode == clearing && a.IsActive, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Hse.ClearingAccount", $"No active account {clearing}.");
+        }
+
+        decimal owing = await OwingAsync(application, ct).ConfigureAwait(false);
+        bool instalments = await _db.Set<InstalmentAgreement>().AnyAsync(a => a.StandId == application.StandId && a.Status == InstalmentAgreementStatus.Active, ct).ConfigureAwait(false);
+        if (owing <= 0m && !instalments)
+        {
+            return Error.Rule("Hse.NothingToAssume", "The transferor's housing account is clear; there is no balance to assume.");
+        }
+
+        application.AssumeBalance(Math.Max(0m, owing), approverUserId, clearing);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Math.Max(0m, owing);
+    }
+
+    private Task<decimal> OwingAsync(TransferApplication application, CancellationToken ct)
+        => _db.OpenItems.Where(i => i.CompanyId == application.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == application.FromCustomerId)
+            .SumAsync(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase, ct);
+
+    // The transferor's outstanding debit items are credited (and allocated) through the clearing account, the transferee is invoiced the same through it per currency
+    // (so the clearing account nets to nil), and a running instalment agreement on the stand gets the transferee as its buyer. Unallocated credits stay with the transferor.
+    private async Task<Result> MoveHousingBalanceAsync(TransferApplication application, string standNumber, DateOnly date, CancellationToken ct)
+    {
+        string clearing = application.AssumptionClearingAccountCode ?? string.Empty;
+        string narrative = $"Housing balance assumed by the transferee on transfer {application.ApplicationNumber} of stand {standNumber}";
+        List<OpenItem> owing = await _db.OpenItems.AsNoTracking()
+            .Where(i => i.CompanyId == application.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == application.FromCustomerId && i.Sign == LedgerSign.Debit && i.OutstandingTransaction > 0m)
+            .OrderBy(i => i.Id).ToListAsync(ct).ConfigureAwait(false);
+        int n = 0;
+        foreach (IGrouping<CurrencyCode, OpenItem> currency in owing.GroupBy(i => i.Currency))
+        {
+            decimal total = 0m;
+            foreach (OpenItem item in currency)
+            {
+                n++;
+                Result<TradingPostingResult> credit = await _ar.PostCreditNoteAsync(new SalesCreditNoteRequest
+                {
+                    CompanyId = application.CompanyId, CustomerId = application.FromCustomerId, DocumentNumber = $"{application.ApplicationNumber}-CN{n}", DocumentDate = date, Currency = item.Currency,
+                    NetAmount = item.OutstandingTransaction, SalesAccountCode = clearing, Narrative = $"{narrative} ({item.DocumentNumber})",
+                }, ct).ConfigureAwait(false);
+                if (credit.IsFailure)
+                {
+                    return Result.Failure(credit.Error);
+                }
+
+                Result<AllocationResult> allocated = await _allocations.AllocateAsync(application.CompanyId, TradingLedger.AccountsReceivable, item.Id, credit.Value.OpenItemId, item.OutstandingTransaction, date, ct).ConfigureAwait(false);
+                if (allocated.IsFailure)
+                {
+                    return Result.Failure(allocated.Error);
+                }
+
+                total += item.OutstandingTransaction;
+            }
+
+            Result<TradingPostingResult> invoice = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
+            {
+                CompanyId = application.CompanyId, CustomerId = application.ToCustomerId, DocumentNumber = $"{application.ApplicationNumber}-ASSUMED-{currency.Key.Value}", DocumentDate = date,
+                Currency = currency.Key, NetAmount = total, SalesAccountCode = clearing, Narrative = narrative,
+            }, ct).ConfigureAwait(false);
+            if (invoice.IsFailure)
+            {
+                return Result.Failure(invoice.Error);
+            }
+        }
+
+        foreach (InstalmentAgreement agreement in await _db.Set<InstalmentAgreement>()
+                     .Where(a => a.CompanyId == application.CompanyId && a.StandId == application.StandId && a.Status == InstalmentAgreementStatus.Active && a.BuyerCustomerId == application.FromCustomerId)
+                     .ToListAsync(ct).ConfigureAwait(false))
+        {
+            agreement.AssignBuyer(application.ToCustomerId);
+        }
+
+        return Result.Success();
     }
 
     private async Task<bool> AllowedAsync(long userId, string permission, OperationFlags operation, CancellationToken ct)

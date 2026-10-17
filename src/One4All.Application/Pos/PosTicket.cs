@@ -376,6 +376,65 @@ public sealed class PosTicket
         return Result.Success();
     }
 
+    /// <summary>Takes a fixed amount off a line (0 removes the discount); above the unsupervised limit, as a percentage of the line, a supervisor must have authorised it.</summary>
+    /// <param name="line">The line.</param>
+    /// <param name="amount">The amount off, in the sale currency.</param>
+    /// <param name="unsupervisedLimitPercent">The most a cashier may give alone, as a percentage.</param>
+    /// <param name="supervised">Whether a supervisor authorised it.</param>
+    /// <returns>Success, or why not (<c>Pos.SupervisorRequired</c> asks for a supervisor).</returns>
+    public Result DiscountLineAmount(PosTicketLine line, decimal amount, decimal unsupervisedLimitPercent, bool supervised)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        if (!_lines.Contains(line) || amount < 0m || amount > line.LineNetBeforeDiscount)
+        {
+            return Result.Failure(Error.Validation("Pos.Discount", "A value discount is between nothing and the value of the line."));
+        }
+
+        decimal percent = line.LineNetBeforeDiscount == 0m ? 0m : amount * 100m / line.LineNetBeforeDiscount;
+        if (percent > unsupervisedLimitPercent && !supervised)
+        {
+            return Result.Failure(Error.Rule("Pos.SupervisorRequired", $"A discount over {unsupervisedLimitPercent:0.##}% needs a supervisor."));
+        }
+
+        line.SetDiscount(null, amount == 0m ? null : amount);
+        return Result.Success();
+    }
+
+    /// <summary>Takes a fixed amount off the whole sale, spread over the lines in proportion to their value (the last line takes the rounding), with the same supervisor rule.</summary>
+    /// <param name="amount">The amount off, in the sale currency.</param>
+    /// <param name="unsupervisedLimitPercent">The most a cashier may give alone, as a percentage of the sale.</param>
+    /// <param name="supervised">Whether a supervisor authorised it.</param>
+    /// <returns>Success, or why not.</returns>
+    public Result DiscountSaleAmount(decimal amount, decimal unsupervisedLimitPercent, bool supervised)
+    {
+        if (_lines.Count == 0)
+        {
+            return Result.Failure(Error.Validation("Pos.Empty", "The ticket has no lines."));
+        }
+
+        decimal before = _lines.Sum(l => l.LineNetBeforeDiscount);
+        if (amount < 0m || amount > before)
+        {
+            return Result.Failure(Error.Validation("Pos.Discount", "A value discount is between nothing and the value of the sale."));
+        }
+
+        if (before > 0m && amount * 100m / before > unsupervisedLimitPercent && !supervised)
+        {
+            return Result.Failure(Error.Rule("Pos.SupervisorRequired", $"A discount over {unsupervisedLimitPercent:0.##}% needs a supervisor."));
+        }
+
+        decimal given = 0m;
+        for (int i = 0; i < _lines.Count; i++)
+        {
+            PosTicketLine line = _lines[i];
+            decimal share = i == _lines.Count - 1 ? amount - given : before == 0m ? 0m : PosMoney.Round(amount * line.LineNetBeforeDiscount / before);
+            given += share;
+            line.SetDiscount(null, share == 0m ? null : share);
+        }
+
+        return Result.Success();
+    }
+
     /// <summary>Overrides a line's unit price (always supervised: the caller passes <paramref name="supervised"/> once authorised).</summary>
     /// <param name="line">The line.</param>
     /// <param name="unitPriceNet">The new tax-exclusive unit price.</param>

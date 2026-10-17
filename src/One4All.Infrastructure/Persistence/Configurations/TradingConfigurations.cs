@@ -45,6 +45,8 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         b.Property(x => x.DefaultTaxCode).HasMaxLength(20);
         b.HasKey(x => x.Id);
         b.Property(x => x.OverReceiptTolerancePercent).HasPrecision(9, 4);
+        b.Property(x => x.InvoicePriceTolerancePercent).HasPrecision(9, 4);
+        b.Property(x => x.InvoiceQuantityTolerancePercent).HasPrecision(9, 4);
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(200);
         b.Property(x => x.AnalysisCode1).HasMaxLength(30);

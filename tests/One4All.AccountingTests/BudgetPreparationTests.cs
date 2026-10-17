@@ -54,10 +54,12 @@ public sealed class BudgetPreparationTests
         (await prep.ApproveAsync(companyId, budgetId, council, "")).Error.Code.Should().Be("Budget.ResolutionRequired");
         (await prep.ApproveAsync(companyId, budgetId, council, "COUNCIL-2026-14")).IsSuccess.Should().BeTrue();
         (await prep.ReviseAsync(companyId, budgetId, department, new ProposedFigure("6100", 1, 999m))).Error.Code.Should().Be("Budget.WrongStage");
-        (await budgeting.ActivateAsync(companyId, budgetId)).IsSuccess.Should().BeTrue();
+        (await budgeting.ActivateAsync(companyId, budgetId, council)).Error.Code.Should().Be("Budget.SelfActivation", "the approver does not put it into force (thirteenth audit #6)");
+        (await budgeting.ActivateAsync(companyId, budgetId, department)).Error.Code.Should().Be("Budget.SelfActivation");
+        (await budgeting.ActivateAsync(companyId, budgetId, finance)).IsSuccess.Should().BeTrue();
 
         Budget budget = await db.Set<Budget>().AsNoTracking().Include(b => b.Lines).SingleAsync(b => b.Id == budgetId);
-        (budget.Round, budget.ResolutionReference, budget.IsSealed, budget.IsActive).Should().Be((2, "COUNCIL-2026-14", true, true));
+        (budget.Round, budget.ResolutionReference, budget.IsSealed, budget.IsActive, budget.ActivatedByUserId).Should().Be((2, "COUNCIL-2026-14", true, true, finance));
         budget.Lines.Single(l => l.AccountCode == "6000").Amount.Should().Be(800m);
         budget.Lines.Single(l => l.AccountCode == "6100").Amount.Should().Be(450m);
 

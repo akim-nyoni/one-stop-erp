@@ -70,6 +70,16 @@ public sealed class RetailReportsTests
         (await Render("POS113")).Should().Contain("1,RSODA Soda 500ml,10,100.0%,100.0%,20");
         (await Render("POS117")).Should().Contain("Cash,USD,1,23.00,100.0%,23");
 
+        // Vouchers (thirteenth audit #13): the gift-card liability aged from issue, and allowance vouchers outstanding per holder.
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Vouchers.IVoucherService>().IssueGiftCardAsync(new One4All.Application.Abstractions.Vouchers.IssueGiftCardRequest
+        {
+            CompanyId = companyId, CardNumber = $"GC-RR-{companyId}", Currency = Scenario.Usd, Value = 80m, IssueDate = new DateOnly(2026, 3, 2), CashAccountCode = "1100", LiabilityAccountCode = "2300",
+        })).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Vouchers.IAllowanceVoucherService>().IssueAsync(companyId,
+            new One4All.Application.Abstractions.Vouchers.AllowanceIssueRequest("RR", 1, 3, One4All.Core.Vouchers.AllowanceKind.Fuel, 40m, "Driver R. Dube", new DateOnly(2026, 3, 2), new DateOnly(2026, 12, 31)))).IsSuccess.Should().BeTrue();
+        (await Render("POS122")).Should().Contain($"GC-RR-{companyId},USD,2026-03-02,").And.Contain(",80.00,80");
+        (await Render("POS123")).Should().Contain("Driver R. Dube,Fuel,3,0,").And.Contain(",120");
+
         foreach (string code in RetailReports.All().Select(r => r.Code))
         {
             await Render(code);

@@ -152,4 +152,10 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>This supplier's over-receipt tolerance (percent), when it differs from the company's.</summary>
     public decimal? OverReceiptTolerancePercent { get; set; }
+
+    /// <summary>This supplier's invoice price tolerance (percent), when it differs from the company's.</summary>
+    public decimal? InvoicePriceTolerancePercent { get; set; }
+
+    /// <summary>This supplier's invoice quantity tolerance (percent), when it differs from the company's.</summary>
+    public decimal? InvoiceQuantityTolerancePercent { get; set; }
 }

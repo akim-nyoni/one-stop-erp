@@ -37,6 +37,7 @@ public sealed class BudgetGateOrderTests
         Item soap = new(companyId, "BGO-SOAP", "Soap") { CostOfSalesAccountCode = "5000" };
         Warehouse store = new(companyId, "BGO-WH", "Store");
         db.AddRange(supplier, soap, store);
+        (await db.Companies.SingleAsync(c => c.Id == companyId)).InvoicePriceTolerancePercent = 50m;
         await db.SaveChangesAsync();
         IBudgetingService budgeting = scope.ServiceProvider.GetRequiredService<IBudgetingService>();
         long budget = (await budgeting.CreateBudgetAsync(companyId, yearId, "2026", BudgetType.OriginalApproved, null, [new NewBudgetLine("6100", 1, 1_000m)])).Value;

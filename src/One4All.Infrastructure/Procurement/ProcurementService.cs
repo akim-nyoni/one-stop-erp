@@ -379,6 +379,21 @@ public sealed class ProcurementService : IProcurementService
             return Error.Rule("Pop.NoControlAccounts", "GRNI and/or AP control accounts are not configured.");
         }
 
+        // The match rules: the supplier's own tolerances, else the company's; a tolerance given with the request may tighten the price rule, never widen it.
+        var supplierRules = await _db.Suppliers.Where(s => s.Id == order.SupplierId).Select(s => new { s.InvoicePriceTolerancePercent, s.InvoiceQuantityTolerancePercent }).FirstAsync(ct).ConfigureAwait(false);
+        var companyRules = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => new { c.InvoicePriceTolerancePercent, c.InvoiceQuantityTolerancePercent }).FirstAsync(ct).ConfigureAwait(false);
+        decimal priceTolerance = supplierRules.InvoicePriceTolerancePercent ?? companyRules.InvoicePriceTolerancePercent;
+        decimal quantityTolerance = supplierRules.InvoiceQuantityTolerancePercent ?? companyRules.InvoiceQuantityTolerancePercent;
+        if (request.TolerancePercent is decimal asked)
+        {
+            if (asked > priceTolerance + 0.0001m)
+            {
+                return Error.Rule("Pop.ToleranceAboveRule", $"A price tolerance of {asked}% is wider than the {priceTolerance}% rule for this supplier (Purchasing › Matching tolerances).");
+            }
+
+            priceTolerance = asked;
+        }
+
         decimal invoiceValue = 0m;
         decimal accruedValue = 0m;
         List<(string Account, decimal Committed, decimal Invoiced)> spent = [];
@@ -393,18 +408,18 @@ public sealed class ProcurementService : IProcurementService
 
             // Three-way quantity check: cannot invoice more than received-but-not-yet-invoiced.
             decimal availableToInvoice = line.ReceivedQuantity - line.InvoicedQuantity;
-            if (invLine.Quantity > availableToInvoice + 0.0001m)
+            if (invLine.Quantity > (availableToInvoice * (1m + quantityTolerance / 100m)) + 0.0001m)
             {
                 return Error.Rule("Pop.QuantityMismatch",
-                    $"PO line {line.Id}: invoicing {invLine.Quantity} but only {availableToInvoice} received and uninvoiced.");
+                    $"PO line {line.Id}: invoicing {invLine.Quantity} but only {availableToInvoice} received and uninvoiced (quantity tolerance {quantityTolerance}%).");
             }
 
             // Three-way price check within tolerance.
-            decimal tolerance = line.UnitPrice * request.TolerancePercent / 100m;
+            decimal tolerance = line.UnitPrice * priceTolerance / 100m;
             if (Math.Abs(invLine.UnitPrice - line.UnitPrice) > tolerance + 0.0001m)
             {
                 return Error.Rule("Pop.PriceMismatch",
-                    $"PO line {line.Id}: invoice price {invLine.UnitPrice} is outside {request.TolerancePercent}% of PO price {line.UnitPrice}.");
+                    $"PO line {line.Id}: invoice price {invLine.UnitPrice} is outside {priceTolerance}% of PO price {line.UnitPrice}.");
             }
 
             invoiceValue += decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven);

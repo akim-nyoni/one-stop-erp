@@ -135,10 +135,53 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Matching tolerances", ListTitle = "Matching tolerances",
+            Description = "The rules a supplier invoice is matched by: its price may differ from the order price by up to the price tolerance, and its quantity may exceed what was received by up to the "
+                + "quantity tolerance; a goods receipt may exceed the order by up to the over-receipt tolerance. The company's rules apply to every supplier without rules of its own (blank a supplier's "
+                + "value to fall back). A clerk matching an invoice may tighten the price tolerance, never widen it.",
+            Fields = [Opt("Supplier", "Supplier code (blank: the company's rules)"), OptNum("Price", "Invoice price tolerance %"), OptNum("Quantity", "Invoice quantity tolerance %"), OptNum("OverReceipt", "Over-receipt tolerance %")],
+            Run = async (c, i) =>
+            {
+                decimal? price = i.OptionalNumber("Price"), quantity = i.OptionalNumber("Quantity"), over = i.OptionalNumber("OverReceipt");
+                if (new[] { price, quantity, over }.Any(v => v < 0m))
+                {
+                    throw new OperationException("A tolerance cannot be negative.");
+                }
+
+                if (i.Optional("Supplier") is string code && code.Trim().Length > 0)
+                {
+                    string key = code.Trim().ToUpperInvariant();
+                    Core.Trading.Supplier supplier = await c.Db.Suppliers.SingleOrDefaultAsync(s => s.CompanyId == c.CompanyId && s.Code.ToUpper() == key).ConfigureAwait(true)
+                        ?? throw new OperationException($"No supplier {code}.");
+                    supplier.InvoicePriceTolerancePercent = price;
+                    supplier.InvoiceQuantityTolerancePercent = quantity;
+                    supplier.OverReceiptTolerancePercent = over;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"{supplier.Code}: price {Pct(price)}, quantity {Pct(quantity)}, over-receipt {Pct(over)} (blank: the company's rule).";
+                }
+
+                Core.System.Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                company.InvoicePriceTolerancePercent = price ?? company.InvoicePriceTolerancePercent;
+                company.InvoiceQuantityTolerancePercent = quantity ?? company.InvoiceQuantityTolerancePercent;
+                company.OverReceiptTolerancePercent = over ?? company.OverReceiptTolerancePercent;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Company rules: price {Pct(company.InvoicePriceTolerancePercent)}, quantity {Pct(company.InvoiceQuantityTolerancePercent)}, over-receipt {Pct(company.OverReceiptTolerancePercent)}.";
+            },
+            List = async c =>
+            {
+                Core.System.Company company = await c.Db.Companies.AsNoTracking().SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                List<(string Who, string Price, string Quantity, string Over)> rows = [("(company)", Pct(company.InvoicePriceTolerancePercent), Pct(company.InvoiceQuantityTolerancePercent), Pct(company.OverReceiptTolerancePercent))];
+                rows.AddRange((await c.Db.Suppliers.AsNoTracking().Where(s => s.CompanyId == c.CompanyId && (s.InvoicePriceTolerancePercent != null || s.InvoiceQuantityTolerancePercent != null || s.OverReceiptTolerancePercent != null))
+                    .OrderBy(s => s.Code).ToListAsync().ConfigureAwait(true)).Select(s => (s.Code, Pct(s.InvoicePriceTolerancePercent), Pct(s.InvoiceQuantityTolerancePercent), Pct(s.OverReceiptTolerancePercent))));
+                return Table(rows, ("Who", r => r.Who), ("Price %", r => r.Price), ("Quantity %", r => r.Quantity), ("Over-receipt %", r => r.Over));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Match a supplier invoice", ListTitle = "Purchase orders",
             Description = "Posts the supplier's invoice against the order (three-way match within the price tolerance; a larger difference is held as a dispute). Leave Lines blank to invoice "
                 + "everything received and not yet invoiced at the order price; otherwise ITEM:quantity@price.",
-            Fields = [Req("Order", "Order number"), Req("Invoice", "Supplier invoice number"), Opt("Lines", "Lines (blank: received, at order price)"), Num("Tolerance", "Price tolerance %", "5"),
+            Fields = [Req("Order", "Order number"), Req("Invoice", "Supplier invoice number"), Opt("Lines", "Lines (blank: received, at order price)"), OptNum("Tolerance", "Price tolerance % (blank: the supplier's or company's rule; may only tighten it)"),
                 Opt("Variance", "Price variance account"), Opt("BudgetApprover", "Budget approver user (over budget)"), Today("Date", "Invoice date")],
             Run = async (c, i) =>
             {
@@ -149,7 +192,7 @@ public static partial class OperationCatalogue
                     : [.. order.Lines.Where(l => l.ReceivedQuantity > l.InvoicedQuantity).Select(l => new InvoiceMatchLine(l.Id, l.ReceivedQuantity - l.InvoicedQuantity, l.UnitPrice))];
                 MatchInvoiceResult matched = Check(await c.Get<IProcurementService>().MatchInvoiceAsync(new MatchInvoiceRequest
                 {
-                    CompanyId = c.CompanyId, PurchaseOrderId = order.Id, InvoiceNumber = i.Text("Invoice"), Date = i.Date("Date"), TolerancePercent = i.Number("Tolerance"),
+                    CompanyId = c.CompanyId, PurchaseOrderId = order.Id, InvoiceNumber = i.Text("Invoice"), Date = i.Date("Date"), TolerancePercent = i.OptionalNumber("Tolerance"),
                     PriceVarianceAccountCode = i.Optional("Variance"), BudgetApprovedByUserId = await OptionalUserAsync(c, i.Optional("BudgetApprover")).ConfigureAwait(true), Lines = lines,
                 }).ConfigureAwait(true));
                 return $"Invoice {i.Text("Invoice")} posted: {M(matched.InvoiceValue)} (journal {matched.JournalNumber}).";
@@ -246,7 +289,7 @@ public static partial class OperationCatalogue
             Description = "Submits a supplier invoice that may not match (outside the tolerance it is held as a dispute rather than refused), then accepts a dispute (posting it, the "
                 + "difference to price variance) or rejects it with a note.",
             Fields = [Pick("Step", "Step", ["Submit", "Accept", "Reject"]), Opt("Order", "Order number (submit)"), Opt("Invoice", "Supplier invoice number (submit)"),
-                Opt("Lines", "Lines: ITEM:quantity@price; … (submit; blank: received at order price)"), Num("Tolerance", "Price tolerance %", "5"), OptNum("Dispute", "Dispute id"), Opt("Note", "Note"),
+                Opt("Lines", "Lines: ITEM:quantity@price; … (submit; blank: received at order price)"), OptNum("Tolerance", "Price tolerance % (blank: the supplier's or company's rule; may only tighten it)"), OptNum("Dispute", "Dispute id"), Opt("Note", "Note"),
                 Opt("Variance", "Price variance account"), Today()],
             Run = async (c, i) =>
             {
@@ -261,7 +304,7 @@ public static partial class OperationCatalogue
                             : [.. order.Lines.Where(l => l.ReceivedQuantity > l.InvoicedQuantity).Select(l => new InvoiceMatchLine(l.Id, l.ReceivedQuantity - l.InvoicedQuantity, l.UnitPrice))];
                         InvoiceSubmission submitted = Check(await disputes.SubmitAsync(new MatchInvoiceRequest
                         {
-                            CompanyId = c.CompanyId, PurchaseOrderId = order.Id, InvoiceNumber = i.Optional("Invoice") ?? string.Empty, Date = i.Date("Date"), TolerancePercent = i.Number("Tolerance"),
+                            CompanyId = c.CompanyId, PurchaseOrderId = order.Id, InvoiceNumber = i.Optional("Invoice") ?? string.Empty, Date = i.Date("Date"), TolerancePercent = i.OptionalNumber("Tolerance"),
                             PriceVarianceAccountCode = i.Optional("Variance"), Lines = lines,
                         }).ConfigureAwait(true));
                         return submitted.Matched ? $"Matched and posted ({submitted.Match!.Value.JournalNumber})." : $"Held as dispute {submitted.DisputeId}: {submitted.Reason}";
@@ -404,4 +447,6 @@ public static partial class OperationCatalogue
 
         return lines;
     }
+
+    private static string Pct(decimal? value) => value is decimal v ? v.ToString("0.##", CultureInfo.InvariantCulture) + "%" : "(company)";
 }

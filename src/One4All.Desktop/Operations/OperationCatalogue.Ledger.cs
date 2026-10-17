@@ -534,6 +534,28 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Deferred posting", ListTitle = "Deferred posting",
+            Description = "The Sage 200 deferred-posting option: name the source modules (AR, AP, POS, INV, PAY, CB …) whose postings queue as deferred journals instead of reaching the nominal ledger at "
+                + "once; sub-ledgers update immediately either way. Queued journals are listed by SYS245 (Unposted & Deferred Batches) and posted in a batch from Period close › Release deferred journals. "
+                + "Blank posts everything straight away.",
+            Fields = [Opt("Modules", "Source modules queued (comma-separated; blank: none)")],
+            Run = async (c, i) =>
+            {
+                Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                string modules = string.Join(", ", (i.Optional("Modules") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(m => m.ToUpperInvariant()).Distinct());
+                company.DeferredPostingModules = modules.Length == 0 ? null : modules;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return modules.Length == 0 ? "Every module posts straight away." : $"Postings from {modules} queue as deferred journals until released.";
+            },
+            List = async c =>
+            {
+                Company company = await c.Db.Companies.AsNoTracking().SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                int queued = await c.Db.Journals.AsNoTracking().CountAsync(j => j.CompanyId == c.CompanyId && j.Status == JournalStatus.Deferred).ConfigureAwait(true);
+                return Table(new[] { (Modules: company.DeferredPostingModules ?? "(none: everything posts at once)", Queued: queued) }, ("Queued modules", r => r.Modules), ("Deferred journals waiting", r => r.Queued));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Intercompany journal",
             Description = "Posts both sides of an intercompany charge at once: in this company against its intercompany account, and in the other company against its own.",
             Fields = [Req("ToCompany", "Other company code"), Num("Amount", "Amount"), Req("Document", "Document number"), Opt("Narrative", "Narrative"), Req("FromAccount", "This company's account"),

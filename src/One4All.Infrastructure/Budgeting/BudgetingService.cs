@@ -108,7 +108,7 @@ public sealed class BudgetingService : IBudgetingService
     }
 
     /// <inheritdoc />
-    public async Task<Result> ActivateAsync(long companyId, long budgetId, CancellationToken ct = default)
+    public async Task<Result> ActivateAsync(long companyId, long budgetId, long? activatedByUserId = null, CancellationToken ct = default)
     {
         Budget? budget = await _db.Set<Budget>().Include(b => b.Lines).FirstOrDefaultAsync(b => b.Id == budgetId && b.CompanyId == companyId, ct).ConfigureAwait(false);
         if (budget is null)
@@ -127,6 +127,12 @@ public sealed class BudgetingService : IBudgetingService
             return Result.Failure(Error.Rule("Budget.NotApproved", $"Budget {budget.Label} v{budget.VersionNumber} is {budget.Status}; it must be approved before activation."));
         }
 
+        // Segregation (brief §4.18.4): the officer who submitted or approved the version does not also put it into force.
+        if (activatedByUserId is long who && (budget.SubmittedByUserId == who || budget.ApprovedByUserId == who))
+        {
+            return Result.Failure(Error.Rule("Budget.SelfActivation", $"Budget {budget.Label} v{budget.VersionNumber} was {(budget.ApprovedByUserId == who ? "approved" : "submitted")} by you; another officer activates it."));
+        }
+
         List<Budget> priorActive = await _db.Set<Budget>()
             .Where(b => b.CompanyId == companyId && b.FiscalYearId == budget.FiscalYearId && b.Type == budget.Type && b.Department == budget.Department && b.IsActive && b.Id != budgetId)
             .ToListAsync(ct).ConfigureAwait(false);
@@ -136,7 +142,7 @@ public sealed class BudgetingService : IBudgetingService
             prior.Supersede();
         }
 
-        budget.Activate();
+        budget.Activate(activatedByUserId, DateOnly.FromDateTime(DateTime.UtcNow));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

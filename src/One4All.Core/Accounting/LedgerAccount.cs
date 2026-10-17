@@ -62,6 +62,9 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether manual journals may be posted to this account (never for control accounts).</summary>
     public bool AllowManualJournal { get; set; }
 
+    /// <summary>Gets or sets whether the account is a monetary item (cash, receivables, payables, loans) revalued at closing rates when currency-restricted (IAS 21); stock, prepayments and fixed assets held in a currency are not.</summary>
+    public bool IsMonetary { get; set; } = true;
+
     /// <summary>Optional currency the account is restricted to (e.g. a foreign bank account).</summary>
     public CurrencyCode? CurrencyRestriction { get; set; }
 

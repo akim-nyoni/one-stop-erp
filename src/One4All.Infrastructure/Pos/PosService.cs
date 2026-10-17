@@ -537,11 +537,11 @@ public sealed class PosService : IPosService
     }
 
     /// <inheritdoc />
-    public Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => VoidSaleCoreAsync(companyId, saleId, date, reason, taxAccountCode, ct), ct);
+    public Task<Result<string>> VoidSaleAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode = null, long? authorisedByUserId = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => VoidSaleCoreAsync(companyId, saleId, date, reason, taxAccountCode, authorisedByUserId, ct), ct);
 
     // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<string>> VoidSaleCoreAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode, CancellationToken ct)
+    private async Task<Result<string>> VoidSaleCoreAsync(long companyId, long saleId, DateOnly date, string reason, string? taxAccountCode, long? authorisedByUserId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -682,7 +682,7 @@ public sealed class PosService : IPosService
         sale.Void();
         PosEvent voided = new(companyId, sale.TerminalId, sale.CashierUserId, PosEventKind.SaleVoid, _clock.UtcNow, date, $"Sale {sale.SaleNumber}", sale.TotalNet + sale.TotalTax)
         {
-            TillSessionId = sale.TillSessionId, SaleNumber = sale.SaleNumber, Reason = reason.Trim(), Reference = posting.Value.JournalNumber,
+            TillSessionId = sale.TillSessionId, SaleNumber = sale.SaleNumber, Reason = reason.Trim(), Reference = posting.Value.JournalNumber, AuthorisedByUserId = authorisedByUserId,
         };
         if (sale.FiscalStatus != FiscalStatus.NotRequired && await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, posting.Value.JournalNumber, sale.TotalGross, sale.TotalTax,
                 sale.BaseCurrency.Value, _clock.UtcNow, FiscalDocumentKind.Refund, sale.SaleNumber), ct).ConfigureAwait(false) is FiscalReceiptResult signedVoid)

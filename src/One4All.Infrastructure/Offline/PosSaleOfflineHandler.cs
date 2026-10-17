@@ -117,7 +117,7 @@ public sealed class PosVoidOfflineHandler : IOfflineOperationHandler
             return Result.Success();
         }
 
-        Result<string> voided = await _pos.VoidSaleAsync(envelope.CompanyId, sale.Id, envelope.Date, envelope.Reason, envelope.TaxAccountCode, ct).ConfigureAwait(false);
+        Result<string> voided = await _pos.VoidSaleAsync(envelope.CompanyId, sale.Id, envelope.Date, envelope.Reason, envelope.TaxAccountCode, envelope.AuthorisedByUserId, ct).ConfigureAwait(false);
         return voided.IsSuccess ? Result.Success() : Result.Failure(voided.Error);
     }
 }

@@ -86,8 +86,10 @@ public sealed class ServicingCostService : IServicingCostService
             return Error.Rule("Hse.NoServicingContract", "No servicing contract is linked to the scheme.");
         }
 
-        // Only stands still in stock take servicing cost; a sold stand's cost has already gone to cost of sales.
-        List<HousingStand> stands = await _db.HousingStands.Where(s => s.CompanyId == companyId && s.SchemeId == schemeId && (s.Status == StandStatus.Available || s.Status == StandStatus.Allocated))
+        // Every stand still in stock takes servicing cost — being planned, surveyed or serviced, available, reserved, offered or allocated; a sold or transferred stand's
+        // cost has already gone to cost of sales (thirteenth audit #7: stands before "available" were skipped, skewing the cost per stand).
+        List<HousingStand> stands = await _db.HousingStands.Where(s => s.CompanyId == companyId && s.SchemeId == schemeId && s.Status != StandStatus.Sold && s.Status != StandStatus.Transferred
+                && s.Status != StandStatus.TitleHandedOver && s.Status != StandStatus.ConsolidatedAway && s.Status != StandStatus.ReSubdivided)
             .OrderBy(s => s.StandNumber).ToListAsync(ct).ConfigureAwait(false);
         CurrencyCode currency = await _db.Set<Company>().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
 

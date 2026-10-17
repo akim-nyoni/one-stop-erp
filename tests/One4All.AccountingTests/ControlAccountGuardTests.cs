@@ -65,6 +65,40 @@ public sealed class ControlAccountGuardTests
         (await extraLine.Should().ThrowAsync<Npgsql.PostgresException>()).Which.MessageText.Should().Contain("cannot be added to posted journal");
     }
 
+    [SkippableFact]
+    public async Task Accounts_that_do_not_allow_manual_journals_refuse_them_in_the_engine_and_the_database()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.Add(new LedgerAccount(companyId, "6890", "System-only expense", AccountType.Expense) { AllowManualJournal = false });
+        await db.SaveChangesAsync();
+        IPostingEngine engine = scope.ServiceProvider.GetRequiredService<IPostingEngine>();
+
+        // The engine refuses the manual journal (thirteenth audit #2: the account's flag is enforced, not only control accounts).
+        (await engine.PostAsync(Manual(companyId, "6890", deferred: false))).Error.Code.Should().Be("Posting.ManualJournalNotAllowed");
+
+        // Redirecting a manual journal's line to the account in the database is refused by the trigger.
+        PostingReceipt deferred = (await engine.PostAsync(Manual(companyId, "6800", deferred: true))).Value;
+        long lineId = await db.Set<JournalLine>().Where(l => l.JournalEntryId == deferred.JournalId && l.AccountCode == "6800").Select(l => l.Id).SingleAsync();
+        Func<Task> redirect = () => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE gl.journal_line SET account_code = '6890' WHERE id = {lineId}");
+        (await redirect.Should().ThrowAsync<Npgsql.PostgresException>()).Which.MessageText.Should().Contain("does not allow manual journals");
+
+        // A system posting still reaches it.
+        JournalRequest system = new()
+        {
+            CompanyId = companyId, SourceModule = "AP", PostingDate = new DateOnly(2026, 3, 10), TransactionCurrency = Scenario.Usd, DocumentNumber = "SYS-6890",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = "6890", Side = JournalSide.Debit, TransactionAmount = 25m },
+                new JournalLineRequest { AccountCode = "1000", Side = JournalSide.Credit, TransactionAmount = 25m },
+            ],
+        };
+        (await engine.PostAsync(system)).IsSuccess.Should().BeTrue();
+    }
+
     private static JournalRequest Manual(long companyId, string debitAccount, bool deferred) => new()
     {
         CompanyId = companyId, SourceModule = "GL", PostingDate = new DateOnly(2026, 3, 10), TransactionCurrency = Scenario.Usd,

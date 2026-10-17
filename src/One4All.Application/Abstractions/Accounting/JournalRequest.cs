@@ -53,6 +53,9 @@ public sealed class JournalRequest
     /// <summary>When true, the journal is queued as deferred rather than posted live.</summary>
     public bool Deferred { get; init; }
 
+    /// <summary>Gets whether this is a period-end valuation entry (an FX revaluation and its reversal): it restates base amounts only, so a bank account reconciled and signed off to the date still takes it.</summary>
+    public bool ValuationOnly { get; init; }
+
     /// <summary>
     /// When set, the journal is submitted for approval by this user (the preparer): it is numbered and held, unposted,
     /// until a different user approves it.

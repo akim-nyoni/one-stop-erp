@@ -114,9 +114,9 @@ public sealed class PostingEngine : IPostingEngine
 
         (JournalEntry journal, decimal totalBaseDebit) = built.Value;
 
-        // A bank account reconciled and signed off to a date takes no more entries on or before it.
+        // A bank account reconciled and signed off to a date takes no more entries on or before it — except a valuation entry, which restates base amounts only.
         List<string> lineAccounts = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
-        string? lockedBank = await _db.Set<Core.Banking.BankAccount>()
+        string? lockedBank = request.ValuationOnly ? null : await _db.Set<Core.Banking.BankAccount>()
             .Where(b => b.CompanyId == request.CompanyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= request.PostingDate)
             .Select(b => b.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (lockedBank is not null)
@@ -148,7 +148,8 @@ public sealed class PostingEngine : IPostingEngine
         string journalNumber = await AllocateJournalNumberAsync(request.CompanyId, request.PostingDate.Year, ct).ConfigureAwait(false);
 
         DateTimeOffset entryDate = DateTimeOffset.UtcNow;
-        bool held = request.Deferred || request.SubmittedByUserId is not null;
+        // Held: asked for, awaiting approval, or from a module the company queues for a controlled release (brief §3.2 rule 8).
+        bool held = request.Deferred || request.SubmittedByUserId is not null || company.DefersPostingsFor(request.SourceModule);
         if (held)
         {
             journal.MarkDeferred(journalNumber, fiscalYear.Id, fiscalPeriod.Id, entryDate);
@@ -285,9 +286,11 @@ public sealed class PostingEngine : IPostingEngine
         }
 
         long companyId = requests[0].CompanyId;
+        Company? batchCompany = await _db.Companies.AsNoTracking().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         foreach (JournalRequest request in requests)
         {
             if (request.CompanyId != companyId || request.Lines.Count == 0 || request.Deferred || request.SubmittedByUserId is not null || request.EnforceManualJournalRules
+                || (batchCompany?.DefersPostingsFor(request.SourceModule) ?? false)
                 || request.ToAdjustmentPeriod || !string.IsNullOrWhiteSpace(request.IdempotencyKey) || request.BudgetOverrideReason is not null)
             {
                 return Error.Rule("Posting.BatchUnsupported", "A deferred, submitted, manual, adjustment-period, keyed or budget-overridden journal posts on its own.");
@@ -620,6 +623,12 @@ public sealed class PostingEngine : IPostingEngine
                 $"Account '{key.AccountCode}' is a control account and cannot be posted by manual journal.");
         }
 
+        if (request.EnforceManualJournalRules && !account.AllowManualJournal)
+        {
+            return Error.Rule("Posting.ManualJournalNotAllowed",
+                $"Account '{key.AccountCode}' does not allow manual journals; it is posted by the system only.");
+        }
+
         CurrencyCode lineCurrency = lineRequest.Currency ?? request.TransactionCurrency;
         if (!account.AllowsCurrency(lineCurrency))
         {
@@ -644,7 +653,7 @@ public sealed class PostingEngine : IPostingEngine
         }
         else
         {
-            Result<decimal> rateResult = await LookupRateAsync(lineCurrency, baseCurrency, request.PostingDate, ct).ConfigureAwait(false);
+            Result<decimal> rateResult = await LookupRateAsync(request, lineCurrency, baseCurrency, ct).ConfigureAwait(false);
             if (rateResult.IsFailure)
             {
                 return rateResult.Error;
@@ -776,7 +785,7 @@ public sealed class PostingEngine : IPostingEngine
             {
                 if (rate is null)
                 {
-                    Result<decimal> found = await LookupRateAsync(baseCurrency, reportingCurrency, request.PostingDate, ct).ConfigureAwait(false);
+                    Result<decimal> found = await LookupRateAsync(request, baseCurrency, reportingCurrency, ct).ConfigureAwait(false);
                     if (found.IsFailure)
                     {
                         return Error.Rule("Posting.NoReportingRate",
@@ -859,9 +868,11 @@ public sealed class PostingEngine : IPostingEngine
         return Error.Rule("Posting.NoPeriod", $"No fiscal period is defined for {date:yyyy-MM-dd} in company {companyId}.");
     }
 
-    private async Task<Result<decimal>> LookupRateAsync(CurrencyCode from, CurrencyCode to, DateOnly date, CancellationToken ct)
+    // The company's exchange-rate policy for the document type (else the source module) picks the rate type; the daily rate is the fallback (brief §3.3).
+    private async Task<Result<decimal>> LookupRateAsync(JournalRequest request, CurrencyCode from, CurrencyCode to, CancellationToken ct)
     {
-        decimal? rate = await ExchangeRateResolver.FindAsync(_db, from, to, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+        DateOnly date = request.PostingDate;
+        decimal? rate = await ExchangeRateResolver.PolicyRateAsync(_db, request.CompanyId, from, to, request.DocumentType, request.SourceModule, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
             return Error.Rule("Posting.NoExchangeRate", $"No daily exchange rate from {from} to {to} (direct, inverse or through another currency) on or before {date:yyyy-MM-dd}.");

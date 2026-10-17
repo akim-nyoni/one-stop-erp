@@ -165,6 +165,10 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
     /// <summary>Marks every instalment raised: the agreement has run its term.</summary>
     public void Complete() => Status = InstalmentAgreementStatus.Completed;
 
+    /// <summary>Moves the agreement to a new buyer (an approved transfer where the transferee assumes the balance, brief §4.10.6).</summary>
+    /// <param name="buyerCustomerId">The new buyer.</param>
+    public void AssignBuyer(long buyerCustomerId) => BuyerCustomerId = buyerCustomerId;
+
     /// <summary>Closes it on repossession: instalments not yet raised are never charged.</summary>
     /// <param name="date">When.</param>
     public void Repossess(DateOnly date)

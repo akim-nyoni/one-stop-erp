@@ -700,11 +700,12 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Add a ledger account", ListTitle = "Chart of accounts", Description = "A ledger account; a control account is posted only by its own ledger.",
             Fields = [Req("Code", "Account code (up to 8)"), Req("Name", "Name"), Pick("Type", "Type", Enum.GetNames<AccountType>()),
-                Pick("Control", "Control account", [NoControl, .. Enum.GetNames<ControlAccountType>()]), Opt("Category", "Report category"), Opt("TaxCode", "Default tax code")],
+                Pick("Control", "Control account", [NoControl, .. Enum.GetNames<ControlAccountType>()]), Opt("Category", "Report category"), Opt("TaxCode", "Default tax code"),
+                Tick("Manual", "Manual journals allowed (untick for an account the system alone posts)", true), Tick("Monetary", "Monetary item (revalued at closing rates when currency-restricted)", true)],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateAccountAsync(new NewAccount(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<AccountType>(i.Text("Type")),
-                i.Text("Control") == NoControl ? null : Enum.Parse<ControlAccountType>(i.Text("Control")), i.Optional("Category"), DefaultTaxCode: i.Optional("TaxCode"))).ConfigureAwait(true), id => "Account added."),
+                i.Text("Control") == NoControl ? null : Enum.Parse<ControlAccountType>(i.Text("Control")), i.Optional("Category"), DefaultTaxCode: i.Optional("TaxCode"), AllowManualJournal: i.Flag("Manual"), IsMonetary: i.Flag("Monetary"))).ConfigureAwait(true), id => "Account added."),
             List = async c => Table(await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.AccountCode).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.ControlAccountType), ("Active", x => x.IsActive)),
+                ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.ControlAccountType), ("Manual", x => x.AllowManualJournal ? "yes" : "no"), ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {

@@ -779,6 +779,8 @@ internal sealed class TransferApplicationConfiguration : IEntityTypeConfiguratio
         b.Property(x => x.TransferType).HasConversion<int>();
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.Consideration).HasPrecision(19, 4);
+        b.Property(x => x.BalanceAssumedAmount).HasPrecision(19, 4);
+        b.Property(x => x.AssumptionClearingAccountCode).HasMaxLength(20);
         b.Property(x => x.RejectionReason).HasMaxLength(1000);
         b.Property(x => x.ClearanceNumber).HasMaxLength(30);
         b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);

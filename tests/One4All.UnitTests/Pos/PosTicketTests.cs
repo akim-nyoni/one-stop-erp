@@ -38,6 +38,28 @@ public sealed class PosTicketTests
     }
 
     [Fact]
+    public void Value_discounts_apply_to_a_line_and_spread_across_a_sale()
+    {
+        PosTicket ticket = new();
+        ticket.AddLine(0, "Soda", 2.00m, 0m, "4000", quantity: 10m);
+        ticket.AddLine(1, "Bread", 5.00m, 0m, "4000", quantity: 2m);
+        PosTicketLine soda = ticket.Lines[0];
+        ticket.DiscountLineAmount(soda, 25m, 10m, supervised: false).Error.Code.Should().Be("Pos.Discount", "more than the line is worth");
+        ticket.DiscountLineAmount(soda, 5m, 10m, supervised: false).Error.Code.Should().Be("Pos.SupervisorRequired", "5 off 20 is 25%, above the 10% limit");
+        ticket.DiscountLineAmount(soda, 5m, 10m, supervised: true).IsSuccess.Should().BeTrue();
+        (soda.Discount, soda.LineNet).Should().Be((5m, 15m));
+
+        ticket.DiscountSaleAmount(3.3m, 10m, supervised: false).Error.Code.Should().Be("Pos.SupervisorRequired", "3.30 off 30 is 11%");
+        ticket.DiscountSaleAmount(3m, 10m, supervised: false).IsSuccess.Should().BeTrue();
+        ticket.Lines.Select(l => l.Discount).Should().Equal(new[] { 2.00m, 1.00m }, "spread in proportion to the lines' value, replacing the line discount");
+        ticket.SubtotalNet.Should().Be(27m);
+        ticket.DiscountSaleAmount(0.01m, 10m, supervised: false).IsSuccess.Should().BeTrue();
+        ticket.Lines.Select(l => l.Discount).Should().Equal(new[] { 0.01m, 0m }, "the last line takes the rounding, here nothing");
+        ticket.DiscountSaleAmount(0m, 10m, supervised: false).IsSuccess.Should().BeTrue();
+        ticket.SubtotalNet.Should().Be(30m);
+    }
+
+    [Fact]
     public void Adding_the_same_sellable_increments_quantity()
     {
         PosTicket ticket = new();

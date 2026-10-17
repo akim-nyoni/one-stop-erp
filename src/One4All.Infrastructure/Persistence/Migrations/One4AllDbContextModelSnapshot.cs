@@ -898,6 +898,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsMonetary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_monetary");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -2864,6 +2868,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("ActivatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("activated_by_user_id");
+
+                    b.Property<DateOnly?>("ActivatedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("activated_on");
 
                     b.Property<long?>("ApprovedByUserId")
                         .HasColumnType("bigint")
@@ -12152,6 +12164,24 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
                         .HasColumnName("application_number");
+
+                    b.Property<long?>("AssumptionApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("assumption_approved_by_user_id");
+
+                    b.Property<string>("AssumptionClearingAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("assumption_clearing_account_code");
+
+                    b.Property<bool>("BalanceAssumed")
+                        .HasColumnType("boolean")
+                        .HasColumnName("balance_assumed");
+
+                    b.Property<decimal>("BalanceAssumedAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("balance_assumed_amount");
 
                     b.Property<string>("ClearanceNumber")
                         .HasMaxLength(30)
@@ -31804,6 +31834,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(256)")
                         .HasColumnName("default_fund");
 
+                    b.Property<string>("DeferredPostingModules")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("deferred_posting_modules");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -31833,6 +31868,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("housing_market_rate_percent");
+
+                    b.Property<decimal>("InvoicePriceTolerancePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("invoice_price_tolerance_percent");
+
+                    b.Property<decimal>("InvoiceQuantityTolerancePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("invoice_quantity_tolerance_percent");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
@@ -34749,6 +34794,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
+
+                    b.Property<decimal?>("InvoicePriceTolerancePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("invoice_price_tolerance_percent");
+
+                    b.Property<decimal?>("InvoiceQuantityTolerancePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("invoice_quantity_tolerance_percent");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")

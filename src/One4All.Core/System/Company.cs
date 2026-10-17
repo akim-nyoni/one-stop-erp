@@ -162,6 +162,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>How far (percent of the ordered quantity) a goods receipt may go over a purchase order line without a supervisor (brief §4.3).</summary>
     public decimal OverReceiptTolerancePercent { get; set; }
 
+    /// <summary>How far (percent) a supplier invoice price may differ from the order price and still match (brief §4.3 three-way match); a clerk may tighten it per match, never widen it.</summary>
+    public decimal InvoicePriceTolerancePercent { get; set; } = 5m;
+
+    /// <summary>How far (percent of the quantity received and not yet invoiced) a supplier invoice quantity may exceed the receipt and still match.</summary>
+    public decimal InvoiceQuantityTolerancePercent { get; set; }
+
     /// <summary>
     /// Gets or sets the largest discount off the price list a sales order may carry without authority (brief §4.4 price and discount control); beyond it
     /// an authoriser who may override prices signs it off, or the company's SalesDiscount workflow approves it. Null: no limit.
@@ -212,6 +218,19 @@ public sealed class Company : SoftDeletableEntity
 
     /// <summary>Gets or sets a value indicating whether a budget must go through preparation and approval before it can be activated.</summary>
     public bool BudgetApprovalRequired { get; set; }
+
+    /// <summary>
+    /// Gets or sets the source modules (comma-separated, e.g. "AR, AP, POS") whose postings are queued as deferred journals and posted in a controlled release
+    /// (brief §3.2 rule 8, the Sage 200 deferred-posting option); blank posts everything straight away. Sub-ledgers update at once either way.
+    /// </summary>
+    public string? DeferredPostingModules { get; set; }
+
+    /// <summary>Whether postings from a source module are queued rather than posted at once.</summary>
+    /// <param name="sourceModule">The source module.</param>
+    /// <returns>True when queued.</returns>
+    public bool DefersPostingsFor(string? sourceModule)
+        => !string.IsNullOrWhiteSpace(DeferredPostingModules) && !string.IsNullOrWhiteSpace(sourceModule)
+            && DeferredPostingModules.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Any(m => m.Equals(sourceModule, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Gets or sets a value indicating whether the company keeps fund accounts: every journal line names a fund and each fund balances within the journal.</summary>
     public bool FundAccounting { get; set; }

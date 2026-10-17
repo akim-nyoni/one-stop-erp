@@ -228,14 +228,27 @@ public sealed class ConsolidationService : IConsolidationService
         decimal unmatched = 0m;
         if (interco.Count > 0)
         {
+            // The matched portion goes (thirteenth audit #9: after translation the two sides rarely net to nil exactly, so all-or-nothing meant nothing was eliminated);
+            // the residue stays on the intercompany accounts, reported as unmatched, for the group accountant to clear.
             List<KeyValuePair<string, decimal>> intercoTotals = [.. translated.Where(t => interco.Contains(t.Key))];
-            unmatched = intercoTotals.Sum(t => t.Value);
-            if (unmatched == 0m)
+            decimal debits = intercoTotals.Where(t => t.Value > 0m).Sum(t => t.Value);
+            decimal credits = -intercoTotals.Where(t => t.Value < 0m).Sum(t => t.Value);
+            unmatched = debits - credits;
+            eliminated = Math.Min(debits, credits);
+            if (eliminated > 0m)
             {
-                eliminated = intercoTotals.Sum(t => Math.Max(0m, t.Value));
                 foreach (KeyValuePair<string, decimal> t in intercoTotals)
                 {
-                    translated.Remove(t.Key);
+                    decimal share = t.Value > 0m ? decimal.Round(eliminated * t.Value / debits, 2, MidpointRounding.ToEven) : -decimal.Round(eliminated * -t.Value / credits, 2, MidpointRounding.ToEven);
+                    decimal left = t.Value - share;
+                    if (left == 0m)
+                    {
+                        translated.Remove(t.Key);
+                    }
+                    else
+                    {
+                        translated[t.Key] = left;
+                    }
                 }
             }
         }

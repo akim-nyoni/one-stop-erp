@@ -160,6 +160,30 @@ public sealed class TransferApplication : AuditableEntity, ICompanyScoped
     /// <summary>The municipal clearance certificate relied on, if the stand is on the municipal register.</summary>
     public string? ClearanceNumber { get; private set; }
 
+    /// <summary>Gets whether the transferee formally assumes the transferor's housing balance (brief §4.10.6 pre-condition 2), with approval.</summary>
+    public bool BalanceAssumed { get; private set; }
+
+    /// <summary>Gets the balance assumed, as it stood when the assumption was approved.</summary>
+    public decimal BalanceAssumedAmount { get; private set; }
+
+    /// <summary>Gets the officer who approved the assumption.</summary>
+    public long? AssumptionApprovedByUserId { get; private set; }
+
+    /// <summary>Gets the account the balance passes through when it moves from the transferor to the transferee (nets to nil).</summary>
+    public string? AssumptionClearingAccountCode { get; private set; }
+
+    /// <summary>Records the approved assumption of the housing balance by the transferee.</summary>
+    /// <param name="amount">The balance.</param>
+    /// <param name="approvedByUserId">The approving officer.</param>
+    /// <param name="clearingAccountCode">The clearing account.</param>
+    public void AssumeBalance(decimal amount, long approvedByUserId, string clearingAccountCode)
+    {
+        BalanceAssumed = true;
+        BalanceAssumedAmount = amount;
+        AssumptionApprovedByUserId = approvedByUserId;
+        AssumptionClearingAccountCode = clearingAccountCode;
+    }
+
     /// <summary>The verified checklist items.</summary>
     public IReadOnlyList<TransferCheck> Checks => _checks.AsReadOnly();
 

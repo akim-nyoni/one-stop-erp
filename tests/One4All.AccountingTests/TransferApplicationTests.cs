@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Trading;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Housing;
 using One4All.Core.Municipal;
@@ -123,6 +124,78 @@ public sealed class TransferApplicationTests
         HousingStand after = await db.HousingStands.AsNoTracking().Include(s => s.Ownership).SingleAsync(s => s.Id == stand.Id);
         (after.CurrentHolderCustomerId, after.Ownership[^1].ChangeType, after.Ownership[^1].Consideration).Should().Be((buyer.Id, OwnershipChangeType.Cession, 9000m));
         after.VerifyOwnershipChain().Should().BeTrue();
+    }
+
+    [SkippableFact]
+    public async Task A_balance_assumed_by_the_transferee_with_approval_moves_to_them_on_completion()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Role officer = new($"Transfer officer {companyId}");
+        officer.Grant("Housing.OwnershipChange", OperationFlags.View | OperationFlags.Create | OperationFlags.Edit);
+        Role director = new($"Transfer approver {companyId}");
+        director.Grant("Housing.OwnershipApprove", OperationFlags.View | OperationFlags.Approve);
+        db.Roles.AddRange(officer, director);
+        User verifier = new($"tra-verifier-{companyId}", "Verifying Officer"), approverOne = new($"tra-approver1-{companyId}", "First Approver"), approverTwo = new($"tra-approver2-{companyId}", "Second Approver");
+        db.Users.AddRange(verifier, approverOne, approverTwo);
+        Customer holder = new(companyId, "TRA-H", "Outgoing Holder", Scenario.Usd), buyer = new(companyId, "TRA-B", "Incoming Holder", Scenario.Usd);
+        db.Customers.AddRange(holder, buyer);
+        LandParcel parcel = new(companyId, $"LP-TRA-{companyId}", "Assumption parcel", 5000m, 50000m);
+        db.LandParcels.Add(parcel);
+        if (!await db.Accounts.AnyAsync(a => a.CompanyId == companyId && a.AccountCode == "2900"))
+        {
+            db.Accounts.Add(new LedgerAccount(companyId, "2900", "Transfer clearing", AccountType.Liability));
+        }
+
+        await db.SaveChangesAsync();
+        verifier.AssignRole(officer.Id);
+        approverOne.AssignRole(director.Id);
+        approverTwo.AssignRole(director.Id);
+        HousingStand stand = new(companyId, parcel.Id, null, "TRA-1", 300m, 2000m);
+        db.HousingStands.Add(stand);
+        Property property = new(companyId, "TRA-1", "Ward 3", holder.Id);
+        db.Properties.Add(property);
+        await db.SaveChangesAsync();
+        IHousingService housing = scope.ServiceProvider.GetRequiredService<IHousingService>();
+        ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<ISalesLedgerService>();
+        (await housing.SellStandAsync(companyId, stand.Id, holder.Id, holder.Name, 6000m, new DateOnly(2026, 3, 1), "4100", "1460", "5100", $"TRA-INV-{companyId}")).IsSuccess.Should().BeTrue();
+
+        ITransferApplicationService transfers = scope.ServiceProvider.GetRequiredService<ITransferApplicationService>();
+        DateOnly day = new(2026, 5, 10);
+        string number = (await transfers.LodgeAsync(new TransferLodgement { CompanyId = companyId, StandId = stand.Id, TransferType = TransferType.Cession, ToCustomerId = buyer.Id, Consideration = 9000m, Date = day })).Value;
+        foreach (TransferRequirement requirement in new[] { TransferRequirement.Identity, TransferRequirement.SpousalConsent, TransferRequirement.OriginalDocuments, TransferRequirement.TaxWithholding })
+        {
+            (await transfers.VerifyAsync(companyId, number, requirement, $"{requirement} seen", verifier.Id, day)).IsSuccess.Should().BeTrue();
+        }
+
+        string fee = $"TRA-FEE-{companyId}";
+        (await ar.PostReceiptAsync(new ReceiptRequest { CompanyId = companyId, CustomerId = buyer.Id, DocumentNumber = fee, ReceiptDate = day, Currency = Scenario.Usd, Amount = 150m, BankAccountCode = "1100" })).IsSuccess.Should().BeTrue();
+        (await transfers.VerifyAsync(companyId, number, TransferRequirement.FeesReceipted, fee, verifier.Id, day)).IsSuccess.Should().BeTrue();
+        db.Set<ClearanceCertificate>().Add(new ClearanceCertificate(companyId, $"CC-TRA-{companyId}", property.Id, new DateOnly(2026, 5, 1), new DateOnly(2026, 7, 31), 0m, 1));
+        await db.SaveChangesAsync();
+
+        // The transferor owes 6,000: instead of settling, the transferee assumes it — approved by an approving officer who did not verify the application (SOD-HSE-05).
+        (await transfers.SubmitAsync(companyId, number, verifier.Id, day)).Error.Message.Should().Contain("owes 6,000.00");
+        (await transfers.AssumeBalanceAsync(companyId, number, verifier.Id, "2900", day)).Error.Code.Should().Be("Hse.NotAuthorised");
+        (await transfers.AssumeBalanceAsync(companyId, number, approverOne.Id, "NOPE", day)).Error.Code.Should().Be("Hse.ClearingAccount");
+        (await transfers.AssumeBalanceAsync(companyId, number, approverOne.Id, "2900", day)).Value.Should().Be(6000m);
+        (await transfers.ChecklistAsync(companyId, number, day)).Value.Single(l => l.Requirement == TransferRequirement.HousingAccountClear).Should().Match<TransferChecklistLine>(l => l.Satisfied && l.Detail!.Contains("assumed"));
+        (await transfers.SubmitAsync(companyId, number, verifier.Id, day)).IsSuccess.Should().BeTrue();
+        (await transfers.ApproveAsync(companyId, number, approverOne.Id, day)).IsSuccess.Should().BeTrue();
+        (await transfers.ApproveAsync(companyId, number, approverTwo.Id, day)).IsSuccess.Should().BeTrue();
+        DateOnly effective = new(2026, 6, 1);
+        (await transfers.CompleteAsync(companyId, number, effective)).IsSuccess.Should().BeTrue();
+
+        // The balance moved: the transferor owes nothing, the transferee owes 6,000 on the assumption invoice, the clearing account nets to nil, the stand has its new holder.
+        (await db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.TraderId == holder.Id && i.Ledger == TradingLedger.AccountsReceivable).SumAsync(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase)).Should().Be(0m);
+        OpenItem assumed = await db.OpenItems.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.TraderId == buyer.Id && i.DocumentNumber == $"{number}-ASSUMED-USD");
+        (assumed.OutstandingBase, assumed.Sign).Should().Be((6000m, LedgerSign.Debit));
+        (await db.Set<JournalLine>().AsNoTracking().Where(l => l.CompanyId == companyId && l.AccountCode == "2900" && l.PostingDate == effective).SumAsync(l => l.BaseDebit - l.BaseCredit)).Should().Be(0m, "the clearing account nets to nil");
+        (await db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == stand.Id)).CurrentHolderCustomerId.Should().Be(buyer.Id);
         PropertyOwner owner = await db.Set<PropertyOwner>().AsNoTracking().SingleAsync(o => o.PropertyId == property.Id && o.OwnedTo == null);
         (owner.CustomerId, owner.Reference, owner.OwnedFrom).Should().Be((buyer.Id, certificate, effective));
         (await db.Set<TransferApplication>().AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.ApplicationNumber == number)).Status.Should().Be(TransferStatus.Completed);
