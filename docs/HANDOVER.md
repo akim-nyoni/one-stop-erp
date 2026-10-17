@@ -10,7 +10,7 @@ Develop the system against `docs/BRIEF.md` non-stop, one increment at a time, wo
 `one4all-progress-and-layout.md` (section "THIRTEENTH AUDIT"). Per increment:
 
 1. Build Debug and Release and run every test suite with the verify script (see below).
-2. Add a row to `docs/PROGRESS.md` (`python -I <scratchpad>/progress_row.py <rowfile>`: line 1 of the row file is the prefix of the row it goes after, line 2 is the new row).
+2. Add a row to `docs/PROGRESS.md` (`python -I tools/dev/progress_row.py <rowfile>`: line 1 of the row file is the prefix of the row it goes after, line 2 is the new row).
 3. Commit locally with the trailer the harness gives for the current model (Opus 5.5 since 2026-10-17: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
    The repository is on GitHub (`origin` = github.com/akim-nyoni/onestoperp, branch `main`); the user pushes. Do not push unless asked, and never
    rewrite commits already on origin (the user's d032d334 "initial commit" is pushed).
@@ -28,16 +28,15 @@ comments, docs, commit messages): use a plain hyphen. a search for U+2014 across
 - Builds can hang MSBuild. The working pattern: run `dotnet build One4All.slnx -c Debug --nologo -v q -nodeReuse:false -p:UseSharedCompilation=false`
   in the background, record the start time, and check DLL timestamps against it. If the build hangs after writing the DLLs, stop it, run
   `taskkill //F //IM dotnet.exe`, then use `--no-build` for `dotnet ef` and `dotnet test`.
-- Full verify: `powershell -File <scratchpad>/verify.ps1 > <scratchpad>/verify.out 2>&1` (Debug build, Release build, then all three suites
+- Full verify: `powershell -File tools/dev/verify.ps1 > verify.out 2>&1` (keep verify.out outside the repo or delete it; Debug build, Release build, then all three suites
   with `--no-build`). It takes 20 to 30 minutes. Do not edit source while its builds run: a Debug build that started before a new file
   existed, or a Release build that compiles a half-applied change, fails the run. Edit only after `=== RELEASE OK ===` appears, and never
   build the test projects while the accounting suite is running (testhost locks the DLLs).
 - The accounting suite creates a fresh PostgreSQL database per run from the migrations; the first user it creates gets id 1, so never use
   user id 1 for "the cashier" in a test that also creates a user. `Scenario.SeedAsync` seeds the chart (see the account list in
   `tests/One4All.AccountingTests/Scenario.cs` before adding accounts: 2900 and 4950 already exist).
-- Console screens snapshot: after adding a screen, copy `src/One4All.Desktop/bin/Debug/net10.0-windows/*` to `<scratchpad>/deskbuild/`,
-  run `<scratchpad>/opsdump2` (`dotnet run > <scratchpad>/ops.tsv`), and rewrite `tests/One4All.UnitTests/Security/console-screens.tsv`
-  (sorted rows, columns 0,1,2,4). Report catalogue doc: `ONE4ALL_WRITE_CATALOGUE=1 dotnet test tests/One4All.UnitTests --no-build --filter ReportCatalogueDocumentTests`.
+- Console screens snapshot: after adding a screen, add its line to `tests/One4All.UnitTests/Security/console-screens.tsv` by hand
+  (module, title, IsDocument, area; tab-separated, kept in sorted order); `ScreenPermissionsTests` fails until the screen has a permission rule. Report catalogue doc: `ONE4ALL_WRITE_CATALOGUE=1 dotnet test tests/One4All.UnitTests --no-build --filter ReportCatalogueDocumentTests`.
 - Generated documentation: `dotnet run --project tools/One4All.DocGen -- .` rewrites `docs/manual/`, `docs/demos/`, `docs/acceptance/ACCEPTANCE-PACK.md`
   and `docs/TRAINING-DATA.md` from the screens, reports and test sources; run it after adding screens, reports or tests and commit the result.
 - Migrations: scaffold only from freshly built DLLs, and only after the previous increment (with its own migration) is committed: the model

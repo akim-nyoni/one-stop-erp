@@ -47,3 +47,6 @@ logs/
 # OS
 Thumbs.db
 .DS_Store
+
+# Local verify output (tools/dev/verify.ps1)
+verify.out

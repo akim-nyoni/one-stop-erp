@@ -707,7 +707,7 @@ public static partial class OperationCatalogue
             Run = async (c, i) => Check(await c.Get<IEstablishmentService>().RunIncrementsAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true),
                 r => $"{r.Moved.Count} employee(s) moved up a notch; {r.AtTop.Count} at the top of their scale."),
             List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId && e.Grade != null && e.Notch != null).OrderBy(e => e.EmployeeNumber).ToListAsync()
-                .ConfigureAwait(true), ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Grade", e => e.Grade), ("Notch", e => e.Notch), ("Basic", e => M(e.BasicSalary)),
+                .ConfigureAwait(true), ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Grade", e => e.Grade), ("Notch", e => e.Notch), ("Basic salary", e => M(e.BasicSalary)),
                 ("Last increment", e => e.LastIncrementOn is DateOnly d ? D(d) : "-")),
         };
         yield return new Operation

@@ -325,6 +325,16 @@ public sealed partial class OperationsViewModel : ObservableObject
         Selected = Operations.FirstOrDefault();
     }
 
+    // A list as the signed-in user may see it: cost, margin, salary and credit-limit columns are removed for users without the right to them
+    // (brief §5.1 field-level sensitivity; the same rules the API and the report runner apply).
+    private Task<DataTable> VisibleListAsync(Func<OperationContext, Task<DataTable>> list) => InScopeAsync(async c =>
+    {
+        DataTable table = await list(c).ConfigureAwait(true);
+        Core.Security.EffectivePermissions permissions = await c.Get<Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true);
+        Application.Security.FieldSensitivity.Strip(table, Application.Security.FieldSensitivity.HiddenFor(permissions));
+        return table;
+    });
+
     // The signed-in user's permission in the action's module and the module's licence, then the screen's own feature and the flags it needs
     // (any one of them), checked before every run, list and delete (brief §5.1, §18.3).
     private Task<string?> RefusalAsync(Operation operation, bool isWrite, Core.Security.OperationFlags needs) => InScopeAsync(async c =>
@@ -374,7 +384,7 @@ public sealed partial class OperationsViewModel : ObservableObject
             StatusMessage = operation.IsDocument ? $"{operation.Title} printed." : "Done.";
             if (operation.List is not null)
             {
-                List = (await InScopeAsync(operation.List).ConfigureAwait(true)).DefaultView;
+                List = (await VisibleListAsync(operation.List).ConfigureAwait(true)).DefaultView;
             }
         }
         catch (OperationException ex)
@@ -449,7 +459,7 @@ public sealed partial class OperationsViewModel : ObservableObject
                 return;
             }
 
-            List = (await InScopeAsync(list).ConfigureAwait(true)).DefaultView;
+            List = (await VisibleListAsync(list).ConfigureAwait(true)).DefaultView;
         }
 #pragma warning disable CA1031 // A list that cannot load is reported, not fatal.
         catch (Exception ex)

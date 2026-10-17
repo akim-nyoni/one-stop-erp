@@ -141,6 +141,26 @@ public static class FieldSensitivity
     /// <param name="hidden">The hidden kinds.</param>
     /// <returns>The rows without them.</returns>
     public static IReadOnlyList<IReadOnlyDictionary<string, object?>> Strip(IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<SensitiveField> hidden)
+        => StripRows(rows, hidden);
+
+    /// <summary>Removes the columns a user may not see from a desktop list (brief §5.1: the same rules as the API and the reports).</summary>
+    /// <param name="table">The list.</param>
+    /// <param name="hidden">The hidden kinds.</param>
+    /// <returns>The number of columns removed.</returns>
+    public static int Strip(System.Data.DataTable table, IReadOnlySet<SensitiveField> hidden)
+    {
+        ArgumentNullException.ThrowIfNull(table);
+        ArgumentNullException.ThrowIfNull(hidden);
+        List<System.Data.DataColumn> gone = [.. table.Columns.Cast<System.Data.DataColumn>().Where(c => IsHidden(c.ColumnName, hidden))];
+        foreach (System.Data.DataColumn column in gone)
+        {
+            table.Columns.Remove(column);
+        }
+
+        return gone.Count;
+    }
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> StripRows(IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, IReadOnlySet<SensitiveField> hidden)
         => hidden.Count == 0 ? rows
             : [.. rows.Select(r => (IReadOnlyDictionary<string, object?>)r.Where(p => !IsHidden(p.Key, hidden)).ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase))];
 }
