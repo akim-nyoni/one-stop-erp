@@ -25,15 +25,20 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         List<LoginEvent> events = await _db.LoginEvents.AsNoTracking().Where(l => l.OccurredOnUtc >= start && l.OccurredOnUtc <= end).ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, int> reportRuns = await _db.Set<ReportRun>().AsNoTracking().Where(r => r.CompanyId == companyId && r.RunAt >= start && r.RunAt <= end && r.UserId != null)
             .GroupBy(r => r.UserId!.Value).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(g => g.Key, g => g.Count, ct).ConfigureAwait(false);
+        var uses = await _db.ScreenUses.AsNoTracking().Where(s => s.CompanyId == companyId && s.OccurredOnUtc >= start && s.OccurredOnUtc <= end)
+            .GroupBy(s => s.UserId).Select(g => new { g.Key, Screens = g.Select(s => s.Module + "|" + s.Screen).Distinct().Count(), Runs = g.Count(s => s.Action == "Run") })
+            .ToDictionaryAsync(g => g.Key, ct).ConfigureAwait(false);
         return [.. events.GroupBy(l => l.UserId is null ? $"(unknown) {l.Username}" : l.Username).OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase).Select(g =>
         {
             List<LoginEvent> ok = [.. g.Where(l => l.Outcome == "Success")];
-            double hours = ok.Where(l => l.EndedOnUtc is not null).Sum(l => (l.EndedOnUtc!.Value - l.OccurredOnUtc).TotalHours);
+            double hours = ok.Where(l => (l.EndedOnUtc ?? l.LastSeenUtc) is not null).Sum(l => ((l.EndedOnUtc ?? l.LastSeenUtc)!.Value - l.OccurredOnUtc).TotalHours);
             long? userId = g.Select(l => l.UserId).FirstOrDefault(id => id is not null);
             return Row(("User", g.Key), ("Logins", ok.Count), ("Failed", g.Count(l => l.Outcome == "InvalidCredentials")), ("Lockouts", g.Count(l => l.Outcome == "LockedOut")),
                 ("First", ok.Count == 0 ? "-" : ok.Min(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
                 ("Last", ok.Count == 0 ? "-" : ok.Max(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Hours", hours.ToString("0.0", CultureInfo.InvariantCulture)),
-                ("Terminals", string.Join(", ", g.Select(l => l.Terminal ?? "-").Distinct().Order(StringComparer.Ordinal))), ("Reports", userId is long u ? reportRuns.GetValueOrDefault(u) : 0));
+                ("Terminals", string.Join(", ", g.Select(l => l.Terminal ?? "-").Distinct().Order(StringComparer.Ordinal))),
+                ("Screens", userId is long s1 && uses.TryGetValue(s1, out var used) ? used.Screens : 0), ("Actions", userId is long s2 && uses.TryGetValue(s2, out var ran) ? ran.Runs : 0),
+                ("Reports", userId is long u ? reportRuns.GetValueOrDefault(u) : 0));
         })];
     }
 
@@ -133,6 +138,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         {
             "SYSRPERMISSIONMATRIX" => await PermissionMatrixAsync(ct).ConfigureAwait(false),
             "SYSRUSERPERMISSIONMATRIX" => await UserPermissionMatrixAsync(ct).ConfigureAwait(false),
+            "SYSRSCREENUSAGE" => await ScreenUsageAsync(companyId, start, end, ct).ConfigureAwait(false),
             "SYSRAUDITTRAIL" => await AuditTrailAsync(companyId, fromDate, toDate, parameters, ct).ConfigureAwait(false),
             "SYSRHEALTH" => await HealthAsync(companyId, DateParameter(parameters, "AsAtDate") ?? today, ct).ConfigureAwait(false),
             "SYSRMEMBERSHIP" => await MembershipAsync(ct).ConfigureAwait(false),
@@ -168,6 +174,24 @@ public sealed class ControlReportDataProvider : IReportDataProvider
             Permission? permission = permissions.GetValueOrDefault(g.PermissionCode);
             return Row(("Role", g.Role), ("Module", permission?.Module ?? "?"), ("Permission", g.PermissionCode), ("Name", permission?.Name ?? "-"), ("Operations", g.Operations.ToString()));
         })];
+    }
+
+    // SYS236-S: the desktop screens used in the period, per user (brief §14 report 236 "screens used").
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ScreenUsageAsync(long companyId, DateTimeOffset start, DateTimeOffset end, CancellationToken ct)
+    {
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        var used = await _db.ScreenUses.AsNoTracking().Where(s => s.CompanyId == companyId && s.OccurredOnUtc >= start && s.OccurredOnUtc <= end)
+            .GroupBy(s => new { s.UserId, s.Module, s.Screen })
+            .Select(g => new { g.Key.UserId, g.Key.Module, g.Key.Screen, Opened = g.Count(s => s.Action == "Open"), Runs = g.Count(s => s.Action == "Run"), Last = g.Max(s => s.OccurredOnUtc) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (var use in used.OrderBy(u => users.GetValueOrDefault(u.UserId, "?"), StringComparer.OrdinalIgnoreCase).ThenByDescending(u => u.Opened + u.Runs))
+        {
+            rows.Add(Row(("User", users.GetValueOrDefault(use.UserId, $"user {use.UserId}")), ("Module", use.Module), ("Screen", use.Screen), ("Opened", use.Opened), ("Runs", use.Runs),
+                ("LastUsed", use.Last.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))));
+        }
+
+        return rows;
     }
 
     // SYS237-U: users by permissions, as resolved through roles, groups and overrides (brief §14 report 237).

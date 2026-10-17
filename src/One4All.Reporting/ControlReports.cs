@@ -21,9 +21,14 @@ public static class ControlReports
             "SysrAuditTrail", [new Column("When", "When (UTC)", 110), new Column("User", "User", 80), new Column("Action", "Action", 60), new Column("Record", "Record", 130),
              new Column("Fields", "Changed fields", 180), new Column("Reason", "Reason", 150)],
             [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("EntityType", ParameterType.String), ("UserName", ParameterType.String)]);
-        yield return Listing("SYS236", "User Activity Report", "System", "Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run.",
+        yield return Listing("SYS236", "User Activity Report", "System", "Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours active (closed sessions, "
+            + "and open ones to their last activity), terminals used, screens used and actions run, and reports run (SYS236-S lists the screens).",
             "SysrUserActivity", [new Column("User", "User", 100), new Column("Logins", "Sign-ins", 55), new Column("Failed", "Failed", 50), new Column("Lockouts", "Lockouts", 55), new Column("First", "First", 115),
-             new Column("Last", "Last", 115), new Column("Hours", "Hours active", 70), new Column("Terminals", "Terminals", 150), new Column("Reports", "Reports run", 65)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+             new Column("Last", "Last", 115), new Column("Hours", "Hours active", 70), new Column("Terminals", "Terminals", 130), new Column("Screens", "Screens used", 60),
+             new Column("Actions", "Actions run", 60), new Column("Reports", "Reports run", 65)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        yield return Listing("SYS236-S", "Screen Usage", "System", "Every desktop screen used in the period, per user: how often it was opened and run, and when it was last used.",
+            "SysrScreenUsage", [new Column("User", "User", 100), new Column("Module", "Module", 100), new Column("Screen", "Screen", 220), new Column("Opened", "Opened", 55),
+             new Column("Runs", "Runs", 55), new Column("LastUsed", "Last used", 115)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("SYS237", "Permission Matrix", "System", "Every role with each permission it grants and the operations allowed.",
             "SysrPermissionMatrix", [new Column("Role", "Role", 120), new Column("Module", "Module", 90), new Column("Permission", "Permission", 170), new Column("Name", "Name", 180),
              new Column("Operations", "Operations", 200)], []);

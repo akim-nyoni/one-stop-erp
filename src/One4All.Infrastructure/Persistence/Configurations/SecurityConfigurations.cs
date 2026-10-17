@@ -218,6 +218,19 @@ internal sealed class LoginEventConfiguration : IEntityTypeConfiguration<LoginEv
     }
 }
 
+internal sealed class ScreenUseConfiguration : IEntityTypeConfiguration<ScreenUse>
+{
+    public void Configure(EntityTypeBuilder<ScreenUse> b)
+    {
+        b.ToTable("screen_use", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Module).HasMaxLength(80);
+        b.Property(x => x.Screen).HasMaxLength(200);
+        b.Property(x => x.Action).HasMaxLength(10);
+        b.HasIndex(x => new { x.UserId, x.OccurredOnUtc });
+    }
+}
+
 internal sealed class PasswordHistoryConfiguration : IEntityTypeConfiguration<PasswordHistory>
 {
     public void Configure(EntityTypeBuilder<PasswordHistory> b)

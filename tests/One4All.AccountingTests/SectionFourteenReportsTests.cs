@@ -72,6 +72,15 @@ public sealed class SectionFourteenReportsTests
         string ap57 = await Render("AP57", new() { ["PaymentDate"] = new DateOnly(2026, 6, 30), ["DueOnOrBefore"] = new DateOnly(2026, 6, 30) });
         ap57.Should().Contain("S14-S,Paper Mill,USD,5,1,400,0,0,Pay,0,400");
 
+        // Screens used (SYS236 and SYS236-S): the desktop logs each open and run.
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        db.ScreenUses.AddRange(new ScreenUse(companyId, user.Id, "Purchasing", "Purchase order", "Open", now), new ScreenUse(companyId, user.Id, "Purchasing", "Purchase order", "Run", now),
+            new ScreenUse(companyId, user.Id, "Suppliers", "Supplier payment", "Open", now));
+        await db.SaveChangesAsync();
+        DateOnly today = DateOnly.FromDateTime(now.UtcDateTime);
+        string usage = await Render("SYS236-S", new() { ["FromDate"] = today.AddDays(-1), ["ToDate"] = today.AddDays(1) });
+        usage.Should().Contain($"s14.{tag},Purchasing,Purchase order,1,1,").And.Contain($"s14.{tag},Suppliers,Supplier payment,1,0,");
+
         string sys = await Render("SYS237-U", new());
         sys.Should().Contain($"s14.{tag},Section Fourteen,").And.Contain("Purchasing.PaymentRun");
     }

@@ -271,6 +271,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     partial void OnSelectedChanged(Operation? value)
     {
+        _ = RecordUseAsync(value, "Open");
         Fields.Clear();
         foreach (OperationField field in value?.Fields ?? [])
         {
@@ -323,6 +324,30 @@ public sealed partial class OperationsViewModel : ObservableObject
         }
 
         Selected = Operations.FirstOrDefault();
+    }
+
+    // Screens used (brief §14 report 236): each open and run is logged for the user activity and screen usage reports; logging never gets in the way.
+    private async Task RecordUseAsync(Operation? operation, string action)
+    {
+        if (operation is null || _userId == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            await InScopeAsync(async c =>
+            {
+                c.Db.ScreenUses.Add(new Core.Security.ScreenUse(c.CompanyId, c.UserId, operation.Module, operation.Title, action, DateTimeOffset.UtcNow));
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return true;
+            }).ConfigureAwait(true);
+        }
+#pragma warning disable CA1031 // Usage logging is best effort.
+        catch (Exception)
+#pragma warning restore CA1031
+        {
+        }
     }
 
     // A list as the signed-in user may see it: cost, margin, salary and credit-limit columns are removed for users without the right to them
@@ -380,6 +405,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
             OperationInput input = new(Fields.ToDictionary(f => f.Field.Name, f => f.Raw()), Fields.ToDictionary(f => f.Field.Name, f => f.Field.Label));
             Result = await InScopeAsync(c => operation.Run(c, input)).ConfigureAwait(true);
+            _ = RecordUseAsync(operation, "Run");
             Failed = false;
             StatusMessage = operation.IsDocument ? $"{operation.Title} printed." : "Done.";
             if (operation.List is not null)

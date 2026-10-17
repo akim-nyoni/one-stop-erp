@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-611 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+612 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -686,7 +686,8 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | DB255 | Trend & Seasonality Analysis | Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before. | AsAtDate (Date, optional) | Month, Revenue, Expenses, LastYear, YearOnYear, Profit | - | Sum(Profit) |
 | SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) - a month-end close aid. | - | Period, Start, End, GL, AR, AP | - | - |
 | SYS235 | Audit Trail Report | Every audit-logged action in the period - who, when, what record, which fields and why - optionally for one record type or user. | FromDate (Date, optional), ToDate (Date, optional), EntityType (String, optional), UserName (String, optional) | When, User, Action, Record, Fields, Reason | - | - |
-| SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run. | FromDate (Date, optional), ToDate (Date, optional) | User, Logins, Failed, Lockouts, First, Last, Hours, Terminals, Reports | - | - |
+| SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours active (closed sessions, and open ones to their last activity), terminals used, screens used and actions run, and reports run (SYS236-S lists the screens). | FromDate (Date, optional), ToDate (Date, optional) | User, Logins, Failed, Lockouts, First, Last, Hours, Terminals, Screens, Actions, Reports | - | - |
+| SYS236-S | Screen Usage | Every desktop screen used in the period, per user: how often it was opened and run, and when it was last used. | FromDate (Date, optional), ToDate (Date, optional) | User, Module, Screen, Opened, Runs, LastUsed | - | - |
 | SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. | - | Role, Module, Permission, Name, Operations | - | - |
 | SYS237-U | Permission Matrix by User | Every active user with each permission they hold through their roles, groups and individual overrides, and the operations allowed; system administrators are shown as holding everything. The auditor's users-by-permissions view. | - | User, Name, Module, Permission, PermissionName, Operations | - | - |
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. | - | User, Name, Status, Roles, Groups, GroupRoles, Overrides | - | - |
