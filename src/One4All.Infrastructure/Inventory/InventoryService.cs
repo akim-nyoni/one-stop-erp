@@ -780,6 +780,13 @@ public sealed class InventoryService : IInventoryService
 
     private async Task<StockBalance> LoadOrCreateBalanceAsync(long companyId, long itemId, long warehouseId, CancellationToken ct)
     {
+        if (_db.Database.CurrentTransaction is not null)
+        {
+            // Twenty tills issuing the same item at once: the balance row is taken under lock inside the unit of work, so the second waits for the
+            // first to commit and then reads the moved-on quantity, instead of failing on the concurrency token and retrying against the same race.
+            await _db.Database.ExecuteSqlAsync($"SELECT id FROM inv.stock_balance WHERE company_id = {companyId} AND item_id = {itemId} AND warehouse_id = {warehouseId} FOR UPDATE", ct).ConfigureAwait(false);
+        }
+
         StockBalance? balance = await _db.Set<StockBalance>()
             .FirstOrDefaultAsync(b => b.CompanyId == companyId && b.ItemId == itemId && b.WarehouseId == warehouseId, ct)
             .ConfigureAwait(false);
@@ -788,6 +795,12 @@ public sealed class InventoryService : IInventoryService
         {
             balance = new StockBalance(companyId, itemId, warehouseId);
             _db.Set<StockBalance>().Add(balance);
+        }
+        else if (_db.Entry(balance).State == EntityState.Unchanged)
+        {
+            // A balance still tracked from an earlier movement in this context (a till's previous sale) keeps the quantity and concurrency token it had
+            // then; another till may have moved it on since, so it is read again now that the row is ours.
+            await _db.Entry(balance).ReloadAsync(ct).ConfigureAwait(false);
         }
 
         return balance;

@@ -36,7 +36,7 @@ internal static class AtomicWork
         => RunAsync(db, work, r => r.IsSuccess, ct);
 
     /// <summary>How many times a unit of work that lost a concurrency race is attempted in all.</summary>
-    internal const int MaxAttempts = 3;
+    internal const int MaxAttempts = 8;
 
     private static async Task<TResult> RunAsync<TResult>(One4AllDbContext db, Func<Task<TResult>> work, Func<TResult, bool> succeeded, CancellationToken ct)
     {
@@ -69,6 +69,15 @@ internal static class AtomicWork
                 // re-reads those rows.
                 await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
                 RestoreTracker(db, before);
+                // A short, growing, jittered pause so twenty tills contending for one stock balance do not all retry in step.
+                await Task.Delay(Random.Shared.Next(5, 25 * attempt), CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Npgsql.PostgresException ex) when (attempt < MaxAttempts && ex.SqlState is Npgsql.PostgresErrorCodes.DeadlockDetected or Npgsql.PostgresErrorCodes.SerializationFailure)
+            {
+                // Two units of work took the same rows under lock in opposite orders: PostgreSQL ended one of them; it runs again after a pause.
+                await transaction.RollbackAsync(CancellationToken.None).ConfigureAwait(false);
+                RestoreTracker(db, before);
+                await Task.Delay(Random.Shared.Next(5, 25 * attempt), CancellationToken.None).ConfigureAwait(false);
             }
             catch
             {
