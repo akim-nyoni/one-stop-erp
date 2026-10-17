@@ -72,7 +72,7 @@ public sealed class ReceivablesReportsTests
         (await Render("AR31", new() { ["CustomerCode"] = "AR-BIG" })).Should().Contain("2026-01-10,Invoice,INV-AR-1").And.Contain("RC-AR-1").And.Contain("700.00");
         (await Render("AR33")).Should().Contain("INV-AR-1").And.Contain("INV-AR-2").And.NotContain("RC-AR-1");
         string top = await Render("AR35");
-        top.Should().Contain("1,Big Buyer,1,80.0%,80.0%,1000").And.Contain("2,Small Buyer,1,20.0%,100.0%,250");
+        top.Should().Contain("1,Big Buyer,1,80.0%,80.0%,0.00,-,2026-01-10,Active,1000").And.Contain("2,Small Buyer,1,20.0%,100.0%,0.00,-,2026-04-01,Active,250");
         (await Render("AR38")).Should().Contain("2026-04-05,1100 ").And.Contain(",USD,system,1,300.00,300");
         (await Render("AR39")).Should().Contain("Big Buyer,RC-AR-1,Receipt,2026-04-05,25,300");
         (await Render("AR47")).Should().Contain("USD,2,");

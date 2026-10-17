@@ -13,7 +13,7 @@ public sealed class DocumentKindsTests
     public void Every_document_kind_has_a_designable_report_with_its_command_and_parameters()
     {
         Dictionary<string, ReportDefinition> reports = SystemReportCatalogue.All().Where(r => r.Code.StartsWith("DOC", StringComparison.Ordinal)).ToDictionary(r => r.Code, StringComparer.Ordinal);
-        DocumentKinds.All.Should().HaveCount(32);
+        DocumentKinds.All.Should().HaveCount(33);
         DocumentKinds.All.Select(k => k.DesignableReportCode).Should().OnlyHaveUniqueItems().And.BeEquivalentTo(reports.Keys);
         DocumentKinds.All.Select(k => k.Kind).Should().OnlyHaveUniqueItems();
         foreach (DocumentKind kind in DocumentKinds.All)
@@ -30,6 +30,6 @@ public sealed class DocumentKindsTests
 
         DocumentKinds.Find("payslip")!.Kind.Should().Be(DocumentKinds.Payslip);
         DocumentKinds.Find("Chain-of-title printout")!.DesignableReportCode.Should().Be("DOC30");
-        DocumentKinds.All.Count(k => k.Text).Should().Be(20, "the text-backed documents");
+        DocumentKinds.All.Count(k => k.Text).Should().Be(21, "the text-backed documents");
     }
 }

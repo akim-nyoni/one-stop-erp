@@ -182,6 +182,9 @@ public sealed class TextDocumentService : ITextDocumentService
                     : Error.Validation("Doc.Cheque", "Give the cheque as bank account code/cheque number, e.g. FNB-MAIN/000123.");
             }
 
+            case DocumentKinds.ClearanceCertificate:
+                return await ClearanceCertificateTextAsync(companyId, found, key, ct).ConfigureAwait(false);
+
             case DocumentKinds.ShelfLabels:
                 return await Get<IDocumentLayoutService>().ShelfLabelsAsync(companyId, key, ct: ct).ConfigureAwait(false);
 
@@ -191,6 +194,49 @@ public sealed class TextDocumentService : ITextDocumentService
                 return built.IsSuccess ? BusinessDocumentFormatter.ToPlainText(built.Value) : built.Error;
             }
         }
+    }
+
+    // The rates clearance certificate a conveyancer lodges with a transfer (brief §14 report 153; §4.9 clearance).
+    private async Task<Result<string>> ClearanceCertificateTextAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        var certificate = await (from c in _db.Set<Core.Municipal.ClearanceCertificate>().AsNoTracking()
+                                 join p in _db.Properties.AsNoTracking() on c.PropertyId equals p.Id
+                                 where c.CompanyId == companyId && c.CertificateNumber == number
+                                 select new { c.CertificateNumber, c.IssuedOn, c.ValidUntil, c.AdvanceHeld, c.IssuedByUserId, p.StandNumber, p.Ward, p.RatepayerCustomerId })
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (certificate is null)
+        {
+            return Missing(kind, number);
+        }
+
+        string council = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.Name).FirstAsync(ct).ConfigureAwait(false);
+        string owner = await _db.Customers.AsNoTracking().Where(c => c.Id == certificate.RatepayerCustomerId).Select(c => c.Name + " (" + c.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "-";
+        string issuer = await _db.Users.AsNoTracking().Where(u => u.Id == certificate.IssuedByUserId).Select(u => u.DisplayName).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? $"user {certificate.IssuedByUserId}";
+        System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+        System.Text.StringBuilder text = new();
+        text.AppendLine(council.ToUpperInvariant());
+        text.AppendLine("RATES CLEARANCE CERTIFICATE");
+        text.AppendLine(new string('=', 64));
+        text.AppendLine(inv, $"Certificate: {certificate.CertificateNumber}");
+        text.AppendLine(inv, $"Issued:      {certificate.IssuedOn:yyyy-MM-dd}");
+        text.AppendLine(inv, $"Property:    stand {certificate.StandNumber}{(string.IsNullOrWhiteSpace(certificate.Ward) ? string.Empty : ", " + certificate.Ward)}");
+        text.AppendLine(inv, $"Ratepayer:   {owner}");
+        text.AppendLine();
+        text.AppendLine("This certifies that all rates, service charges and other amounts due");
+        text.AppendLine(inv, $"to the council on the property above have been paid up to and including {certificate.ValidUntil:yyyy-MM-dd}.");
+        if (certificate.AdvanceHeld > 0m)
+        {
+            text.AppendLine(inv, $"An advance of {certificate.AdvanceHeld:N2} is held to cover charges to that date.");
+        }
+
+        text.AppendLine(inv, $"This certificate is valid until {certificate.ValidUntil:yyyy-MM-dd} for the transfer of the property.");
+        text.AppendLine();
+        text.AppendLine(inv, $"Issued by: {issuer}");
+        text.AppendLine();
+        text.AppendLine("Signature: ____________________________   Date: ______________");
+        text.AppendLine("Official stamp:");
+        return text.ToString();
     }
 
     private static Error Missing(DocumentKind kind, string key) => Error.NotFound("Doc.NotFound", $"No {kind.Name.ToLowerInvariant()} {key} ({kind.NumberLabel}).");

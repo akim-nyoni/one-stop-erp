@@ -549,7 +549,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Document layouts", ListTitle = "Document layouts",
-            Description = "Which report lays out each business document. Copy the document's designable report (DOC01–DOC32, listed here) in the report designer, lay it out as your own, "
+            Description = "Which report lays out each business document. Copy the document's designable report (DOC01–DOC33, listed here) in the report designer, lay it out as your own, "
                 + "and name your copy's code here; a document with no layout prints as the standard text document. A blank code clears the layout.",
             Fields = [Pick("Document", "Document", [.. Application.Documents.DocumentKinds.All.Select(k => k.Name)]), Opt("Layout", "Layout report code (blank: standard text document)")],
             Run = async (c, i) =>

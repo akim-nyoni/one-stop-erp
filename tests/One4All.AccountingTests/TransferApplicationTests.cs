@@ -128,6 +128,10 @@ public sealed class TransferApplicationTests
         (owner.CustomerId, owner.Reference, owner.OwnedFrom).Should().Be((buyer.Id, certificate, effective));
         (await db.Set<TransferApplication>().AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.ApplicationNumber == number)).Status.Should().Be(TransferStatus.Completed);
 
+        // The clearance certificate prints as a document (brief §14 report 153; DOC33).
+        string printed = (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Documents.ITextDocumentService>().RenderAsync(companyId, "ClearanceCertificate", certificate)).Value;
+        printed.Should().Contain("RATES CLEARANCE CERTIFICATE").And.Contain(certificate).And.Contain("stand TRF-1, Ward 3").And.Contain("valid until 2026-07-31");
+
         // A change of name has a shorter checklist (no clearance or account checks) and can be rejected.
         string rename = (await transfers.LodgeAsync(new TransferLodgement { CompanyId = companyId, StandId = stand.Id, TransferType = TransferType.ChangeOfName, ToCustomerId = buyer.Id, Date = effective })).Value;
         (await transfers.ChecklistAsync(companyId, rename, effective)).Value.Select(l => l.Requirement).Should().Equal(TransferRequirement.Identity, TransferRequirement.FeesReceipted);

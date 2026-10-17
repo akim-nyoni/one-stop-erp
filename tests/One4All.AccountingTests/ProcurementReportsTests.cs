@@ -81,7 +81,7 @@ public sealed class ProcurementReportsTests
         (await Render("PO130")).Should().Contain("PR-G1,2026-03-06,Gadget Co,PR-G Gadget,8,2,Cracked casings,10");
         (await Render("PO132")).Should().Contain("PR-G Gadget,PR-PO2,2026-03-20,Gadget Co,5.00,6.00,+20.0%,10,10");
         (await Render("PO136")).Should().Contain("PR-RQ1,2026-03-25,6000 (no budget),21.00,0.00,0.00,0.00,0.00,No budget,-21");
-        (await Render("PO134")).Should().Contain("Gadget Co,USD,2,2,1,100.0%,110");
+        (await Render("PO134")).Should().Contain("2026-03,Gadget Co,-,-,USD,2,2,1,100.0%,110");
         (await Render("PO135")).Should().Contain("Gadget Co,1,4.0,4,4,-");
 
         FrameworkAgreement framework = new(companyId, supplier.Id, "fa-1", "Gadgets 2026", new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), 150m);

@@ -303,12 +303,17 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
         Dictionary<long, string> suppliers = await SuppliersAsync(companyId, ct).ConfigureAwait(false);
         List<PurchaseOrder> orders = await _db.Set<PurchaseOrder>().AsNoTracking().Include(o => o.Lines)
             .Where(o => o.CompanyId == companyId && o.Status != PurchaseOrderStatus.Cancelled && o.OrderDate >= fromDate && o.OrderDate <= to).ToListAsync(ct).ConfigureAwait(false);
-        var groups = orders.GroupBy(o => (o.SupplierId, Currency: o.Currency.Value))
-            .Select(g => (g.Key, Orders: g.Count(), Lines: g.Sum(o => o.Lines.Count), Items: g.SelectMany(o => o.Lines).Select(l => l.ItemId).Distinct().Count(),
-                Spend: g.SelectMany(o => o.Lines).Sum(l => Value(l.OrderedQuantity, l.UnitPrice)))).ToList();
+        Dictionary<long, string> categories = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId)
+            .ToDictionaryAsync(i => i.Id, i => string.IsNullOrWhiteSpace(i.Category) ? "-" : i.Category!, ct).ConfigureAwait(false);
+        var groups = orders.SelectMany(o => o.Lines.Select(l => (Order: o, Line: l)))
+            .GroupBy(x => (Month: x.Order.OrderDate.ToString("yyyy-MM", CultureInfo.InvariantCulture), x.Order.SupplierId, Category: categories.GetValueOrDefault(x.Line.ItemId, "-"),
+                Department: string.IsNullOrWhiteSpace(x.Order.Department) ? "-" : x.Order.Department!, Currency: x.Order.Currency.Value))
+            .Select(g => (g.Key, Orders: g.Select(x => x.Order.Id).Distinct().Count(), Lines: g.Count(), Items: g.Select(x => x.Line.ItemId).Distinct().Count(),
+                Spend: g.Sum(x => Value(x.Line.OrderedQuantity, x.Line.UnitPrice)))).ToList();
         Dictionary<string, decimal> totals = groups.GroupBy(g => g.Key.Currency).ToDictionary(g => g.Key, g => g.Sum(x => x.Spend));
-        return [.. groups.OrderBy(g => g.Key.Currency, StringComparer.Ordinal).ThenByDescending(g => g.Spend)
-            .Select(g => Row(("Supplier", suppliers.GetValueOrDefault(g.Key.SupplierId, "?")), ("Currency", g.Key.Currency), ("Orders", g.Orders), ("Lines", g.Lines), ("Items", g.Items),
+        return [.. groups.OrderBy(g => g.Key.Currency, StringComparer.Ordinal).ThenBy(g => g.Key.Month, StringComparer.Ordinal).ThenByDescending(g => g.Spend)
+            .Select(g => Row(("Month", g.Key.Month), ("Supplier", suppliers.GetValueOrDefault(g.Key.SupplierId, "?")), ("Category", g.Key.Category), ("Department", g.Key.Department),
+                ("Currency", g.Key.Currency), ("Orders", g.Orders), ("Lines", g.Lines), ("Items", g.Items),
                 ("Share", totals[g.Key.Currency] == 0m ? "-" : (g.Spend * 100m / totals[g.Key.Currency]).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Spend", g.Spend)))];
     }
 

@@ -114,6 +114,9 @@ public static class DocumentKinds
     /// <summary>A price list's shelf labels.</summary>
     public const string ShelfLabels = "ShelfLabels";
 
+    /// <summary>A property's rates clearance certificate (brief §14 report 153).</summary>
+    public const string ClearanceCertificate = "ClearanceCertificate";
+
     /// <summary>Every kind, in catalogue order.</summary>
     public static IReadOnlyList<DocumentKind> All { get; } =
     [
@@ -149,6 +152,7 @@ public static class DocumentKinds
         new(ChainOfTitle, "Chain-of-title printout", "DOC30", "Stand number", Text: true),
         new(Cheque, "Cheque", "DOC31", "Bank account code/cheque number", Text: true),
         new(ShelfLabels, "Shelf labels", "DOC32", "Price list code", Text: true),
+        new(ClearanceCertificate, "Rates clearance certificate", "DOC33", "Certificate number", Text: true),
     ];
 
     /// <summary>Finds a kind by key or name (case-insensitive).</summary>
