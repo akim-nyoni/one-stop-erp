@@ -51,6 +51,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             "GLEDREALISEDFX" => await DocumentLinesAsync(companyId, fromDate, toDate, d => d.StartsWith("RealisedFx", StringComparison.Ordinal), false, ct).ConfigureAwait(false),
             "GLEDSUSPENSE" => await SuspenseAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDRECURRINGDUE" => await RecurringDueAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "GLEDFXREVALUATIONTRADERS" => await FxRevaluationTradersAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDACCRUALS" => await AccrualsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDNOTES" => await NotesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDMANAGEMENTPACK" => await ManagementPackAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -206,6 +207,32 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     }
 
     // LastPostedPeriod is yyyyMM; a template is due for the month before the date's month once that month has ended.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FxRevaluationTradersAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        Application.Abstractions.Trading.ITradingRevaluationService revaluation = _services.GetRequiredService<Application.Abstractions.Trading.ITradingRevaluationService>();
+        Dictionary<long, (string Code, string Name)> customers = await _db.Customers.AsNoTracking().IgnoreQueryFilters([One4AllDbContext.SoftDeleteFilter]).Where(c => c.CompanyId == companyId)
+            .ToDictionaryAsync(c => c.Id, c => (c.Code, c.Name), ct).ConfigureAwait(false);
+        Dictionary<long, (string Code, string Name)> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => (s.Code, s.Name), ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (TradingLedger ledger in new[] { TradingLedger.AccountsReceivable, TradingLedger.AccountsPayable })
+        {
+            Result<Application.Abstractions.Trading.TradingRevaluationResult> preview = await revaluation.PreviewAsync(companyId, ledger, asAt, ct).ConfigureAwait(false);
+            if (preview.IsFailure)
+            {
+                continue;
+            }
+
+            Dictionary<long, (string Code, string Name)> traders = ledger == TradingLedger.AccountsReceivable ? customers : suppliers;
+            rows.AddRange(preview.Value.Items.GroupBy(i => (i.TraderId, i.Currency)).OrderBy(g => traders.GetValueOrDefault(g.Key.TraderId).Code, StringComparer.Ordinal).ThenBy(g => g.Key.Currency, StringComparer.Ordinal)
+                .Select(g => Row(("Ledger", ledger == TradingLedger.AccountsReceivable ? "AR" : "AP"), ("Trader", traders.GetValueOrDefault(g.Key.TraderId).Code ?? g.Key.TraderId.ToString(CultureInfo.InvariantCulture)),
+                    ("Name", traders.GetValueOrDefault(g.Key.TraderId).Name ?? "?"), ("Currency", g.Key.Currency), ("Items", g.Count()), ("Outstanding", Money(g.Sum(i => i.OutstandingForeign))),
+                    ("Before", Money(g.Sum(i => i.BookedBase))), ("After", Money(g.Sum(i => i.RevaluedBase))), ("Difference", g.Sum(i => i.Difference)))));
+        }
+
+        return rows;
+    }
+
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RecurringDueAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
         List<RecurringJournal> templates = await _db.Set<RecurringJournal>().AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == companyId && r.IsActive).OrderBy(r => r.Code).ToListAsync(ct).ConfigureAwait(false);

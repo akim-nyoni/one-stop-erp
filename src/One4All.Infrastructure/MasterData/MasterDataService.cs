@@ -145,7 +145,10 @@ public sealed class MasterDataService : IMasterDataService
             return Duplicate("account", key);
         }
 
-        LedgerAccount created = new(account.CompanyId, key, account.Name.Trim(), account.Type, string.IsNullOrWhiteSpace(account.ReportCategory) ? null : account.ReportCategory.Trim());
+        LedgerAccount created = new(account.CompanyId, key, account.Name.Trim(), account.Type, string.IsNullOrWhiteSpace(account.ReportCategory) ? null : account.ReportCategory.Trim())
+        {
+            DefaultTaxCode = string.IsNullOrWhiteSpace(account.DefaultTaxCode) ? null : account.DefaultTaxCode.Trim().ToUpperInvariant(),
+        };
         if (account.ControlType is ControlAccountType control)
         {
             created.MakeControlAccount(control);
@@ -426,8 +429,17 @@ public sealed class MasterDataService : IMasterDataService
             return Duplicate("item", key);
         }
 
+        // The category's costing method applies to an item created in it without one of its own (brief §3.4).
+        CostingMethod costing = item.Costing;
+        string? categoryCode = string.IsNullOrWhiteSpace(item.Category) ? null : item.Category.Trim().ToUpperInvariant();
+        if (costing == CostingMethod.WeightedAverage && categoryCode is not null
+            && await _db.ItemCategories.AsNoTracking().Where(c => c.CompanyId == item.CompanyId && c.Code == categoryCode).Select(c => c.CostingMethod).FirstOrDefaultAsync(ct).ConfigureAwait(false) is CostingMethod fromCategory)
+        {
+            costing = fromCategory;
+        }
+
         // A standard-costed item needs its standard and somewhere for the price variance to go; a shelf life is whole days.
-        if (item.Costing == CostingMethod.Standard && (item.StandardCost is not > 0m || string.IsNullOrWhiteSpace(item.PriceVarianceAccountCode)))
+        if (costing == CostingMethod.Standard && (item.StandardCost is not > 0m || string.IsNullOrWhiteSpace(item.PriceVarianceAccountCode)))
         {
             return Invalid("A standard-costed item needs a standard cost above nil and a price variance account.");
         }
@@ -445,7 +457,7 @@ public sealed class MasterDataService : IMasterDataService
             }
         }
 
-        Item created = new(item.CompanyId, key, item.Description.Trim(), item.Type, item.Costing)
+        Item created = new(item.CompanyId, key, item.Description.Trim(), item.Type, costing)
         {
             RevenueAccountCode = Code(item.RevenueAccountCode), CostOfSalesAccountCode = Code(item.CostOfSalesAccountCode), StandardCost = item.StandardCost,
             Tracking = item.Tracking, ShelfLifeDays = item.ShelfLifeDays, PriceVarianceAccountCode = Code(item.PriceVarianceAccountCode),

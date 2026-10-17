@@ -59,6 +59,9 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the account is on hold (blocks payment).</summary>
     public bool OnHold { get; set; }
 
+    /// <summary>The tax code the supplier's invoices take when none is given (brief §3.5); null falls back to the expense account's.</summary>
+    public string? DefaultTaxCode { get; set; }
+
     /// <summary>Gets or sets the first transaction analysis code (brief §4.5: how this account's transactions are analysed, e.g. region, buyer, commodity).</summary>
     public string? AnalysisCode1 { get; set; }
 

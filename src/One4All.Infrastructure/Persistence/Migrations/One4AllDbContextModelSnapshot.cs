@@ -873,6 +873,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency_restriction");
 
+                    b.Property<string>("DefaultTaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("default_tax_code");
+
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("deleted_by_user_id");
@@ -13713,6 +13718,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<int?>("CostingMethod")
+                        .HasColumnType("integer")
+                        .HasColumnName("costing_method");
+
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("created_by_user_id");
@@ -23356,6 +23365,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("branch_id");
 
+                    b.Property<decimal?>("CashUpSignOffVariance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cash_up_sign_off_variance");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -23768,6 +23782,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("gift_card_number");
 
+                    b.Property<bool>("GiftWrap")
+                        .HasColumnType("boolean")
+                        .HasColumnName("gift_wrap");
+
                     b.Property<long>("ItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("item_id");
@@ -23776,6 +23794,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("line_net");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("note");
 
                     b.Property<string>("PromotionCode")
                         .HasMaxLength(60)
@@ -23805,6 +23828,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("SaleId")
                         .HasColumnType("bigint")
                         .HasColumnName("sale_id");
+
+                    b.Property<string>("SerialNumber")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("serial_number");
 
                     b.Property<decimal>("TaxAmount")
                         .HasPrecision(19, 4)
@@ -24088,6 +24116,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<long?>("SignedOffByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("signed_off_by_user_id");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer")
@@ -27575,6 +27607,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("menu_item_id");
 
+                    b.Property<string>("Note")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("note");
+
                     b.Property<decimal>("Quantity")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -28409,6 +28446,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("MenuItemId")
                         .HasColumnType("bigint")
                         .HasColumnName("menu_item_id");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("note");
 
                     b.Property<decimal>("Quantity")
                         .HasPrecision(19, 4)
@@ -34676,6 +34718,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)")
                         .HasColumnName("currency");
+
+                    b.Property<string>("DefaultTaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("default_tax_code");
 
                     b.Property<long?>("DeletedByUserId")
                         .HasColumnType("bigint")

@@ -62,7 +62,11 @@ public static class LedgerReports
         yield return Listing("GL22", "Recurring Journals Due & Missed", "GeneralLedger", "Each active recurring template's last posted month against the date: posted, due or missed.",
             "GledRecurringDue", [new Column("Code", "Code", 80), new Column("Description", "Description", 180), new Column("LastPosted", "Last posted", 75), new Column("Status", "Status", 120),
              new Column("Value", "Value", 95, true), new Column("Schedule", "Schedule", 200)], [("AsAtDate", ParameterType.Date)]);
-
+        yield return Listing("GL26", "FX Revaluation by Trader (before / after)", "GeneralLedger", "Every debtor and creditor with foreign-currency open items at the date: the base value booked, the value at the "
+            + "closing rate and the unrealised difference, from the revaluation preview (nothing is posted).",
+            "GledFxRevaluationTraders", [new Column("Ledger", "Ledger", 55), new Column("Trader", "Trader", 90), new Column("Name", "Name", 160), new Column("Currency", "Currency", 55), new Column("Items", "Items", 50),
+             new Column("Outstanding", "Outstanding (foreign)", 110), new Column("Before", "Booked (base)", 100), new Column("After", "At closing rate", 100), new Column("Difference", "Gain / (loss)", 100, true)],
+            [("AsAtDate", ParameterType.Date)]);
         yield return Listing("GL23", "Accruals, Prepayments & Deferred Income Schedule", "GeneralLedger", "Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise.",
             "GledAccruals", [new Column("Kind", "Kind", 100), new Column("Reference", "Reference", 110), new Column("Date", "Date / start", 75), new Column("Detail", "Detail", 220), new Column("Recognised", "Recognised", 90),
              new Column("Amount", "Amount / remaining", 100, true)], Period);

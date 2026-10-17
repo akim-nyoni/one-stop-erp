@@ -122,8 +122,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Category under a category", ListTitle = "Item categories",
-            Description = "Places a category under another so the till can drill down (blank parent: top level).",
-            Fields = [Req("Category", "Category code"), Opt("Parent", "Parent category code")],
+            Description = "Places a category under another so the till can drill down (blank parent: top level), and sets the costing method items created in it take when none is given.",
+            Fields = [Req("Category", "Category code"), Opt("Parent", "Parent category code"), Pick("Costing", "Costing method for new items", ["Keep", .. Enum.GetNames<CostingMethod>()])],
             Run = async (c, i) =>
             {
                 string code = i.Text("Category").ToUpperInvariant(), parent = (i.Optional("Parent") ?? string.Empty).ToUpperInvariant();
@@ -142,11 +142,16 @@ public static partial class OperationCatalogue
                 }
 
                 category.ParentCode = parent.Length == 0 ? null : parent;
+                if (i.Text("Costing") != "Keep")
+                {
+                    category.CostingMethod = Enum.Parse<CostingMethod>(i.Text("Costing"));
+                }
+
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return parent.Length == 0 ? $"{code} is a top-level category." : $"{code} now sits under {parent}.";
             },
             List = async c => Table(await c.Db.ItemCategories.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ParentCode).ThenBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Under", x => x.ParentCode ?? "—"), ("Active", x => x.IsActive)),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Under", x => x.ParentCode ?? "—"), ("Costing", x => x.CostingMethod?.ToString() ?? "—"), ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {

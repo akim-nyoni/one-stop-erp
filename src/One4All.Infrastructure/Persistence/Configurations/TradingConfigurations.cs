@@ -42,6 +42,7 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
     public void Configure(EntityTypeBuilder<Supplier> b)
     {
         b.ToTable("supplier", Schemas.AccountsPayable);
+        b.Property(x => x.DefaultTaxCode).HasMaxLength(20);
         b.HasKey(x => x.Id);
         b.Property(x => x.OverReceiptTolerancePercent).HasPrecision(9, 4);
         b.Property(x => x.Code).HasMaxLength(20);

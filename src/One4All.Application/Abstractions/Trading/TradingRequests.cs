@@ -14,7 +14,7 @@ public readonly record struct TradingPostingResult(long OpenItemId, string Journ
 }
 
 /// <summary>A request to post a sales invoice (AR).</summary>
-public sealed class SalesInvoiceRequest : ITradingAnalysis
+public sealed record SalesInvoiceRequest : ITradingAnalysis
 {
     /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
     public string? CostCentre { get; init; }
@@ -120,7 +120,7 @@ public sealed class ReceiptRequest
 }
 
 /// <summary>A request to post a supplier invoice (AP).</summary>
-public sealed class PurchaseInvoiceRequest : ITradingAnalysis
+public sealed record PurchaseInvoiceRequest : ITradingAnalysis
 {
     /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
     public string? CostCentre { get; init; }

@@ -12,7 +12,7 @@ namespace One4All.Application.Abstractions.MasterData;
 /// <param name="Type">The account type.</param>
 /// <param name="ControlType">Makes it a control account (posted only by its ledger), if given.</param>
 /// <param name="ReportCategory">The reporting category, if not the type's default.</param>
-public sealed record NewAccount(long CompanyId, string Code, string Name, AccountType Type, ControlAccountType? ControlType = null, string? ReportCategory = null, bool BudgetEnabled = false);
+public sealed record NewAccount(long CompanyId, string Code, string Name, AccountType Type, ControlAccountType? ControlType = null, string? ReportCategory = null, bool BudgetEnabled = false, string? DefaultTaxCode = null);
 
 /// <summary>A new tax code with its first rate.</summary>
 /// <param name="CompanyId">The company.</param>

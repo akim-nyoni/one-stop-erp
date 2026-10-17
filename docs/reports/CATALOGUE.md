@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-580 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+581 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -153,6 +153,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL23 | Accruals, Prepayments & Deferred Income Schedule | Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Reference, Date, Detail, Recognised, Amount | — | Sum(Amount) |
 | GL24 | Intercompany Balances & Reconciliation | Intercompany journals in the period and whether the counterparty company holds the mirror entry. | FromDate (Date, optional), ToDate (Date, optional) | Document, Date, Narrative, Counterparty, Status, Amount | — | Sum(Amount) |
 | GL25 | Hyperinflation (IAS 29) Working Papers | Each account's historical balance restated by the price index at the date, monetary items unchanged, with the restatement. | AsAtDate (Date, optional), IndexCode (String, optional) | Account, Name, Type, Monetary, Historical, Restated, Restatement | — | Sum(Restatement) |
+| GL26 | FX Revaluation by Trader (before / after) | Every debtor and creditor with foreign-currency open items at the date: the base value booked, the value at the closing rate and the unrealised difference, from the revaluation preview (nothing is posted). | AsAtDate (Date, optional) | Ledger, Trader, Name, Currency, Items, Outstanding, Before, After, Difference | — | Sum(Difference) |
 | GL2R | Trial Balance — Reporting Currency | Posted balances as at the date per account in base and in the company's reporting currency, each posting carried at the rate of its day. | AsAtDate (Date, optional) | Account, Name, Base, Currency, Reporting | — | Sum(Reporting) |
 | GL5 | Journal Listing & Journal Audit | Every journal in the period with status, source, manual flag, who prepared and approved it, reversals and value. | FromDate (Date, optional), ToDate (Date, optional) | Journal, Date, Status, Source, Document, Manual, PreparedBy, ApprovedBy, Reversal, Value | — | Sum(Value) |
 | GL8 | Statement of Changes in Equity | Each equity account's opening balance, the period's profit and other movements, and closing balance. | FromDate (Date, optional), ToDate (Date, optional) | Line, Opening, Profit, Movements, Closing | — | Sum(Closing) |

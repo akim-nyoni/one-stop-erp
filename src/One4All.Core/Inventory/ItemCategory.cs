@@ -37,4 +37,7 @@ public sealed class ItemCategory : AuditableEntity, ICompanyScoped
 
     /// <summary>Gets or sets the category this one sits under (null: a top-level category), for drilling down at the till.</summary>
     public string? ParentCode { get; set; }
+
+    /// <summary>The costing method an item created in this category takes when none is given (brief §3.4); null leaves the company default.</summary>
+    public CostingMethod? CostingMethod { get; set; }
 }

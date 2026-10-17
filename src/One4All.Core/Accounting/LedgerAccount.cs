@@ -83,6 +83,9 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>The notes-to-the-accounts reference the balance is disclosed under (for example "7" or "7.2"); null when not mapped.</summary>
     public string? NoteReference { get; set; }
 
+    /// <summary>The tax code a document line on this account takes when none is given (brief §3.5); null for none.</summary>
+    public string? DefaultTaxCode { get; set; }
+
     /// <summary>The normal balance side, derived from the account type.</summary>
     public NormalBalance NormalBalance => Type.NormalBalance();
 

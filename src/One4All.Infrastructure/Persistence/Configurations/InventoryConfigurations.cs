@@ -342,6 +342,7 @@ internal sealed class ItemCategoryConfiguration : IEntityTypeConfiguration<Core.
     public void Configure(EntityTypeBuilder<Core.Inventory.ItemCategory> b)
     {
         b.ToTable("item_category", Schemas.Inventory);
+        b.Property(x => x.CostingMethod).HasConversion<int>();
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.ParentCode).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);

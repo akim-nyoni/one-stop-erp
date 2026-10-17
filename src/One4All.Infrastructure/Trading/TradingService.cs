@@ -103,6 +103,14 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             }
         }
 
+        List<SalesInvoiceRequest> defaulted = [];
+        foreach (SalesInvoiceRequest request in requests)
+        {
+            defaulted.Add(await WithTaxDefaultsAsync(request, customers[request.CustomerId], ct).ConfigureAwait(false));
+        }
+
+        requests = defaulted;
+
         // Exemption certificates and exempt tax codes, read once for the batch.
         DateOnly earliest = requests.Min(r => r.DocumentDate), latest = requests.Max(r => r.DocumentDate);
         List<TaxExemptionCertificate> certificates = await _db.TaxExemptionCertificates.AsNoTracking()
@@ -236,6 +244,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         {
             return Error.Rule("Ar.CustomerOnHold", $"Customer {customer.Code} is on hold; no new invoices can be posted.");
         }
+
+        request = await WithTaxDefaultsAsync(request, customer, ct).ConfigureAwait(false);
 
         // Exemption certificates: a certified customer is not charged tax, and an exempt supply needs a valid certificate.
         bool certified = await _db.TaxExemptionCertificates.AnyAsync(c => c.CompanyId == request.CompanyId && c.Ledger == TradingLedger.AccountsReceivable && c.TraderId == customer.Id
@@ -903,6 +913,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         {
             return Error.NotFound("Ap.SupplierNotFound", $"Supplier {request.SupplierId} not found.");
         }
+
+        request = await WithTaxDefaultsAsync(request, supplier, ct).ConfigureAwait(false);
 
         // Duplicate-invoice control: the same supplier invoice entered twice is the classic double payment.
         // Numbers compare on letters and digits only, so "INV-001", "inv 001" and "INV001" are one invoice.
@@ -1586,6 +1598,61 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     };
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+
+    // Default tax (brief §3.5): a sales invoice entered without a tax code or amount takes the customer's default code, else the revenue account's,
+    // and the tax at that code's rate on the document date, posted to the code's output account (else the VAT output control).
+    private async Task<SalesInvoiceRequest> WithTaxDefaultsAsync(SalesInvoiceRequest request, Customer customer, CancellationToken ct)
+    {
+        if (request.TaxCode is not null || request.TaxAmount != 0m)
+        {
+            return request;
+        }
+
+        string? code = Clean(customer.DefaultTaxCode) ?? await AccountTaxCodeAsync(request.CompanyId, request.SalesAccountCode, ct).ConfigureAwait(false);
+        if (code is null)
+        {
+            return request;
+        }
+
+        (decimal tax, string? account) = await DefaultTaxAsync(request.CompanyId, code, request.NetAmount, request.DocumentDate, ControlAccountType.VatOutput, ct).ConfigureAwait(false);
+        return request with { TaxCode = code, TaxAmount = tax, TaxAccountCode = request.TaxAccountCode ?? (tax == 0m ? null : account) };
+    }
+
+    // As above for a purchase invoice: the supplier's default code, else the expense account's, to the code's input account (else the VAT input control).
+    private async Task<PurchaseInvoiceRequest> WithTaxDefaultsAsync(PurchaseInvoiceRequest request, Supplier supplier, CancellationToken ct)
+    {
+        if (request.TaxCode is not null || request.TaxAmount != 0m)
+        {
+            return request;
+        }
+
+        string? code = Clean(supplier.DefaultTaxCode) ?? await AccountTaxCodeAsync(request.CompanyId, request.ExpenseAccountCode, ct).ConfigureAwait(false);
+        if (code is null)
+        {
+            return request;
+        }
+
+        (decimal tax, string? account) = await DefaultTaxAsync(request.CompanyId, code, request.NetAmount, request.DocumentDate, ControlAccountType.VatInput, ct).ConfigureAwait(false);
+        return request with { TaxCode = code, TaxAmount = tax, TaxAccountCode = request.TaxAccountCode ?? (tax == 0m ? null : account) };
+    }
+
+    private async Task<string?> AccountTaxCodeAsync(long companyId, string? accountCode, CancellationToken ct)
+        => string.IsNullOrWhiteSpace(accountCode) ? null
+            : Clean(await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && a.AccountCode == accountCode).Select(a => a.DefaultTaxCode).FirstOrDefaultAsync(ct).ConfigureAwait(false));
+
+    private async Task<(decimal Tax, string? Account)> DefaultTaxAsync(long companyId, string code, decimal net, DateOnly date, ControlAccountType control, CancellationToken ct)
+    {
+        TaxCode? tax = await _db.TaxCodes.AsNoTracking().Include(t => t.Rates).FirstOrDefaultAsync(t => t.CompanyId == companyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
+        if (tax is null)
+        {
+            return (0m, null);
+        }
+
+        decimal amount = decimal.Round(net * tax.RateOn(date) / 100m, 2, MidpointRounding.AwayFromZero);
+        string? account = (control == ControlAccountType.VatOutput ? tax.OutputAccountCode : tax.InputAccountCode)
+            ?? await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && a.ControlAccountType == control).OrderBy(a => a.AccountCode).Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return (amount, account);
+    }
 
     private static decimal Round(decimal value) => decimal.Round(value, Scale, MidpointRounding.ToEven);
 }

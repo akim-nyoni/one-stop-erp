@@ -616,9 +616,9 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Add a ledger account", ListTitle = "Chart of accounts", Description = "A ledger account; a control account is posted only by its own ledger.",
             Fields = [Req("Code", "Account code (up to 8)"), Req("Name", "Name"), Pick("Type", "Type", Enum.GetNames<AccountType>()),
-                Pick("Control", "Control account", [NoControl, .. Enum.GetNames<ControlAccountType>()]), Opt("Category", "Report category")],
+                Pick("Control", "Control account", [NoControl, .. Enum.GetNames<ControlAccountType>()]), Opt("Category", "Report category"), Opt("TaxCode", "Default tax code")],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateAccountAsync(new NewAccount(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<AccountType>(i.Text("Type")),
-                i.Text("Control") == NoControl ? null : Enum.Parse<ControlAccountType>(i.Text("Control")), i.Optional("Category"))).ConfigureAwait(true), id => "Account added."),
+                i.Text("Control") == NoControl ? null : Enum.Parse<ControlAccountType>(i.Text("Control")), i.Optional("Category"), DefaultTaxCode: i.Optional("TaxCode"))).ConfigureAwait(true), id => "Account added."),
             List = async c => Table(await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.AccountCode).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.ControlAccountType), ("Active", x => x.IsActive)),
         };
@@ -697,6 +697,7 @@ public static partial class OperationCatalogue
                 {
                     existing.Name = i.Text("Name");
                     (existing.AnalysisCode1, existing.AnalysisCode2, existing.AnalysisCode3) = (Code(i.Optional("Analysis1")), Code(i.Optional("Analysis2")), Code(i.Optional("Analysis3")));
+                    existing.DefaultTaxCode = Code(i.Optional("TaxCode"));
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
                     return $"Customer {existing.Code} changed.";
                 }
@@ -704,6 +705,7 @@ public static partial class OperationCatalogue
                 long id = Check(await c.Get<IMasterDataService>().CreateCustomerAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Number("Limit")).ConfigureAwait(true));
                 Core.Trading.Customer added = await c.Db.Customers.SingleAsync(x => x.Id == id).ConfigureAwait(true);
                 (added.AnalysisCode1, added.AnalysisCode2, added.AnalysisCode3) = (Code(i.Optional("Analysis1")), Code(i.Optional("Analysis2")), Code(i.Optional("Analysis3")));
+                added.DefaultTaxCode = Code(i.Optional("TaxCode"));
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return "Customer added.";
             },
@@ -716,7 +718,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Add a supplier", ListTitle = "Suppliers", Delete = SoftDelete<Core.Trading.Supplier>(x => x.Code, "supplier"),
             Description = "A supplier account. An existing code changes that supplier's name and analysis codes (the currency stays). The three analysis codes (e.g. region, buyer, commodity) "
                 + "are how the account's transactions are analysed in reports.",
-            Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD"), Opt("Analysis1", "Analysis code 1"), Opt("Analysis2", "Analysis code 2"), Opt("Analysis3", "Analysis code 3")],
+            Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD"), Opt("Analysis1", "Analysis code 1"), Opt("Analysis2", "Analysis code 2"), Opt("Analysis3", "Analysis code 3"),
+                Opt("TaxCode", "Default tax code")],
             Run = async (c, i) =>
             {
                 static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
