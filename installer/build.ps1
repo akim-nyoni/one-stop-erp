@@ -11,7 +11,10 @@ $root = Split-Path -Parent $PSScriptRoot
 $publish = Join-Path $root "artifacts/publish"
 
 dotnet publish (Join-Path $root "src/One4All.Desktop/One4All.Desktop.csproj") -c $Configuration -r win-x64 --self-contained true -p:Version=$Version -o (Join-Path $publish "desktop")
-dotnet publish (Join-Path $root "src/One4All.Server/One4All.Server.csproj") -c $Configuration -p:Version=$Version -o (Join-Path $publish "server")
+dotnet publish (Join-Path $root "src/One4All.Server/One4All.Server.csproj") -c $Configuration -r win-x64 --self-contained true -p:Version=$Version -o (Join-Path $publish "server")
+# The licence generator ships as one file for the licensing desk (no runtime install): One4All.Licensing.Generator.exe
+dotnet publish (Join-Path $root "src/One4All.Licensing.Generator/One4All.Licensing.Generator.csproj") -c $Configuration -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:Version=$Version -o (Join-Path $publish "licensing")
+Copy-Item (Join-Path $PSScriptRoot "server-install.ps1") (Join-Path $publish "server") -Force
 
 $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
 if ($null -eq $iscc) {
@@ -22,3 +25,4 @@ if ($null -eq $iscc) {
 $env:ONE4ALL_VERSION = $Version
 & $iscc (Join-Path $PSScriptRoot "One4All.iss")
 Write-Host "Installer: $(Join-Path $root "artifacts/installer/One4All-$Version-setup.exe")"
+Write-Host "Server (service): $(Join-Path $publish "server") — run server-install.ps1 there as administrator; licensing tool: $(Join-Path $publish "licensing")"

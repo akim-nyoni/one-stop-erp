@@ -14,6 +14,9 @@ using One4All.Infrastructure.Security;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
+// Packaging (brief §10): the same executable runs as a Windows service (installer/server-install.ps1 registers it) or from a console.
+builder.Host.UseWindowsService(options => options.ServiceName = "One4All Server");
+
 // --- Infrastructure (embedded services, same code path as the desktop) ------------------------------------
 string connectionString = builder.Configuration.GetConnectionString("One4All")
     ?? Environment.GetEnvironmentVariable("ONE4ALL_CONNECTION")
@@ -154,6 +157,11 @@ builder.Services.AddRateLimiter(options =>
 WebApplication app = builder.Build();
 
 // Apply migrations and seed the permission catalogue + default administrator on startup.
+if (await DatabaseBootstrap.EnsureDatabaseAsync(connectionString))
+{
+    app.Logger.LogInformation("First run: created the One4All database on the PostgreSQL server.");
+}
+
 await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
 {
     await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Database.MigrateAsync();

@@ -112,6 +112,7 @@ public partial class App : System.Windows.Application
         await using AsyncServiceScope scope = Services.CreateAsyncScope();
         IServiceProvider sp = scope.ServiceProvider;
 
+        await DatabaseBootstrap.EnsureDatabaseAsync(ResolveConnectionString()).ConfigureAwait(false); // first run on a workstation with its own PostgreSQL
         await sp.GetRequiredService<One4AllDbContext>().Database.MigrateAsync().ConfigureAwait(false);
         await sp.GetRequiredService<PermissionSeeder>().SeedAsync().ConfigureAwait(false);
         await sp.GetRequiredService<AdministratorSeeder>().SeedAsync().ConfigureAwait(false);
