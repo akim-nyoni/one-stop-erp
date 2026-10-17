@@ -24,7 +24,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Termination and final pay", ListTitle = "Clearance checklist",
             Description = "Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans "
-                + "recovered as far as the pay allows), then terminate — the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are "
+                + "recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are "
                 + "cleared, release the final pay from the bank; print the certificate.",
             Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Release final pay", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
                 Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
@@ -87,7 +87,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "HR expiry alerts", ListTitle = "Expiring within 60 days",
-            Description = "What lapses for active employees — work permits, contract ends, probation, filed documents and training certificates — within the days given; "
+            Description = "What lapses for active employees - work permits, contract ends, probation, filed documents and training certificates - within the days given; "
                 + "Notify sends HR (users whose roles cover employee records) one notification listing them. The scheduled task hr.expiry-alerts does this daily for 30 days ahead.",
             Fields = [Pick("Step", "Step", ["List", "Notify HR"]), Num("Days", "Within (days)", "60"), Today()],
             Run = async (c, i) =>
@@ -107,7 +107,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Grievances and property issued", ListTitle = "Open grievances and property out",
-            Description = "Lodge a grievance and follow it (investigating, resolved or withdrawn with the outcome); issue company property to an employee and record its return — "
+            Description = "Lodge a grievance and follow it (investigating, resolved or withdrawn with the outcome); issue company property to an employee and record its return - "
                 + "anything still out is listed on the leaver's clearance. Medical records are kept under Medical records (restricted).",
             Fields = [Pick("Step", "Step", ["Lodge grievance", "Move grievance", "Issue property", "Return property"]), Opt("Number", "Employee number"), Opt("Subject", "Subject / item"),
                 Opt("Details", "Details"), Opt("Against", "Against (grievance)"), Pick("Status", "Grievance is now", ["Investigating", "Resolved", "Withdrawn"]), Opt("Outcome", "Outcome / return condition"),
@@ -144,7 +144,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Medical records (restricted)",
-            Description = "An employee's medical records — fitness assessments, illness, injury, disability — seen and kept only by users with the Hr.Medical permission; "
+            Description = "An employee's medical records - fitness assessments, illness, injury, disability - seen and kept only by users with the Hr.Medical permission; "
                 + "notes are encrypted at rest.",
             Fields = [Pick("Step", "Step", ["Show", "Record"]), Req("Number", "Employee number"), Pick("Kind", "Record is", Enum.GetNames<MedicalRecordKind>()), Opt("Note", "Note"),
                 Pick("Fit", "Fit for work", ["Not assessed", "Fit", "Not fit"]), Opt("Review", "Review on (yyyy-MM-dd)"), Today()],
@@ -268,8 +268,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Pay elements and tax tables", ListTitle = "Pay elements",
-            Description = "Create a pay element, assign one to (or end one for) an employee, create a tax table — bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
-                + "'0-100:0; 100-300:20; 300-:30' — or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
+            Description = "Create a pay element, assign one to (or end one for) an employee, create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
+                + "'0-100:0; 100-300:20; 300-:30' - or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
             Fields = [Pick("Step", "Step", ["Create element", "Set element options", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]), Opt("Code", "Element / table code"),
                 Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
                 Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
@@ -557,8 +557,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Pay and close a payroll run", ListTitle = "Payroll runs",
-            Description = "After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money, cheques) — earnings paid in another "
-                + "currency go out of that currency's account at the pay date's rate — and clears the net pay control; "
+            Description = "After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money, cheques) - earnings paid in another "
+                + "currency go out of that currency's account at the pay date's rate - and clears the net pay control; "
                 + "Close closes the run once its net pay control is clear; Stage shows where a run stands.",
             Fields = [Pick("Step", "Step", ["Pay", "Close", "Stage"]), Req("Run", "Run document number"), Opt("Bank", "Bank account for transfers", "1100"), Opt("Cash", "Cash account"),
                 Opt("Mobile", "Mobile-money float account"), Opt("Cheque", "Bank account cheques are drawn on"), Opt("Foreign", "Foreign-currency accounts (EUR:1120; ZAR:1130)"), Today()],
@@ -625,7 +625,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Leave calendar and recall", ListTitle = "Leave this month",
-            Description = "Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled — the days "
+            Description = "Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled - the days "
                 + "not taken go back to the balance (pro rata unless given).",
             Fields = [Pick("Step", "Step", ["Calendar", "Cancel or recall"]), Today("From", "From"), Today("To", "To"), Opt("Department", "Department (calendar)"),
                 OptNum("Leave", "Leave record id (cancel)"), Opt("Returned", "Back at work on (yyyy-mm-dd; blank: cancel outright)"), OptNum("DaysBack", "Days given back (blank: pro rata)")],
@@ -708,7 +708,7 @@ public static partial class OperationCatalogue
                 r => $"{r.Moved.Count} employee(s) moved up a notch; {r.AtTop.Count} at the top of their scale."),
             List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId && e.Grade != null && e.Notch != null).OrderBy(e => e.EmployeeNumber).ToListAsync()
                 .ConfigureAwait(true), ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Grade", e => e.Grade), ("Notch", e => e.Notch), ("Basic", e => M(e.BasicSalary)),
-                ("Last increment", e => e.LastIncrementOn is DateOnly d ? D(d) : "—")),
+                ("Last increment", e => e.LastIncrementOn is DateOnly d ? D(d) : "-")),
         };
         yield return new Operation
         {
@@ -761,7 +761,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Supplementary payroll run", ListTitle = "Payroll runs", Description = "Corrects a committed period with extra (or negative) element amounts — a visible run with its own payslips and journal.",
+            Module = module, Title = "Supplementary payroll run", ListTitle = "Payroll runs", Description = "Corrects a committed period with extra (or negative) element amounts - a visible run with its own payslips and journal.",
             Fields = [Req("Period", "Committed period"), Today(), Req("Document", "Run document number"), Req("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420"),
                 Req("Lines", "Lines: EMPLOYEE:ELEMENT:amount; …")],
             Run = async (c, i) =>
@@ -885,7 +885,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Commit approved payroll", ListTitle = "Payroll drafts", Description = "Saves the payslips and posts the journal — refused if anything changed since approval.",
+            Module = module, Title = "Commit approved payroll", ListTitle = "Payroll drafts", Description = "Saves the payslips and posts the journal - refused if anything changed since approval.",
             Fields = [Num("Draft", "Draft id (from the list)")],
             Run = async (c, i) =>
             {
@@ -897,7 +897,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Raise third-party invoices", ListTitle = "Payroll runs",
-            Description = "Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier — clearing the payroll liabilities into payables.",
+            Description = "Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier - clearing the payroll liabilities into payables.",
             Fields = [Req("Run", "Run document or journal number")],
             Run = async (c, i) =>
             {
@@ -947,7 +947,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Split net pay", ListTitle = "Pay splits",
-            Description = "Sends part of an employee's net pay to another bank account or wallet — a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. "
+            Description = "Sends part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. "
                 + "Remove takes a split off.",
             Fields = [EmployeePick("Employee", "Employee"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()), Req("Destination", "Account or wallet number"), OptNum("Amount", "Fixed amount"),
                 OptNum("Percent", "Percent of net pay"), Opt("Bank", "Bank of that account (blank: the employee's bank)"), Opt("Branch", "Branch of that account"), Tick("Remove", "Remove this split")],
@@ -1050,7 +1050,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Import legacy payroll (parallel run)", Description = "The old system's figures for a period, compared line by line in report PR8. Replaces an earlier import of the period.",
             Fields = [Req("Period", "Period"), Req("Lines", "Lines: EMPLOYEE,ELEMENT,amount; … (NET for net pay)")],
-            Run = async (c, i) => $"{Check(await c.Get<IPayrollAdjustmentService>().ImportLegacyPayrollAsync(c.CompanyId, i.Text("Period"), i.Text("Lines").Replace(';', '\n')).ConfigureAwait(true))} line(s) imported — run report PR8.",
+            Run = async (c, i) => $"{Check(await c.Get<IPayrollAdjustmentService>().ImportLegacyPayrollAsync(c.CompanyId, i.Text("Period"), i.Text("Lines").Replace(';', '\n')).ConfigureAwait(true))} line(s) imported - run report PR8.",
         };
     }
 
@@ -1252,7 +1252,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Void a cheque leaf", ListTitle = "Cheque register (latest 100)", Description = "A spoilt or lost leaf that was never issued — kept in the register so the number sequence has no gaps.",
+            Module = module, Title = "Void a cheque leaf", ListTitle = "Cheque register (latest 100)", Description = "A spoilt or lost leaf that was never issued - kept in the register so the number sequence has no gaps.",
             Fields = [Req("Bank", "Bank account code"), Req("Number", "Cheque number"), Today(), Req("Reason", "Reason")],
             Run = async (c, i) => Check(await c.Get<IChequeService>().VoidLeafAsync(c.CompanyId, await BankAsync(c, i.Text("Bank")).ConfigureAwait(true), i.Text("Number"), i.Date("Date"), i.Text("Reason"))
                 .ConfigureAwait(true), $"Leaf {i.Text("Number")} voided."),
@@ -1284,7 +1284,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Save a bank file layout", ListTitle = "Bank file layouts",
-            Description = "A bank's EFT format as templates: {Field[,width][:format]} — header/trailer: Date, Originator, Currency, Count, Total, Hash; detail: Seq, Date, Reference, Name, Bank, Branch, Account, Currency, Amount (format 'cents' for whole cents; width 010 zero-pads).",
+            Description = "A bank's EFT format as templates: {Field[,width][:format]} - header/trailer: Date, Originator, Currency, Count, Total, Hash; detail: Seq, Date, Reference, Name, Bank, Branch, Account, Currency, Amount (format 'cents' for whole cents; width 010 zero-pads).",
             Fields = [Req("Code", "Layout code"), Req("Name", "Bank / format name"), Opt("Header", "Header template"), Req("Detail", "Detail template", "{Reference}|{Name}|{Bank}|{Account}|{Amount}"), Opt("Trailer", "Trailer template")],
             Run = async (c, i) => Check(await c.Get<IBankFileService>().SaveLayoutAsync(new BankFileLayoutRequest(c.CompanyId, i.Text("Code"), i.Text("Name"), i.Optional("Header"), i.Text("Detail"), i.Optional("Trailer")))
                 .ConfigureAwait(true), id => $"Layout {i.Text("Code").ToUpperInvariant()} saved."),
@@ -1395,7 +1395,7 @@ public static partial class OperationCatalogue
         {
             Module = "Sales & Schools", Title = "Term dates, optional fees and leavers", ListTitle = "Optional fee items",
             Description = "Term dates (with pro rata, a joiner pays from the admission date and a leaver is credited the unused part of the term invoice); a student taking or "
-                + "dropping an optional item (lunches, clubs, trips — billed with the term, not discounted); a student's admission date; withdrawing a student.",
+                + "dropping an optional item (lunches, clubs, trips - billed with the term, not discounted); a student's admission date; withdrawing a student.",
             Fields = [Pick("Step", "Step", ["Term dates", "Take option", "Drop option", "Admission date", "Withdraw"]), Opt("Structure", "Fee structure code"),
                 Opt("Student", "Admission number"), OptNum("Item", "Optional fee item id (from the list)"), Opt("Start", "Term start / admission date (yyyy-MM-dd)"),
                 Opt("End", "Term end (yyyy-MM-dd)"), Tick("ProRata", "Pro rata joiners and leavers", true), Opt("Prefix", "Term invoice prefix (withdraw)"), Today("Date", "Left on (withdraw)")],
@@ -1437,7 +1437,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Sales & Schools", Title = "Bursaries", ListTitle = "Bursary requests",
-            Description = "Request a bursary (percentage or value off compulsory fees) — it reduces fees only once approved by someone else with the bursary approval right, "
+            Description = "Request a bursary (percentage or value off compulsory fees) - it reduces fees only once approved by someone else with the bursary approval right, "
                 + "or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference. A bursary may expire: fees billed "
                 + "after its last day get no bursary. Expiring lists bursaries ending within the given days, for renewal.",
             Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Expiring"]), Opt("Student", "Admission number (request)"), Pick("Type", "Type", ["Percentage", "Value"]),
@@ -1545,7 +1545,7 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Get<IAcademicStructureService>().ClassRollsAsync(c.CompanyId).ConfigureAwait(true),
-                ("Grade", r => r.Grade), ("Stream", r => r.Stream ?? "—"), ("Class", r => r.Name), ("Enrolled", r => r.Enrolled), ("Capacity", r => r.Capacity?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—"),
+                ("Grade", r => r.Grade), ("Stream", r => r.Stream ?? "-"), ("Class", r => r.Name), ("Enrolled", r => r.Enrolled), ("Capacity", r => r.Capacity?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "-"),
                 ("Moves to", r => r.NextGrade ?? "leaves")),
         };
         yield return new Operation
@@ -1602,7 +1602,7 @@ public static partial class OperationCatalogue
         {
             Module = "Sales & Schools", Title = "Sales order processing", ListTitle = "Open sales orders",
             Description = "Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; "
-                + "lines ITEM:quantity, or blank for everything outstanding — a part despatch leaves the rest on back order), invoice what has been despatched (tax at each "
+                + "lines ITEM:quantity, or blank for everything outstanding - a part despatch leaves the rest on back order), invoice what has been despatched (tax at each "
                 + "line's tax code), take back goods returned from a despatch, or cancel what is left of the order.",
             Fields = [Pick("Step", "Step", ["Create", "Despatch", "Invoice", "Return", "Cancel"]), Req("Order", "Order number"), Today(), Opt("Customer", "Customer code (create)"),
                 Opt("Lines", "Lines (create: ITEM:qty[:price[:tax]]; despatch/return: ITEM:qty)"), Opt("Revenue", "Revenue account (create; blank: the item's)"),
@@ -1814,7 +1814,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Sales & Schools", Title = "Drop-ship order lines", ListTitle = "Drop-shipments",
-            Description = "The supplier sends sales-order items straight to the customer. Untick 'Confirm' to place it; tick it (with the supplier's invoice) once delivered — cost of sales is charged and the lines become invoiceable, no stock moves.",
+            Description = "The supplier sends sales-order items straight to the customer. Untick 'Confirm' to place it; tick it (with the supplier's invoice) once delivered - cost of sales is charged and the lines become invoiceable, no stock moves.",
             Fields = [Req("Reference", "Drop-shipment reference"), Tick("Confirm", "Confirm delivered"), Opt("Order", "Sales order number (placing)"), Opt("Supplier", "Supplier code (placing)"),
                 Opt("Lines", "Lines: ITEM:quantity:unit cost; … (placing)"), Today(), Opt("Invoice", "Supplier invoice (confirming)"), Req("Cogs", "Cost of sales account", "5000")],
             Run = async (c, i) =>
@@ -1966,7 +1966,7 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Documents()
     {
         const string module = "Documents";
-        // A document prints as its standard text, or — when the company has named a layout for it under System Manager › Document layouts — through that
+        // A document prints as its standard text, or - when the company has named a layout for it under System Manager › Document layouts - through that
         // report, saved as a PDF at the path given (the layout runs with the document's number and date).
         async Task<string> PrintAsync(OperationContext c, OperationInput i, string kind, string number, DateOnly? date, Func<Task<One4All.Core.Common.Result<string>>> text)
         {
@@ -1995,8 +1995,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Print a document", IsDocument = true,
-            Description = "Prints any document of the list — statements, reminders, remittances, payslips, vouchers, certificates, tickets, pick lists, RFQs, the chain of title, cheques, "
-                + "shelf labels and the business documents — by its number (see Document layouts › Identified by), as the standard text or through the company's own layout as a PDF.",
+            Description = "Prints any document of the list - statements, reminders, remittances, payslips, vouchers, certificates, tickets, pick lists, RFQs, the chain of title, cheques, "
+                + "shelf labels and the business documents - by its number (see Document layouts › Identified by), as the standard text or through the company's own layout as a PDF.",
             Fields = [Pick("Document", "Document", [.. Application.Documents.DocumentKinds.All.Select(k => k.Name)]), Req("Number", "Number or code (two parts as a/b where the document says so)"),
                 new OperationField("Date", "Date (as at, pay date or month; today when blank)", FieldKind.Date, null, Required: false), Opt("SaveTo", "PDF file path (when a layout is set)")],
             Run = (c, i) =>

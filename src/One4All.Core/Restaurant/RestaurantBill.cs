@@ -3,7 +3,7 @@ using One4All.Core.Common;
 namespace One4All.Core.Restaurant;
 
 /// <summary>
-/// A persisted record of a restaurant bill (<c>res.bill</c>) — the money breakdown captured each time a table
+/// A persisted record of a restaurant bill (<c>res.bill</c>) - the money breakdown captured each time a table
 /// order (or a split of it) is billed, for an audit trail, reporting and reversal. One order may have several
 /// bills (splits / per-seat / per-tender).
 /// </summary>

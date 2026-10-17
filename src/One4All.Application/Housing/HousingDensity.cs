@@ -3,7 +3,7 @@ using One4All.Core.Housing;
 namespace One4All.Application.Housing;
 
 /// <summary>
-/// The density a stand serves, by size (brief §14 H29 demand vs supply, H96 statutory return): the usual planning bands —
+/// The density a stand serves, by size (brief §14 H29 demand vs supply, H96 statutory return): the usual planning bands -
 /// up to 300 m² is high density, up to 800 m² medium, larger low. Rental units supply the flats and rental categories
 /// instead. Pure and unit-tested.
 /// </summary>

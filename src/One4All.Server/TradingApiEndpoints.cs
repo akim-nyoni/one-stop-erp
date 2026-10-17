@@ -13,8 +13,8 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Server;
 
 /// <summary>
-/// The REST API's master-data and document endpoints (brief §11): customers, suppliers, items and prices — list, read, create,
-/// change, retire — and posting sales invoices, credit notes, receipts, supplier invoices, credit notes, payments and till sales,
+/// The REST API's master-data and document endpoints (brief §11): customers, suppliers, items and prices - list, read, create,
+/// change, retire - and posting sales invoices, credit notes, receipts, supplier invoices, credit notes, payments and till sales,
 /// each through the same application service the desktop uses, so every rule and posting is the same.
 /// </summary>
 internal static class TradingApiEndpoints

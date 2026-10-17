@@ -211,7 +211,7 @@ public sealed class AssemblyService : IAssemblyService
         Dictionary<long, decimal?> standardCost = await _db.Items.AsNoTracking().Where(i => ids.Contains(i.Id)).ToDictionaryAsync(i => i.Id, i => i.StandardCost, ct).ConfigureAwait(false);
         List<(BomLine Line, decimal Standard, decimal Recovered)> recovered = [.. parts.Where(p => p.Recovered > 0m)];
 
-        // The cost is shared by what the components are worth: their cost, or — the joint-product method — their selling price on the default list.
+        // The cost is shared by what the components are worth: their cost, or - the joint-product method - their selling price on the default list.
         Dictionary<long, decimal> sellingPrice = [];
         if (request.BySalesValue)
         {

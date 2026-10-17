@@ -79,7 +79,7 @@ public enum PettyCashCountStatus
 
 /// <summary>
 /// A physical count of a petty cash fund (<c>cb.petty_cash_count</c>): the cash counted against the book
-/// balance at the date, the variance, and — once reconciled — the variance and reimbursement journals.
+/// balance at the date, the variance, and - once reconciled - the variance and reimbursement journals.
 /// </summary>
 public sealed class PettyCashCount : AuditableEntity, ICompanyScoped
 {

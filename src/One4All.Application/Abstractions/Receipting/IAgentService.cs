@@ -18,7 +18,7 @@ public readonly record struct AgentRemittanceResult(decimal Gross, decimal Commi
 
 /// <summary>
 /// Third-party collection agents (brief §RCP-11). An agent collects on the council's behalf against a
-/// debtor account (settling the debt, holding the cash) and later remits — less commission. The agent's
+/// debtor account (settling the debt, holding the cash) and later remits - less commission. The agent's
 /// collected-minus-remitted balance is reconciled and aged.
 /// </summary>
 public interface IAgentService

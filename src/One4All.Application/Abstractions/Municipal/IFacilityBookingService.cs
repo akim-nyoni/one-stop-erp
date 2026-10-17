@@ -43,7 +43,7 @@ public sealed record FacilityCalendarEntry(string BookingNumber, string Customer
 
 /// <summary>
 /// Facility hire (brief §4.9: halls, market stalls, sports grounds and other council revenue streams): register
-/// facilities with a daily rate, book them for a range of days — never twice for the same day — invoicing the hire
+/// facilities with a daily rate, book them for a range of days - never twice for the same day - invoicing the hire
 /// through AR, cancel with a refund credited, and show a facility's calendar.
 /// </summary>
 public interface IFacilityBookingService

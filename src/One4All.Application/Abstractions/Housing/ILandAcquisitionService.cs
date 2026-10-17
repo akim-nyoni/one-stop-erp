@@ -65,8 +65,8 @@ public sealed record AcquisitionPosition(string AcquisitionNumber, AcquisitionSt
 /// <summary>
 /// Land acquisition with due diligence (brief §4.10.1): an acquisition is opened with its method, counterparty and
 /// authorising resolution; its valuation is recorded; each due-diligence item is signed off by an officer; every cost is
-/// capitalised into land WIP as incurred; and it completes — bringing the parcel into the land bank at its total built-up
-/// cost — only once the checklist is fully and acceptably signed off. An abandoned acquisition's costs are written off.
+/// capitalised into land WIP as incurred; and it completes - bringing the parcel into the land bank at its total built-up
+/// cost - only once the checklist is fully and acceptably signed off. An abandoned acquisition's costs are written off.
 /// </summary>
 public interface ILandAcquisitionService
 {

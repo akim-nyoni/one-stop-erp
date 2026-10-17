@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers migrating a company: master data previewed then committed, opening stock, open receivables (with a credit) and payables, and
-/// the legacy trial balance — after which the suspense account nets to zero and the controls agree with their sub-ledgers.
+/// the legacy trial balance - after which the suspense account nets to zero and the controls agree with their sub-ledgers.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class OpeningBalanceTests

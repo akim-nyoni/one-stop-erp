@@ -2,7 +2,7 @@ namespace One4All.Application.Trading;
 
 /// <summary>
 /// Comparison of trading document numbers as people actually type them: only letters and digits count, and
-/// case is ignored — so <c>INV-0042</c>, <c>inv 0042</c> and <c>INV0042</c> are the same document. Used by the
+/// case is ignored - so <c>INV-0042</c>, <c>inv 0042</c> and <c>INV0042</c> are the same document. Used by the
 /// duplicate supplier-invoice control and the supplier statement reconciliation. Pure.
 /// </summary>
 public static class DocumentNumbers

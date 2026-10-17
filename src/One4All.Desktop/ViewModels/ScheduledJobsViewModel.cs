@@ -75,7 +75,7 @@ public sealed partial class ScheduledJobsViewModel : ObservableObject
         foreach (ScheduledJob job in jobs)
         {
             Jobs.Add(new JobVm(job.Code, job.TaskKey, Describe(job), job.IsEnabled ? Local(job.NextRunAt) : "(disabled)",
-                job.LastRunAt is DateTimeOffset last ? $"{Local(last)} — {(job.LastSucceeded == true ? "succeeded" : "failed")}" : "never",
+                job.LastRunAt is DateTimeOffset last ? $"{Local(last)} - {(job.LastSucceeded == true ? "succeeded" : "failed")}" : "never",
                 job.IsEnabled, job.LastSucceeded == false));
         }
 
@@ -90,7 +90,7 @@ public sealed partial class ScheduledJobsViewModel : ObservableObject
         string code = Selected!.Code;
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         Result<JobRunEntry> run = await scope.ServiceProvider.GetRequiredService<IJobScheduler>().RunNowAsync(_companyId, code, DateTimeOffset.UtcNow, ct).ConfigureAwait(true);
-        StatusMessage = run.IsFailure ? run.Error.Message : $"{code}: {(run.Value.Succeeded ? "succeeded" : "failed")} — {run.Value.Message}";
+        StatusMessage = run.IsFailure ? run.Error.Message : $"{code}: {(run.Value.Succeeded ? "succeeded" : "failed")} - {run.Value.Message}";
         await RefreshAsync(ct).ConfigureAwait(true);
     }
 

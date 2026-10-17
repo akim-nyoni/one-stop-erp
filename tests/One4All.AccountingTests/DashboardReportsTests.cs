@@ -66,7 +66,7 @@ public sealed class DashboardReportsTests
         executive.Should().Contain("Revenue 2026 to date,\"2,000.00\"").And.Contain("Net profit to date,\"1,700.00\"").And.Contain("Cash & bank,\"1,500.00\"").And.Contain("Debtors,200.00");
         (await Render("DB252")).Should().Contain("\"Sales (invoices + POS, net)\",200.00,0.00,200.00");
         (await Render("DB253")).Should().Contain("Revenue,\"1,200.00\",800.00,▲ better");
-        (await Render("DB255")).Should().Contain("2026-02,800.00,0.00,0.00,—,800").And.Contain("2026-03,\"1,200.00\",300.00,0.00,—,900");
+        (await Render("DB255")).Should().Contain("2026-02,800.00,0.00,0.00,-,800").And.Contain("2026-03,\"1,200.00\",300.00,0.00,-,900");
 
         foreach (string code in DashboardReports.All().Select(r => r.Code))
         {

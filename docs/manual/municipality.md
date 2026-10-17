@@ -37,7 +37,7 @@ The list beside the form shows: Properties.
 
 ### Property ownership
 
-Registers a stand's owners and their shares ("CUST1:50:R; CUST2:50" — R marks the ratepayer), transfers it to buyers against a clearance certificate, and shows the owners now or the full history. Also keeps the tenants, occupiers and managing agents (each optionally copied on the bills) and a correspondence address separate from the property's own.
+Registers a stand's owners and their shares ("CUST1:50:R; CUST2:50" - R marks the ratepayer), transfers it to buyers against a clearance certificate, and shows the owners now or the full history. Also keeps the tenants, occupiers and managing agents (each optionally copied on the bills) and a correspondence address separate from the property's own.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -205,7 +205,7 @@ The list beside the form shows: Prepaid sales (this month).
 
 ### Billing run
 
-Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve to post the bills — someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing); SMS bills texts each ratepayer with a mobile number from an SMS template (fields {{Name}} {{Account}} {{Stands}} {{Bills}} {{Amount}} {{Balance}} {{Currency}} {{BillDate}}); Print bills prints every bill in the run, one ratepayer per page in stand order — or Print bills not emailed for only those without email.
+Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve to post the bills - someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing); SMS bills texts each ratepayer with a mobile number from an SMS template (fields {{Name}} {{Account}} {{Stands}} {{Bills}} {{Amount}} {{Balance}} {{Currency}} {{BillDate}}); Print bills prints every bill in the run, one ratepayer per page in stand order - or Print bills not emailed for only those without email.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -355,7 +355,7 @@ Log, assign and close faults reported by the public.
 
 ### Fault ticket categories
 
-The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times — the clocks the fault desk measures every ticket against.
+The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times - the clocks the fault desk measures every ticket against.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -398,6 +398,6 @@ The list beside the form shows: Fault ticket categories.
 | M168 | Tariff Schedule | Every tariff with its type, category, ward, effective date, charges, blocks and seasonal rates. |
 | M169 | Revenue by Source / Vote | Year to date: billed charges by service and revenue account, prepaid sales and licence fees. |
 | M170 | Ward Councillor Pack | One ward: properties, billing, debtors, arrangements, disconnections, indigent households, open faults and licences. |
-| M171 | Statutory Debtors Age Analysis | Debtors by consumer category aged 30/60/90/120+ as at the date, with a grand total — the statutory return layout. |
+| M171 | Statutory Debtors Age Analysis | Debtors by consumer category aged 30/60/90/120+ as at the date, with a grand total - the statutory return layout. |
 | M172 | Prepaid vs Conventional | Month by month for the year: prepaid sales (vends, units, amount, recovered to arrears) against conventional billing, per service. |
 | MUN-PROP | Property Register | Stands on the municipal register with ward, valuation and ratepayer. |

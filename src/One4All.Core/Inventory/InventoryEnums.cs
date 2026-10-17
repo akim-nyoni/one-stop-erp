@@ -65,7 +65,7 @@ public enum StockMovementType
     /// <summary>Return of goods to a supplier (quantity out at moving-average cost).</summary>
     SupplierReturn = 6,
 
-    /// <summary>Landed charges (freight, duty …) added to the value of stock already received — no quantity.</summary>
+    /// <summary>Landed charges (freight, duty …) added to the value of stock already received - no quantity.</summary>
     LandedCost = 7,
 
     /// <summary>A change of standard cost revaluing stock on hand (value only, no quantity).</summary>

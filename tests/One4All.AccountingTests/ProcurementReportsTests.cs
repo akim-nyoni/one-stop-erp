@@ -76,13 +76,13 @@ public sealed class ProcurementReportsTests
         }
 
         string orders = await Render("PO126");
-        orders.Should().Contain("PR-PO1,2026-03-01,Gadget Co,Received").And.Contain("PR-PO2,2026-03-20,Gadget Co,Open,—,—,USD,60.00,0.00,60");
+        orders.Should().Contain("PR-PO1,2026-03-01,Gadget Co,Received").And.Contain("PR-PO2,2026-03-20,Gadget Co,Open,-,-,USD,60.00,0.00,60");
         (await Render("PO129")).Should().Contain("PR-G1,2026-03-05,PR-PO1,Gadget Co,PR-G Gadget,10,10,0,0.00,50");
         (await Render("PO130")).Should().Contain("PR-G1,2026-03-06,Gadget Co,PR-G Gadget,8,2,Cracked casings,10");
         (await Render("PO132")).Should().Contain("PR-G Gadget,PR-PO2,2026-03-20,Gadget Co,5.00,6.00,+20.0%,10,10");
         (await Render("PO136")).Should().Contain("PR-RQ1,2026-03-25,6000 (no budget),21.00,0.00,0.00,0.00,0.00,No budget,-21");
         (await Render("PO134")).Should().Contain("Gadget Co,USD,2,2,1,100.0%,110");
-        (await Render("PO135")).Should().Contain("Gadget Co,1,4.0,4,4,—");
+        (await Render("PO135")).Should().Contain("Gadget Co,1,4.0,4,4,-");
 
         FrameworkAgreement framework = new(companyId, supplier.Id, "fa-1", "Gadgets 2026", new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), 150m);
         db.Add(framework);

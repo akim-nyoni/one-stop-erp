@@ -52,7 +52,7 @@ public sealed record SalesInvoiceRequest : ITradingAnalysis
     /// <summary>The user raising it (refused as their own credit-limit override; checked for back-dating).</summary>
     public long? EnteredByUserId { get; init; }
 
-    /// <summary>The revenue account code (credited) — used when <see cref="RevenueLines"/> is empty.</summary>
+    /// <summary>The revenue account code (credited) - used when <see cref="RevenueLines"/> is empty.</summary>
     public string SalesAccountCode { get; init; } = string.Empty;
 
     /// <summary>
@@ -183,7 +183,7 @@ public sealed record PurchaseInvoiceRequest : ITradingAnalysis
     public long? BudgetApprovedByUserId { get; init; }
 }
 
-/// <summary>A request to post a credit note to a customer (AR) — reduces the debtor balance.</summary>
+/// <summary>A request to post a credit note to a customer (AR) - reduces the debtor balance.</summary>
 public sealed class SalesCreditNoteRequest : ITradingAnalysis
 {
     /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
@@ -235,7 +235,7 @@ public sealed class SalesCreditNoteRequest : ITradingAnalysis
     public string? Narrative { get; init; }
 }
 
-/// <summary>A request to post a credit note from a supplier (AP) — reduces the creditor balance.</summary>
+/// <summary>A request to post a credit note from a supplier (AP) - reduces the creditor balance.</summary>
 public sealed class PurchaseCreditNoteRequest : ITradingAnalysis
 {
     /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
@@ -319,7 +319,7 @@ public sealed class PaymentRequest
 
     /// <summary>
     /// A withholding tax code to apply (brief §3.5): when the supplier has no valid tax clearance on the payment date,
-    /// its rate is withheld from the payment — the supplier's account is settled for the full amount, the bank pays
+    /// its rate is withheld from the payment - the supplier's account is settled for the full amount, the bank pays
     /// the net and the tax is owed on the code's output (WHT payable) account. Ignored for a cleared supplier.
     /// </summary>
     public string? WithholdingTaxCode { get; init; }

@@ -77,8 +77,8 @@ public static class RetailReports
         yield return Listing("POS122", "Receipt / Invoice / Refund Slip Layouts", "PointOfSale", "A sale's slip as printed on 58 mm or 80 mm roll paper or an A4 page, with any refunds "
             + "taken against it as a refund slip below.", "RetlSlip", [new Column("Line", "#", 30), new Column("Text", "Slip", 520, true)],
             [("SaleNumber", ParameterType.String), ("Paper", ParameterType.String)]);
-        yield return Listing("TX223", "Tax Invoice / Fiscal Receipt Compliance Layout", "Tax", "A sale laid out as a tax invoice — supplier and tax number, document number and time, lines with "
-            + "tax, the tax summary by code, totals, the fiscal device status — followed by the compliance checks it passes or fails.", "RetlTaxInvoice",
+        yield return Listing("TX223", "Tax Invoice / Fiscal Receipt Compliance Layout", "Tax", "A sale laid out as a tax invoice - supplier and tax number, document number and time, lines with "
+            + "tax, the tax summary by code, totals, the fiscal device status - followed by the compliance checks it passes or fails.", "RetlTaxInvoice",
             [new Column("Section", "Section", 90), new Column("Item", "Item", 220), new Column("Value", "Value", 220), new Column("Check", "Check", 60, true)], [("SaleNumber", ParameterType.String)]);
         yield return Listing("POS120", "Offline Sync Log", "PointOfSale", "Operations captured offline in the period: kind, status, attempts, when synced and any error.",
             "RetlOffline", [new Column("Created", "Created", 115), new Column("Kind", "Kind", 110), new Column("Status", "Status", 70), new Column("Attempts", "Attempts", 55), new Column("Synced", "Synced", 115),
@@ -86,7 +86,7 @@ public static class RetailReports
         yield return Listing("POS121", "Fiscal Submission Log", "PointOfSale", "Sales submitted to the fiscal device or revenue authority in the period, with the fiscal receipt reference and outcome.",
             "RetlFiscal", [new Column("Submitted", "Submitted", 115), new Column("Till", "Till", 60), new Column("Sale", "Sale", 90), new Column("Reference", "Fiscal reference", 120), new Column("Outcome", "Outcome", 200),
              new Column("Amount", "Value", 90, true)], Period);
-        yield return Listing("POS122", "Gift Card Liability by Age", "PointOfSale", "Every gift card still carrying value as at the To date, aged from issue (0–90, 91–180, 181–365, over 365 days) with its "
+        yield return Listing("POS124", "Gift Card Liability by Age", "PointOfSale", "Every gift card still carrying value as at the To date, aged from issue (0–90, 91–180, 181–365, over 365 days) with its "
             + "expiry and status: the liability on the books, and where breakage is likely.",
             "RetlGiftCards", [new Column("Card", "Card", 110), new Column("Currency", "Ccy", 45), new Column("Issued", "Issued", 75), new Column("Expires", "Expires", 75), new Column("Status", "Status", 65),
              new Column("AgeDays", "Days", 50), new Column("Band", "Band", 70), new Column("Original", "Original", 80), new Column("Balance", "Balance", 90, true)], Period);

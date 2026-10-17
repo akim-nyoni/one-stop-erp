@@ -4,8 +4,8 @@ using System.Windows.Controls;
 namespace One4All.Desktop.Navigation;
 
 /// <summary>
-/// A module's page in the Explorer: "Related Tasks" (its everyday screens) on the left, and its kinds of work side by side on the right —
-/// Maintenance, Transactions, Enquiries, Utilities — each listing its screens as tiles.
+/// A module's page in the Explorer: "Related Tasks" (its everyday screens) on the left, and its kinds of work side by side on the right -
+/// Maintenance, Transactions, Enquiries, Utilities - each listing its screens as tiles.
 /// </summary>
 public partial class ModulePage : UserControl
 {

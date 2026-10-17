@@ -18,7 +18,7 @@ public sealed record StandCostEntry(string StandNumber, decimal Cost, decimal Se
 /// <summary>
 /// Servicing cost per stand (brief §4.10.2 servicing projects, §4.10.10 job costing): a servicing contract linked to a
 /// scheme; stand frontage and zoning weights recorded; and each run capitalising the contract's cost added since the last
-/// run into the scheme's unsold stands — Dr stands available, Cr servicing WIP — on the chosen basis, so every stand
+/// run into the scheme's unsold stands - Dr stands available, Cr servicing WIP - on the chosen basis, so every stand
 /// carries an auditable cost.
 /// </summary>
 public interface IServicingCostService

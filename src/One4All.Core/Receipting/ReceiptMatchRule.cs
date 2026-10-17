@@ -30,7 +30,7 @@ public enum ReceiptMatchKind
 
 /// <summary>
 /// A council's own rule for matching imported payments (<c>rcp.receipt_match_rule</c>, brief §RCP-8): when the reference or the payer's name fits the pattern,
-/// the payment goes to the account — e.g. the employer "MINISTRY OF HEALTH" pays for account EMP-0042, or references starting "WTR" are water accounts.
+/// the payment goes to the account - e.g. the employer "MINISTRY OF HEALTH" pays for account EMP-0042, or references starting "WTR" are water accounts.
 /// Rules are tried in priority order (lowest first) before the account code and stand number are looked for.
 /// </summary>
 public sealed class ReceiptMatchRule : AuditableEntity, ICompanyScoped

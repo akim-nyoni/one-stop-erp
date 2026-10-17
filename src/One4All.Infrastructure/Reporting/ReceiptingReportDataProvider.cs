@@ -85,7 +85,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .Where(r => r.CompanyId == companyId && r.AllocationOverride != null && r.Date >= from && r.Date <= to)
             .OrderBy(r => r.Date).ThenBy(r => r.ReceiptNumber).ToListAsync(ct).ConfigureAwait(false);
         List<long> payers = [.. receipts.Where(r => r.PayerAccountId != null).Select(r => r.PayerAccountId!.Value).Distinct()];
-        Dictionary<long, string> names = await _db.Customers.AsNoTracking().Where(c => payers.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Code + " — " + c.Name, ct).ConfigureAwait(false);
+        Dictionary<long, string> names = await _db.Customers.AsNoTracking().Where(c => payers.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Code + " - " + c.Name, ct).ConfigureAwait(false);
         return [.. receipts.Select(r => Row(new()
         {
             ["ReceiptNumber"] = r.ReceiptNumber,
@@ -95,7 +95,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
         }))];
     }
 
-    // RC47: each field collector's day — receipts issued, their value, and the cash-up variance of the session (0 while it is still open).
+    // RC47: each field collector's day - receipts issued, their value, and the cash-up variance of the session (0 while it is still open).
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FieldCollectorReconciliationAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
         DateOnly date = ReportParameters.Date(parameters, "Date");
@@ -110,7 +110,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             string state = theirs.Count == 0 ? "no session" : theirs.All(s => s.ClosedOn != null) ? "returned" : "out";
             return Row(new()
             {
-                ["Collector"] = $"{c.Code} — {c.Name}" + (c.RouteCode is null ? string.Empty : $" ({c.RouteCode})") + $" · {state}",
+                ["Collector"] = $"{c.Code} - {c.Name}" + (c.RouteCode is null ? string.Empty : $" ({c.RouteCode})") + $" · {state}",
                 ["Receipts"] = issued.Count,
                 ["Value"] = issued.Sum(r => r.TenderTotal),
                 ["Variance"] = theirs.Sum(s => s.CashUpVarianceBase),
@@ -158,7 +158,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
 
         return [.. budget.Keys.Union(actual.Keys).OrderBy(code => code, StringComparer.Ordinal).Select(code => Row(new()
         {
-            ["Vote"] = $"{code} — {names.GetValueOrDefault(code, string.Empty)}",
+            ["Vote"] = $"{code} - {names.GetValueOrDefault(code, string.Empty)}",
             ["Budget"] = budget.GetValueOrDefault(code),
             ["Actual"] = actual.GetValueOrDefault(code),
             ["Variance"] = actual.GetValueOrDefault(code) - budget.GetValueOrDefault(code),
@@ -225,7 +225,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .Select(s => Row(new()
             {
                 ["Service"] = s.Service, ["Billed"] = s.Billed, ["Collected"] = s.Collected,
-                ["Percent"] = s.Billed == 0m ? "—" : (s.Collected * 100m / s.Billed).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%",
+                ["Percent"] = s.Billed == 0m ? "-" : (s.Collected * 100m / s.Billed).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + "%",
             }))];
     }
 
@@ -643,7 +643,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, string> customers = await _db.Set<Core.Trading.Customer>()
             .Where(c => c.CompanyId == companyId)
-            .ToDictionaryAsync(c => c.Id, c => $"{c.Code} — {c.Name}", ct).ConfigureAwait(false);
+            .ToDictionaryAsync(c => c.Id, c => $"{c.Code} - {c.Name}", ct).ConfigureAwait(false);
 
         return allocations.Select(a => Row(new()
         {
@@ -704,7 +704,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, string> customers = await _db.Set<Core.Trading.Customer>()
             .Where(c => c.CompanyId == companyId)
-            .ToDictionaryAsync(c => c.Id, c => $"{c.Code} — {c.Name}", ct).ConfigureAwait(false);
+            .ToDictionaryAsync(c => c.Id, c => $"{c.Code} - {c.Name}", ct).ConfigureAwait(false);
 
         return arrangements.Select(a => Row(new()
         {
@@ -785,7 +785,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
             .OrderBy(a => a.Code)
             .ToListAsync(ct).ConfigureAwait(false);
         return agents.Where(a => a.Outstanding > 0m)
-            .Select(a => Row(new() { ["Agent"] = $"{a.Code} — {a.Name}", ["Days"] = 0, ["Outstanding"] = a.Outstanding }))
+            .Select(a => Row(new() { ["Agent"] = $"{a.Code} - {a.Name}", ["Days"] = 0, ["Outstanding"] = a.Outstanding }))
             .ToList();
     }
 
@@ -901,7 +901,7 @@ public sealed class ReceiptingReportDataProvider : IReportDataProvider
 
         return agents.Select(a => Row(new()
         {
-            ["Agent"] = $"{a.Code} — {a.Name}",
+            ["Agent"] = $"{a.Code} - {a.Name}",
             ["Collected"] = a.CollectedToDate,
             ["Remitted"] = a.RemittedToDate,
             ["Outstanding"] = a.Outstanding,

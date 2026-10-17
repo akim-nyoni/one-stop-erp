@@ -73,8 +73,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Menu items", ListTitle = "Menu",
             Description = "Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed), sets a price for a price level (happy hour, staff…), "
-                + "marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) — fired orders "
-                + "give each station its own ticket — and shows a station's queue.",
+                + "marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) - fired orders "
+                + "give each station its own ticket - and shows a station's queue.",
             Fields = [Pick("Step", "Step", ["Create", "Price level", "Available", "Unavailable", "Refresh availability", "Prep station", "Station queue"]), Opt("Station", "Preparation station"), Opt("Code", "Menu item code"), Opt("Name", "Name (create)"),
                 Num("Price", "Price", "0"), Opt("Revenue", "Revenue account (create)"), Opt("Cost", "Cost of sales account (create)"), Opt("Tax", "Tax code (create)"),
                 Opt("Recipe", "Recipe: ITEM:quantity; … (create)"), Opt("Level", "Price level"), Opt("Warehouse", "Warehouse (refresh)")],
@@ -258,7 +258,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Bill an order", ListTitle = "Recent bills",
             Description = "Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), across several tenders (ACCOUNT:amount; …), to a gift card or to a customer's "
-                + "house account — with service charge, tip and discount — issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill.",
+                + "house account - with service charge, tip and discount - issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill.",
             Fields = [Pick("Step", "Step", ["Full", "Seat", "Split", "Tenders", "Gift card", "House account", "Quote gratuity", "Reverse bill"]), Opt("Order", "Order number"),
                 Opt("Warehouse", "Warehouse (stock issued)"), Opt("Cash", "Cash / card account"), Opt("Tax", "Tax account"), Num("Service", "Service charge", "0"), Opt("ServiceAccount", "Service charge account"),
                 Num("Tip", "Tip", "0"), Opt("Tips", "Tips payable account"), Num("Discount", "Discount", "0"), Opt("DiscountAccount", "Discount account"), OptNum("Seat", "Seat number"),

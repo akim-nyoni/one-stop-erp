@@ -14,7 +14,7 @@ public sealed record CashPieces(IReadOnlyDictionary<decimal, int> Pieces, decima
 
 /// <summary>
 /// Cash pay by notes and coins (brief §4.7 PR12): each employee's net pay split into the fewest notes and coins, largest first, and the totals a pay point
-/// needs drawn from the bank — the sum of its employees' pieces, so each envelope can be made up exactly.
+/// needs drawn from the bank - the sum of its employees' pieces, so each envelope can be made up exactly.
 /// </summary>
 public static class CashPayBreakdown
 {

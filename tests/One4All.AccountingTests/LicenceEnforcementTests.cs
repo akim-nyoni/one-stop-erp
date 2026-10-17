@@ -81,6 +81,15 @@ public sealed class LicenceEnforcementTests
         (await pos.OpenTillAsync(companyId, first.Id, 1, 0m)).IsSuccess.Should().BeTrue();
         (await pos.OpenTillAsync(companyId, second.Id, 1, 0m)).Error.Code.Should().Be("Licence.LimitReached");
 
+        // The POS module's own "terminals" limit, as the brief's payload writes it, counts too (thirteenth audit #15).
+        string moduleToken = new LicenseSigner(keys.PrivateKeyBase64).Sign(new LicensePayload
+        {
+            KeyId = "enf-test", Product = LicenceService.Product, Customer = new LicenceCustomer { Id = "E", Name = "Enforced Co" }, ValidFrom = new DateOnly(2025, 1, 1), ValidTo = today.AddDays(10), GraceDays = 0, HardStop = false,
+            Modules = [new LicenceModuleGrant { Code = "GL" }, new LicenceModuleGrant { Code = "POS", Limits = new Dictionary<string, int?> { ["terminals"] = terminalsUpToFirst } }],
+        });
+        (await licence.InstallAsync(moduleToken)).IsUsable.Should().BeTrue();
+        (await pos.OpenTillAsync(companyId, second.Id, 1, 0m)).Error.Code.Should().Be("Licence.LimitReached", "the module's terminals limit applies without a global pos_terminals");
+
         IPostingEngine engine = scope.ServiceProvider.GetRequiredService<IPostingEngine>();
         JournalRequest journal = new()
         {

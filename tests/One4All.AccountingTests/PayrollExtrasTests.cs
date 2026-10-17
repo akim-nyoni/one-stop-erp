@@ -73,10 +73,10 @@ public sealed class PayrollExtrasTests
             return Encoding.UTF8.GetString(rendered.Value.Content);
         }
 
-        (await Render("PR14")).Should().Contain("XA-A Ann,BankTransfer —,MobileMoney 0772 500.00,\"2,900.00\",2400");
+        (await Render("PR14")).Should().Contain("XA-A Ann,BankTransfer -,MobileMoney 0772 500.00,\"2,900.00\",2400");
         (await Render("PR34")).Should().Contain("XA-A Ann,Motor vehicle,Company car,300.00,60");
         (await Render("PR52")).Should().Contain("XA-T Ted,2026-03-31,Retrenchment,6,\"2,600.00\",\"1,199.82\",\"7,200.00\",\"14,400.00\",500.00,\"2,160.00\",22739.82");
-        (await Render("PR54")).Should().Contain("XA-A Ann,6,\"7,200.00\",6,4064.21").And.Contain("XA-C Cas,1,461.54,—,461.54");
+        (await Render("PR54")).Should().Contain("XA-A Ann,6,\"7,200.00\",6,4064.21").And.Contain("XA-C Cas,1,461.54,-,461.54");
         (await Render("PR62")).Should().Contain("Ops,\"5,500.00\",\"1,000.00\",45.00,19.0%,6545");
         DateOnly today = DateOnly.FromDateTime(DateTime.UtcNow);
         string reprints = await Render("PR69", today.AddDays(-1), today.AddDays(1));

@@ -15,7 +15,7 @@ namespace One4All.Infrastructure.Receipting;
 /// Bulk / file-based receipting (brief §RCP-8). Imports a payment file, matches each line to a customer by
 /// the account code appearing in the payment reference, receipts matched lines through the AR ledger
 /// (Dr bank / Cr debtor control, allocated oldest-first) and parks unmatched money in the suspense
-/// control (Dr bank / Cr suspense — never a guessed account). Re-importing the same file (by hash) fails.
+/// control (Dr bank / Cr suspense - never a guessed account). Re-importing the same file (by hash) fails.
 /// </summary>
 public sealed class ReceiptImportService : IReceiptImportService
 {
@@ -97,7 +97,7 @@ public sealed class ReceiptImportService : IReceiptImportService
                     Currency = company.BaseCurrency,
                     Amount = lineRequest.Amount,
                     BankAccountCode = request.BankAccountCode,
-                    Narrative = $"Imported payment — {lineRequest.PayerName} (matched by {match.By})",
+                    Narrative = $"Imported payment - {lineRequest.PayerName} (matched by {match.By})",
                 }, ct).ConfigureAwait(false);
 
                 if (receipt.IsFailure)
@@ -121,7 +121,7 @@ public sealed class ReceiptImportService : IReceiptImportService
                     TransactionCurrency = company.BaseCurrency,
                     DocumentType = "IMPORT-SUS",
                     DocumentNumber = documentNumber,
-                    Narrative = $"Unmatched import — {lineRequest.PayerName} ({lineRequest.PayerReference})",
+                    Narrative = $"Unmatched import - {lineRequest.PayerName} ({lineRequest.PayerReference})",
                     Lines =
                     [
                         new JournalLineRequest { AccountCode = request.BankAccountCode, Side = JournalSide.Debit, TransactionAmount = lineRequest.Amount },

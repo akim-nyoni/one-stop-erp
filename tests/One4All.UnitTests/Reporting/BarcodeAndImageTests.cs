@@ -8,7 +8,7 @@ namespace One4All.UnitTests.Reporting;
 
 /// <summary>
 /// Covers pictures in reports: Code 128 (set B, with its checksum) and QR codes drawn as PNG, and the engine placing a static picture, a
-/// picture field, the company logo and a barcode of a field — shown as images in HTML and PDF while exports keep the barcode's value.
+/// picture field, the company logo and a barcode of a field - shown as images in HTML and PDF while exports keep the barcode's value.
 /// </summary>
 public sealed class BarcodeAndImageTests
 {

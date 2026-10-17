@@ -28,16 +28,16 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
                 .GroupBy(o => o.Item.DocumentNumber, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(o => o.SignedTransaction(LedgerSign.Credit)), StringComparer.OrdinalIgnoreCase);
             Dictionary<string, decimal> theirs = statement.Lines.GroupBy(l => l.DocumentNumber, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Sum(l => l.Amount), StringComparer.OrdinalIgnoreCase);
             decimal ourBalance = ours.Values.Sum();
-            rows.Add(Row(("Supplier", name), ("Section", $"Balances at {statement.StatementDate:yyyy-MM-dd}"), ("Document", "—"), ("Theirs", Money(statement.ClosingBalance)), ("Ours", Money(ourBalance)),
+            rows.Add(Row(("Supplier", name), ("Section", $"Balances at {statement.StatementDate:yyyy-MM-dd}"), ("Document", "-"), ("Theirs", Money(statement.ClosingBalance)), ("Ours", Money(ourBalance)),
                 ("Difference", statement.ClosingBalance - ourBalance)));
             foreach (var only in theirs.Where(t => !ours.ContainsKey(t.Key)).OrderBy(t => t.Key, StringComparer.Ordinal))
             {
-                rows.Add(Row(("Supplier", name), ("Section", "On their statement only"), ("Document", only.Key), ("Theirs", Money(only.Value)), ("Ours", "—"), ("Difference", 0m)));
+                rows.Add(Row(("Supplier", name), ("Section", "On their statement only"), ("Document", only.Key), ("Theirs", Money(only.Value)), ("Ours", "-"), ("Difference", 0m)));
             }
 
             foreach (var only in ours.Where(o => !theirs.ContainsKey(o.Key)).OrderBy(o => o.Key, StringComparer.Ordinal))
             {
-                rows.Add(Row(("Supplier", name), ("Section", "In our ledger only"), ("Document", only.Key), ("Theirs", "—"), ("Ours", Money(only.Value)), ("Difference", 0m)));
+                rows.Add(Row(("Supplier", name), ("Section", "In our ledger only"), ("Document", only.Key), ("Theirs", "-"), ("Ours", Money(only.Value)), ("Difference", 0m)));
             }
 
             foreach (var both in theirs.Where(t => ours.TryGetValue(t.Key, out decimal o) && o != t.Value).OrderBy(t => t.Key, StringComparer.Ordinal))
@@ -140,7 +140,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
         Dictionary<long, decimal> withheld = await _db.Set<WithholdingCertificate>().AsNoTracking().Where(c => ids.Contains(c.PaymentOpenItemId))
             .GroupBy(c => c.PaymentOpenItemId).Select(g => new { g.Key, Amount = g.Sum(c => c.WithheldAmount) }).ToDictionaryAsync(x => x.Key, x => x.Amount, ct).ConfigureAwait(false);
         return [.. payments.Select(p => Row(("Date", Date(p.DocumentDate)), ("Document", p.DocumentNumber), ("Supplier", suppliers.GetValueOrDefault(p.TraderId, "?")), ("Currency", p.Currency.Value),
-            ("Transaction", Money(p.OriginalTransaction)), ("Withheld", withheld.TryGetValue(p.Id, out decimal w) ? Money(w) : "—"), ("Base", p.OriginalBase)))];
+            ("Transaction", Money(p.OriginalTransaction)), ("Withheld", withheld.TryGetValue(p.Id, out decimal w) ? Money(w) : "-"), ("Base", p.OriginalBase)))];
     }
 
     // The accrual: received but not invoiced, at the order price (the price the GRN accrued at).
@@ -155,7 +155,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
                                                        group g by g.PurchaseOrderId into r select new { r.Key, Last = r.Max(x => x.Date) }).ToDictionaryAsync(x => x.Key, x => x.Last, ct).ConfigureAwait(false);
         return [.. orders.SelectMany(o => o.Lines.Where(l => l.ReceivedQuantity > l.InvoicedQuantity).Select(l => Row(("Order", o.OrderNumber), ("Supplier", suppliers.GetValueOrDefault(o.SupplierId, "?")),
             ("Item", items.GetValueOrDefault(l.ItemId, l.Description)), ("Received", Qty(l.ReceivedQuantity)), ("Invoiced", Qty(l.InvoicedQuantity)), ("Price", Money(l.UnitPrice)),
-            ("LastReceipt", lastReceipt.TryGetValue(o.Id, out DateOnly last) ? Date(last) : "—"), ("Days", lastReceipt.TryGetValue(o.Id, out DateOnly d) ? Math.Max(0, asAt.DayNumber - d.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"),
+            ("LastReceipt", lastReceipt.TryGetValue(o.Id, out DateOnly last) ? Date(last) : "-"), ("Days", lastReceipt.TryGetValue(o.Id, out DateOnly d) ? Math.Max(0, asAt.DayNumber - d.DayNumber).ToString(CultureInfo.InvariantCulture) : "-"),
             ("Value", Math.Round((l.ReceivedQuantity - l.InvoicedQuantity) * l.UnitPrice, 2, MidpointRounding.AwayFromZero)))))];
     }
 
@@ -166,7 +166,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
         List<InvoiceDispute> disputes = await _db.Set<InvoiceDispute>().AsNoTracking().Include(d => d.Lines).Where(d => d.CompanyId == companyId).OrderBy(d => d.InvoiceDate).ThenBy(d => d.InvoiceNumber)
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. disputes.Select(d => Row(("Invoice", d.InvoiceNumber), ("Date", Date(d.InvoiceDate)), ("Supplier", suppliers.GetValueOrDefault(d.SupplierId, "?")), ("Order", orders.GetValueOrDefault(d.PurchaseOrderId, "?")),
-            ("Reason", $"{d.ReasonCode}: {d.Reason}"), ("Status", d.Status.ToString()), ("Resolution", d.ResolutionNote ?? "—"),
+            ("Reason", $"{d.ReasonCode}: {d.Reason}"), ("Status", d.Status.ToString()), ("Resolution", d.ResolutionNote ?? "-"),
             ("Value", d.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero)))))];
     }
 
@@ -182,9 +182,9 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ScorecardAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
         => [.. (await _scorecard.ScorecardAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).OrderBy(s => s.SupplierName, StringComparer.Ordinal)
-            .Select(s => Row(("Supplier", s.SupplierName), ("Deliveries", s.Deliveries), ("OnTime", s.OnTimePercent is decimal o ? $"{o:0.#}% of {s.DeliveriesJudged}" : "—"),
-                ("Received", Qty(s.QuantityReceived)), ("Returned", Qty(s.QuantityReturned)), ("Quality", s.QualityPercent is decimal q ? $"{q:0.#}%" : "—"), ("Spend", s.Spend),
-                ("PriceVariance", s.PriceVariance), ("PriceVariancePct", s.PriceVariancePercent is decimal v ? $"{v:+0.#;-0.#;0}%" : "—")))];
+            .Select(s => Row(("Supplier", s.SupplierName), ("Deliveries", s.Deliveries), ("OnTime", s.OnTimePercent is decimal o ? $"{o:0.#}% of {s.DeliveriesJudged}" : "-"),
+                ("Received", Qty(s.QuantityReceived)), ("Returned", Qty(s.QuantityReturned)), ("Quality", s.QualityPercent is decimal q ? $"{q:0.#}%" : "-"), ("Spend", s.Spend),
+                ("PriceVariance", s.PriceVariance), ("PriceVariancePct", s.PriceVariancePercent is decimal v ? $"{v:+0.#;-0.#;0}%" : "-")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BalancesAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
@@ -207,10 +207,10 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
         Dictionary<long, string> suppliers = await SuppliersAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
         List<SupplierBankChange> changes = await _db.Set<SupplierBankChange>().AsNoTracking().Where(c => c.CompanyId == companyId).OrderBy(c => c.CreatedOnUtc).ThenBy(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
-        static string Mask(string? number) => string.IsNullOrEmpty(number) ? "—" : number.Length <= 4 ? new string('*', number.Length) : new string('*', number.Length - 4) + number[^4..];
+        static string Mask(string? number) => string.IsNullOrEmpty(number) ? "-" : number.Length <= 4 ? new string('*', number.Length) : new string('*', number.Length - 4) + number[^4..];
         return [.. changes.Select(c => Row(("Requested", c.CreatedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Supplier", suppliers.GetValueOrDefault(c.SupplierId, "?")),
-            ("RequestedBy", users.GetValueOrDefault(c.RequestedByUserId, $"user {c.RequestedByUserId}")), ("NewDetails", $"{c.BankName ?? "—"} / {c.AccountName ?? "—"} / {Mask(c.AccountNumber)}"),
-            ("Status", c.Status.ToString()), ("ReviewedBy", c.ReviewedByUserId is long r ? users.GetValueOrDefault(r, $"user {r}") : "—"), ("Reason", c.RejectionReason ?? string.Empty)))];
+            ("RequestedBy", users.GetValueOrDefault(c.RequestedByUserId, $"user {c.RequestedByUserId}")), ("NewDetails", $"{c.BankName ?? "-"} / {c.AccountName ?? "-"} / {Mask(c.AccountNumber)}"),
+            ("Status", c.Status.ToString()), ("ReviewedBy", c.ReviewedByUserId is long r ? users.GetValueOrDefault(r, $"user {r}") : "-"), ("Reason", c.RejectionReason ?? string.Empty)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TopSuppliersAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -242,7 +242,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
                 Value: g.Sum(l => Math.Round(l.OrderedQuantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero))))
             .OrderBy(x => suppliers.GetValueOrDefault(x.Key.SupplierId), StringComparer.Ordinal).ThenByDescending(x => x.Value)
             .Select(x => Row(("Supplier", suppliers.GetValueOrDefault(x.Key.SupplierId, "?")), ("Item", items.GetValueOrDefault(x.Key.ItemId, "?")), ("Orders", x.Orders), ("Quantity", Qty(x.Quantity)),
-                ("AveragePrice", x.Quantity == 0m ? "—" : Money(x.Value / x.Quantity)), ("Currency", x.Key.Currency), ("Value", x.Value)))];
+                ("AveragePrice", x.Quantity == 0m ? "-" : Money(x.Value / x.Quantity)), ("Currency", x.Key.Currency), ("Value", x.Value)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AdvancesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -252,7 +252,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
         List<SupplierAdvance> advances = await _db.Set<SupplierAdvance>().AsNoTracking()
             .Where(a => a.CompanyId == companyId && ((a.AdvanceDate >= fromDate && a.AdvanceDate <= toDate) || (a.AdvanceDate <= toDate && a.Status == SupplierAdvanceStatus.Open)))
             .OrderBy(a => a.AdvanceDate).ThenBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
-        return [.. advances.Select(a => Row(("Supplier", suppliers.GetValueOrDefault(a.SupplierId, "?")), ("Document", a.DocumentNumber), ("Date", Date(a.AdvanceDate)), ("Order", a.PurchaseOrderNumber ?? "—"),
+        return [.. advances.Select(a => Row(("Supplier", suppliers.GetValueOrDefault(a.SupplierId, "?")), ("Document", a.DocumentNumber), ("Date", Date(a.AdvanceDate)), ("Order", a.PurchaseOrderNumber ?? "-"),
             ("Currency", a.Currency.Value), ("Amount", Money(a.Amount)), ("Applied", Money(a.Applied)), ("Refunded", Money(a.Refunded)), ("Outstanding", Money(a.Outstanding)), ("Status", a.Status.ToString())))];
     }
 
@@ -261,7 +261,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 
-    private static string Percent(decimal part, decimal total) => total == 0m ? "—" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    private static string Percent(decimal part, decimal total) => total == 0m ? "-" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     private static string Qty(decimal quantity) => quantity.ToString("0.###", CultureInfo.InvariantCulture);
 

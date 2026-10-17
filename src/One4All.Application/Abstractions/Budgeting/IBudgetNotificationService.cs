@@ -48,7 +48,7 @@ public interface IBudgetNotificationService
 
     /// <summary>
     /// Emails the company's budget alert address the votes that have crossed a utilisation threshold (the company's, e.g. 75 / 90 / 100%) since the
-    /// last alert — each vote and threshold once.
+    /// last alert - each vote and threshold once.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAt">The date (its fiscal year and period are used).</param>
@@ -58,8 +58,8 @@ public interface IBudgetNotificationService
 
     /// <summary>
     /// The monthly budget-holder statement (brief §4.18 "a monthly budget-holder statement pushed by email"): each department with a budget holder's
-    /// address gets its active budget against actuals to the period of the date, account by account — budget and actual to date, the variance, the
-    /// share used of the year's budget — with the votes past the company's utilisation thresholds called out.
+    /// address gets its active budget against actuals to the period of the date, account by account - budget and actual to date, the variance, the
+    /// share used of the year's budget - with the votes past the company's utilisation thresholds called out.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAt">The date (its fiscal year and period are used).</param>

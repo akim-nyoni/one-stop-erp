@@ -211,7 +211,7 @@ foreach (string project in Directory.GetDirectories(Path.Combine(root, "tests"))
         foreach ((_, string cls, string text, List<string> tests) in area)
         {
             pack.AppendLine();
-            pack.AppendLine("**" + Words(cls.EndsWith("Tests", StringComparison.Ordinal) ? cls[..^5] : cls) + "**" + (text.Length == 0 ? string.Empty : " — " + text));
+            pack.AppendLine("**" + Words(cls.EndsWith("Tests", StringComparison.Ordinal) ? cls[..^5] : cls) + "**" + (text.Length == 0 ? string.Empty : " - " + text));
             foreach (string name in tests)
             {
                 scenarios++;

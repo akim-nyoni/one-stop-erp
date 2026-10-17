@@ -4,7 +4,7 @@ namespace One4All.Application.Abstractions.Restaurant;
 
 /// <summary>
 /// Prints kitchen order tickets at their preparation stations (brief §4.2): each station is mapped to a printer, and a fired order's
-/// tickets — one per station — print where they are cooked. A station with no printer works from its kitchen display only.
+/// tickets - one per station - print where they are cooked. A station with no printer works from its kitchen display only.
 /// </summary>
 public interface IKitchenPrintService
 {

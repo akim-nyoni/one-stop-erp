@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.Procurement;
@@ -126,11 +127,11 @@ public sealed class ProcurementTests
         {
             ITradingReports reports = scope.ServiceProvider.GetRequiredService<ITradingReports>();
             AgeingReport creditors = await reports.AgedCreditorsAsync(companyId, new DateOnly(2026, 3, 31));
-            creditors.Total.Should().Be(200m); // now owed to the supplier via AP
+            creditors.Total.Should().Be(230.6m); // owed to the supplier via AP: 200 matched first, plus SINV-WIDE (10.2 at 3.00) from the tolerance checks
 
             IInventoryService inv = scope.ServiceProvider.GetRequiredService<IInventoryService>();
             var valuation = await inv.StockValuationAsync(companyId);
-            valuation.Should().Contain(l => l.ItemCode == "BOLT" && l.Quantity == 100m && l.Value == 200m);
+            valuation.Should().Contain(l => l.ItemCode == "BOLT" && l.Quantity == 110m && l.Value == 220m); // 100 on PO-1 plus 10 on PO-2, both at 2.00
         }
     }
 }

@@ -156,7 +156,7 @@ public interface IInventoryService
 
     /// <summary>
     /// Adjusts stock to a physical count (stocktake): computes the variance against the on-hand quantity and
-    /// posts it at moving-average cost against a stock-adjustment account — a surplus increases stock
+    /// posts it at moving-average cost against a stock-adjustment account - a surplus increases stock
     /// (Dr stock / Cr adjustment), a shortage decreases it (Dr adjustment / Cr stock). A nil variance is a
     /// no-op. Records an Adjustment movement and returns the signed variance value (+ surplus, − shortage).
     /// </summary>

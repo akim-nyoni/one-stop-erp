@@ -83,26 +83,33 @@ public sealed class ConsolidationService : IConsolidationService
             .Select(g => new { Code = g.Key, Name = g.Min(a => a.Name)! })
             .ToDictionaryAsync(x => x.Code, x => x.Name, ct).ConfigureAwait(false);
 
-        // Intercompany elimination: the due-from / due-to accounts should net to zero across the group. When
-        // they do, their rows are dropped; when they don't, the residual is reported and the rows are kept.
+        // Intercompany elimination: the due-from / due-to balances are eliminated to the extent they match (the lesser of the intercompany debits
+        // and credits, spread pro rata); any residue stays on the accounts and is reported as unmatched for the group accountant to clear.
         HashSet<string> interco = new(intercompanyAccountCodes ?? [], StringComparer.Ordinal);
+        Dictionary<string, decimal> nets = totals.ToDictionary(t => t.Code, t => t.Debit - t.Credit, StringComparer.Ordinal);
         decimal eliminated = 0m;
         decimal unmatched = 0m;
         if (interco.Count > 0)
         {
-            var intercoTotals = totals.Where(t => interco.Contains(t.Code)).ToList();
-            unmatched = intercoTotals.Sum(t => t.Debit - t.Credit);
-            if (unmatched == 0m)
+            List<KeyValuePair<string, decimal>> intercoNets = [.. nets.Where(n => interco.Contains(n.Key))];
+            decimal debits = intercoNets.Where(n => n.Value > 0m).Sum(n => n.Value);
+            decimal credits = -intercoNets.Where(n => n.Value < 0m).Sum(n => n.Value);
+            unmatched = debits - credits;
+            eliminated = Math.Min(debits, credits);
+            if (eliminated > 0m)
             {
-                eliminated = intercoTotals.Sum(t => Math.Max(0m, t.Debit - t.Credit));
-                totals = totals.Where(t => !interco.Contains(t.Code)).ToList();
+                foreach (KeyValuePair<string, decimal> n in intercoNets)
+                {
+                    nets[n.Key] = n.Value - (n.Value > 0m ? decimal.Round(eliminated * n.Value / debits, 2, MidpointRounding.ToEven)
+                        : -decimal.Round(eliminated * -n.Value / credits, 2, MidpointRounding.ToEven));
+                }
             }
         }
 
         List<ConsolidatedTrialBalanceRow> rows = [];
         foreach (var t in totals.OrderBy(t => t.Code, StringComparer.Ordinal))
         {
-            decimal net = t.Debit - t.Credit;
+            decimal net = nets[t.Code];
             if (net == 0m)
             {
                 continue;

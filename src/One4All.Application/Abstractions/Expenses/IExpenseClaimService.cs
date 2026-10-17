@@ -11,7 +11,7 @@ public readonly record struct ExpenseClaimLineRequest(string Description, string
 /// <summary>
 /// Manages employee expense claims: capture, approval and reimbursement. Approval gates payment, and
 /// reimbursement posts the expenses (Dr each line's account) against a funding account (Cr) through the
-/// central posting engine — no expense reaches the ledger until the claim is paid.
+/// central posting engine - no expense reaches the ledger until the claim is paid.
 /// </summary>
 public interface IExpenseClaimService
 {

@@ -130,7 +130,7 @@ The list beside the form shows: Acting appointments.
 
 ### An employee leaves (final pay)
 
-Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans recovered as far as the pay allows), then terminate — the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are cleared, release the final pay from the bank; print the certificate.
+Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are cleared, release the final pay from the bank; print the certificate.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -158,7 +158,7 @@ The list beside the form shows: Clearance checklist.
 
 ### HR expiry alerts
 
-What lapses for active employees — work permits, contract ends, probation, filed documents and training certificates — within the days given; Notify sends HR (users whose roles cover employee records) one notification listing them. The scheduled task hr.expiry-alerts does this daily for 30 days ahead.
+What lapses for active employees - work permits, contract ends, probation, filed documents and training certificates - within the days given; Notify sends HR (users whose roles cover employee records) one notification listing them. The scheduled task hr.expiry-alerts does this daily for 30 days ahead.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -207,7 +207,7 @@ Rating 1–5 and the next appraisal date.
 
 ### Grievances and property issued
 
-Lodge a grievance and follow it (investigating, resolved or withdrawn with the outcome); issue company property to an employee and record its return — anything still out is listed on the leaver's clearance. Medical records are kept under Medical records (restricted).
+Lodge a grievance and follow it (investigating, resolved or withdrawn with the outcome); issue company property to an employee and record its return - anything still out is listed on the leaver's clearance. Medical records are kept under Medical records (restricted).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -227,7 +227,7 @@ The list beside the form shows: Open grievances and property out.
 
 ### Medical records (restricted)
 
-An employee's medical records — fitness assessments, illness, injury, disability — seen and kept only by users with the Hr.Medical permission; notes are encrypted at rest.
+An employee's medical records - fitness assessments, illness, injury, disability - seen and kept only by users with the Hr.Medical permission; notes are encrypted at rest.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -357,7 +357,7 @@ The list beside the form shows: Leave balances.
 
 ### Leave calendar and recall
 
-Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled — the days not taken go back to the balance (pro rata unless given).
+Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled - the days not taken go back to the balance (pro rata unless given).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -491,7 +491,7 @@ The list beside the form shows: Payroll drafts.
 
 ### 3. Commit the payroll
 
-Saves the payslips and posts the journal — refused if anything changed since approval.
+Saves the payslips and posts the journal - refused if anything changed since approval.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -501,7 +501,7 @@ The list beside the form shows: Payroll drafts.
 
 ### 4. Pay and close the payroll
 
-After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money, cheques) — earnings paid in another currency go out of that currency's account at the pay date's rate — and clears the net pay control; Close closes the run once its net pay control is clear; Stage shows where a run stands.
+After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money, cheques) - earnings paid in another currency go out of that currency's account at the pay date's rate - and clears the net pay control; Close closes the run once its net pay control is clear; Stage shows where a run stands.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -547,7 +547,7 @@ Saves one employee's payslip for a period as a (password-protected) PDF, or emai
 
 ### Supplementary payroll run
 
-Corrects a committed period with extra (or negative) element amounts — a visible run with its own payslips and journal.
+Corrects a committed period with extra (or negative) element amounts - a visible run with its own payslips and journal.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -593,7 +593,7 @@ The list beside the form shows: Payroll runs.
 
 ### Split net pay
 
-Sends part of an employee's net pay to another bank account or wallet — a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. Remove takes a split off.
+Sends part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. Remove takes a split off.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -646,7 +646,7 @@ The list beside the form shows: Claims.
 
 ### Raise third-party invoices
 
-Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier — clearing the payroll liabilities into payables.
+Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier - clearing the payroll liabilities into payables.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -716,7 +716,7 @@ The list beside the form shows: Requests awaiting HR.
 
 ### Pay elements and tax tables
 
-Create a pay element, assign one to (or end one for) an employee, create a tax table — bands as 'from-to:rate' separated by ';', the last open-ended, e.g. '0-100:0; 100-300:20; 300-:30' — or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).
+Create a pay element, assign one to (or end one for) an employee, create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. '0-100:0; 100-300:20; 300-:30' - or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -874,8 +874,8 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | EXP-CLAIMS | Expense Claims | Employee expense claims with reference, date, total, status and reimbursement journal. |
 | HR-EMP | Employee Register | All employees with number, name, department, cost centre, status and basic salary. |
 | PAY-DED | Payroll Deductions | Deductions aggregated by element across payslips in the period, with the number of employees affected. |
-| PAY-LEAVE | Leave Balances | Employee leave balances by type — days accrued, taken and available. |
-| PAY-LOANS | Employee Loans | Outstanding employee loans — principal, balance, installment and status. |
+| PAY-LEAVE | Leave Balances | Employee leave balances by type - days accrued, taken and available. |
+| PAY-LOANS | Employee Loans | Outstanding employee loans - principal, balance, installment and status. |
 | PAY-SUM | Payroll Summary | Gross, deductions and net pay per employee for a period. |
 | PR10 | Backpay & Retrospective Adjustments | Backpay paid in the period: per employee, the period corrected and each element's paid, due and difference. |
 | PR11 | Bank Transfer (EFT) Schedule | Net pay for the period to employees paid by bank transfer (held salaries excluded), with bank, branch and account. |
@@ -886,7 +886,7 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | PR16 | Net Pay Control Reconciliation | Per pay month: gross, deductions and net from the payslips against the net pay credited in the payroll journals. |
 | PR17 | Earnings Analysis | Earnings in the period by department and element. |
 | PR18 | Deductions Analysis | Each deduction over the period: how many employees had it, the total, the average and the largest, by department. |
-| PR19 | Third-Party Remittance Schedules | Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs. |
+| PR19 | Third-Party Remittance Schedules | Per scheme and member for the period: the employee's deduction and the employer's contribution - the schedule each provider needs. |
 | PR2 | Payroll Summary by Element | Totals for the period per pay group by earning, deduction and employer contribution, with how many employees each. |
 | PR20 | Deductions vs Remittances | Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap. |
 | PR21 | Garnishee & Court Order Register | Every court order by employee and priority: creditor, instalment, total ordered, deducted through payroll to the date and the balance still to collect. |
@@ -896,7 +896,7 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | PR25 | Overtime Analysis | Overtime in the period by department, employee and multiplier: hours, approved and unapproved hours, and the cost at the basic hourly rate. |
 | PR26 | Allowance Analysis | Earnings other than basic salary in the period, per employee and allowance. |
 | PR27 | PAYE Remittance Return | Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference. |
-| PR28 | Annual Tax Certificates | Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE — the certificate data. |
+| PR28 | Annual Tax Certificates | Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE - the certificate data. |
 | PR29 | Tax Reconciliation | Per employee over the period: taxable earnings, PAYE deducted and the effective rate. |
 | PR3 | Payroll Journal | The payroll postings of the period by account, with debits and credits. |
 | PR30 | Social Security Contribution Schedule | Social security members with the period's employee and employer contributions. |
@@ -938,8 +938,8 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | PR63 | Payroll Accrual Schedule | Employees in service at the period end not yet paid for that month (including salaries on hold), with the basic salary to accrue. |
 | PR64 | Payroll GL Reconciliation | Per element account: what the payslips say against what the ledger holds for the period. |
 | PR65 | Payroll Audit Trail | Every recorded change in the period to employees, elements, assignments, loans, leave and payslips. |
-| PR66 | Segregation of Duties Violations — Payroll | Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves. |
-| PR67 | Payroll Report Access & Export Log | Every run of a payroll report in the period — who, what, format and copy. |
+| PR66 | Segregation of Duties Violations - Payroll | Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves. |
+| PR67 | Payroll Report Access & Export Log | Every run of a payroll report in the period - who, what, format and copy. |
 | PR68 | Ghost Worker Investigation Pack | Active employees sharing a bank account, wallet or national ID with another, with no ID, or with no leave in over a year. |
 | PR69 | Payslip Reprint Log | Payslips printed more than once: each print after the first with when and by whom. |
 | PR7 | Payroll Run Control Register | Every payroll run in the period: employees, gross, deductions, net, the journal and who ran it. |
@@ -947,6 +947,6 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | PR71 | Net-Pay Protection & Deduction Arrears | Deductions suspended to keep net pay at the minimum take-home, and arrears recovered later: attempted, deducted, why, and the arrears still carried forward. |
 | PR72 | Variable Input Register | Overtime, absences and once-off earnings and deductions keyed or imported for each period, and what each was paid at. |
 | PR73 | Third-Party Invoices Raised | The AP invoices raised for the tax authority, schemes and garnishee creditors from payroll runs, with what is still outstanding on each. |
-| PR74 | Payslip (designable) | Every payslip line in the period — employee, section, element and amount with the slip's gross, deductions and net — as the data source for a company's own payslip layout in the report designer (one employee, or all). |
+| PR74 | Payslip (designable) | Every payslip line in the period - employee, section, element and amount with the slip's gross, deductions and net - as the data source for a company's own payslip layout in the report designer (one employee, or all). |
 | PR8 | Parallel Run Comparison | Go-live parallel run: One4All's payslips against the imported legacy payroll, per period, employee and element (NET for net pay). |
 | PR9 | Supplementary Runs & Reversal Register | Every supplementary, backpay and reversal run in the period, and every run reversed: reason, approval and journals. |

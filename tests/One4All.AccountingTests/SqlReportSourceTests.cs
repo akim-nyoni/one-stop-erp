@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers user-authored report data sources: the statement checks (one SELECT filtered by company, no protected schemas or file functions,
-/// views and functions only from rpt), and running them for real — company rows only, report parameters bound, a reporting view read, and a
+/// views and functions only from rpt), and running them for real - company rows only, report parameters bound, a reporting view read, and a
 /// data-changing CTE that slips past the text checks still stopped by the read-only transaction.
 /// </summary>
 [Collection(AccountingCollection.Name)]

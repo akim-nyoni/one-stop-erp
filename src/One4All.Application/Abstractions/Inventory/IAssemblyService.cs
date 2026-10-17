@@ -61,7 +61,7 @@ public sealed class DisassemblyRequest
 
     /// <summary>
     /// Gets whether the cost is split by the components' relative sales value (each one's selling price on the default price list times the
-    /// quantity recovered — the joint-product method) instead of by their cost. Components with no price get no cost.
+    /// quantity recovered - the joint-product method) instead of by their cost. Components with no price get no cost.
     /// </summary>
     public bool BySalesValue { get; init; }
 }

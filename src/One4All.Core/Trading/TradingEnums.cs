@@ -3,19 +3,19 @@ namespace One4All.Core.Trading;
 /// <summary>The kind of open-item document in a customer/supplier ledger (brief §4.5/§4.6).</summary>
 public enum OpenItemType
 {
-    /// <summary>An invoice — increases what the trader owes (AR) / what we owe (AP).</summary>
+    /// <summary>An invoice - increases what the trader owes (AR) / what we owe (AP).</summary>
     Invoice = 1,
 
-    /// <summary>A credit note — decreases the balance.</summary>
+    /// <summary>A credit note - decreases the balance.</summary>
     CreditNote = 2,
 
-    /// <summary>A debit note — increases the balance.</summary>
+    /// <summary>A debit note - increases the balance.</summary>
     DebitNote = 3,
 
-    /// <summary>A receipt (AR) — money received, decreases the debtor balance.</summary>
+    /// <summary>A receipt (AR) - money received, decreases the debtor balance.</summary>
     Receipt = 4,
 
-    /// <summary>A payment (AP) — money paid, decreases the creditor balance.</summary>
+    /// <summary>A payment (AP) - money paid, decreases the creditor balance.</summary>
     Payment = 5,
 
     /// <summary>A ledger journal adjustment.</summary>
@@ -55,10 +55,10 @@ public enum StatementType
 /// </summary>
 public enum LedgerSign
 {
-    /// <summary>A debit item (AR invoice, AP debit — increases the outstanding balance).</summary>
+    /// <summary>A debit item (AR invoice, AP debit - increases the outstanding balance).</summary>
     Debit = 1,
 
-    /// <summary>A credit item (AR receipt/credit note — decreases the outstanding balance).</summary>
+    /// <summary>A credit item (AR receipt/credit note - decreases the outstanding balance).</summary>
     Credit = 2,
 }
 

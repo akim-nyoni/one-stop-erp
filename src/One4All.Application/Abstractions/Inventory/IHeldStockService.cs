@@ -5,7 +5,7 @@ namespace One4All.Application.Abstractions.Inventory;
 
 /// <summary>
 /// Goods held for suppliers (consignment stock, not ours until used) and for customers (in our keeping, never ours): taken in, handed
-/// back and — supplier-owned only — used, which buys them from the supplier at the agreed price and takes them into our own stock
+/// back and - supplier-owned only - used, which buys them from the supplier at the agreed price and takes them into our own stock
 /// (brief §4.6 consignment, supplier-owned and customer-owned stock).
 /// </summary>
 public interface IHeldStockService

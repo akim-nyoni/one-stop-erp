@@ -14,7 +14,7 @@ public enum StandStatus
     /// <summary>Allocated/offered to a beneficiary but control not yet transferred.</summary>
     Allocated = 2,
 
-    /// <summary>Sold — control transferred, cost of sale released.</summary>
+    /// <summary>Sold - control transferred, cost of sale released.</summary>
     Sold = 3,
 
     /// <summary>Ownership transferred/ceded to a subsequent holder.</summary>
@@ -197,7 +197,7 @@ public enum OwnershipChangeType
 
 /// <summary>
 /// A housing stand (brief §4.10.2, <c>hse.stand</c>) carrying its apportioned cost and a tamper-evident
-/// chain of ownership from origination to the current holder — the module's primary job (brief §4.10).
+/// chain of ownership from origination to the current holder - the module's primary job (brief §4.10).
 /// </summary>
 public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
 {

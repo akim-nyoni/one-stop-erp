@@ -2,7 +2,7 @@ namespace One4All.Application.Abstractions.Reporting;
 
 /// <summary>
 /// The last step of the drill-down (brief §4.4: trial balance → account → transaction → source document): finds the document a journal
-/// came from — the customer or supplier item, the till sale, the counter receipt, the order — and describes it.
+/// came from - the customer or supplier item, the till sale, the counter receipt, the order - and describes it.
 /// </summary>
 public interface ISourceDocumentService
 {

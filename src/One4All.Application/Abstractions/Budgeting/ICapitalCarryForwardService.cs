@@ -3,8 +3,8 @@ using One4All.Core.Common;
 namespace One4All.Application.Abstractions.Budgeting;
 
 /// <summary>
-/// Year-end carry-forward of unspent approved capital (brief §5): proposed per capital vote — the year's approved capital budget less what
-/// was spent and what was already carried — and approved as its own act into the next year's capital budget, leaving an audit document.
+/// Year-end carry-forward of unspent approved capital (brief §5): proposed per capital vote - the year's approved capital budget less what
+/// was spent and what was already carried - and approved as its own act into the next year's capital budget, leaving an audit document.
 /// </summary>
 public interface ICapitalCarryForwardService
 {

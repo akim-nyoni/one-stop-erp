@@ -4,7 +4,7 @@ namespace One4All.Application.Abstractions.Payroll;
 
 /// <summary>
 /// HR expiry alerts (brief §4.15.1 "work permit … expiry alert", "contract start and end with expiry alerts", probation confirmation): what lapses
-/// for active employees within a number of days — work permits, contracts, probation, filed documents and training certificates.
+/// for active employees within a number of days - work permits, contracts, probation, filed documents and training certificates.
 /// </summary>
 public interface IHrAlertService
 {

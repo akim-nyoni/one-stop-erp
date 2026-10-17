@@ -48,8 +48,8 @@ public sealed class SubscriptionRequest
 public sealed record DeliveryLogEntry(DateTimeOffset RunAt, string Recipient, string FileName, bool Succeeded, string Detail);
 
 /// <summary>
-/// Scheduled report delivery (brief §13.3 scheduling): a report with stored parameters — relative date tokens resolved at
-/// each run — rendered in its format and emailed as an attachment to a distribution list, with a delivery log. The
+/// Scheduled report delivery (brief §13.3 scheduling): a report with stored parameters - relative date tokens resolved at
+/// each run - rendered in its format and emailed as an attachment to a distribution list, with a delivery log. The
 /// <c>reports.subscriptions</c> scheduled task runs every active subscription of a company.
 /// </summary>
 public interface IReportSubscriptionService

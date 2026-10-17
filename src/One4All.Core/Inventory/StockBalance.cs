@@ -66,7 +66,7 @@ public sealed class StockBalance : Entity, ICompanyScoped
     }
 
     /// <summary>
-    /// Adds value without quantity — landed charges capitalised onto stock on hand — and re-derives the average cost.
+    /// Adds value without quantity - landed charges capitalised onto stock on hand - and re-derives the average cost.
     /// </summary>
     /// <param name="amount">The value added.</param>
     public void AddValue(decimal amount)

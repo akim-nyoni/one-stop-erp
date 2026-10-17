@@ -34,7 +34,7 @@ appsettings.Development.json
 .env
 secrets.json
 
-# Licensing private keys — NEVER commit
+# Licensing private keys - NEVER commit
 *.private.pem
 *.privatekey
 licensing-keys/

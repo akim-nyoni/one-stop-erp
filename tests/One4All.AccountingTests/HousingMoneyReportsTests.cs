@@ -69,9 +69,9 @@ public sealed class HousingMoneyReportsTests
 
         string movement = await Render("H17", new DateOnly(2026, 4, 30), ("StandsAccountCode", "1460"));
         movement.Should().Contain("Opening stock 2026-01-01,0,0.00").And.Contain("+ Created by subdivision,2,\"10,000.00\"").And.Contain("− Sold,-1,\"-5,000.00\"")
-            .And.Contain("Closing stock 2026-04-30,1,\"5,000.00\"").And.Contain("Stands control account 1460,—,\"5,000.00\"").And.Contain("Difference (register − ledger),—,0.00");
-        (await Render("H48", new DateOnly(2026, 1, 31))).Should().Contain($"{scheme.Code},2026-01-10,Ledger receipt,USD,—,1,");
-        (await Render("H94", new DateOnly(2026, 4, 30))).Should().Contain("Stand sales,0.00,—,13000");
+            .And.Contain("Closing stock 2026-04-30,1,\"5,000.00\"").And.Contain("Stands control account 1460,-,\"5,000.00\"").And.Contain("Difference (register − ledger),-,0.00");
+        (await Render("H48", new DateOnly(2026, 1, 31))).Should().Contain($"{scheme.Code},2026-01-10,Ledger receipt,USD,-,1,");
+        (await Render("H94", new DateOnly(2026, 4, 30))).Should().Contain("Stand sales,0.00,-,13000");
         string ward = await Render("H97", new DateOnly(2026, 4, 30), ("Ward", "W7"));
         ward.Should().Contain($"Ward W7,Schemes,{scheme.Code}").And.Contain("Ward W7,Stands,2").And.Contain("Ward W7,Stands sold,1").And.Contain("Ward W7,Instalment arrears,\"2,132.38\"");
         (await Render("H95", new DateOnly(2026, 3, 31))).Should().Contain("Collection efficiency, 2026-03");

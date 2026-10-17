@@ -40,8 +40,8 @@ public sealed record IndustrySetupResult(long CompanyId, int Accounts, int TaxCo
     int FeaturedReports = 0, int Layouts = 0);
 
 /// <summary>
-/// The Industry Setup Wizard (brief §12): creates a company for chosen industries — chart of accounts, tax codes, warehouses, a fiscal
-/// year opened for posting, starter roles and optional demo data — and adds further industries later. Industries add to one another;
+/// The Industry Setup Wizard (brief §12): creates a company for chosen industries - chart of accounts, tax codes, warehouses, a fiscal
+/// year opened for posting, starter roles and optional demo data - and adds further industries later. Industries add to one another;
 /// anything that already exists is kept.
 /// </summary>
 public interface IIndustrySetupService

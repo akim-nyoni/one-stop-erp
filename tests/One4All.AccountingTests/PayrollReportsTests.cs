@@ -85,16 +85,16 @@ public sealed class PayrollReportsTests
         (await Render("PR29")).Should().Contain("PR-EMP Pat Payee,\"2,000.00\",9.0%,180");
         string gl = await Render("PR64");
         gl.Should().Contain("6100,").And.Contain("\"3,306.45\",\"3,306.45\",0").And.Contain("-100.00,-100.00,0");
-        (await Render("PR70")).Should().Contain("PR-EMP Pat Payee,—,\"2,000.00\",\"2,000.00\",280.00,0.00,1720");
+        (await Render("PR70")).Should().Contain("PR-EMP Pat Payee,-,\"2,000.00\",\"2,000.00\",280.00,0.00,1720");
 
-        (await Render("PR4")).Should().Contain("PR-EMP2 Casey Casual,—,MobileMoney,No national ID; No tax number; Mobile money without a wallet number; No date of birth").And.NotContain("PR-EMP Pat Payee");
-        (await Render("PR11")).Should().Contain("PR-EMP Pat Payee,First Bank,—,123456789,2026-01,1720");
+        (await Render("PR4")).Should().Contain("PR-EMP2 Casey Casual,-,MobileMoney,No national ID; No tax number; Mobile money without a wallet number; No date of birth").And.NotContain("PR-EMP Pat Payee");
+        (await Render("PR11")).Should().Contain("PR-EMP Pat Payee,First Bank,-,123456789,2026-01,1720");
         (await Render("PR13")).Should().NotContain("Casey"); // held
-        (await Render("PR15")).Should().Contain("PR-EMP2 Casey Casual,—,MobileMoney,Pending verification,1306.45");
-        (await Render("PR46")).Should().Contain("Starter,PR-EMP2 Casey Casual,—,2026-01-05");
+        (await Render("PR15")).Should().Contain("PR-EMP2 Casey Casual,-,MobileMoney,Pending verification,1306.45");
+        (await Render("PR46")).Should().Contain("Starter,PR-EMP2 Casey Casual,-,2026-01-05");
         (await Render("PR48")).Should().Contain("G3,1,1,0,0").And.Contain("G1,1,0,0,1");
-        (await Render("PR51")).Should().Contain("Contract end,PR-EMP Pat Payee,—,2026-03-15,in 43 days");
-        (await Render("PR68")).Should().Contain("PR-EMP2 Casey Casual,—,2026-01-05,No national ID");
+        (await Render("PR51")).Should().Contain("Contract end,PR-EMP Pat Payee,-,2026-03-15,in 43 days");
+        (await Render("PR68")).Should().Contain("PR-EMP2 Casey Casual,-,2026-01-05,No national ID");
 
         (await Render("PR7")).Should().Contain("2026-01,2026-01-25,2,\"3,306.45\",280.00,JNL-");
         (await Render("PR19")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
@@ -103,10 +103,10 @@ public sealed class PayrollReportsTests
         (await Render("PR31")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
         (await Render("PR36")).Should().Contain("TAX26,2026-01-01,0.00,\"1,000.00\",0,0.00").And.Contain("and above");
 
-        (await Render("PR18")).Should().Contain("PAYE,PAYE,—,1,180.00,180.00,180").And.Contain("PENSION,Pension (5% of basic),—,1,100.00,100.00,100");
-        (await Render("PR37")).Should().Contain("—,PR-EMP Pat Payee,ANNUAL,—,10,2,0,—,8");
-        (await Render("PR44")).Should().Contain("—,PR-EMP,Pat Payee,G3,Permanent,Active,2025-01-01,—,—").And.Contain("PR-EMP2,Casey Casual,G1");
-        (await Render("PR58")).Should().Contain("PR-EMP Pat Payee,—,1,\"2,000.00\",0.00,\"24,000.00\",2000");
+        (await Render("PR18")).Should().Contain("PAYE,PAYE,-,1,180.00,180.00,180").And.Contain("PENSION,Pension (5% of basic),-,1,100.00,100.00,100");
+        (await Render("PR37")).Should().Contain("-,PR-EMP Pat Payee,ANNUAL,-,10,2,0,-,8");
+        (await Render("PR44")).Should().Contain("-,PR-EMP,Pat Payee,G3,Permanent,Active,2025-01-01,-,-").And.Contain("PR-EMP2,Casey Casual,G1");
+        (await Render("PR58")).Should().Contain("PR-EMP Pat Payee,-,1,\"2,000.00\",0.00,\"24,000.00\",2000");
 
         foreach (string code in PayrollReports.All().Select(r => r.Code))
         {

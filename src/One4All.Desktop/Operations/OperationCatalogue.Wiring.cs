@@ -191,7 +191,7 @@ public static partial class OperationCatalogue
                         int from = (int)(i.OptionalNumber("From") ?? throw new OperationException("Give the earlier version.")), to = (int)(i.OptionalNumber("To") ?? throw new OperationException("Give the later version."));
                         IReadOnlyList<Application.Reporting.JsonChange> changes = Check(await reports.DiffAsync(c.CompanyId, code, from, to).ConfigureAwait(true));
                         return changes.Count == 0 ? $"v{from} and v{to} are the same."
-                            : string.Join(Environment.NewLine, changes.Select(ch => $"{ch.Kind,-8} {ch.Path}: {ch.Before ?? "—"} → {ch.After ?? "—"}"));
+                            : string.Join(Environment.NewLine, changes.Select(ch => $"{ch.Kind,-8} {ch.Path}: {ch.Before ?? "-"} → {ch.After ?? "-"}"));
                     default:
                         int version = (int)(i.OptionalNumber("From") ?? throw new OperationException("Give the version to restore."));
                         int saved = Check(await reports.RollbackAsync(c.CompanyId, code, version, c.UserId).ConfigureAwait(true));

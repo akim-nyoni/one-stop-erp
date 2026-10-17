@@ -5,16 +5,16 @@ namespace One4All.Core.Restaurant;
 /// <summary>The lifecycle of a waitlist entry (Restaurant module).</summary>
 public enum WaitlistStatus
 {
-    /// <summary>Waiting — a walk-in party queued for a table.</summary>
+    /// <summary>Waiting - a walk-in party queued for a table.</summary>
     Waiting = 1,
 
-    /// <summary>Seated — the party was seated at a table.</summary>
+    /// <summary>Seated - the party was seated at a table.</summary>
     Seated = 2,
 
-    /// <summary>Left — the party gave up and left before being seated.</summary>
+    /// <summary>Left - the party gave up and left before being seated.</summary>
     Left = 3,
 
-    /// <summary>No-show — the party was called but did not return.</summary>
+    /// <summary>No-show - the party was called but did not return.</summary>
     NoShow = 4,
 }
 

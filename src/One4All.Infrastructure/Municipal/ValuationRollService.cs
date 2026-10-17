@@ -18,7 +18,7 @@ internal static class ValuationHistory
     /// <param name="tariffName">The tariff's name.</param>
     /// <param name="standNumber">The stand.</param>
     /// <returns>The narrative.</returns>
-    public static string BillNarrative(string tariffName, string standNumber) => $"{tariffName} — stand {standNumber}";
+    public static string BillNarrative(string tariffName, string standNumber) => $"{tariffName} - stand {standNumber}";
 
     /// <summary>The property's valuation records in the order they were made.</summary>
     /// <param name="db">The database context.</param>

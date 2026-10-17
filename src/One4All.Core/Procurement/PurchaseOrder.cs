@@ -6,7 +6,7 @@ namespace One4All.Core.Procurement;
 /// <summary>The status of a purchase order (brief §4.3).</summary>
 public enum PurchaseOrderStatus
 {
-    /// <summary>Open — awaiting receipt.</summary>
+    /// <summary>Open - awaiting receipt.</summary>
     Open = 0,
 
     /// <summary>Partially received.</summary>

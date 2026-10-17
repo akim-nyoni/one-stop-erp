@@ -167,7 +167,7 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
             }
         }
 
-        string Describe(UtilisationAlert alert) => $"{alert.AccountCode} {alert.Name}: {alert.PercentUsed:0.#}% used ({alert.Used:N2} of {alert.Appropriation:N2}) — past {alert.ThresholdCrossed:0.#}%";
+        string Describe(UtilisationAlert alert) => $"{alert.AccountCode} {alert.Name}: {alert.PercentUsed:0.#}% used ({alert.Used:N2} of {alert.Appropriation:N2}) - past {alert.ThresholdCrossed:0.#}%";
         async Task<Error?> SendAsync(string recipient, string who, IReadOnlyList<UtilisationAlert> theirs)
         {
             if (theirs.Count == 0)
@@ -280,7 +280,7 @@ public sealed class BudgetNotificationService : IBudgetNotificationService
             text.AppendLine(CultureInfo.InvariantCulture, $"{row.AccountCode,-10} {(name.Length > 28 ? name[..28] : name),-28} {row.Budget,15:N2} {row.Actual,15:N2} {row.Budget - row.Actual,13:N2} {used,8:0.0}%");
             if (thresholds.Where(t => used >= t).DefaultIfEmpty(0m).Max() is decimal crossed && crossed > 0m)
             {
-                flagged.Add($"{row.AccountCode} {name}: {used:0.0}% of the year's budget used — past {crossed:0.#}%");
+                flagged.Add($"{row.AccountCode} {name}: {used:0.0}% of the year's budget used - past {crossed:0.#}%");
             }
         }
 

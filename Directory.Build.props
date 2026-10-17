@@ -32,7 +32,7 @@
   <PropertyGroup Condition="'$(IsCoreLayer)' == 'true'">
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <!-- CS1591: missing XML doc — enforced via GenerateDocumentationFile on public members -->
+    <!-- CS1591: missing XML doc - enforced via GenerateDocumentationFile on public members -->
     <NoWarn>$(NoWarn)</NoWarn>
   </PropertyGroup>
 

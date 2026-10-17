@@ -84,7 +84,7 @@ public interface IBankReconciliationService
 
     /// <summary>
     /// Produces the cash position as at a date: each active bank account's GL cash-book balance (and how
-    /// many imported statement lines are still unreconciled), with the total — the daily treasury view.
+    /// many imported statement lines are still unreconciled), with the total - the daily treasury view.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The as-at date.</param>

@@ -12,7 +12,7 @@ namespace One4All.Infrastructure.Restaurant;
 /// <summary>
 /// The Restaurant / Hospitality module. Menu items are sellable composites (never stocked); billing a table
 /// order recognises revenue at the menu prices and cost of sales by exploding each item's recipe into
-/// moving-average stock issues of its ingredients — everything posts through the central engine.
+/// moving-average stock issues of its ingredients - everything posts through the central engine.
 /// </summary>
 public sealed class RestaurantService : IRestaurantService
 {

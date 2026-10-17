@@ -18,7 +18,7 @@
             <Button Content="Refresh" Padding="14,6" DockPanel.Dock="Right" Command="{Binding LoadCommand}" />
             <StackPanel>
                 <TextBlock Text="Bank Rules" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
-                <TextBlock Text="Statement lines whose description contains a phrase are posted straight to an account and matched — fees, interest, standing orders."
+                <TextBlock Text="Statement lines whose description contains a phrase are posted straight to an account and matched - fees, interest, standing orders."
                            Foreground="#667" FontSize="12" />
             </StackPanel>
         </DockPanel>

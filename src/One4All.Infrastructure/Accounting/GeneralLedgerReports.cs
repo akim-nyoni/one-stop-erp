@@ -473,7 +473,7 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
                 continue;
             }
 
-            // A non-cash debit movement consumes cash; a credit movement provides it — hence the sign flip.
+            // A non-cash debit movement consumes cash; a credit movement provides it - hence the sign flip.
             decimal cashEffect = -movementNet;
 
             // The indirect method's lines: income and expense make up the profit; each balance-sheet account is a movement line.
@@ -593,7 +593,7 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
 
         Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
 
-        // Sub-ledger totals as they stood at the date — not as they stand today. Later allocations, and stock
+        // Sub-ledger totals as they stood at the date - not as they stand today. Later allocations, and stock
         // movements after the date, must not leak into a past reconciliation.
         // Receivables split by control: each customer's own control, else the main (lowest-numbered) one.
         string? mainAr = await Trading.ReceivableControlService.MainControlAsync(_db, companyId, ct).ConfigureAwait(false);

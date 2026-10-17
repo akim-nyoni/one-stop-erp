@@ -44,7 +44,7 @@ public sealed record TitlePipelineReport(IReadOnlyList<StageAgeing> Stages, IRea
 /// The title deed pipeline (brief §4.10.6): title is applied for once a stand's holder has paid in full; the application
 /// moves through conveyancer, lodging, registry queries, registration (deed number and date), council custody and
 /// hand-over against a signed receipt; a blocked stand cannot have title processed; and the pipeline is reported with its
-/// age at every stage — including deeds held in custody and not yet collected.
+/// age at every stage - including deeds held in custody and not yet collected.
 /// </summary>
 public interface ITitleDeedService
 {

@@ -16,7 +16,7 @@ public sealed record GridRow(IReadOnlyList<object?> Cells, BandType Band)
 }
 
 /// <summary>
-/// Lays a rendered report out as a grid — real rows and columns, not pictures (brief §13.3: "XLSX with real columns") — so a spreadsheet,
+/// Lays a rendered report out as a grid - real rows and columns, not pictures (brief §13.3: "XLSX with real columns") - so a spreadsheet,
 /// CSV or Word table shows what the report shows: headings, group headers, detail lines and totals in order. Columns come from where the
 /// report's text sits across the page (positions within 3pt are one column); each line of text in a band is a row. Figures that read as
 /// numbers become numbers; codes with leading zeros stay text.

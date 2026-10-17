@@ -1,4 +1,4 @@
-# ADR-0007 — Serilog to a daily file and the sys.app_log table
+# ADR-0007 - Serilog to a daily file and the sys.app_log table
 
 - **Status:** Accepted
 - **Date:** 2026-10-17

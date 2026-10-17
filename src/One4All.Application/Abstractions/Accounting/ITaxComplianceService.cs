@@ -33,7 +33,7 @@ public sealed record BasisVatReturn(TaxPointBasis Basis, DateOnly FromDate, Date
 
 /// <summary>
 /// Tax compliance (brief §3.5): exemption certificates for customers and suppliers with expiry warnings, and the VAT return on the company's
-/// tax point basis — invoice date (the ledger), tax point (documents moved to their tax point), or cash accounting (invoice VAT due as it is paid).
+/// tax point basis - invoice date (the ledger), tax point (documents moved to their tax point), or cash accounting (invoice VAT due as it is paid).
 /// </summary>
 public interface ITaxComplianceService
 {

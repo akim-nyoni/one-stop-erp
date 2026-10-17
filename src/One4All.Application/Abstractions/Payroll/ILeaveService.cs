@@ -2,7 +2,7 @@ using One4All.Core.Common;
 
 namespace One4All.Application.Abstractions.Payroll;
 
-/// <summary>Tracks employee leave balances (accrual and days taken). Operational HR — no GL.</summary>
+/// <summary>Tracks employee leave balances (accrual and days taken). Operational HR - no GL.</summary>
 public interface ILeaveService
 {
     /// <summary>Accrues leave days of a type for an employee (creating the balance if needed).</summary>
@@ -28,7 +28,7 @@ public interface ILeaveService
 
     /// <summary>
     /// Trues up the leave provision (IAS 19) to the value of all outstanding leave (total balance days × the
-    /// daily rate): posts the difference against the provision liability — an increase debits leave expense and
+    /// daily rate): posts the difference against the provision liability - an increase debits leave expense and
     /// credits the provision, a decrease releases it back. A nil change posts nothing. Idempotent across
     /// periods: re-running only posts the movement to the new target.
     /// </summary>

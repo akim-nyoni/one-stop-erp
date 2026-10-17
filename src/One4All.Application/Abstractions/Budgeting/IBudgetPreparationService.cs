@@ -22,7 +22,7 @@ public sealed record BudgetTrail(BudgetStatus Status, int Round, string? Resolut
 /// <summary>
 /// Budget preparation through review and approval (brief §4.18.4): the department submits; Finance reviews, proposes figures and returns
 /// or recommends; the department accepts proposals or revises and resubmits (each submission a new round, requested and proposed figures
-/// both kept); the board or council approves with its resolution reference — never the person who submitted it — and the budget is sealed.
+/// both kept); the board or council approves with its resolution reference - never the person who submitted it - and the budget is sealed.
 /// </summary>
 public interface IBudgetPreparationService
 {

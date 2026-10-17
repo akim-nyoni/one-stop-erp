@@ -172,6 +172,7 @@ internal sealed class StandAllocationConfiguration : IEntityTypeConfiguration<St
         b.Property(x => x.CertificateNumber).HasMaxLength(30);
         b.Property(x => x.Reason).HasMaxLength(500);
         b.Ignore(x => x.IsLive);
+        b.Property(x => x.ExtensionReason).HasMaxLength(300);
         b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
 

@@ -48,7 +48,7 @@ public sealed class StandCoOwnership : AuditableEntity, ICompanyScoped
 }
 
 /// <summary>
-/// A holder's share of a stand for a period (<c>hse.stand_holding</c>): append-only — a change ends the current periods and
+/// A holder's share of a stand for a period (<c>hse.stand_holding</c>): append-only - a change ends the current periods and
 /// opens new ones, so the holders on any date can always be shown.
 /// </summary>
 public sealed class StandHolding : Entity, ICompanyScoped

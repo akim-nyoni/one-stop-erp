@@ -5,7 +5,7 @@ namespace One4All.Reporting;
 
 /// <summary>
 /// Audit, security and compliance reports (brief §14 P) and master data / system listings (§14 R) not already in the core
-/// catalogue — codes are SYS plus the brief's item number — over <c>Sysr*</c> data commands served by the control report
+/// catalogue - codes are SYS plus the brief's item number - over <c>Sysr*</c> data commands served by the control report
 /// data provider.
 /// </summary>
 public static class ControlReports
@@ -17,7 +17,7 @@ public static class ControlReports
     public static IEnumerable<ReportDefinition> All()
     {
         // Audit, security & compliance.
-        yield return Listing("SYS235", "Audit Trail Report", "System", "Every audit-logged action in the period — who, when, what record, which fields and why — optionally for one record type or user.",
+        yield return Listing("SYS235", "Audit Trail Report", "System", "Every audit-logged action in the period - who, when, what record, which fields and why - optionally for one record type or user.",
             "SysrAuditTrail", [new Column("When", "When (UTC)", 110), new Column("User", "User", 80), new Column("Action", "Action", 60), new Column("Record", "Record", 130),
              new Column("Fields", "Changed fields", 180), new Column("Reason", "Reason", 150)],
             [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("EntityType", ParameterType.String), ("UserName", ParameterType.String)]);
@@ -50,8 +50,8 @@ public static class ControlReports
         yield return Listing("SYS245", "Unposted & Deferred Batches", "System", "Journals still draft, deferred or awaiting approval, with who prepared them.",
             "SysrUnposted", [new Column("Journal", "Journal", 100), new Column("Posting", "Posting date", 80), new Column("Status", "Status", 110), new Column("Source", "Source", 60),
              new Column("Document", "Document", 120), new Column("PreparedBy", "Prepared by", 90), new Column("Narrative", "Narrative", 200)], []);
-        yield return Listing("SYS246", "Data Integrity & System Health", "System", "The data-health checks at a date — orphan records, unbalanced batches, control-account variances, negative stock and "
-            + "the rest — each with its status, count, value and first findings.", "SysrHealth",
+        yield return Listing("SYS246", "Data Integrity & System Health", "System", "The data-health checks at a date - orphan records, unbalanced batches, control-account variances, negative stock and "
+            + "the rest - each with its status, count, value and first findings.", "SysrHealth",
             [new Column("Check", "Check", 160), new Column("Status", "Status", 60), new Column("Count", "Count", 50), new Column("Value", "Value", 90), new Column("Findings", "Findings", 300)],
             [("AsAtDate", ParameterType.Date)]);
         yield return Listing("SYS247", "Audit Trail Hash-Chain Verification", "System", "Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks.",
@@ -78,7 +78,7 @@ public static class ControlReports
              new Column("Yearly", "Resets yearly", 70), new Column("Gapless", "Gapless", 60), new Column("Next", "Next number(s)", 220)], []);
         yield return Listing("SYS261", "Company Configuration Listing", "System", "Every setting of the company record.",
             "SysrCompany", [new Column("Setting", "Setting", 220), new Column("Value", "Value", 300)], []);
-        yield return Listing("SYS262", "Report Definition Inventory", "System", "Every report definition held — system and custom — with scope, version and last change.",
+        yield return Listing("SYS262", "Report Definition Inventory", "System", "Every report definition held - system and custom - with scope, version and last change.",
             "SysrReportInventory", [new Column("Code", "Code", 80), new Column("Name", "Name", 220), new Column("Module", "Module", 90), new Column("Scope", "Scope", 70), new Column("Version", "Version", 55),
              new Column("Changed", "Last changed", 115)], []);
         yield return Listing("SYS263", "Scheduled Job Status & Delivery Log", "System", "Each scheduled job's state and last result, then report deliveries in the period.",

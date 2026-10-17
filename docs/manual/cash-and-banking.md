@@ -94,7 +94,7 @@ The list beside the form shows: Cheque register (latest 100).
 
 ### Void a cheque leaf
 
-A spoilt or lost leaf that was never issued — kept in the register so the number sequence has no gaps.
+A spoilt or lost leaf that was never issued - kept in the register so the number sequence has no gaps.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -181,7 +181,7 @@ The list beside the form shows: Standing orders and direct debits.
 
 ### Save a bank file layout
 
-A bank's EFT format as templates: {Field[,width][:format]} — header/trailer: Date, Originator, Currency, Count, Total, Hash; detail: Seq, Date, Reference, Name, Bank, Branch, Account, Currency, Amount (format 'cents' for whole cents; width 010 zero-pads).
+A bank's EFT format as templates: {Field[,width][:format]} - header/trailer: Date, Originator, Currency, Count, Total, Hash; detail: Seq, Date, Reference, Name, Bank, Branch, Account, Currency, Amount (format 'cents' for whole cents; width 010 zero-pads).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -214,6 +214,6 @@ A payroll run's net pay in a bank layout, one file per beneficiary bank, with co
 | CB72 | 13-Week Cash Flow Forecast by Currency | From today's bank balances, week by week: customer receipts and supplier payments falling due, and the closing cash, per currency. |
 | CB73 | Petty Cash & Imprest Report | Disbursements and top-ups on the petty cash account in the period with its running balance. |
 | CB74 | Inter-account Transfers | Transfers between bank accounts in the period, with the amount out, the amount in and any exchange difference. |
-| CB75 | Cheque Register | Every cheque written in the period by bank account: payee, amount and status — issued, presented, cancelled, voided, or stale when unpresented past the limit. |
+| CB75 | Cheque Register | Every cheque written in the period by bank account: payee, amount and status - issued, presented, cancelled, voided, or stale when unpresented past the limit. |
 | CB76 | Mobile Money / Wallet Reconciliation | Per mobile-money wallet at the date: ledger balance against the wallet statement, unmatched items on each side and any difference left unexplained. |
 | CB77 | Petty Cash Counts & Imprest Reconciliation | Every petty cash fund with its float and book balance, and each count in the period: cash counted against the book, the variance, who counted, and the variance and reimbursement journals once reconciled. |

@@ -97,7 +97,7 @@ The list beside the form shows: Framework agreements.
 
 ### Supplier scorecard
 
-Each supplier active in a period: deliveries on time against the orders' required-by dates, quality as the share of goods not returned, spend, and the purchase price variance — invoiced above or below the order prices.
+Each supplier active in a period: deliveries on time against the orders' required-by dates, quality as the share of goods not returned, spend, and the purchase price variance - invoiced above or below the order prices.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -106,7 +106,7 @@ Each supplier active in a period: deliveries on time against the orders' require
 
 ### Supplier rebates
 
-A volume rebate agreement with a supplier for a period with spend tiers ("0:1; 100000:2.5; 250000:4" — from spend:rate %); Accrue books what each agreement has earned so far.
+A volume rebate agreement with a supplier for a period with spend tiers ("0:1; 100000:2.5; 250000:4" - from spend:rate %); Accrue books what each agreement has earned so far.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ The list beside the form shows: Purchase orders.
 
 ### Amend a purchase order
 
-Changes order lines (ITEM:quantity@price; …) as a new version with the reason — quantities never below what was received, prices not once invoiced; a rise over the threshold sends the order back for re-approval. Re-approve clears it (another user); History lists its versions.
+Changes order lines (ITEM:quantity@price; …) as a new version with the reason - quantities never below what was received, prices not once invoiced; a rise over the threshold sends the order back for re-approval. Re-approve clears it (another user); History lists its versions.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -231,7 +231,7 @@ The list beside the form shows: Purchase orders.
 
 ### Quality inspection of a receipt
 
-Inspects goods received on a GRN held for quality: per item, what passed (released to the warehouse) and what was rejected (returned, with a credit note) — "ITEM:passed:rejected:reason; …".
+Inspects goods received on a GRN held for quality: per item, what passed (released to the warehouse) and what was rejected (returned, with a credit note) - "ITEM:passed:rejected:reason; …".
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -436,7 +436,7 @@ The list beside the form shows: Recurring invoices.
 
 ### Allowance vouchers
 
-Numbered fuel and meal vouchers issued to staff or a department, then reconciled against the supplier's invoice (serial@date; … as billed) — showing any difference between the vouchers' value and the amount invoiced.
+Numbered fuel and meal vouchers issued to staff or a department, then reconciled against the supplier's invoice (serial@date; … as billed) - showing any difference between the vouchers' value and the amount invoiced.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -597,7 +597,7 @@ Prints the supplier debit note in the standard business document layout, or thro
 | AP53 | Supplier Ledger | One supplier's documents in date order with running balance and what is still outstanding on each. |
 | AP54 | Purchase Day Book | Supplier invoices, credit notes and debit notes posted in the period, in transaction and base currency. |
 | AP55 | Purchase Analysis by Supplier and Item | Order lines placed in the period (cancelled orders excluded) by supplier and item: quantity, average price and value. |
-| AP56 | Cash Requirement Forecast / Payment Due Report | What must be paid to suppliers by week of due date and currency — overdue, each of the coming weeks and later — net of unallocated payments and debit notes. |
+| AP56 | Cash Requirement Forecast / Payment Due Report | What must be paid to suppliers by week of due date and currency - overdue, each of the coming weeks and later - net of unallocated payments and debit notes. |
 | AP58 | Payments Made | Payments to suppliers in the period (payment runs and single payments) with tax withheld. |
 | AP59 | Goods Received Not Invoiced (GRNI) | Order lines received but not yet invoiced: the GRNI accrual by order and item, with its age. |
 | AP60 | Invoice Matching Exceptions | Supplier invoices disputed against their order: reason, status and resolution. |

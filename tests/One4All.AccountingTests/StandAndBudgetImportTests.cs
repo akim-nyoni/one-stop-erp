@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers migrating the housing stand register and a budget: stands come in on their parcels (a parcel not yet registered is made from its stands), sold
-/// statuses are refused, and a budget file becomes a budget for the year of the date — previewed first, written only when clean.
+/// statuses are refused, and a budget file becomes a budget for the year of the date - previewed first, written only when clean.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class StandAndBudgetImportTests

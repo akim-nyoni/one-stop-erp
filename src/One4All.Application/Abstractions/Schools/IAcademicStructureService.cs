@@ -26,8 +26,8 @@ public sealed record TermOn(string Year, string Term, string Name, DateOnly Star
 public sealed record PromotionResult(int Promoted, int Completed, IReadOnlyList<string> Unplaced);
 
 /// <summary>
-/// The school's academic structure (brief §4.11: "classes/forms/streams, terms/semesters, academic years"): years and their terms — whose dates the
-/// fee structures for each term take, for pro-rata billing and deferred income — and classes with capacity, class teacher and the grade they move up to,
+/// The school's academic structure (brief §4.11: "classes/forms/streams, terms/semesters, academic years"): years and their terms - whose dates the
+/// fee structures for each term take, for pro-rata billing and deferred income - and classes with capacity, class teacher and the grade they move up to,
 /// placing students within capacity and promoting the whole school at year end.
 /// </summary>
 public interface IAcademicStructureService

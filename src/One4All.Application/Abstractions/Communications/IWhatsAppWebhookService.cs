@@ -20,7 +20,7 @@ public sealed record InboundMessageLine(long Id, string From, string? SenderName
 
 /// <summary>
 /// The WhatsApp Cloud API webhook (brief §9 messaging): the subscription handshake, and signed deliveries of receipts (sent, delivered,
-/// read, failed — applied to the outbound message by its provider id) and of customers' replies (recorded once each, matched to the
+/// read, failed - applied to the outbound message by its provider id) and of customers' replies (recorded once each, matched to the
 /// customer or lead with that number, and listed until handled).
 /// </summary>
 public interface IWhatsAppWebhookService

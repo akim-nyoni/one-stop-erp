@@ -2,7 +2,7 @@ namespace One4All.Application.Accounting;
 
 /// <summary>
 /// Working-capital efficiency ratios. Days-outstanding expresses a balance as the number of days of flow it
-/// represents — receivables against credit sales (DSO) or payables against credit purchases (DPO). Pure, so
+/// represents - receivables against credit sales (DSO) or payables against credit purchases (DPO). Pure, so
 /// the arithmetic is unit-tested; the service supplies the balances and flows from the ledger.
 /// </summary>
 public static class WorkingCapital

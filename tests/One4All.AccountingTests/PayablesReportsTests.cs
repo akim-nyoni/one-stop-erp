@@ -49,7 +49,7 @@ public sealed class PayablesReportsTests
         {
             CompanyId = companyId, SupplierId = minor.Id, DocumentNumber = "PMT-AP-1", PaymentDate = new DateOnly(2026, 3, 10), Currency = Scenario.Usd, Amount = 150m, BankAccountCode = "1100",
         })).IsSuccess.Should().BeTrue();
-        db.Set<SupplierBankChange>().Add(new SupplierBankChange(companyId, main.Id, "Main Supplies", "1234567890", "First Bank", 71));
+        db.Set<SupplierBankChange>().Add(new SupplierBankChange(companyId, main.Id, "Main Supplies", "1234567890", "First Bank", 999_971));
         await db.SaveChangesAsync();
 
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
@@ -68,9 +68,9 @@ public sealed class PayablesReportsTests
 
         (await Render("AP53", new() { ["SupplierCode"] = "AP-MIN" })).Should().Contain("SI-AP-2").And.Contain("PMT-AP-1").And.Contain("-50.00");
         (await Render("AP54")).Should().Contain("SI-AP-1").And.Contain("SI-AP-2").And.NotContain("PMT-AP-1");
-        (await Render("AP58")).Should().Contain("2026-03-10,PMT-AP-1,Minor Parts,USD,150.00,—,150");
+        (await Render("AP58")).Should().Contain("2026-03-10,PMT-AP-1,Minor Parts,USD,150.00,-,150");
         (await Render("AP64")).Should().Contain("Minor Parts,USD,Debit balance,Active,-50").And.Contain("Main Supplies,USD,,Active,900");
-        (await Render("AP65")).Should().Contain("Main Supplies,user 71,First Bank / Main Supplies / ******7890,Pending");
+        (await Render("AP65")).Should().Contain("Main Supplies,user 999971,First Bank / Main Supplies / ******7890,Pending");
         (await Render("AP66")).Should().Contain("1,Main Supplies,1,90.0%,90.0%,900").And.Contain("2,Minor Parts,1,10.0%,100.0%,100");
 
         foreach (string code in PayablesReports.All().Select(r => r.Code))

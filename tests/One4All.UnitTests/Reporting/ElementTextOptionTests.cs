@@ -8,7 +8,7 @@ namespace One4All.UnitTests.Reporting;
 
 /// <summary>
 /// Covers the element text options (brief §13.1): text for a missing value, vertical alignment, padding, per-side borders, word-wrap,
-/// shrink-to-fit and rotation — carried from the definition to the rendered cell, kept by layout copies, and drawn by HTML and PDF.
+/// shrink-to-fit and rotation - carried from the definition to the rendered cell, kept by layout copies, and drawn by HTML and PDF.
 /// </summary>
 public sealed class ElementTextOptionTests
 {

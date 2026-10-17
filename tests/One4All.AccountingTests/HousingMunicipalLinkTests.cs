@@ -41,7 +41,7 @@ public sealed class HousingMunicipalLinkTests
         LandParcel parcel = new(companyId, $"LP-HM-{companyId}", "Linked parcel", 5000m, 50000m);
         db.LandParcels.Add(parcel);
         await db.SaveChangesAsync();
-        HousingStand stand = new(companyId, parcel.Id, null, $"HM-1-{companyId}", 400m, 3000m);
+        HousingStand stand = new(companyId, parcel.Id, null, $"HM-1-{companyId}", 400m, 3000m) { Ward = "Ward 4" };
         HousingStand rated = new(companyId, parcel.Id, null, $"HM-2-{companyId}", 400m, 3000m);
         db.HousingStands.AddRange(stand, rated);
         db.Properties.Add(new Property(companyId, rated.StandNumber, "Ward 1", other.Id));
@@ -57,7 +57,7 @@ public sealed class HousingMunicipalLinkTests
         DateOnly sold = new(2026, 4, 16);
         (await housing.SellStandAsync(companyId, stand.Id, buyer.Id, buyer.Name, 8000m, sold, "4100", "1460", "5100", $"HM-INV-{companyId}")).IsSuccess.Should().BeTrue();
         Property property = await db.Properties.AsNoTracking().Include(p => p.Services).SingleAsync(p => p.CompanyId == companyId && p.StandNumber == stand.StandNumber);
-        (property.Ward, property.RatepayerCustomerId, property.Valuation, property.SizeSquareMetres).Should().Be(("Ward 9", buyer.Id, 8000m, 400m));
+        (property.Ward, property.RatepayerCustomerId, property.Valuation, property.SizeSquareMetres).Should().Be(("Ward 4", buyer.Id, 8000m, 400m), "the stand's own ward, not the link's default");
         property.Services.Should().ContainSingle().Which.StartDate.Should().Be(sold);
         IReadOnlyList<OwnerEntry> owners = await scope.ServiceProvider.GetRequiredService<IOwnershipService>().OwnersAsync(companyId, property.Id, sold);
         owners.Should().ContainSingle().Which.SharePercent.Should().Be(100m);

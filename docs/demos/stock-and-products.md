@@ -19,7 +19,7 @@ Goal: show that products and services, warehouses, stock movements, counts and p
 
 ## Stock counts
 10. Open **Start a stocktake**. Freezes the warehouse's quantities. Fill in: Warehouse, Date, Stocktake reference. Press OK and point out the result line and the list on the right.
-11. Open **Start a cycle count (a few items at a time)**. Counts only the items due: never-counted items first, then A items every 30 days, B every 90 and C every 180 (change the days below). Fill in: Warehouse, Date, Count reference, Days between counts — A items, Days between counts — B items, Days between counts — C items, Most items in this count. Press OK and point out the result line and the list on the right.
+11. Open **Start a cycle count (a few items at a time)**. Counts only the items due: never-counted items first, then A items every 30 days, B every 90 and C every 180 (change the days below). Fill in: Warehouse, Date, Count reference, Days between counts - A items, Days between counts - B items, Days between counts - C items, Most items in this count. Press OK and point out the result line and the list on the right.
 12. Open **Record a count**. The first count of an item, by the signed-in user. Fill in: Stocktake id, Product, Counted quantity. Press OK and point out the result line and the list on the right.
 
 ## Production
@@ -27,7 +27,7 @@ Goal: show that products and services, warehouses, stock movements, counts and p
 14. Open **Disassemble finished goods**. Takes finished units apart into their components; their cost is split over the components recovered at each one's average cost, or by their relative sales value on the default price list (joint products: a carcass into cuts). Fill in: BOM code, Warehouse, Units taken apart, Date, Assembly clearing account. Press OK and point out the result line and the list on the right.
 
 ## Look up
-15. Open **Stock on hand and back orders**. An item's stock on hand, allocated to sales orders, on order and free — available to promise; the list shows every back-ordered sales order line and whether stock now covers it. Fill in: Product. Press OK and point out the result line and the list on the right.
+15. Open **Stock on hand and back orders**. An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether stock now covers it. Fill in: Product. Press OK and point out the result line and the list on the right.
 16. Open **Trace a batch or serial (recall)**. For a recall: where a batch or serial came from (receipts, with the supplier), where it went (issues and sales, with the customer), and what is still on hand in each warehouse. Fill in: Product, Batch / serial number. Press OK and point out the result line and the list on the right.
 17. Open **Suggest picks (first expiry, first out)**. Which batches to pick for a quantity, earliest expiry first, never expired stock. Fill in: Product, Warehouse, Quantity, Date. Press OK and point out the result line and the list on the right.
 

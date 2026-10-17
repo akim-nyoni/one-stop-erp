@@ -15,7 +15,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers a restaurant bill as one unit of work: when the cost-of-sales issue is refused (the inventory period is
-/// closed) after the revenue has been posted, nothing remains — no journal, no billed quantity, no stock movement —
+/// closed) after the revenue has been posted, nothing remains - no journal, no billed quantity, no stock movement -
 /// even after a save in the same scope; once the period reopens the same order bills normally.
 /// </summary>
 [Collection(AccountingCollection.Name)]

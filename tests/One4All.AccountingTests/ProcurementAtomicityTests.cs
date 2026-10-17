@@ -15,7 +15,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers procurement steps as single units of work: a goods receipt whose second line is unknown receives nothing; an
 /// invoice match whose second line is outside price tolerance marks no line invoiced; a supplier return refused by a
-/// closed period leaves stock untouched — each even after a save in the same scope, with check data clean.
+/// closed period leaves stock untouched - each even after a save in the same scope, with check data clean.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class ProcurementAtomicityTests

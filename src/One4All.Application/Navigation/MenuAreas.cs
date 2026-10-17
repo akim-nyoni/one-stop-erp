@@ -16,7 +16,7 @@ public enum MenuArea
     Utilities = 4,
 }
 
-/// <summary>Works out an action's menu area from its title — the console's actions read as verbs and nouns, so a few rules place nearly all of them. Pure.</summary>
+/// <summary>Works out an action's menu area from its title - the console's actions read as verbs and nouns, so a few rules place nearly all of them. Pure.</summary>
 public static class MenuAreas
 {
     // Period-end runs and system housekeeping.

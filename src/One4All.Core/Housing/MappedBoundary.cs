@@ -1,8 +1,8 @@
 namespace One4All.Core.Housing;
 
 /// <summary>
-/// A mapped boundary (brief §4.10.10 GIS hook), held on parcels and stands: the polygon as WKT — PostGIS-ready, the same
-/// text loads into a geometry column — with its centroid and mapped area.
+/// A mapped boundary (brief §4.10.10 GIS hook), held on parcels and stands: the polygon as WKT - PostGIS-ready, the same
+/// text loads into a geometry column - with its centroid and mapped area.
 /// </summary>
 public sealed class MappedBoundary
 {

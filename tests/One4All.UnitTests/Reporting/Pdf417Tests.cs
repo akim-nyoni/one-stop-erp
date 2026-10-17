@@ -9,7 +9,7 @@ public sealed class Pdf417Tests
 {
     [Theory]
     [InlineData("INV-2026/0001|USD 1,250.50|2026-10-08")]
-    [InlineData("Fiscal 7f3a9c — Zimbabwe Revenue Authority verification code")]
+    [InlineData("Fiscal 7f3a9c - Zimbabwe Revenue Authority verification code")]
     public void The_symbol_reads_back_as_its_value(string value)
     {
         bool[][] modules = Barcodes.Pdf417Modules(value);

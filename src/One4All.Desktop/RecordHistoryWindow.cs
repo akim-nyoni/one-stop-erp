@@ -86,7 +86,7 @@ public sealed class RecordHistoryWindow : Window
         static string When(AuditEntryView? e) => e is null ? "not in the log" : $"{e.UserName} on {e.OccurredOnUtc.ToLocalTime():yyyy-MM-dd HH:mm}";
         _summary.Text = history.Entries.Count == 0 && history.DatabaseChanges.Count == 0
             ? $"Nothing is logged for {history.EntityType} #{history.EntityId}. (Is the type spelt as in the list?)"
-            : $"{history.EntityType} #{history.EntityId} — created by {When(history.Created)}; last changed by {When(history.LastChanged)}. "
+            : $"{history.EntityType} #{history.EntityId} - created by {When(history.Created)}; last changed by {When(history.LastChanged)}. "
               + $"Touched by: {string.Join(", ", history.Users)}. {history.Entries.Count} log entr{(history.Entries.Count == 1 ? "y" : "ies")}"
               + (history.OutsideApplication.Count > 0 ? $"; {history.OutsideApplication.Count} change(s) made OUTSIDE the application." : ".");
         _summary.Foreground = history.OutsideApplication.Count > 0 ? Brushes.Firebrick : Brushes.Black;

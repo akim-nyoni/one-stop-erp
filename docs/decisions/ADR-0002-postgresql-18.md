@@ -1,4 +1,4 @@
-# ADR-0002 — PostgreSQL 18 as the development database
+# ADR-0002 - PostgreSQL 18 as the development database
 
 - **Status:** Accepted
 - **Date:** 2026-09-14

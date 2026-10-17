@@ -4,8 +4,8 @@ using One4All.Core.Workflow;
 namespace One4All.Application.Abstractions.Workflow;
 
 /// <summary>
-/// What a module does when the approval workflow for one of its documents ends (brief §7): approved — the document goes ahead (a
-/// requisition is approved, a journal posts); rejected or returned — it is turned down. Runs in the same unit of work as the last
+/// What a module does when the approval workflow for one of its documents ends (brief §7): approved - the document goes ahead (a
+/// requisition is approved, a journal posts); rejected or returned - it is turned down. Runs in the same unit of work as the last
 /// decision, so if the document cannot go ahead the decision is not recorded either.
 /// </summary>
 public interface IWorkflowDocumentHandler

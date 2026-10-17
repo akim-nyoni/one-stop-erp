@@ -37,7 +37,7 @@ public static class HousingReports
             [new Column("Parcel", "Parcel", 80), new Column("Type", "Type", 110), new Column("Reference", "Reference", 90), new Column("InFavourOf", "In favour of", 150),
              new Column("Registered", "Registered", 75), new Column("Status", "Status", 110), new Column("Description", "Particulars", 220)], []);
         yield return Listing("H9", "Land Bank Valuation vs Carrying Value (IAS 2 NRV test)", "Housing",
-            "Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell — the write-down working paper.",
+            "Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell - the write-down working paper.",
             "HousingNrvTest", [new Column("Item", "Item", 90), new Column("Kind", "Kind", 55), new Column("Scheme", "Scheme", 80), new Column("Carrying", "Carrying", 90), new Column("Basis", "Price basis", 140),
              new Column("Price", "Estimated price", 90), new Column("CostsToSell", "Costs to sell", 85), new Column("Nrv", "NRV", 90), new Column("WriteDown", "Write-down", 90, true)],
             [("AsAtDate", ParameterType.Date), ("CostToSellPercent", ParameterType.Decimal)]);
@@ -67,7 +67,7 @@ public static class HousingReports
              new Column("Levy", "Levy", 80, true), new Column("Margin", "Margin", 80, true), new Column("MarginPercent", "Margin %", 60), new Column("Price", "Price", 90, true)],
             [("AsAtDate", ParameterType.Date)]);
 
-        yield return Listing("H16", "Price List by Scheme & Stand Size Band", "Housing", "Every pricing rule with its scope, effective date, terms and approval — the price change history.", "HousingPriceList",
+        yield return Listing("H16", "Price List by Scheme & Stand Size Band", "Housing", "Every pricing rule with its scope, effective date, terms and approval - the price change history.", "HousingPriceList",
             [new Column("Scope", "Scope", 70), new Column("Applies", "Applies to", 160), new Column("Effective", "Effective", 80), new Column("Terms", "Overhead / levy / margin", 200),
              new Column("Approved", "Approved", 130)], []);
 
@@ -86,7 +86,7 @@ public static class HousingReports
         yield return Listing("H22", "Priority Score Derivation", "Housing", "How each active applicant's points were computed, factor by factor.", "HousingScoreDerivation",
             [new Column("WaitingListNumber", "WL number", 100), new Column("Factor", "Factor", 130), new Column("Detail", "Applicant's figure", 140), new Column("Points", "Points", 70), new Column("Total", "Total score", 80)],
             [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H24", "Applicants Already Owning Property", "Housing", "Active applicants holding a council stand or owning rated property — disqualification candidates.", "HousingApplicantOwners",
+        yield return Listing("H24", "Applicants Already Owning Property", "Housing", "Active applicants holding a council stand or owning rated property - disqualification candidates.", "HousingApplicantOwners",
             [new Column("WaitingListNumber", "WL number", 100), new Column("Name", "Applicant", 160), new Column("Holds", "Holds", 360)], []);
         yield return Listing("H26","Registration Date Change Audit", "Housing", "Every requested change to a seniority date: who asked, who decided, why.", "HousingRegistrationChanges",
             [new Column("WaitingListNumber", "WL number", 100), new Column("OldDate", "From", 80), new Column("NewDate", "To", 80), new Column("Reason", "Reason", 200),
@@ -109,7 +109,7 @@ public static class HousingReports
         yield return Listing("H36", "Declined, Lapsed & Cancelled Offers", "Housing", "Offers that did not proceed, with when and why.", "HousingFailedOffers",
             [new Column("Certificate", "Certificate", 100), new Column("Stand", "Stand", 80), new Column("Applicant", "Applicant", 160), new Column("Status", "Outcome", 80), new Column("DecidedOn", "On", 80),
              new Column("Reason", "Reason", 200)], []);
-        yield return Listing("H34", "Skipped Applicant / Substitution Report", "Housing", "Per allocation run: listed applicants left out and why, and offers declined, lapsed or cancelled — the appeal-defence report.",
+        yield return Listing("H34", "Skipped Applicant / Substitution Report", "Housing", "Per allocation run: listed applicants left out and why, and offers declined, lapsed or cancelled - the appeal-defence report.",
             "HousingSkippedApplicants", [new Column("Run", "Run", 80), new Column("Scheme", "Scheme", 80), new Column("Method", "Method", 70), new Column("WaitingListNumber", "WL number", 80),
              new Column("Applicant", "Applicant", 150), new Column("Outcome", "Outcome", 90), new Column("Reason", "Reason", 240)], []);
         yield return Listing("H37", "Quota Compliance Report", "Housing", "Per scheme: allocations to each beneficiary group against its policy quota.", "HousingQuotaCompliance",
@@ -118,7 +118,7 @@ public static class HousingReports
         yield return Listing("H38","Appeals Register & Outcomes", "Housing", "Appeals lodged against allocation runs with hearing and outcome.", "HousingAppeals",
             [new Column("Appeal", "Appeal", 90), new Column("WaitingListNumber", "Appellant", 100), new Column("Run", "Run", 90), new Column("Lodged", "Lodged", 80),
              new Column("Status", "Status", 80), new Column("Hearing", "Hearing", 80), new Column("Outcome", "Outcome", 220)], []);
-        yield return Listing("H39", "Double Allocation Exception Report", "Housing", "Stands promised through more than one route — must always be empty; any row is an incident.", "HousingDoubleAllocations",
+        yield return Listing("H39", "Double Allocation Exception Report", "Housing", "Stands promised through more than one route - must always be empty; any row is an incident.", "HousingDoubleAllocations",
             [new Column("Stand", "Stand", 90), new Column("Claims", "Claims", 60), new Column("Routes", "Promised through", 420)], []);
 
         yield return Listing("H40", "Beneficiaries with More Than One Stand", "Housing", "People (by national ID) holding or allocated more than one stand across schemes.", "HousingMultipleStands",
@@ -131,7 +131,7 @@ public static class HousingReports
         yield return Listing("H42", "Agreement Register", "Housing", "Agreements by type with party, stand, version in force, signature and price.", "HousingAgreements",
             [new Column("Agreement", "Agreement", 90), new Column("Type", "Type", 100), new Column("Party", "Party", 150), new Column("Stand", "Stand", 70), new Column("Version", "In force", 60),
              new Column("Status", "Status", 120), new Column("Price", "Price", 90, true)], []);
-        yield return Listing("H44", "Instalment Amortisation Schedule", "Housing", "Each instalment's capital, interest and balance — for one agreement or all.", "HousingAmortisation",
+        yield return Listing("H44", "Instalment Amortisation Schedule", "Housing", "Each instalment's capital, interest and balance - for one agreement or all.", "HousingAmortisation",
             [new Column("Agreement", "Agreement", 90), new Column("Number", "No.", 40), new Column("Due", "Due", 80), new Column("Interest", "Interest", 80), new Column("Principal", "Capital", 80),
              new Column("Balance", "Balance", 90), new Column("State", "State", 70), new Column("Amount", "Instalment", 90, true)], [("AgreementNumber", ParameterType.String)]);
         yield return Listing("H45", "Housing Debtors Age Analysis", "Housing", "Instalment debtors aged 30/60/90/120+ by tenure type and scheme, as at any date.", "HousingDebtorsAgeing",
@@ -159,7 +159,7 @@ public static class HousingReports
         yield return Listing("H48", "Collections Report", "Housing", "Receipts from housing debtors and tenants in the month, by scheme or tenancy, day, method, currency and officer.",
             "HousingCollections", [new Column("Scheme", "Scheme / type", 90), new Column("Day", "Day", 75), new Column("Method", "Method", 85), new Column("Currency", "Currency", 55),
              new Column("Officer", "Officer", 90), new Column("Receipts", "Receipts", 55), new Column("Amount", "Amount", 95, true)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H49","Fully Paid / Ready for Transfer", "Housing", "Sold stands whose holders owe nothing and have no title application — the most actionable list.", "HousingReadyForTitle",
+        yield return Listing("H49","Fully Paid / Ready for Transfer", "Housing", "Sold stands whose holders owe nothing and have no title application - the most actionable list.", "HousingReadyForTitle",
             [new Column("Stand", "Stand", 80), new Column("Holder", "Holder", 170), new Column("Status", "Stand status", 90), new Column("SoldOn", "Sold", 80), new Column("Price", "Price", 90, true)], []);
 
         yield return Listing("H54", "Development Covenant Compliance", "Housing", "Covenants with the latest milestone, deadline, extensions and breach status.", "HousingCovenants",
@@ -195,7 +195,7 @@ public static class HousingReports
         yield return Listing("H64","Title Deed Pipeline Report", "Housing", "Open title applications with stage, days at the stage, days since applied and conveyancer.", "HousingTitlePipeline",
             [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Stage", "Stage", 110), new Column("DaysAtStage", "Days at stage", 80),
              new Column("DaysSinceApplied", "Since applied", 80), new Column("Conveyancer", "Conveyancer", 160)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H65", "Title Deeds Held but Uncollected", "Housing", "Deeds in council custody not yet handed over, aged, with the owner's contact — the chase list.", "HousingDeedsUncollected",
+        yield return Listing("H65", "Title Deeds Held but Uncollected", "Housing", "Deeds in council custody not yet handed over, aged, with the owner's contact - the chase list.", "HousingDeedsUncollected",
             [new Column("Application", "Application", 90), new Column("Stand", "Stand", 80), new Column("Deed", "Deed", 100), new Column("Owner", "Owner", 160), new Column("Contact", "Contact", 160),
              new Column("DaysHeld", "Days held", 70)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H66", "Deeds Register", "Housing", "Registered deeds with registration date and current custody.", "HousingDeeds",
@@ -206,7 +206,7 @@ public static class HousingReports
         yield return Listing("H68","Caveats, Blocks & Disputes Register", "Housing", "Every block placed: reason, particulars, document, who placed and lifted it, age.", "HousingBlocks",
             [new Column("Stand", "Stand", 80), new Column("Reason", "Reason", 110), new Column("Detail", "Particulars", 200), new Column("Document", "Document", 90),
              new Column("PlacedOn", "Placed", 80), new Column("State", "State", 110), new Column("AgeDays", "Age (days)", 70)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H69", "Stands with No Recorded Owner / Broken Ownership Chain", "Housing", "Data-integrity exceptions — must be empty.", "HousingBrokenChains",
+        yield return Listing("H69", "Stands with No Recorded Owner / Broken Ownership Chain", "Housing", "Data-integrity exceptions - must be empty.", "HousingBrokenChains",
             [new Column("Stand", "Stand", 90), new Column("Problem", "Problem", 460)], []);
         yield return Listing("H70", "Sectional Title Unit Register & Participation Quotas", "Housing", "Units of every sectional scheme with floor area, quota and owner.", "HousingSectionalUnits",
             [new Column("Scheme", "Scheme", 90), new Column("Building", "Building", 150), new Column("Unit", "Unit", 60), new Column("FloorArea", "Floor m²", 70), new Column("Quota", "Quota %", 70),
@@ -264,16 +264,16 @@ public static class HousingReports
              new Column("Amount", "Amount", 90, true), new Column("Spent", "Spent", 90, true), new Column("Recognised", "Recognised", 90, true), new Column("Deferred", "Deferred", 90, true)], []);
 
         // Control, audit & executive.
-        yield return Listing("H90", "Housing Audit Trail Report", "Housing", "Every recorded change to housing records — before and after values, user, time.", "HousingAuditTrail",
+        yield return Listing("H90", "Housing Audit Trail Report", "Housing", "Every recorded change to housing records - before and after values, user, time.", "HousingAuditTrail",
             [new Column("When", "When", 120), new Column("User", "User", 90), new Column("Entity", "Record", 130), new Column("Id", "Id", 50), new Column("Action", "Action", 60), new Column("Changed", "Fields changed", 260)],
             [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("H91", "Allocation & Ownership Change Approval Audit", "Housing", "Who requested and who approved each run, transfer, seniority change, price rule and block lift — turnaround and dual-authorisation exceptions.",
+        yield return Listing("H91", "Allocation & Ownership Change Approval Audit", "Housing", "Who requested and who approved each run, transfer, seniority change, price rule and block lift - turnaround and dual-authorisation exceptions.",
             "HousingApprovalAudit", [new Column("Area", "Area", 100), new Column("Reference", "Reference", 90), new Column("RequestedBy", "Requested by", 90), new Column("ApprovedBy", "Approved by", 110),
              new Column("Requested", "Requested", 75), new Column("Approved", "Approved", 75), new Column("Days", "Days", 45), new Column("Exception", "Exception", 170), new Column("Value", "Value", 90, true)], []);
-        yield return Listing("H93", "Manual Override & Exception Report", "Housing", "Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted — each with the stated reason.",
+        yield return Listing("H93", "Manual Override & Exception Report", "Housing", "Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted - each with the stated reason.",
             "HousingOverrides", [new Column("Type", "Type", 150), new Column("Reference", "Reference", 100), new Column("Detail", "Detail", 200), new Column("Date", "Date", 75), new Column("By", "By", 90),
              new Column("Reason", "Reason", 220)], []);
-        yield return Listing("H92", "Segregation of Duties Violations — Housing", "Housing", "Users whose permissions combine housing duties that must be separated.", "HousingSodViolations",
+        yield return Listing("H92", "Segregation of Duties Violations - Housing", "Housing", "Users whose permissions combine housing duties that must be separated.", "HousingSodViolations",
             [new Column("User", "User", 120), new Column("Rule", "Rule", 90), new Column("Conflict", "Conflict", 360)], []);
         yield return Listing("H94", "Housing Revenue Summary", "Housing", "Year to date against the same period last year: stand sales, instalment interest, rentals and recharges, development levies.",
             "HousingRevenueSummary", [new Column("Stream", "Stream", 180), new Column("PriorYear", "Same period last year", 120), new Column("Change", "Change", 80), new Column("YearToDate", "Year to date", 110, true)],
@@ -285,7 +285,7 @@ public static class HousingReports
             "HousingWardPack", [new Column("Section", "Section", 100), new Column("Item", "Item", 200), new Column("Value", "Value", 160)], [("Ward", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
 
         // Applicant verification, statements and scheme delivery.
-        yield return Listing("H21", "Applicant Detail / Verification Sheet", "Housing", "One applicant: every captured detail, notices, date changes and the score derivation — printable for the applicant.",
+        yield return Listing("H21", "Applicant Detail / Verification Sheet", "Housing", "One applicant: every captured detail, notices, date changes and the score derivation - printable for the applicant.",
             "HousingApplicantSheet", [new Column("Section", "Section", 90), new Column("Item", "Item", 170), new Column("Value", "Value", 300)],
             [("WaitingListNumber", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
         yield return Listing("H23", "Duplicate & Suspected Fraudulent Applicants", "Housing", "Fuzzy name, ID and date-of-birth matches across the waiting list, stand holders and the property register.",
@@ -302,13 +302,13 @@ public static class HousingReports
              new Column("Allocated", "Allocated", 60), new Column("Closing", "Closing", 60)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("H29", "Demand vs Supply (the Housing Gap)", "Housing", "Active applicants by category against stands and rental units available for it.", "HousingDemandSupply",
             [new Column("Category", "Category", 110), new Column("Demand", "Applicants", 70), new Column("Supply", "Available", 70), new Column("Gap", "Gap", 70)], []);
-        yield return Listing("H43", "Beneficiary Account Statement", "Housing", "Charges, instalments, receipts and balance per beneficiary, with the next instalment — one or all (burst by beneficiary).",
+        yield return Listing("H43", "Beneficiary Account Statement", "Housing", "Charges, instalments, receipts and balance per beneficiary, with the next instalment - one or all (burst by beneficiary).",
             "HousingBeneficiaryStatement", [new Column("Beneficiary", "Beneficiary", 140), new Column("Date", "Date", 75), new Column("Document", "Document", 100), new Column("Type", "Type", 90),
              new Column("Due", "Due", 75), new Column("Balance", "Balance", 90), new Column("Amount", "Amount", 90, true)], [("Beneficiary", ParameterType.String)]);
         yield return Listing("H60", "Transfer Checklist Exception Report", "Housing", "Open transfer applications and the mandatory documents still missing.", "HousingTransferExceptions",
             [new Column("Application", "Application", 90), new Column("Stand", "Stand", 70), new Column("Type", "Type", 90), new Column("Status", "Status", 70), new Column("Lodged", "Lodged", 75),
              new Column("Missing", "Missing", 300)], []);
-        yield return Listing("H74", "Tenant Statement", "Housing", "Rent charges, receipts and balance per tenant — one or all (burst by tenant).", "HousingTenantStatement",
+        yield return Listing("H74", "Tenant Statement", "Housing", "Rent charges, receipts and balance per tenant - one or all (burst by tenant).", "HousingTenantStatement",
             [new Column("Tenant", "Tenant", 140), new Column("Date", "Date", 75), new Column("Document", "Document", 100), new Column("Type", "Type", 90), new Column("Due", "Due", 75),
              new Column("Balance", "Balance", 90), new Column("Amount", "Amount", 90, true)], [("Tenant", ParameterType.String)]);
         yield return Listing("H82", "Scheme Delivery Dashboard", "Housing", "Per scheme: target, stands created, serviced, allocated, sold and titled, and % delivered.", "HousingSchemeDelivery",

@@ -22,7 +22,7 @@ public sealed record EmployeeFacts(long Id, string Number, string Name, string? 
 /// Pre-payroll validation and ghost-worker indicators (brief §14 PR4, PR68). Validation flags what stops a clean payment
 /// or a statutory return: no national ID or tax number, a bank transfer without an account, mobile money without a wallet,
 /// no date of birth, a zero basic, an employee under 16. Ghost-worker signals flag records that share a bank account,
-/// wallet or national ID with another, have no ID at all, or have never taken leave after more than a year — each a
+/// wallet or national ID with another, have no ID at all, or have never taken leave after more than a year - each a
 /// reason to verify the person exists, not proof. Pure and unit-tested.
 /// </summary>
 public static class EmployeeChecks

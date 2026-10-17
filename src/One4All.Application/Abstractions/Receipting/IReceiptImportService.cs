@@ -49,8 +49,8 @@ public readonly record struct ImportResult(long BatchId, int TotalLines, int Mat
 
 /// <summary>
 /// Bulk / file-based receipting (brief §RCP-8). Imports a payment file, auto-matches each line to an
-/// account by the payment reference — receipting matched lines against the debtor (never income) and
-/// parking unmatched money in the suspense control — and rejects a file already imported (by hash).
+/// account by the payment reference - receipting matched lines against the debtor (never income) and
+/// parking unmatched money in the suspense control - and rejects a file already imported (by hash).
 /// </summary>
 public interface IReceiptImportService
 {

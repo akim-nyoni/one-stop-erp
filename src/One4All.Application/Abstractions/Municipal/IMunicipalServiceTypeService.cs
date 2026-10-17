@@ -16,7 +16,7 @@ public sealed record PropertyServiceRow(string StandNumber, string Service, stri
 /// <summary>
 /// A council's configurable services and the connections to them (brief §4.9): service types of its own, billed like a built-in category; connecting
 /// one to a property with a quantity and a deposit (invoiced to the ratepayer and held in the deposit account); and suspending, disconnecting,
-/// reconnecting or closing it — only an active connection is billed.
+/// reconnecting or closing it - only an active connection is billed.
 /// </summary>
 public interface IMunicipalServiceTypeService
 {

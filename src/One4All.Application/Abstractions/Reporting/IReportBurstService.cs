@@ -33,8 +33,8 @@ public sealed record BurstRequest(long CompanyId, string ReportCode, string KeyF
 public sealed record BurstDelivery(string Key, IReadOnlyList<string> Recipients, string FileName, long? BatchId);
 
 /// <summary>
-/// Bursting (brief §13.3): one report run split by a key and each part emailed as its own document — statements to each customer,
-/// bills to each ratepayer, remittances to each supplier — to the address in the rows or the trader's contacts.
+/// Bursting (brief §13.3): one report run split by a key and each part emailed as its own document - statements to each customer,
+/// bills to each ratepayer, remittances to each supplier - to the address in the rows or the trader's contacts.
 /// </summary>
 public interface IReportBurstService
 {

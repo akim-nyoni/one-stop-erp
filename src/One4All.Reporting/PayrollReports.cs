@@ -73,7 +73,7 @@ public static class PayrollReports
         yield return Listing("PR65", "Payroll Audit Trail", "Payroll", "Every recorded change in the period to employees, elements, assignments, loans, leave and payslips.",
             "PyrlAudit", [new Column("When", "When", 115), new Column("User", "User", 90), new Column("Entity", "Record", 130), new Column("Id", "Id", 60), new Column("Action", "Action", 60),
              new Column("Changed", "Fields changed", 260)], Period);
-        yield return Listing("PR67", "Payroll Report Access & Export Log", "Payroll", "Every run of a payroll report in the period — who, what, format and copy.",
+        yield return Listing("PR67", "Payroll Report Access & Export Log", "Payroll", "Every run of a payroll report in the period - who, what, format and copy.",
             "PyrlAccessLog", [new Column("When", "When", 115), new Column("Report", "Report", 80), new Column("User", "User", 90), new Column("Purpose", "Purpose", 70), new Column("Format", "Format", 55),
              new Column("Copy", "Copy", 45)], Period);
         yield return Listing("PR70", "Year-to-Date Payroll Register", "Payroll", "Per employee for the year to the end of the period: gross, taxable, deductions, employer contributions and net.",
@@ -139,7 +139,7 @@ public static class PayrollReports
         yield return Listing("PR73", "Third-Party Invoices Raised", "Payroll", "The AP invoices raised for the tax authority, schemes and garnishee creditors from payroll runs, with what is still outstanding on each.",
             "PyrlRemittanceInvoices", [new Column("Run", "Run", 90), new Column("Period", "Period", 70), new Column("Payee", "Payee", 90), new Column("Supplier", "Supplier", 80), new Column("Account", "Account", 65),
              new Column("Invoice", "AP invoice", 110), new Column("Outstanding", "Outstanding", 90), new Column("Amount", "Amount", 95, true)], Period);
-        yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution — the schedule each provider needs.",
+        yield return Listing("PR19", "Third-Party Remittance Schedules", "Payroll", "Per scheme and member for the period: the employee's deduction and the employer's contribution - the schedule each provider needs.",
             "PyrlSchemes", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("SchemeCode", ParameterType.String)]);
         yield return Listing("PR20", "Deductions vs Remittances", "Payroll", "Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap.",
@@ -148,7 +148,7 @@ public static class PayrollReports
         yield return Listing("PR27", "PAYE Remittance Return", "Payroll", "Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference.",
             "PyrlPayeReturn", [new Column("Month", "Month", 70), new Column("Employees", "Employees", 65), new Column("Taxable", "Taxable", 100), new Column("ByTable", "Per tax table", 100), new Column("Difference", "Difference", 90),
              new Column("Deducted", "PAYE deducted", 100, true)], Period);
-        yield return Listing("PR28", "Annual Tax Certificates", "Payroll", "Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE — the certificate data.",
+        yield return Listing("PR28", "Annual Tax Certificates", "Payroll", "Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE - the certificate data.",
             "PyrlCertificates", [new Column("Employee", "Employee", 160), new Column("NationalId", "National ID", 100), new Column("TaxNumber", "Tax no.", 80), new Column("Gross", "Gross", 95), new Column("Taxable", "Taxable", 95),
              new Column("Pension", "Pension", 85), new Column("Paye", "PAYE", 95, true)], Period);
         yield return Listing("PR30", "Social Security Contribution Schedule", "Payroll", "Social security members with the period's employee and employer contributions.",
@@ -228,9 +228,9 @@ public static class PayrollReports
         yield return Listing("PR63", "Payroll Accrual Schedule", "Payroll", "Employees in service at the period end not yet paid for that month (including salaries on hold), with the basic salary to accrue.",
             "PyrlAccrual", [new Column("Employee", "Employee", 160), new Column("Department", "Department", 100), new Column("LastPaid", "Last paid", 75), new Column("Status", "Status", 140),
              new Column("Accrual", "Accrual", 95, true)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("PR66", "Segregation of Duties Violations — Payroll", "Payroll", "Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves.",
+        yield return Listing("PR66", "Segregation of Duties Violations - Payroll", "Payroll", "Users who processed a payroll run in the period after changing employee pay or payment details, and anyone who processed a run that paid themselves.",
             "PyrlSod", [new Column("User", "User", 100), new Column("Violation", "Violation", 200), new Column("Detail", "Detail", 260), new Column("Run", "Run", 100), new Column("When", "When", 110)], Period);
-        yield return Listing("PR74", "Payslip (designable)", "Payroll", "Every payslip line in the period — employee, section, element and amount with the slip's gross, deductions and net — "
+        yield return Listing("PR74", "Payslip (designable)", "Payroll", "Every payslip line in the period - employee, section, element and amount with the slip's gross, deductions and net - "
             + "as the data source for a company's own payslip layout in the report designer (one employee, or all).",
             "PyrlPayslipLines", [new Column("Employee", "Employee", 150), new Column("Number", "No.", 60), new Column("Department", "Dept", 60), new Column("Period", "Period", 60),
              new Column("PayDate", "Pay date", 70), new Column("Section", "Section", 80), new Column("Element", "Element", 70), new Column("Description", "Description", 150),

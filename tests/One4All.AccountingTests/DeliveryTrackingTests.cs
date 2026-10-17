@@ -85,10 +85,10 @@ public sealed class DeliveryTrackingTests
         }
 
         (await Render("SO140")).Should().Contain("DT-O1,Depot Buyer,2026-03-10,10,6,2026-03-13,No,No,No").And.Contain("DT-O2,Depot Buyer,2026-03-15,5,5,2026-03-15,Yes,Yes,Yes")
-            .And.Contain("DT-O3,Depot Buyer,2026-03-20,2,0,—,No,No,No");
-        (await Render("SO141")).Should().Contain("DT-D4,DT-O3,Depot Buyer,2026-03-18,13,—,—,2").And.NotContain("DT-D1");
+            .And.Contain("DT-O3,Depot Buyer,2026-03-20,2,0,-,No,No,No");
+        (await Render("SO141")).Should().Contain("DT-D4,DT-O3,Depot Buyer,2026-03-18,13,-,-,2").And.NotContain("DT-D1");
         string loads = await Render("SO142");
-        loads.Should().Contain("2026-03-09,ABC123,North,Sam,DT-D1,DT-O1,Depot Buyer,6 × DT-BAG,150").And.Contain("2026-03-14,XYZ,—,—,DT-D3,DT-O2,Depot Buyer,5 × DT-BAG,125")
+        loads.Should().Contain("2026-03-09,ABC123,North,Sam,DT-D1,DT-O1,Depot Buyer,6 × DT-BAG,150").And.Contain("2026-03-14,XYZ,-,-,DT-D3,DT-O2,Depot Buyer,5 × DT-BAG,125")
             .And.Contain("2026-03-18,Unassigned,");
     }
 }

@@ -14,8 +14,8 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers a July–June year with an adjustment period: adjustments reach the 13th period only when asked; the year-end closes into it
-/// and opens the next July–June year (not a calendar year) with its own adjustment period; the year-end can be reversed — the profit
-/// comes back — and run again, until it is hard-locked, after which every period is permanently closed.
+/// and opens the next July–June year (not a calendar year) with its own adjustment period; the year-end can be reversed - the profit
+/// comes back - and run again, until it is hard-locked, after which every period is permanently closed.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class YearEndCalendarTests

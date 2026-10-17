@@ -80,7 +80,7 @@ public partial class App : System.Windows.Application
             MessageBox.Show(
                 $"One4All could not start.\n\n{ex.Message}\n\nCheck that PostgreSQL is running and the connection string is correct " +
                 "(set ONE4ALL_CONNECTION or appsettings.Development.json).",
-                "One4All — Startup error", MessageBoxButton.OK, MessageBoxImage.Error);
+                "One4All - Startup error", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
     }

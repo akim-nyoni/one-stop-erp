@@ -224,7 +224,7 @@ public sealed partial class PermissionGridViewModel : ObservableObject
             }
         }
 
-        StatusMessage = changed == 0 ? "Nothing to change." : $"{changed} operation(s) {(on ? "ticked" : "cleared")} — Save to keep them.";
+        StatusMessage = changed == 0 ? "Nothing to change." : $"{changed} operation(s) {(on ? "ticked" : "cleared")} - Save to keep them.";
         return changed;
     }
 

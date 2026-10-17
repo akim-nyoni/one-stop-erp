@@ -28,7 +28,7 @@ public interface IRecurringPurchaseInvoiceService
     /// <summary>
     /// Runs billing as at a date: for every active template whose next run has fallen due on or before
     /// <paramref name="asOf"/>, posts a supplier invoice (dated the run date, numbered reference-yyyyMM) and
-    /// advances the template by its interval — catching up multiple periods if the template is behind.
+    /// advances the template by its interval - catching up multiple periods if the template is behind.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asOf">The billing cut-off date.</param>

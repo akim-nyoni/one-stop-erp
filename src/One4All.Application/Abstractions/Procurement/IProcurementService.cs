@@ -111,6 +111,9 @@ public sealed class MatchInvoiceRequest
     /// <summary>A price tolerance (percent) for this match; null uses the supplier's (else the company's) rule, and a value above that rule is refused.</summary>
     public decimal? TolerancePercent { get; init; }
 
+    /// <summary>Gets a value indicating whether the invoice price was accepted through a decided price dispute (the price rule is then not applied; the variance posts as usual).</summary>
+    public bool PriceAcceptedThroughDispute { get; init; }
+
     /// <summary>Gets who approved a budget overrun on the invoice, if it needs approval.</summary>
     public long? BudgetApprovedByUserId { get; init; }
 

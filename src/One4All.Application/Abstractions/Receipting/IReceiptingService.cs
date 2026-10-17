@@ -124,7 +124,7 @@ public sealed class ReceiptRequest
     /// <summary>The strategy for spreading a debtor payment across outstanding items.</summary>
     public ReceiptAllocationStrategy AllocationStrategy { get; init; } = ReceiptAllocationStrategy.OldestFirst;
 
-    /// <summary>Why the payment is allocated other than oldest first — required then, and listed on the allocation override report (RC19).</summary>
+    /// <summary>Why the payment is allocated other than oldest first - required then, and listed on the allocation override report (RC19).</summary>
     public string? AllocationReason { get; init; }
 
     /// <summary>Explicit allocations, when <see cref="AllocationStrategy"/> is user-directed.</summary>
@@ -186,7 +186,7 @@ public interface IReceiptingService
 
     /// <summary>
     /// Previews how a debtor payment would be spread across the account's outstanding items under a
-    /// strategy — shown to the payer before the receipt is committed (brief §RCP-5), never writing.
+    /// strategy - shown to the payer before the receipt is committed (brief §RCP-5), never writing.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="customerId">The debtor account.</param>
@@ -200,7 +200,7 @@ public interface IReceiptingService
     /// <summary>
     /// Posts a receipt: debtor-payment lines credit the debtor control (via AR, allocated by strategy),
     /// sundry lines credit the income vote, deposits credit the deposit liability, and unidentified money
-    /// credits the suspense control — the money is debited to the cash/bank control.
+    /// credits the suspense control - the money is debited to the cash/bank control.
     /// </summary>
     /// <param name="request">The receipt request.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -240,7 +240,7 @@ public interface IReceiptingService
     /// <summary>
     /// Reverses a committed receipt (brief §RCP-7): un-allocates the debtor portion (restoring the settled
     /// charges), posts the exact opposite GL of every line (Dr debtor control / Cr cash for the debtor
-    /// portion; Dr income/deposit/suspense / Cr cash for coded lines), and marks the receipt cancelled —
+    /// portion; Dr income/deposit/suspense / Cr cash for coded lines), and marks the receipt cancelled -
     /// nothing is deleted. A cashier cannot reverse their own receipt. Requires a reason.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -254,7 +254,7 @@ public interface IReceiptingService
 
     /// <summary>
     /// Refunds a payer's credit balance (overpayment / credit on account, brief §RCP-9): Dr debtor control,
-    /// Cr bank — paid through the bank/safe, never the till drawer — then clears the payer's outstanding
+    /// Cr bank - paid through the bank/safe, never the till drawer - then clears the payer's outstanding
     /// credit items. Refuses to refund more than the available credit. An approved act with a reason.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -329,7 +329,7 @@ public interface IReceiptingService
 
     /// <summary>
     /// Captures a payment arrangement at the counter (brief §RCP-16 RC42): a promise to clear a balance in
-    /// instalments. Not a GL posting — receipts against the account settle the debt; the arrangement tracks
+    /// instalments. Not a GL posting - receipts against the account settle the debt; the arrangement tracks
     /// the promise for credit control.
     /// </summary>
     /// <param name="companyId">The company.</param>

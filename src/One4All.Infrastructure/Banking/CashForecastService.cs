@@ -95,7 +95,7 @@ public sealed class CashForecastService : ICashForecastService
             }
         }
 
-        // Payroll: the last regular run repeated monthly — net pay on its pay day, deductions remitted ten days later.
+        // Payroll: the last regular run repeated monthly - net pay on its pay day, deductions remitted ten days later.
         DateOnly? lastPay = await _db.Payslips.AsNoTracking().Where(p => p.CompanyId == companyId && p.RunKind == PayRunKind.Regular).MaxAsync(p => (DateOnly?)p.PayDate, ct).ConfigureAwait(false);
         if (lastPay is DateOnly pay)
         {

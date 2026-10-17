@@ -51,7 +51,7 @@ public enum AllocationStatus
 }
 
 /// <summary>
-/// An allocation run (<c>hse.allocation_run</c>, brief §4.10.4 — the highest-fraud-risk process): a proposed list
+/// An allocation run (<c>hse.allocation_run</c>, brief §4.10.4 - the highest-fraud-risk process): a proposed list
 /// pairing a scheme's available stands with waiting-list applicants by seniority, score or a seeded ballot. The seed,
 /// the exact inputs and their hash are kept so the draw can be independently re-verified; approval must come from
 /// someone other than the proposer.
@@ -271,6 +271,22 @@ public sealed class StandAllocation : Entity
     {
         Status = AllocationStatus.Accepted;
         DecidedOn = date;
+    }
+
+    /// <summary>Gets how many times the offer's deadline was extended.</summary>
+    public int OfferExtensions { get; private set; }
+
+    /// <summary>Gets the reason for the latest extension.</summary>
+    public string? ExtensionReason { get; private set; }
+
+    /// <summary>Extends an open offer's deadline (brief §4.10.4: an expired offer is lapsed or extended by an officer, with a reason).</summary>
+    /// <param name="newExpiry">The new deadline.</param>
+    /// <param name="reason">Why.</param>
+    public void ExtendOffer(DateOnly newExpiry, string reason)
+    {
+        OfferExpires = newExpiry;
+        OfferExtensions++;
+        ExtensionReason = reason;
     }
 
     /// <summary>Steps out of the live offers for a moment while a swap moves the other allottee onto this stand (one live offer per stand).</summary>

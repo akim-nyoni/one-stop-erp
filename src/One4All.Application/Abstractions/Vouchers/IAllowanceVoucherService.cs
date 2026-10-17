@@ -40,7 +40,7 @@ public sealed record OutstandingVouchers(string IssuedTo, AllowanceKind Kind, in
 
 /// <summary>
 /// Fuel, meal and allowance vouchers (brief §4.8): issued in serial-numbered runs, then reconciled against supplier
-/// invoices — every voucher billed must have been issued, be unexpired when used and not have been billed before, and the
+/// invoices - every voucher billed must have been issued, be unexpired when used and not have been billed before, and the
 /// invoice must equal the vouchers' value.
 /// </summary>
 public interface IAllowanceVoucherService

@@ -78,7 +78,7 @@ public sealed class ReceivablesReportsTests
         (await Render("AR47")).Should().Contain("USD,2,");
         (await Render("AR48")).Should().Contain("New,Big Buyer,2026-01-10").And.Contain("New,Small Buyer,2026-04-01");
 
-        (await Render("AR36")).Should().Contain("Big Buyer,0.00,—,0.00,\"1,000.00\",▼,1000").And.Contain("Small Buyer,0.00,—,250.00,0.00,▲,250");
+        (await Render("AR36")).Should().Contain("Big Buyer,0.00,-,0.00,\"1,000.00\",▼,1000").And.Contain("Small Buyer,0.00,-,250.00,0.00,▲,250");
 
         (await ar.PostCreditNoteAsync(new One4All.Application.Abstractions.Trading.SalesCreditNoteRequest
         {

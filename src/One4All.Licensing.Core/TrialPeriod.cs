@@ -2,7 +2,7 @@ namespace One4All.Licensing.Core;
 
 /// <summary>
 /// A trial counted from first activation (brief §11.1: "time-limited trial from first activation"): the vendor issues one signed Trial licence carrying
-/// the <c>trial_days</c> limit, and each installation may use it for that many days from the day it was first installed there — after which it is
+/// the <c>trial_days</c> limit, and each installation may use it for that many days from the day it was first installed there - after which it is
 /// read-only (data can still be seen and exported) until a full licence is installed.
 /// </summary>
 public static class TrialPeriod

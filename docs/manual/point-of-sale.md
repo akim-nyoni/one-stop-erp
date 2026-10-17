@@ -293,7 +293,7 @@ The list beside the form shows: Gift cards.
 
 ### Till favourite buttons
 
-Items pinned to the till's ★ Favourites tabs — for one terminal or every till, and optionally for one cashier (their own come first, then the till's, then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.
+Items pinned to the till's ★ Favourites tabs - for one terminal or every till, and optionally for one cashier (their own come first, then the till's, then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.
 
 | Field | Required | Notes |
 | --- | --- | --- |

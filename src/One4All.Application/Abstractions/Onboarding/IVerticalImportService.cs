@@ -34,20 +34,20 @@ public interface IVerticalImportService
     Task<ImportReport> ImportEmployeeLoansAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// Municipal properties: <c>stand, ward, ratepayer</c> (customer code) (optional <c>valuation, size, connected, services</c> — e.g.
+    /// Municipal properties: <c>stand, ward, ratepayer</c> (customer code) (optional <c>valuation, size, connected, services</c> - e.g.
     /// <c>Water:WAT1;Refuse:REF1</c>).
     /// </summary>
     Task<ImportReport> ImportPropertiesAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// Payroll year-to-date openings: <c>employee_number, tax_year, code, amount</c> — <c>TAXABLE</c> for taxable pay so far, or a pay element's code
+    /// Payroll year-to-date openings: <c>employee_number, tax_year, code, amount</c> - <c>TAXABLE</c> for taxable pay so far, or a pay element's code
     /// (a tax-table element's figure is the tax already deducted). Cumulative tax counts them with this payroll's own payslips; a later import
     /// of the same employee, year and code replaces the figure.
     /// </summary>
     Task<ImportReport> ImportPayrollYtdAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// Opening leave balances: <c>employee_number, leave_type, days</c> (optional <c>taken</c>) — each employee's leave owed when the system takes over,
+    /// Opening leave balances: <c>employee_number, leave_type, days</c> (optional <c>taken</c>) - each employee's leave owed when the system takes over,
     /// accrued as the opening and less what was taken; an employee already holding a balance of that type is skipped.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -67,7 +67,7 @@ public interface IVerticalImportService
     Task<ImportReport> ImportDimensionsAsync(long companyId, string csv, bool departments, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// Tax codes: <c>code, name, type, rate, effective_from</c> (optional <c>output_account, input_account</c>) — the type one of the tax types, the rate a
+    /// Tax codes: <c>code, name, type, rate, effective_from</c> (optional <c>output_account, input_account</c>) - the type one of the tax types, the rate a
     /// percentage in force from the date; codes already there are skipped.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -78,7 +78,7 @@ public interface IVerticalImportService
     Task<ImportReport> ImportTaxCodesAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// The meter register: <c>serial, stand, service, reading, date</c> (optional <c>digits, multiplier</c>) — each meter goes on the register with
+    /// The meter register: <c>serial, stand, service, reading, date</c> (optional <c>digits, multiplier</c>) - each meter goes on the register with
     /// its opening reading as an accepted actual reading and is linked to the property's active service of that type (Water, Sewer…), which must
     /// not already be metered.
     /// </summary>
@@ -89,7 +89,7 @@ public interface IVerticalImportService
 
     /// <summary>
     /// Housing stands: <c>stand, parcel, size</c> (optional <c>cost, scheme, status</c>). A parcel not yet on the register is created from its stands (area and cost
-    /// their totals); nothing is posted — the land's value comes in with the trial balance.
+    /// their totals); nothing is posted - the land's value comes in with the trial balance.
     /// </summary>
     Task<ImportReport> ImportStandsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
@@ -127,7 +127,7 @@ public interface IVerticalImportService
     /// Housing sale and instalment agreements in force at take-on (brief §4.10): <c>agreement, stand, buyer, cash_price, deposit, rate, method, term_months, signed, first_due,
     /// interest_account</c> (optional <c>tenure, escalation, arrears</c>); method is Zero, Flat or ReducingBalance, tenure InstalmentSale, RentToBuy or LeaseWithOption. The stand is
     /// recorded sold to the buyer (unless the register already shows it), the buyer goes onto the tenure's receivables control, the schedule is rebuilt and every instalment due on or
-    /// before the opening date is marked raised (history), and the arrears — what of those instalments is still unpaid — becomes an open item on the buyer against the migration suspense
+    /// before the opening date is marked raised (history), and the arrears - what of those instalments is still unpaid - becomes an open item on the buyer against the migration suspense
     /// account. An agreement number already on file is skipped.
     /// </summary>
     Task<ImportReport> ImportInstalmentAgreementsAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default);

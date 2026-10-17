@@ -18,7 +18,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the approval workflow driving documents: a company's requisition workflow (two stages, the second only for larger amounts)
-/// governs the requisition — direct approval is refused, approvers are notified stage by stage, the last approval approves the
+/// governs the requisition - direct approval is refused, approvers are notified stage by stage, the last approval approves the
 /// requisition and the requester is told; a journal workflow posts the journal on approval and rejects it on rejection; and when the
 /// document cannot follow a decision (the preparer approving their own journal), the decision is not recorded.
 /// </summary>

@@ -77,7 +77,7 @@ public sealed partial class ReportParameterInput : ObservableObject
         ParameterType.Decimal => "number",
         ParameterType.Boolean => "true / false",
         _ => "text",
-    }) + (Definition.MultiSelect ? ", several separated by commas" : string.Empty) + (LookupNote is { Length: > 0 } note ? " — " + note : string.Empty);
+    }) + (Definition.MultiSelect ? ", several separated by commas" : string.Empty) + (LookupNote is { Length: > 0 } note ? " - " + note : string.Empty);
 
     /// <summary>Why the list is empty (waiting on another parameter, refused), shown under the input.</summary>
     [ObservableProperty]
@@ -100,7 +100,7 @@ public sealed partial class ReportParameterInput : ObservableObject
 public sealed record ParameterChoice(string Value, string Label)
 {
     /// <summary>The text in the drop-down.</summary>
-    public string Display => Label == Value ? Value : $"{Value} — {Label}";
+    public string Display => Label == Value ? Value : $"{Value} - {Label}";
 }
 
 /// <summary>

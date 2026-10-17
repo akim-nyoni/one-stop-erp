@@ -8,7 +8,7 @@ namespace One4All.Application.Reporting;
 /// <summary>
 /// Report run auditing (brief §13.3 security): parameters written in one canonical form so the same run is recognised
 /// again, the permission each purpose needs (view, print, export, reprint), the document fingerprint, and the copy number
-/// of a print — a print of something already printed is a reprint. Pure and unit-tested.
+/// of a print - a print of something already printed is a reprint. Pure and unit-tested.
 /// </summary>
 public static class ReportRunAudit
 {

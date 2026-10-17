@@ -263,7 +263,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Quality inspection of a receipt",
             Description = "Inspects goods received on a GRN held for quality: per item, what passed (released to the warehouse) and what was rejected (returned, with a credit note) "
-                + "— \"ITEM:passed:rejected:reason; …\".",
+                + "- \"ITEM:passed:rejected:reason; …\".",
             Fields = [Req("Grn", "GRN number"), Req("Results", "Results: ITEM:passed:rejected[:reason]; …"), Req("Warehouse", "Release to warehouse"), Opt("Variance", "Price variance account"), Today()],
             Run = async (c, i) =>
             {
@@ -322,7 +322,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Amend a purchase order", ListTitle = "Purchase orders",
-            Description = "Changes order lines (ITEM:quantity@price; …) as a new version with the reason — quantities never below what was received, prices not once invoiced; a rise over "
+            Description = "Changes order lines (ITEM:quantity@price; …) as a new version with the reason - quantities never below what was received, prices not once invoiced; a rise over "
                 + "the threshold sends the order back for re-approval. Re-approve clears it (another user); History lists its versions.",
             Fields = [Pick("Step", "Step", ["Amend", "Re-approve", "History"]), Req("Order", "Order number"), Opt("Lines", "Lines: ITEM:quantity@price; …"), Opt("Reason", "Reason"),
                 Num("Threshold", "Re-approval threshold %", "10"), Today()],
@@ -350,7 +350,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Supplier rebates", ListTitle = "Rebate agreements",
-            Description = "A volume rebate agreement with a supplier for a period with spend tiers (\"0:1; 100000:2.5; 250000:4\" — from spend:rate %); Accrue books what each agreement "
+            Description = "A volume rebate agreement with a supplier for a period with spend tiers (\"0:1; 100000:2.5; 250000:4\" - from spend:rate %); Accrue books what each agreement "
                 + "has earned so far.",
             Fields = [Pick("Step", "Step", ["Create", "Accrue"]), Opt("Supplier", "Supplier code (create)"), Opt("Code", "Agreement code"), Today("From", "From"), Today("To", "To"),
                 Opt("Tiers", "Tiers: from spend:rate %; …"), Opt("Receivable", "Rebate receivable account (accrue)"), Opt("Income", "Rebate income account (accrue)"), Today("Date", "As at (accrue)")],
@@ -381,7 +381,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Supplier scorecard",
             Description = "Each supplier active in a period: deliveries on time against the orders' required-by dates, quality as the share of goods not returned, spend, and "
-                + "the purchase price variance — invoiced above or below the order prices.",
+                + "the purchase price variance - invoiced above or below the order prices.",
             Fields = [Today("From", "From"), Today("To", "To")],
             Run = async (c, i) =>
             {

@@ -24,7 +24,7 @@ public enum TenderType
     /// <summary>Voucher / gift card.</summary>
     Voucher = 6,
 
-    /// <summary>On account (credit — posts to AR).</summary>
+    /// <summary>On account (credit - posts to AR).</summary>
     Credit = 7,
 }
 
@@ -93,7 +93,7 @@ public sealed class PosTerminal : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the till is cashed up blind (brief §4.1): the cashier declares the count before seeing what was expected.</summary>
     public bool BlindCashUp { get; set; }
 
-    /// <summary>The terminal's profile — what kind of counter it is, which shapes the till's layout (brief §4.1 "configurable layout per terminal profile").</summary>
+    /// <summary>The terminal's profile - what kind of counter it is, which shapes the till's layout (brief §4.1 "configurable layout per terminal profile").</summary>
     public TerminalProfile Profile { get; set; }
 
     /// <summary>Gets or sets the terminal's own function keys ("F2=TenderCash; F3=TenderCard"), over its profile's defaults.</summary>

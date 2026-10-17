@@ -34,8 +34,8 @@ public sealed record OrderVersion(int Version, decimal TotalNet, IReadOnlyList<A
 
 /// <summary>
 /// Purchase order amendments with version history and re-approval (brief §4.3): every amendment retains the version it
-/// replaces with the reason; one that raises the order's value beyond the threshold holds the order — nothing can be
-/// received against it — until a different user re-approves it.
+/// replaces with the reason; one that raises the order's value beyond the threshold holds the order - nothing can be
+/// received against it - until a different user re-approves it.
 /// </summary>
 public interface IPurchaseOrderAmendmentService
 {

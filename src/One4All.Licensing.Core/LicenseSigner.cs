@@ -5,7 +5,7 @@ namespace One4All.Licensing.Core;
 
 /// <summary>
 /// Signs a licence payload with an Ed25519 private key, producing the compact token
-/// <c>payload_base64url.signature_base64url</c> (brief §11.2). Vendor-only — the private key never
+/// <c>payload_base64url.signature_base64url</c> (brief §11.2). Vendor-only - the private key never
 /// ships with the ERP.
 /// </summary>
 public sealed class LicenseSigner

@@ -141,7 +141,7 @@ public sealed class ReportingSnapshotService : IReportingSnapshotService
                 FROM gl.account a
                 WHERE a.company_id = @companyId AND NOT a.is_deleted AND (a.name ILIKE @like OR a.account_code ILIKE @like OR @text <% a.name)
                 UNION ALL
-                SELECT 'Property', p.id, p.stand_number, p.stand_number || coalesce(' — ' || p.address, ''),
+                SELECT 'Property', p.id, p.stand_number, p.stand_number || coalesce(' - ' || p.address, ''),
                        word_similarity(q.text, public.f_unaccent(coalesce(p.address, ''))), p.stand_number ILIKE @like OR public.f_unaccent(coalesce(p.address, '')) ILIKE q.pattern
                 FROM mun.property p, q
                 WHERE p.company_id = @companyId AND NOT p.is_deleted

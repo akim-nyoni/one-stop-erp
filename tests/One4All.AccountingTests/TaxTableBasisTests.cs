@@ -53,7 +53,7 @@ public sealed class TaxTableBasisTests
         (await payroll.CalculateAsync(companyId, pam.Id)).Value.Lines.Should().Contain(new PayLine("PAYE-P", 100m));
         (await payroll.RunAsync(companyId, "2026-01", new DateOnly(2026, 1, 25), "2420", "TT-01")).Value.TotalDeductions.Should().Be(200m);
 
-        // February: Cal's raise to 3,000 is taxed cumulatively — 4,000 to date on doubled bands is 600, less January's 100 = 500
+        // February: Cal's raise to 3,000 is taxed cumulatively - 4,000 to date on doubled bands is 600, less January's 100 = 500
         // (per period it would be 600). Pam's 1,200 bonus is spread: 100 on her pay plus 1,440 − 1,200 = 240 on the bonus (not 260).
         cal.BasicSalary = 3000m;
         await db.SaveChangesAsync();

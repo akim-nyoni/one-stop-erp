@@ -146,7 +146,7 @@ public class LicensingTests
     public void Machine_binding_matches_within_fuzzy_tolerance()
     {
         MachineFingerprint issued = MachineFingerprint.FromComponents(["mb:AAA", "guid:BBB", "mac:CCC", "vol:DDD"]);
-        // One component changed (mac) — still 3 of 4 match.
+        // One component changed (mac) - still 3 of 4 match.
         MachineFingerprint current = MachineFingerprint.FromComponents(["mb:AAA", "guid:BBB", "mac:ZZZ", "vol:DDD"]);
 
         (LicenseSigner signer, LicenseVerifier verifier) = NewPair();

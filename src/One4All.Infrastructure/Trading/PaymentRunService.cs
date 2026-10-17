@@ -46,7 +46,7 @@ public sealed class PaymentRunService : IPaymentRunService
         return await PayAsync(request, null, ct).ConfigureAwait(false);
     }
 
-    // Pays the run: everything due, or — for an approved saved run — only its included lines at their approved amounts (a part-payment
+    // Pays the run: everything due, or - for an approved saved run - only its included lines at their approved amounts (a part-payment
     // settles the oldest invoices first).
     private readonly Application.Abstractions.Banking.IChequeService? _cheques;
 
@@ -512,7 +512,7 @@ public sealed class PaymentRunService : IPaymentRunService
     }
 
     // The withholding the payment run deducts from a payment (payment currency): the code's rate when the supplier has no
-    // valid tax clearance on the payment date, otherwise none — the same rule the purchase ledger applies.
+    // valid tax clearance on the payment date, otherwise none - the same rule the purchase ledger applies.
     private async Task<decimal> WithholdingOnAsync(PaymentRunRequest request, Supplier supplier, decimal amount, CancellationToken ct)
     {
         if (await TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, ct).ConfigureAwait(false) is not string code)

@@ -92,7 +92,7 @@ public sealed class BudgetPlanningTests
         (await Render("B4", new() { ["Level"] = "Division" })).Should().Contain("Division,Infrastructure,1,1080").And.Contain("Division,Amenities,1,600");
         (await Render("B5")).Should().Contain("ENROL,Enrolment,students,400,1,12000");
         (await Render("B6", new() { ["DriverCode"] = "enrol", ["NewValue"] = 420m })).Should().Contain("FEES v1,4000,All,\"12,000.00\",\"12,600.00\",600");
-        (await Render("B7")).Should().Contain("WORKS v2,WRK,6000,ZeroBased,—,1080").And.Contain("FEES v1,All,4000,DriverBased,ENROL,12000");
+        (await Render("B7")).Should().Contain("WORKS v2,WRK,6000,ZeroBased,-,1080").And.Contain("FEES v1,All,4000,DriverBased,ENROL,12000");
         (await Render("B8", new() { ["StaffAccount"] = "6100", ["VacancyPercent"] = 10m })).Should().Contain("WRK,2,1,\"24,000.00\",10%,\"21,600.00\",\"20,000.00\",-1600");
         (await Render("B10")).Should().Contain("FEES v1,4000,").And.Contain(",ENROL,400,30.00,12000");
         (await Render("B32")).Should().Contain("W. Boss,WRK,6100,\"20,000.00\",\"2,000.00\",0.00,10.0%,18000");

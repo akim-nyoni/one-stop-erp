@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the control reconciliation for a past date with later activity: an allocation and a stock issue
-/// after the date must not leak into it, so March still reconciles after April's receipt and issue — and
+/// after the date must not leak into it, so March still reconciles after April's receipt and issue - and
 /// April reconciles too.
 /// </summary>
 [Collection(AccountingCollection.Name)]

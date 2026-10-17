@@ -48,7 +48,7 @@ public interface IPosCatalogueService
     /// <returns>The tiles by category and name.</returns>
     Task<IReadOnlyList<PosTile>> TilesAsync(long companyId, CancellationToken ct = default);
 
-    /// <summary>Searches the whole item master on the server — code, PLU, barcodes (item, pack or alias), synonyms, brand and description — and prices the hits.</summary>
+    /// <summary>Searches the whole item master on the server - code, PLU, barcodes (item, pack or alias), synonyms, brand and description - and prices the hits.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="term">What was typed or scanned.</param>
     /// <param name="take">How many to return.</param>
@@ -113,7 +113,7 @@ public interface IPosCatalogueService
     /// </summary>
     Task<Result> ArrangeFavouritesAsync(long companyId, long? terminalId, long userId, int page, IReadOnlyList<long> itemIds, CancellationToken ct = default);
 
-    /// <summary>The favourites a cashier sees at a till: their own first, then the till's, then every till's — each item once — with colour and page.</summary>
+    /// <summary>The favourites a cashier sees at a till: their own first, then the till's, then every till's - each item once - with colour and page.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="terminalId">The till.</param>
     /// <param name="userId">The cashier.</param>

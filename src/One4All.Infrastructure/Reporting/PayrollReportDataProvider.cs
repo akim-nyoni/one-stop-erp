@@ -114,7 +114,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         };
     }
 
-    // Every payslip line with its slip's totals — the data a designed payslip layout groups by employee.
+    // Every payslip line with its slip's totals - the data a designed payslip layout groups by employee.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayslipLinesAsync(long companyId, DateOnly fromDate, DateOnly toDate, string? employeeNumber, CancellationToken ct)
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
@@ -154,7 +154,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
-            .SelectMany(p => p.Lines.Where(l => l.Type == PayElementType.Deduction).Select(l => (p.EmployeeId, Department: employees.TryGetValue(p.EmployeeId, out Employee? e) ? e.Department ?? "—" : "—", Line: l)))
+            .SelectMany(p => p.Lines.Where(l => l.Type == PayElementType.Deduction).Select(l => (p.EmployeeId, Department: employees.TryGetValue(p.EmployeeId, out Employee? e) ? e.Department ?? "-" : "-", Line: l)))
             .GroupBy(x => (x.Line.ElementCode, x.Department)).OrderBy(g => g.Key.ElementCode, StringComparer.Ordinal).ThenBy(g => g.Key.Department, StringComparer.Ordinal)
             .Select(g =>
             {
@@ -193,7 +193,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             bool isNew = !before.ContainsKey(id), gone = !now.ContainsKey(id);
             decimal a = before.GetValueOrDefault(id), b = now.GetValueOrDefault(id);
             string flag = isNew ? "Starter / new" : gone ? "Leaver / not paid" : a != 0m && Math.Abs((b - a) / a) > 0.10m ? "Changed > 10%" : string.Empty;
-            return Row(("Employee", Name(employees, id)), ("Department", employees.GetValueOrDefault(id)?.Department ?? "—"), ("Previous", Money(a)), ("Current", Money(b)), ("Flag", flag), ("Change", b - a));
+            return Row(("Employee", Name(employees, id)), ("Department", employees.GetValueOrDefault(id)?.Department ?? "-"), ("Previous", Money(a)), ("Current", Money(b)), ("Flag", flag), ("Change", b - a));
         })];
     }
 
@@ -201,10 +201,10 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<string, PayElement> elements = await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Code, ct).ConfigureAwait(false);
-        string Rule(PayElement? e) => e is null ? "—" : e.Basis switch
+        string Rule(PayElement? e) => e is null ? "-" : e.Basis switch
         {
             CalculationBasis.FixedAmount => Money(e.FixedAmount),
-            CalculationBasis.Formula => e.Formula ?? "—",
+            CalculationBasis.Formula => e.Formula ?? "-",
             CalculationBasis.RatePerUnit => $"{e.Rate:0.####} per unit",
             _ => $"{e.Rate:0.####}%",
         };
@@ -240,7 +240,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                     ("Breakdown", faces.Count == 0 ? "no denominations set up" : envelope.Pieces.Describe()), ("Net", envelope.Net)));
             }
 
-            rows.Add(Row(("PayPoint", point.Key), ("Employee", $"TOTAL — {point.Count()} employee(s)"),
+            rows.Add(Row(("PayPoint", point.Key), ("Employee", $"TOTAL - {point.Count()} employee(s)"),
                 ("Breakdown", (faces.Count == 0 ? "-" : Application.Payroll.CashPayBreakdown.Total(point.Select(x => x.Pieces)).Describe())
                     + $"  (draw {point.Sum(x => x.Net).ToString("N2", CultureInfo.InvariantCulture)})"), ("Net", null))); // the pay point's sum is in the text, so the column total is not doubled
         }
@@ -284,7 +284,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             decimal taxable = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount);
             decimal tax = g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount);
-            return Row(("Employee", Name(employees, g.Key)), ("Taxable", Money(taxable)), ("Rate", taxable == 0m ? "—" : (tax * 100m / taxable).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Tax", tax));
+            return Row(("Employee", Name(employees, g.Key)), ("Taxable", Money(taxable)), ("Rate", taxable == 0m ? "-" : (tax * 100m / taxable).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Tax", tax));
         })];
     }
 
@@ -311,17 +311,17 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             .Where(b => employees.TryGetValue(b.EmployeeId, out Employee? e) && e.Status != EmployeeStatus.Terminated)
             .OrderBy(b => employees[b.EmployeeId].Department ?? string.Empty, StringComparer.Ordinal).ThenBy(b => Name(employees, b.EmployeeId), StringComparer.Ordinal)
             .ThenBy(b => b.LeaveType, StringComparer.Ordinal)
-            .Select(b => Row(("Department", employees[b.EmployeeId].Department ?? "—"), ("Employee", Name(employees, b.EmployeeId)), ("LeaveType", b.LeaveType),
-                ("Entitlement", entitlement.TryGetValue(b.LeaveType, out decimal days) ? Qty(days) : "—"), ("Accrued", Qty(b.AccruedDays)), ("Taken", Qty(b.TakenDays)),
-                ("CarriedForward", Qty(b.CarriedOverDays)), ("Expiring", b.CarriedOverDays > 0m && b.CarryExpiresOn is DateOnly lapse ? $"{Qty(b.CarriedOverDays)} on {Date(lapse)}" : "—"),
+            .Select(b => Row(("Department", employees[b.EmployeeId].Department ?? "-"), ("Employee", Name(employees, b.EmployeeId)), ("LeaveType", b.LeaveType),
+                ("Entitlement", entitlement.TryGetValue(b.LeaveType, out decimal days) ? Qty(days) : "-"), ("Accrued", Qty(b.AccruedDays)), ("Taken", Qty(b.TakenDays)),
+                ("CarriedForward", Qty(b.CarriedOverDays)), ("Expiring", b.CarriedOverDays > 0m && b.CarryExpiresOn is DateOnly lapse ? $"{Qty(b.CarriedOverDays)} on {Date(lapse)}" : "-"),
                 ("Balance", b.BalanceDays)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EmployeeMasterAsync(long companyId, CancellationToken ct)
         => [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values
             .OrderBy(e => e.Department ?? string.Empty, StringComparer.Ordinal).ThenBy(e => e.EmployeeNumber, StringComparer.Ordinal)
-            .Select(e => Row(("Department", e.Department ?? "—"), ("Number", e.EmployeeNumber), ("Name", e.FullName), ("Grade", e.Grade ?? "—"), ("ContractType", e.EmploymentType.ToString()),
-                ("Status", e.Status.ToString()), ("Engaged", Date(e.EngagementDate)), ("JobTitle", e.JobTitle ?? "—"), ("PayGroup", e.PayGroup ?? "—")))];
+            .Select(e => Row(("Department", e.Department ?? "-"), ("Number", e.EmployeeNumber), ("Name", e.FullName), ("Grade", e.Grade ?? "-"), ("ContractType", e.EmploymentType.ToString()),
+                ("Status", e.Status.ToString()), ("Engaged", Date(e.EngagementDate)), ("JobTitle", e.JobTitle ?? "-"), ("PayGroup", e.PayGroup ?? "-")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SalaryChangesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
@@ -333,11 +333,11 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             if (json is null)
             {
-                return "—";
+                return "-";
             }
 
             using JsonDocument document = JsonDocument.Parse(json);
-            return document.RootElement.TryGetProperty("BasicSalary", out JsonElement salary) ? salary.ToString() : "—";
+            return document.RootElement.TryGetProperty("BasicSalary", out JsonElement salary) ? salary.ToString() : "-";
         }
 
         return [.. changes.Where(c => c.ChangedFields.Contains("BasicSalary")).Select(c => Row(("When", c.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
@@ -398,7 +398,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<string, decimal> payroll = slips.GroupBy(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture))
             .ToDictionary(g => g.Key, g => g.Sum(p => p.GrossEarnings) + g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.EmployerContribution).Sum(l => l.Amount));
         return [.. revenue.Keys.Union(payroll.Keys).Order(StringComparer.Ordinal).Select(m => Row(("Month", m), ("Revenue", Money(revenue.GetValueOrDefault(m))),
-            ("Share", revenue.GetValueOrDefault(m) == 0m ? "—" : (payroll.GetValueOrDefault(m) * 100m / revenue[m]).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Payroll", payroll.GetValueOrDefault(m))))];
+            ("Share", revenue.GetValueOrDefault(m) == 0m ? "-" : (payroll.GetValueOrDefault(m) * 100m / revenue[m]).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Payroll", payroll.GetValueOrDefault(m))))];
     }
 
     // Earnings and employer contributions debit their accounts; deductions and contributions' liabilities credit theirs.
@@ -421,8 +421,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         DateTimeOffset start = Start(fromDate), end = End(toDate);
         return [.. (await _db.ChangeLog.AsNoTracking().Where(c => (c.CompanyId == companyId || c.CompanyId == null) && PayrollEntities.Contains(c.EntityType) && c.OccurredOnUtc >= start && c.OccurredOnUtc <= end)
                 .OrderBy(c => c.Id).Take(10000).ToListAsync(ct).ConfigureAwait(false))
-            .Select(c => Row(("When", c.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", c.UserName), ("Entity", c.EntityType), ("Id", c.EntityId ?? "—"),
-                ("Action", c.Action.ToString()), ("Changed", c.ChangedFields.Count == 0 ? "—" : string.Join(", ", c.ChangedFields))))];
+            .Select(c => Row(("When", c.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", c.UserName), ("Entity", c.EntityType), ("Id", c.EntityId ?? "-"),
+                ("Action", c.Action.ToString()), ("Changed", c.ChangedFields.Count == 0 ? "-" : string.Join(", ", c.ChangedFields))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AccessLogAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -432,14 +432,14 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. (await _db.Set<ReportRun>().AsNoTracking().Where(r => r.CompanyId == companyId && r.RunAt >= start && r.RunAt <= end
                 && (r.ReportCode.StartsWith("PR") || r.ReportCode.StartsWith("PAY-") || r.ReportCode.StartsWith("HR-"))).OrderBy(r => r.RunAt).ToListAsync(ct).ConfigureAwait(false))
             .Select(r => Row(("When", r.RunAt.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Report", r.ReportCode), ("User", r.UserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "system"),
-                ("Purpose", r.Purpose.ToString()), ("Format", r.Format), ("Copy", r.CopyNumber?.ToString(CultureInfo.InvariantCulture) ?? "—")))];
+                ("Purpose", r.Purpose.ToString()), ("Format", r.Format), ("Copy", r.CopyNumber?.ToString(CultureInfo.InvariantCulture) ?? "-")))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> YtdAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         return [.. (await PayslipsAsync(companyId, new DateOnly(toDate.Year, 1, 1), toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal)
-            .Select(g => Row(("Employee", Name(employees, g.Key)), ("Department", employees.GetValueOrDefault(g.Key)?.Department ?? "—"), ("Gross", Money(g.Sum(p => p.GrossEarnings))),
+            .Select(g => Row(("Employee", Name(employees, g.Key)), ("Department", employees.GetValueOrDefault(g.Key)?.Department ?? "-"), ("Gross", Money(g.Sum(p => p.GrossEarnings))),
                 ("Taxable", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount))), ("Deductions", Money(g.Sum(p => p.TotalDeductions))),
                 ("Employer", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.EmployerContribution).Sum(l => l.Amount))), ("Net", g.Sum(p => p.NetPay))))];
     }
@@ -457,7 +457,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         return [.. (await FactsAsync(companyId, ct).ConfigureAwait(false)).Select(f => (Facts: f, Issues: EmployeeChecks.Issues(f, asAt))).Where(x => x.Issues.Count > 0)
-            .Select(x => Row(("Employee", Name(employees, x.Facts.Id)), ("Department", employees[x.Facts.Id].Department ?? "—"), ("Method", x.Facts.PaymentMethod.ToString()), ("Issues", string.Join("; ", x.Issues))))];
+            .Select(x => Row(("Employee", Name(employees, x.Facts.Id)), ("Department", employees[x.Facts.Id].Department ?? "-"), ("Method", x.Facts.PaymentMethod.ToString()), ("Issues", string.Join("; ", x.Issues))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PaymentScheduleAsync(long companyId, DateOnly fromDate, DateOnly toDate, PayMethod method, CancellationToken ct)
@@ -470,7 +470,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             {
                 Employee e = employees[p.EmployeeId];
                 return method == PayMethod.BankTransfer
-                    ? Row(("Employee", Name(employees, p.EmployeeId)), ("Bank", e.BankName ?? "MISSING"), ("Branch", e.BankBranch ?? "—"), ("Account", e.BankAccountNumber ?? "MISSING"), ("Reference", p.PeriodLabel), ("Net", p.NetPay))
+                    ? Row(("Employee", Name(employees, p.EmployeeId)), ("Bank", e.BankName ?? "MISSING"), ("Branch", e.BankBranch ?? "-"), ("Account", e.BankAccountNumber ?? "MISSING"), ("Reference", p.PeriodLabel), ("Net", p.NetPay))
                     : Row(("Employee", Name(employees, p.EmployeeId)), ("Wallet", e.MobileMoneyNumber ?? "MISSING"), ("Reference", p.PeriodLabel), ("Net", p.NetPay));
             })];
     }
@@ -480,7 +480,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, decimal> net = (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).ToDictionary(g => g.Key, g => g.Sum(p => p.NetPay));
         return [.. employees.Values.Where(e => e.IsSalaryHeld).OrderBy(e => e.EmployeeNumber, StringComparer.Ordinal)
-            .Select(e => Row(("Employee", Name(employees, e.Id)), ("Department", e.Department ?? "—"), ("Method", e.PaymentMethod.ToString()), ("Reason", e.HoldReason ?? "—"), ("Net", net.GetValueOrDefault(e.Id))))];
+            .Select(e => Row(("Employee", Name(employees, e.Id)), ("Department", e.Department ?? "-"), ("Method", e.PaymentMethod.ToString()), ("Reason", e.HoldReason ?? "-"), ("Net", net.GetValueOrDefault(e.Id))))];
     }
 
     private static bool EmployedOn(Employee e, DateOnly date) => e.EngagementDate <= date && !(e.TerminationDate is DateOnly left && left < date);
@@ -500,9 +500,9 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         return [.. employees.Values.Where(e => e.EngagementDate >= fromDate && e.EngagementDate <= toDate).Select(e => (Kind: "Starter", Employee: e, Date: e.EngagementDate, Reason: string.Empty))
-            .Concat(employees.Values.Where(e => e.TerminationDate is DateOnly d && d >= fromDate && d <= toDate).Select(e => (Kind: "Leaver", Employee: e, Date: e.TerminationDate!.Value, Reason: e.TerminationReason ?? "—")))
+            .Concat(employees.Values.Where(e => e.TerminationDate is DateOnly d && d >= fromDate && d <= toDate).Select(e => (Kind: "Leaver", Employee: e, Date: e.TerminationDate!.Value, Reason: e.TerminationReason ?? "-")))
             .OrderBy(x => x.Date).ThenBy(x => x.Kind, StringComparer.Ordinal)
-            .Select(x => Row(("Kind", x.Kind), ("Employee", Name(employees, x.Employee.Id)), ("Department", x.Employee.Department ?? "—"), ("Date", Date(x.Date)), ("Reason", x.Reason), ("Basic", x.Employee.BasicSalary)))];
+            .Select(x => Row(("Kind", x.Kind), ("Employee", Name(employees, x.Employee.Id)), ("Department", x.Employee.Department ?? "-"), ("Date", Date(x.Date)), ("Reason", x.Reason), ("Basic", x.Employee.BasicSalary)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GradesAsync(long companyId, CancellationToken ct)
@@ -524,7 +524,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             if (json is null)
             {
-                return "—";
+                return "-";
             }
 
             using JsonDocument document = JsonDocument.Parse(json);
@@ -547,7 +547,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. employees.Values.Where(e => e.Status != EmployeeStatus.Terminated)
             .SelectMany(e => new[] { ("Contract end", e, e.ContractEndDate), ("Probation end", e, e.ProbationEndDate), ("Work permit", e, e.WorkPermitExpiry) })
             .Where(x => x.Item3 is DateOnly d && d <= horizon).OrderBy(x => x.Item3)
-            .Select(x => Row(("Kind", x.Item1), ("Employee", Name(employees, x.Item2.Id)), ("Department", x.Item2.Department ?? "—"), ("Date", Date(x.Item3!.Value)),
+            .Select(x => Row(("Kind", x.Item1), ("Employee", Name(employees, x.Item2.Id)), ("Department", x.Item2.Department ?? "-"), ("Date", Date(x.Item3!.Value)),
                 ("Due", x.Item3.Value < asAt ? $"{asAt.DayNumber - x.Item3.Value.DayNumber} days overdue" : $"in {x.Item3.Value.DayNumber - asAt.DayNumber} days")))];
     }
 
@@ -555,7 +555,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         return [.. EmployeeChecks.GhostSignals(await FactsAsync(companyId, ct).ConfigureAwait(false), asAt).OrderBy(s => Name(employees, s.Key), StringComparer.Ordinal)
-            .Select(s => Row(("Employee", Name(employees, s.Key)), ("Department", employees[s.Key].Department ?? "—"), ("Engaged", Date(employees[s.Key].EngagementDate)), ("Signals", string.Join("; ", s.Value))))];
+            .Select(s => Row(("Employee", Name(employees, s.Key)), ("Department", employees[s.Key].Department ?? "-"), ("Engaged", Date(employees[s.Key].EngagementDate)), ("Signals", string.Join("; ", s.Value))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RunsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -696,8 +696,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     }
 
     // PR35: per employee and period with earnings paid in more than the base currency, each currency's taxable earnings, its share,
-    // and the tax attributable to it — on the currency's own table when one is in force, otherwise the base table's tax on the
-    // whole remuneration apportioned by share — with the tax deducted apportioned the same way.
+    // and the tax attributable to it - on the currency's own table when one is in force, otherwise the base table's tax on the
+    // whole remuneration apportioned by share - with the tax deducted apportioned the same way.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CurrencySplitAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
@@ -882,11 +882,11 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         List<AttendanceRecord> days = [.. (await AttendanceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(a => a.OvertimeHours > 0m)];
         return [.. days.GroupBy(a => (a.EmployeeId, a.OvertimeMultiplier)).Select(g => (g, e: employees.GetValueOrDefault(g.Key.EmployeeId)))
-            .OrderBy(x => x.e?.Department ?? "—", StringComparer.Ordinal).ThenBy(x => Name(employees, x.g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(x => x.g.Key.OvertimeMultiplier)
+            .OrderBy(x => x.e?.Department ?? "-", StringComparer.Ordinal).ThenBy(x => Name(employees, x.g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(x => x.g.Key.OvertimeMultiplier)
             .Select(x =>
             {
                 decimal hours = x.g.Sum(a => a.OvertimeHours), approved = x.g.Where(a => a.OvertimeApprovedByUserId != null).Sum(a => a.OvertimeHours);
-                return Row(("Department", x.e?.Department ?? "—"), ("Employee", Name(employees, x.g.Key.EmployeeId)), ("Multiplier", Qty(x.g.Key.OvertimeMultiplier)), ("Hours", Qty(hours)),
+                return Row(("Department", x.e?.Department ?? "-"), ("Employee", Name(employees, x.g.Key.EmployeeId)), ("Multiplier", Qty(x.g.Key.OvertimeMultiplier)), ("Hours", Qty(hours)),
                     ("Approved", Qty(approved)), ("Unapproved", Qty(hours - approved)), ("Cost", AttendanceRules.OvertimeCost(hours, x.e?.BasicSalary ?? 0m, hoursPerMonth, x.g.Key.OvertimeMultiplier)));
             })];
     }
@@ -896,7 +896,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         List<LeaveRecord> taken = await _db.LeaveRecords.AsNoTracking().Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && l.FromDate >= fromDate && l.FromDate <= toDate)
             .ToListAsync(ct).ConfigureAwait(false);
-        return [.. taken.GroupBy(l => (l.LeaveType, Department: employees.GetValueOrDefault(l.EmployeeId)?.Department ?? "—", Month: l.FromDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)))
+        return [.. taken.GroupBy(l => (l.LeaveType, Department: employees.GetValueOrDefault(l.EmployeeId)?.Department ?? "-", Month: l.FromDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)))
             .OrderBy(g => g.Key.LeaveType, StringComparer.Ordinal).ThenBy(g => g.Key.Department, StringComparer.Ordinal).ThenBy(g => g.Key.Month, StringComparer.Ordinal)
             .Select(g => Row(("Type", g.Key.LeaveType), ("Department", g.Key.Department), ("Month", g.Key.Month), ("Employees", g.Select(l => l.EmployeeId).Distinct().Count()), ("Records", g.Count()),
                 ("Days", g.Sum(l => l.Days))))];
@@ -963,8 +963,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
             if (issues.Count > 0)
             {
-                rows.Add(Row(("Date", Date(a.Date)), ("Employee", Name(employees, a.EmployeeId)), ("In", a.ClockIn?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—"),
-                    ("Out", a.ClockOut?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "—"), ("Hours", hours is decimal h ? Qty(h) : "—"), ("Exception", string.Join("; ", issues))));
+                rows.Add(Row(("Date", Date(a.Date)), ("Employee", Name(employees, a.EmployeeId)), ("In", a.ClockIn?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "-"),
+                    ("Out", a.ClockOut?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? "-"), ("Hours", hours is decimal h ? Qty(h) : "-"), ("Exception", string.Join("; ", issues))));
             }
         }
 
@@ -980,7 +980,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             Employee? e = employees.GetValueOrDefault(g.Key);
             decimal net = slips.Where(p => p.EmployeeId == g.Key).OrderBy(p => p.PayDate).Select(p => p.NetPay).LastOrDefault();
-            string primary = e is null ? "?" : e.PaymentMethod == PayMethod.MobileMoney ? $"MobileMoney {e.MobileMoneyNumber ?? "—"}" : $"{e.PaymentMethod} {e.BankAccountNumber ?? "—"}";
+            string primary = e is null ? "?" : e.PaymentMethod == PayMethod.MobileMoney ? $"MobileMoney {e.MobileMoneyNumber ?? "-"}" : $"{e.PaymentMethod} {e.BankAccountNumber ?? "-"}";
             return Row(("Employee", Name(employees, g.Key)), ("Primary", primary),
                 ("Splits", string.Join("; ", g.Select(s => $"{s.Method} {s.Destination} {(s.Percent is decimal p ? $"{p:0.##}%" : Money(s.Amount))}"))), ("Net", Money(net)),
                 ("Remainder", Math.Max(0m, net - g.Sum(s => s.AmountFrom(net)))));
@@ -1021,7 +1021,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             bool retrenched = (e.TerminationReason ?? string.Empty).Contains("retrench", StringComparison.OrdinalIgnoreCase);
             FinalSettlement s = TerminalBenefits.Settle(e.BasicSalary, e.EngagementDate, e.TerminationDate!.Value, leave.Where(l => l.EmployeeId == e.Id).Sum(l => l.AccruedDays - l.TakenDays), retrenched,
                 loans.Where(l => l.EmployeeId == e.Id).Sum(l => l.Outstanding), policy);
-            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Left", Date(e.TerminationDate!.Value)), ("Reason", e.TerminationReason ?? "—"), ("Years", s.Years), ("Notice", Money(s.Notice)),
+            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Left", Date(e.TerminationDate!.Value)), ("Reason", e.TerminationReason ?? "-"), ("Years", s.Years), ("Notice", Money(s.Notice)),
                 ("Leave", Money(s.Leave)), ("Gratuity", Money(s.Gratuity)), ("Severance", Money(s.Severance)), ("Recoveries", Money(s.Recoveries)), ("Tax", Money(s.Tax)), ("Net", s.Net));
         })];
     }
@@ -1031,7 +1031,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             var p = TerminalBenefits.Provision(e.BasicSalary, e.EngagementDate, asAt, e.DateOfBirth, weeksPerYear, retirementAge, discountRate);
             return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Years", TerminalBenefits.CompletedYears(e.EngagementDate, asAt)), ("Accrued", Money(p.Accrued)),
-                ("ToRetirement", e.DateOfBirth is null ? "—" : p.YearsToRetirement.ToString(CultureInfo.InvariantCulture)), ("Provision", p.Provision));
+                ("ToRetirement", e.DateOfBirth is null ? "-" : p.YearsToRetirement.ToString(CultureInfo.InvariantCulture)), ("Provision", p.Provision));
         })];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LabourMixAsync(long companyId, DateOnly fromDate, DateOnly toDate, decimal hoursPerMonth, CancellationToken ct)
@@ -1039,7 +1039,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
         List<AttendanceRecord> overtime = [.. (await AttendanceAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(a => a.OvertimeHours > 0m)];
-        string Department(long id) => employees.GetValueOrDefault(id)?.Department ?? "—";
+        string Department(long id) => employees.GetValueOrDefault(id)?.Department ?? "-";
         bool Casual(long id) => employees.GetValueOrDefault(id)?.EmploymentType == EmploymentType.Casual;
         return [.. slips.Select(p => Department(p.EmployeeId)).Concat(overtime.Select(a => Department(a.EmployeeId))).Distinct().Order(StringComparer.Ordinal).Select(d =>
         {
@@ -1048,7 +1048,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             decimal ot = overtime.Where(a => Department(a.EmployeeId) == d)
                 .Sum(a => AttendanceRules.OvertimeCost(a.OvertimeHours, employees.GetValueOrDefault(a.EmployeeId)?.BasicSalary ?? 0m, hoursPerMonth, a.OvertimeMultiplier));
             return Row(("Department", d), ("Permanent", Money(permanent)), ("Casual", Money(casual)), ("Overtime", Money(ot)),
-                ("Share", permanent == 0m ? "—" : ((casual + ot) * 100m / permanent).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Total", permanent + casual + ot));
+                ("Share", permanent == 0m ? "-" : ((casual + ot) * 100m / permanent).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Total", permanent + casual + ot));
         })];
     }
 
@@ -1089,12 +1089,12 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     {
         List<Employee> inService = [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values.Where(e => EmployedOn(e, asAt))];
         List<EstablishmentPost> posts = await _db.EstablishmentPosts.AsNoTracking().Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
-        var keys = posts.Select(p => (p.Department, p.Grade)).Concat(inService.Select(e => (Department: e.Department ?? "—", Grade: e.Grade ?? "—"))).Distinct()
+        var keys = posts.Select(p => (p.Department, p.Grade)).Concat(inService.Select(e => (Department: e.Department ?? "-", Grade: e.Grade ?? "-"))).Distinct()
             .OrderBy(k => k.Department, StringComparer.Ordinal).ThenBy(k => k.Grade, StringComparer.Ordinal);
         return [.. keys.Select(k =>
         {
             EstablishmentPost? post = posts.FirstOrDefault(p => p.Department == k.Department && p.Grade == k.Grade);
-            int approved = post?.ApprovedPosts ?? 0, filled = inService.Count(e => (e.Department ?? "—") == k.Department && (e.Grade ?? "—") == k.Grade);
+            int approved = post?.ApprovedPosts ?? 0, filled = inService.Count(e => (e.Department ?? "-") == k.Department && (e.Grade ?? "-") == k.Grade);
             int vacant = Math.Max(0, approved - filled), over = Math.Max(0, filled - approved);
             return Row(("Department", k.Department), ("Grade", k.Grade), ("Approved", approved), ("Filled", filled), ("Vacant", vacant), ("Over", over), ("Saving", vacant * (post?.AnnualCostPerPost ?? 0m)));
         })];
@@ -1111,12 +1111,12 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             List<EmployeeDocument> own = [.. documents.Where(d => d.EmployeeId == e.Id)];
             foreach (string missing in required.Where(t => own.All(d => d.DocumentType != t)))
             {
-                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Type", missing), ("Reference", "—"), ("Expires", "—"), ("Status", "Missing")));
+                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Type", missing), ("Reference", "-"), ("Expires", "-"), ("Status", "Missing")));
             }
 
             foreach (EmployeeDocument d in own.Where(d => HrRules.Status(d.ExpiresOn, asAt, windowDays) != "Valid").OrderBy(d => d.ExpiresOn))
             {
-                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Type", d.DocumentType), ("Reference", d.Reference ?? "—"), ("Expires", Date(d.ExpiresOn!.Value)),
+                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Type", d.DocumentType), ("Reference", d.Reference ?? "-"), ("Expires", Date(d.ExpiresOn!.Value)),
                     ("Status", HrRules.Status(d.ExpiresOn, asAt, windowDays))));
             }
         }
@@ -1129,7 +1129,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         List<DisciplinaryRecord> records = await _db.DisciplinaryRecords.AsNoTracking().Where(d => d.CompanyId == companyId && d.Date <= asAt).OrderBy(d => d.Date).ToListAsync(ct).ConfigureAwait(false);
         return [.. records.Select(d => Row(("Employee", Name(employees, d.EmployeeId)), ("Date", Date(d.Date)), ("Offence", d.Offence), ("Sanction", d.Sanction.ToString()),
-            ("Expires", d.ExpiresOn is DateOnly e ? Date(e) : "—"), ("Status", d.ExpiresOn is DateOnly lapse && lapse < asAt ? "Lapsed" : "Live")))];
+            ("Expires", d.ExpiresOn is DateOnly e ? Date(e) : "-"), ("Status", d.ExpiresOn is DateOnly lapse && lapse < asAt ? "Lapsed" : "Live")))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TrainingAsync(long companyId, DateOnly asAt, int windowDays, CancellationToken ct)
@@ -1138,7 +1138,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         List<TrainingRecord> training = await _db.TrainingRecords.AsNoTracking().Where(t => t.CompanyId == companyId && t.CompletedOn <= asAt).ToListAsync(ct).ConfigureAwait(false);
         List<EmployeeAppraisal> appraisals = await _db.EmployeeAppraisals.AsNoTracking().Where(a => a.CompanyId == companyId && a.Date <= asAt).ToListAsync(ct).ConfigureAwait(false);
         return [.. training.OrderBy(t => Name(employees, t.EmployeeId), StringComparer.Ordinal).ThenBy(t => t.CompletedOn).Select(t => Row(("Section", "Training"), ("Employee", Name(employees, t.EmployeeId)),
-                ("Item", t.Provider is null ? t.Course : $"{t.Course} ({t.Provider})"), ("Date", Date(t.CompletedOn)), ("Due", t.ExpiresOn is DateOnly e ? Date(e) : "—"),
+                ("Item", t.Provider is null ? t.Course : $"{t.Course} ({t.Provider})"), ("Date", Date(t.CompletedOn)), ("Due", t.ExpiresOn is DateOnly e ? Date(e) : "-"),
                 ("Status", HrRules.Status(t.ExpiresOn, asAt, windowDays)), ("Cost", t.Cost))),
             .. appraisals.GroupBy(a => a.EmployeeId).Select(g => g.OrderBy(a => a.Date).Last()).Where(a => employees.TryGetValue(a.EmployeeId, out Employee? e) && EmployedOn(e, asAt))
                 .OrderBy(a => a.NextDue).Select(a => Row(("Section", "Appraisal"), ("Employee", Name(employees, a.EmployeeId)), ("Item", $"Rated {a.Rating}"), ("Date", Date(a.Date)), ("Due", Date(a.NextDue)),
@@ -1164,8 +1164,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             List<Core.JobCosting.JobTimesheet> own = [.. sheets.Where(t => t.EmployeeId == id)];
             decimal allocated = own.Sum(t => t.Cost), paid = gross.GetValueOrDefault(id);
-            return Row(("Employee", Name(employees, id)), ("Jobs", own.Count == 0 ? "—" : string.Join(", ", own.Select(t => contracts.GetValueOrDefault(t.JobContractId, "?")).Distinct().Order(StringComparer.Ordinal))),
-                ("Hours", Qty(own.Sum(t => t.Hours))), ("Allocated", Money(allocated)), ("Gross", Money(paid)), ("Share", paid == 0m ? "—" : (allocated * 100m / paid).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
+            return Row(("Employee", Name(employees, id)), ("Jobs", own.Count == 0 ? "-" : string.Join(", ", own.Select(t => contracts.GetValueOrDefault(t.JobContractId, "?")).Distinct().Order(StringComparer.Ordinal))),
+                ("Hours", Qty(own.Sum(t => t.Hours))), ("Allocated", Money(allocated)), ("Gross", Money(paid)), ("Share", paid == 0m ? "-" : (allocated * 100m / paid).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Unallocated", paid - allocated));
         })];
     }
@@ -1187,7 +1187,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             int items = held.Count + (owed > 0m ? 1 : 0) + (days > 0m ? 1 : 0);
             if (items > 0)
             {
-                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Left", Date(e.TerminationDate!.Value)), ("Reason", e.TerminationReason ?? "—"), ("Assets", held.Count == 0 ? "—" : string.Join(", ", held)),
+                rows.Add(Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Left", Date(e.TerminationDate!.Value)), ("Reason", e.TerminationReason ?? "-"), ("Assets", held.Count == 0 ? "-" : string.Join(", ", held)),
                     ("Leave", Qty(Math.Max(0m, days))), ("Items", items), ("Loans", owed)));
             }
         }
@@ -1204,7 +1204,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. employees.Values.Where(e => EmployedOn(e, asAt) && !slips.Any(p => p.EmployeeId == e.Id && p.PayDate >= monthStart)).OrderBy(e => e.EmployeeNumber, StringComparer.Ordinal).Select(e =>
         {
             DateOnly? last = slips.Where(p => p.EmployeeId == e.Id).Select(p => (DateOnly?)p.PayDate).Max();
-            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Department", e.Department ?? "—"), ("LastPaid", last is DateOnly d ? Date(d) : "never"),
+            return Row(("Employee", $"{e.EmployeeNumber} {e.FullName}"), ("Department", e.Department ?? "-"), ("LastPaid", last is DateOnly d ? Date(d) : "never"),
                 ("Status", e.HoldReason is string reason ? $"Salary held: {reason}" : "Not yet paid"), ("Accrual", e.BasicSalary));
         })];
     }
@@ -1258,7 +1258,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                     ? g.Sum(p => PayeTable.Tax(InForce(tables, p.PayDate)!.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), p.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount)))
                     : null;
                 return Row(("Month", g.Key), ("Employees", g.Select(p => p.EmployeeId).Distinct().Count()), ("Taxable", Money(taxable)), ("ByTable", byTable is decimal t ? Money(t) : "no table"),
-                    ("Difference", byTable is decimal d ? Money(deducted - d) : "—"), ("Deducted", deducted));
+                    ("Difference", byTable is decimal d ? Money(deducted - d) : "-"), ("Deducted", deducted));
             })];
     }
 
@@ -1283,7 +1283,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
         List<PayeBand> bands = [.. table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent))];
         return [.. bands.Select(b => Row(("Table", table.Code), ("Effective", Date(table.EffectiveFrom)), ("From", Money(b.From)), ("To", b.To is decimal to ? Money(to) : "and above"),
-            ("Rate", b.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Cumulative", b.To is decimal top ? Money(PayeTable.Tax(bands, top)) : "—")))];
+            ("Rate", b.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Cumulative", b.To is decimal top ? Money(PayeTable.Tax(bands, top)) : "-")))];
     }
 
     private static string? Text(IReadOnlyDictionary<string, object?> parameters, string name)
@@ -1296,7 +1296,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false))
             .SelectMany(p => p.Lines.Where(l => l.Type == PayElementType.Earning && !l.ElementCode.Equals("BASIC", StringComparison.OrdinalIgnoreCase) && l.Amount != 0m).Select(l => (p.EmployeeId, Line: l)))
             .GroupBy(x => (x.EmployeeId, x.Line.ElementCode)).OrderBy(g => Name(employees, g.Key.EmployeeId), StringComparer.Ordinal).ThenBy(g => g.Key.ElementCode, StringComparer.Ordinal)
-            .Select(g => Row(("Employee", Name(employees, g.Key.EmployeeId)), ("Department", employees.GetValueOrDefault(g.Key.EmployeeId)?.Department ?? "—"), ("Element", g.Key.ElementCode),
+            .Select(g => Row(("Employee", Name(employees, g.Key.EmployeeId)), ("Department", employees.GetValueOrDefault(g.Key.EmployeeId)?.Department ?? "-"), ("Element", g.Key.ElementCode),
                 ("Description", g.First().Line.Description), ("Taxable", g.First().Line.Taxable ? "Yes" : "No"), ("Amount", g.Sum(x => x.Line.Amount))))];
     }
 
@@ -1307,7 +1307,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         {
             int months = g.Select(p => p.PeriodLabel).Distinct().Count();
             decimal gross = g.Sum(p => p.GrossEarnings), employer = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.EmployerContribution).Sum(l => l.Amount);
-            return Row(("Employee", Name(employees, g.Key)), ("Department", employees.GetValueOrDefault(g.Key)?.Department ?? "—"), ("Months", months), ("Gross", Money(gross)), ("Employer", Money(employer)),
+            return Row(("Employee", Name(employees, g.Key)), ("Department", employees.GetValueOrDefault(g.Key)?.Department ?? "-"), ("Months", months), ("Gross", Money(gross)), ("Employer", Money(employer)),
                 ("Annualised", Money(Math.Round((gross + employer) / months * 12m, 2, MidpointRounding.AwayFromZero))), ("Cost", gross + employer));
         })];
     }

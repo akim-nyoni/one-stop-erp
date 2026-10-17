@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers development covenants: two stands carry two-year covenants from 1 January 2024. One holder submits and gets
-/// plans approved (milestones in order; a skipped or back-dated one refused), builds and completes — the covenant is
+/// plans approved (milestones in order; a skipped or back-dated one refused), builds and completes - the covenant is
 /// complied with. The other does nothing: the breach run on 2 January 2026 flags it and levies 500 once (a repeat levies
 /// nothing); a paid extension of six months (fee 200) reopens it; breached again after the extension, it is levied again
 /// and a notice of intention to repossess is issued, after which it cannot be extended. Covenant income is 1,200.

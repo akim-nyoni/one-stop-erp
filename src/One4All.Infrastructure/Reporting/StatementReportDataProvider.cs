@@ -105,7 +105,7 @@ public sealed class StatementReportDataProvider : IReportDataProvider
 
             rows.AddRange(statement.Value.Lines.OrderBy(l => l.CustomerCode, StringComparer.Ordinal)
                 .Select(l => Row(("Rep", rep.Code), ("Customer", l.CustomerCode), ("Base", l.Base), ("Commission", l.Commission))));
-            rows.Add(Row(("Rep", rep.Code), ("Customer", $"Total to accrue — {rep.Name}"), ("Base", statement.Value.Lines.Sum(l => l.Base)), ("Commission", statement.Value.Total)));
+            rows.Add(Row(("Rep", rep.Code), ("Customer", $"Total to accrue - {rep.Name}"), ("Base", statement.Value.Lines.Sum(l => l.Base)), ("Commission", statement.Value.Total)));
         }
 
         return rows;
@@ -167,7 +167,7 @@ public sealed class StatementReportDataProvider : IReportDataProvider
         foreach (Property property in properties)
         {
             string payer = customers.TryGetValue(property.RatepayerCustomerId, out Customer? customer) ? $"{customer.Code} {customer.Name}" : "?";
-            string account = $"Stand {property.StandNumber} — {payer}";
+            string account = $"Stand {property.StandNumber} - {payer}";
             string services = string.Join(", ", property.Services.Where(s => s.IsActive).Select(s => s.ServiceType.ToString()).Distinct().Order(StringComparer.Ordinal));
             rows.Add(Row(("Account", account), ("Section", "Property"), ("Date", string.Empty), ("Type", property.Address ?? property.Ward), ("Document", services.Length == 0 ? "no services" : services),
                 ("Debit", null), ("Credit", null), ("Balance", null)));
@@ -196,12 +196,12 @@ public sealed class StatementReportDataProvider : IReportDataProvider
         var bills = await (from i in _db.OpenItems.AsNoTracking()
                            join j in _db.Journals.AsNoTracking() on i.JournalEntryId equals j.Id
                            where i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.ItemType == OpenItemType.Invoice && i.DocumentDate <= toDate
-                                 && j.Narrative != null && j.Narrative.Contains(" fees — ")
+                                 && j.Narrative != null && j.Narrative.Contains(" fees - ")
                            select new { Item = i, j.Narrative }).ToListAsync(ct).ConfigureAwait(false);
         var fees = bills.Select(b =>
         {
             int open = b.Narrative!.LastIndexOf('('), close = b.Narrative.LastIndexOf(')');
-            return new { b.Item, Admission = open >= 0 && close > open ? b.Narrative[(open + 1)..close] : string.Empty, Term = b.Narrative[..b.Narrative.IndexOf(" fees — ", StringComparison.Ordinal)] };
+            return new { b.Item, Admission = open >= 0 && close > open ? b.Narrative[(open + 1)..close] : string.Empty, Term = b.Narrative[..b.Narrative.IndexOf(" fees - ", StringComparison.Ordinal)] };
         }).ToList();
         List<long> ids = [.. fees.Select(f => f.Item.Id)];
         var allocations = await (from a in _db.Allocations.AsNoTracking()
@@ -224,7 +224,7 @@ public sealed class StatementReportDataProvider : IReportDataProvider
             IEnumerable<Movement> movements = mine.Select(f => new Movement(f.Item.DocumentDate, $"{f.Term} fees", f.Item.DocumentNumber, f.Item.OriginalBase))
                 .Concat(paid.Select(a => new Movement(a.AllocationDate, a.ItemType.ToString(), a.DocumentNumber, -a.DebitBase)));
             IEnumerable<(DateOnly Due, decimal Outstanding)> outstanding = mine.Select(f => (f.Item.DueDate, f.Item.OriginalBase - paid.Where(a => a.DebitItemId == f.Item.Id).Sum(a => a.DebitBase)));
-            string account = $"{student.FullName} ({student.AdmissionNumber}), {student.Grade} — billed to {names.GetValueOrDefault(student.PayerCustomerId, "?")}";
+            string account = $"{student.FullName} ({student.AdmissionNumber}), {student.Grade} - billed to {names.GetValueOrDefault(student.PayerCustomerId, "?")}";
             rows.AddRange(Statement(account, movements.OrderBy(m => m.Date), fromDate, toDate, outstanding));
         }
 

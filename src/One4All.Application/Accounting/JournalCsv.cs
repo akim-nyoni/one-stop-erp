@@ -39,8 +39,8 @@ public sealed record JournalCsvResult(IReadOnlyList<ImportedJournal> Journals, I
 }
 
 /// <summary>
-/// Reads manual journals from a CSV file (brief §4.4): a header row naming the columns, in any order — Reference, Date,
-/// Account, Debit, Credit, and optionally CostCentre, Department and Narrative — then one row per line. Rows sharing a
+/// Reads manual journals from a CSV file (brief §4.4): a header row naming the columns, in any order - Reference, Date,
+/// Account, Debit, Credit, and optionally CostCentre, Department and Narrative - then one row per line. Rows sharing a
 /// reference form one journal, which must have one date and balance. Dates are yyyy-MM-dd or dd/MM/yyyy. Pure and
 /// unit-tested.
 /// </summary>

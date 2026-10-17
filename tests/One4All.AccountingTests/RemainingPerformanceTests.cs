@@ -174,7 +174,7 @@ public sealed class RemainingPerformanceTests
     }
 
     [SkippableFact]
-    public async Task A_thousand_payslips_are_rendered_and_queued_for_email_within_the_hour()
+    public async Task A_thousand_payslips_are_rendered_and_queued_for_email_within_five_minutes()
     {
         Skip.IfNot(_fixture.Available, _fixture.SkipReason);
         Skip.IfNot(Enabled, "Set ONE4ALL_PERF=1 to run the performance pack.");
@@ -207,6 +207,6 @@ public sealed class RemainingPerformanceTests
         emailed.IsSuccess.Should().BeTrue(emailed.IsFailure ? emailed.Error.Message : null);
         _output.WriteLine($"{emailed.Value.Queued:N0} payslips rendered and queued in {watch.Elapsed.TotalSeconds:0.0} s ({emailed.Value.NoEmail.Count} without e-mail, {emailed.Value.NoPassword.Count} without a password).");
         emailed.Value.Queued.Should().Be(employees);
-        watch.Elapsed.TotalMinutes.Should().BeLessThan(60, "the brief's target: a payroll's payslips e-mailed within the hour");
+        watch.Elapsed.TotalMinutes.Should().BeLessThan(5, "the brief's target (§15): payslip PDFs generated and e-mailed for 1,000 employees in under 5 minutes");
     }
 }

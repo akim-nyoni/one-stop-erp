@@ -1,6 +1,6 @@
 namespace One4All.Application.Pos;
 
-/// <summary>Points earned on a purchase, the tier a member is in, and which earned points have expired — first in, first out.</summary>
+/// <summary>Points earned on a purchase, the tier a member is in, and which earned points have expired - first in, first out.</summary>
 public static class LoyaltyRules
 {
     /// <summary>Whole points earned on a spend.</summary>

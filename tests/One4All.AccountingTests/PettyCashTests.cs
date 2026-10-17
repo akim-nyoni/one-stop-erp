@@ -51,7 +51,7 @@ public sealed class PettyCashTests
             // Spend 30 on an expense.
             (await petty.DisburseAsync(companyId, 30m, new DateOnly(2026, 3, 10), Expense, PettyCash, "PC-1")).IsSuccess.Should().BeTrue();
 
-            // Reimburse back to the 100 float — only the 30 shortfall is drawn.
+            // Reimburse back to the 100 float - only the 30 shortfall is drawn.
             var top = await petty.ReimburseToFloatAsync(companyId, new DateOnly(2026, 3, 31), PettyCash, Bank, 100m, "PC-TOP");
             top.Value.ReimbursedAmount.Should().Be(30m);
             top.Value.FloatBalanceAfter.Should().Be(100m);

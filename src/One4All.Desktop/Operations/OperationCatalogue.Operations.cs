@@ -35,7 +35,7 @@ public static partial class OperationCatalogue
                 (long id, bool passed) = Check(await tests.RecordAsync(c.CompanyId, new Application.Abstractions.Inventory.ConcreteTestEntry(i.Text("Run"), i.Optional("Sample") ?? string.Empty,
                     Enum.Parse<Core.Inventory.ConcreteTestKind>(i.Text("Kind")), i.Date("Date"), i.Number("Result"), i.Number("Specified"), i.Number("Tolerance")) { TestedBy = i.Optional("By") })
                     .ConfigureAwait(true));
-                return passed ? $"Test {id} recorded: pass." : $"Test {id} recorded: FAILED — follow up with the plant and the customer.";
+                return passed ? $"Test {id} recorded: pass." : $"Test {id} recorded: FAILED - follow up with the plant and the customer.";
             },
             List = async c => Table(await c.Get<Application.Abstractions.Inventory.IConcreteTestService>().FailuresAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today).AddDays(-90),
                     DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
@@ -81,7 +81,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Second weigh (complete a ticket)", ListTitle = "Tickets still on the bridge",
-            Description = "Completes the ticket: net weight, haulage by zone and — for an outbound load from a stockpile — the stock issue.",
+            Description = "Completes the ticket: net weight, haulage by zone and - for an outbound load from a stockpile - the stock issue.",
             Fields = [Req("Ticket", "Ticket number"), OptNum("Weight", "Weight kg"), Num("Deduction", "Deduction kg (moisture etc.)", "0"), Tick("Manual", "Weight keyed by hand"), Opt("Reason", "Why keyed"),
                 Opt("AuthorisedBy", "Authorised by (user name)"), Tick("Scale", "Read the weight from the scale"), Tick("Print", "Show the printed ticket")],
             Run = async (c, i) =>
@@ -93,7 +93,7 @@ public static partial class OperationCatalogue
                     CompanyId = c.CompanyId, TicketId = ticket, WeightKg = weight, DeductionKg = i.Number("Deduction"), OperatorUserId = c.UserId, IsManual = i.Flag("Manual"),
                     ManualReason = i.Optional("Reason"), AuthorisedByUserId = await OptionalUserAsync(c, i.Optional("AuthorisedBy")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
-                string summary = $"Net {Q(done.NetTonnes)} t ({Q(done.NetCubicMetres)} m³), haulage {M(done.HaulageCharge)}." + (done.Overloaded ? " OVERLOADED — over the vehicle's legal maximum." : string.Empty);
+                string summary = $"Net {Q(done.NetTonnes)} t ({Q(done.NetCubicMetres)} m³), haulage {M(done.HaulageCharge)}." + (done.Overloaded ? " OVERLOADED - over the vehicle's legal maximum." : string.Empty);
                 return i.Flag("Print") ? summary + Environment.NewLine + Environment.NewLine + Check(await c.Get<IWeighbridgeService>().RenderTicketAsync(c.CompanyId, i.Text("Ticket")).ConfigureAwait(true)) : summary;
             },
             List = OpenTicketsAsync,
@@ -208,7 +208,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Asset classes and impairment", ListTitle = "Asset classes",
             Description = "Classes hold the defaults an asset registered in them takes (method, life, residual %, rate and accounts). An impairment test (IAS 36) books a "
-                + "recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers — never above what it would have been unimpaired.",
+                + "recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers - never above what it would have been unimpaired.",
             Fields = [Pick("Step", "Step", ["Save class", "Impairment test"]), Opt("Class", "Class code"), Opt("Name", "Class name"),
                 Pick("Method", "Method", Enum.GetNames<Core.FixedAssets.DepreciationMethod>()), OptNum("Life", "Useful life (months)"), OptNum("Residual", "Residual % of cost"),
                 OptNum("Rate", "Reducing-balance rate %"), Opt("CostAccount", "Cost account"), Opt("AccumAccount", "Accumulated depreciation account"), Opt("ExpenseAccount", "Depreciation expense account"),
@@ -302,7 +302,7 @@ public static partial class OperationCatalogue
             Run = async (c, i) =>
             {
                 int missing = Check(await c.Get<IAssetControlService>().CloseCountAsync(c.CompanyId, await CountAsync(c, i.Text("Count")).ConfigureAwait(true), i.Flag("Move")).ConfigureAwait(true));
-                return $"Count closed — {missing} asset(s) missing. See report FA210.";
+                return $"Count closed - {missing} asset(s) missing. See report FA210.";
             },
             List = OpenCountsAsync,
         };
@@ -373,7 +373,7 @@ public static partial class OperationCatalogue
         Dictionary<long, string> assets = await c.Db.FixedAssets.Where(a => a.CompanyId == c.CompanyId).ToDictionaryAsync(a => a.Id, a => a.AssetNumber).ConfigureAwait(true);
         return Table(await c.Db.MaintenancePlans.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.IsActive).OrderBy(p => p.NextDue).ToListAsync().ConfigureAwait(true),
             ("Plan", p => p.Id), ("Asset", p => assets.GetValueOrDefault(p.AssetId)), ("Task", p => p.Description), ("Every", p => $"{p.IntervalMonths} months"),
-            ("Last done", p => p.LastDone is DateOnly d ? D(d) : "—"), ("Next due", p => D(p.NextDue)));
+            ("Last done", p => p.LastDone is DateOnly d ? D(d) : "-"), ("Next due", p => D(p.NextDue)));
     }
 
     private static async Task<System.Data.DataTable> ProjectsAsync(OperationContext c)
@@ -386,7 +386,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Contract revenue, losses and budget", ListTitle = "Job contracts",
-            Description = "Recognise a contract's revenue by stage of completion (cost to date over budgeted cost) against certified billing — the difference to the contract asset "
+            Description = "Recognise a contract's revenue by stage of completion (cost to date over budgeted cost) against certified billing - the difference to the contract asset "
                 + "or liability; provide for a foreseeable loss (the whole expected loss at once, the provision trued up); or revise the budgeted cost with the reason.",
             Fields = [Pick("Step", "Step", ["Recognise revenue", "Provide for loss", "Revise budget"]), Req("Contract", "Contract number"), Today(), Opt("AssetAccount", "Contract asset account (revenue)"),
                 Opt("LiabilityAccount", "Contract liability account (revenue)"), Opt("LossAccount", "Loss expense account (loss)"), Opt("ProvisionAccount", "Loss provision account (loss)"),
@@ -526,7 +526,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Client certificates, advance and retention", ListTitle = "Contract positions",
             Description = "Certify progress (cumulative work, approved variation work and materials on site; retention held and any client advance recovered at its percentage), "
-                + "receive a client advance, record practical completion with the defects-liability period, and release retention — half after completion, the rest when the period ends.",
+                + "receive a client advance, record practical completion with the defects-liability period, and release retention - half after completion, the rest when the period ends.",
             Fields = [Pick("Step", "Step", ["Certify", "Receive advance", "Practical completion", "Release retention"]), Req("Contract", "Contract number"), Opt("Number", "Document number"), Today(),
                 OptNum("Work", "Work done to date"), OptNum("Variations", "Variation work to date"), OptNum("Materials", "Materials on site"), Opt("RetentionAccount", "Retention receivable account"),
                 OptNum("Amount", "Amount (advance / release)"), OptNum("Percent", "Advance recovery %"), Opt("AdvanceAccount", "Advance liability account"), Opt("Bank", "Bank account"),
@@ -551,8 +551,8 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.Set<Core.JobCosting.JobContract>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ContractNumber).ToListAsync().ConfigureAwait(true),
                 ("Contract", x => x.ContractNumber), ("Certified", x => M(x.CertifiedToDate)), ("Retention held", x => M(x.RetentionHeld)), ("Released", x => M(x.RetentionReleased)),
-                ("Advance left", x => M(x.AdvanceOutstanding)), ("Completed", x => x.PracticalCompletionDate is DateOnly d ? D(d) : "—"),
-                ("Defects end", x => x.DefectsLiabilityEnds is DateOnly e ? D(e) : "—")),
+                ("Advance left", x => M(x.AdvanceOutstanding)), ("Completed", x => x.PracticalCompletionDate is DateOnly d ? D(d) : "-"),
+                ("Defects end", x => x.DefectsLiabilityEnds is DateOnly e ? D(e) : "-")),
         };
         yield return new Operation
         {

@@ -140,7 +140,7 @@ public interface IJobCostingService
 
     /// <summary>
     /// Period-end percentage-of-completion revenue recognition (cost-to-cost): brings cumulative revenue to
-    /// contract value × % complete by posting the movement since the last run — an under-billed contract
+    /// contract value × % complete by posting the movement since the last run - an under-billed contract
     /// carries the excess of earned over certified as a contract asset (Dr asset / Cr revenue), an over-billed
     /// one carries the shortfall as a contract liability (Dr revenue / Cr liability). The prior position is
     /// unwound and the new one booked in one journal, so re-running after new costs or certificates only

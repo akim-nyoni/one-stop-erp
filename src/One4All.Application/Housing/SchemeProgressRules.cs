@@ -9,7 +9,7 @@ namespace One4All.Application.Housing;
 public sealed record NrvAssessment(decimal CostsToSell, decimal NetRealisableValue, decimal WriteDown);
 
 /// <summary>
-/// Scheme progress rules (brief §14 H9, H12, H13): the IAS 2 test of land stock — NRV is the estimated selling price
+/// Scheme progress rules (brief §14 H9, H12, H13): the IAS 2 test of land stock - NRV is the estimated selling price
 /// less the costs to complete and the costs to sell, and any carrying amount above it is the write-down; a stand is
 /// serviced only once every bulk service reaches it; survey stages only move forward. Pure and unit-tested.
 /// </summary>

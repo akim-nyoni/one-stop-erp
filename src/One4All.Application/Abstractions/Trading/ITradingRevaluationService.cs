@@ -31,7 +31,7 @@ public sealed record TradingRevaluationResult(DateOnly AsAtDate, TradingLedger L
 
 /// <summary>
 /// Period-end retranslation of foreign-currency receivables and payables at the closing rate (IAS 21 monetary items).
-/// The open items keep their historic base amounts — allocation still realises the exchange difference against those —
+/// The open items keep their historic base amounts - allocation still realises the exchange difference against those -
 /// and the unrealised difference is booked on the control account against FX gain / loss, normally reversed the next
 /// day. The run posts only the difference between the target and what is already booked at the date, so repeating it
 /// is harmless; the control-account reconciliation shows the booked revaluation as a reconciling item.

@@ -13,7 +13,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers percentage-of-completion revenue recognition: an under-billed contract books a contract asset, a
 /// later run after more certification unwinds it and books a liability, and an unchanged position posts
-/// nothing — with the ledger balancing throughout.
+/// nothing - with the ledger balancing throughout.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class RevenueRecognitionTests

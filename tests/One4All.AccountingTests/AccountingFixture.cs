@@ -112,7 +112,7 @@ public sealed class AccountingFixture : IAsyncLifetime
     /// <inheritdoc />
     public async Task DisposeAsync()
     {
-        // Dropped whenever it was created — also when migrating it failed — so no test database is left behind.
+        // Dropped whenever it was created - also when migrating it failed - so no test database is left behind.
         if (!_created)
         {
             return;

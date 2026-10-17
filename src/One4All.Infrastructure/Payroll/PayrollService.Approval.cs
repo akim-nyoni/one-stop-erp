@@ -234,7 +234,7 @@ public sealed partial class PayrollService : IPayrollApprovalService
         return PayrollRunChecks.Exceptions(facts, previous, payDate);
     }
 
-    // §4.15.10: nobody calculates, approves, commits or reverses a run that pays them — the employee number of the conflict, or null.
+    // §4.15.10: nobody calculates, approves, commits or reverses a run that pays them - the employee number of the conflict, or null.
     private async Task<string?> OwnRecordAsync(long userId, IReadOnlyCollection<long> employeeIds, CancellationToken ct)
         => userId == 0 ? null
             : await _db.Set<Employee>().Where(e => e.UserId == userId && employeeIds.Contains(e.Id)).Select(e => e.EmployeeNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false);

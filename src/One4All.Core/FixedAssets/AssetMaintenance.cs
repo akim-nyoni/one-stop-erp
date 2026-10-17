@@ -4,7 +4,7 @@ namespace One4All.Core.FixedAssets;
 
 /// <summary>
 /// A maintenance/service event logged against a fixed asset (<c>fa.asset_maintenance</c>): date, what was done,
-/// the provider and an informational cost. Operational asset-lifecycle history — it holds no GL balance (the
+/// the provider and an informational cost. Operational asset-lifecycle history - it holds no GL balance (the
 /// actual spend is captured through the supplier invoice or expense claim that pays for it).
 /// </summary>
 public sealed class AssetMaintenance : AuditableEntity, ICompanyScoped

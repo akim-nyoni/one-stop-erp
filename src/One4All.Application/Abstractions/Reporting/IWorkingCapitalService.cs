@@ -21,7 +21,7 @@ public sealed record WorkingCapitalMetrics(
     decimal InventoryBalance, decimal CostOfSales, decimal DaysInventoryOutstanding)
 {
     /// <summary>
-    /// The cash conversion cycle: DSO + DIO − DPO — the number of days between paying for inventory and
+    /// The cash conversion cycle: DSO + DIO − DPO - the number of days between paying for inventory and
     /// collecting the cash from selling it.
     /// </summary>
     public decimal CashConversionCycle => DaysSalesOutstanding + DaysInventoryOutstanding - DaysPayableOutstanding;

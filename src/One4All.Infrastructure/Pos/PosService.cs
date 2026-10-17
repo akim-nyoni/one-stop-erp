@@ -173,7 +173,7 @@ public sealed class PosService : IPosService
         }
 
         // Gift cards sold or topped up on the ticket (brief §4.8.1): the line's value loads the card and posts to the gift card liability the line names
-        // (Dr the tender, Cr liability — not revenue); printed stock activates, an active or emptied card tops up.
+        // (Dr the tender, Cr liability - not revenue); printed stock activates, an active or emptied card tops up.
         foreach (PosSaleLineRequest line in request.Lines.Where(l => !string.IsNullOrWhiteSpace(l.GiftCardNumber)))
         {
             string number = line.GiftCardNumber!.Trim().ToUpperInvariant();
@@ -369,7 +369,7 @@ public sealed class PosService : IPosService
         decimal difference = sale.NetTenderedBase - sale.TotalGross - request.Tip;
         if (Math.Abs(difference) > 0.0001m)
         {
-            // Cash rounding: a cash sale may be tendered up to half the smallest cash unit away from the exact total — in base, or in the change
+            // Cash rounding: a cash sale may be tendered up to half the smallest cash unit away from the exact total - in base, or in the change
             // currency when change is given in it (half its smallest cash unit at the day's rate).
             decimal tolerance = company.CashRoundingIncrement is decimal increment && increment > 0m ? increment / 2m : 0m;
             if (company.PosChangeCurrency is string changeCode && changeCode != baseCurrency.Value)

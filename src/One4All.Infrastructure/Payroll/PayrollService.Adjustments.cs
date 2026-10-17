@@ -10,8 +10,8 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Infrastructure.Payroll;
 
 /// <content>
-/// Corrections after commit (brief §4.15.6): supplementary runs, formally approved reversals and backpay — each a visible run with
-/// its own payslips and journal, never an edit — and the legacy import for the go-live parallel run.
+/// Corrections after commit (brief §4.15.6): supplementary runs, formally approved reversals and backpay - each a visible run with
+/// its own payslips and journal, never an edit - and the legacy import for the go-live parallel run.
 /// </content>
 public sealed partial class PayrollService
 {
@@ -166,7 +166,7 @@ public sealed partial class PayrollService
 
         if (run.Kind == PayRunKind.Reversal)
         {
-            return Error.Rule("Payroll.CannotReverseReversal", "A reversal cannot itself be reversed — run the period again instead.");
+            return Error.Rule("Payroll.CannotReverseReversal", "A reversal cannot itself be reversed - run the period again instead.");
         }
 
         if (run.IsReversed)

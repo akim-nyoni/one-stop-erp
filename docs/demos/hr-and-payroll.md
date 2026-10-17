@@ -24,7 +24,7 @@ Goal: show that employees, leave, time and attendance, and the payroll work end 
 
 ## Leave
 13. Open **Take leave**. Records leave taken over a period (never more than the balance). Fill in: Employee, Leave type, From, To, Days. Press OK and point out the result line and the list on the right.
-14. Open **Leave calendar and recall**. Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled — the days not taken go back to the balance (pro rata unless given). Fill in: Step, From, To. Press OK and point out the result line and the list on the right.
+14. Open **Leave calendar and recall**. Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled - the days not taken go back to the balance (pro rata unless given). Fill in: Step, From, To. Press OK and point out the result line and the list on the right.
 15. Open **Encash leave**. Pays out leave days at a daily rate. Fill in: Employee, Leave type, Date, Days, Daily rate. Press OK and point out the result line and the list on the right.
 
 ## Running the payroll
@@ -35,10 +35,10 @@ Goal: show that employees, leave, time and attendance, and the payroll work end 
 ## Loans, claims and provisions
 19. Open **Staff loans**. Grants a staff loan (paid out, recovered through payroll by the instalment) or records a repayment made outside payroll. Fill in: Step, Principal / repayment, Monthly instalment (grant), Bank / funding account, Document number, Date. Press OK and point out the result line and the list on the right.
 20. Open **Expense claims**. A staff member's claim for out-of-pocket expenses (lines DESCRIPTION:ACCOUNT:amount; …), approved by a user other than the claimant, rejected, or reimbursed from a bank or cash account. Fill in: Step, Claim reference, Date. Press OK and point out the result line and the list on the right.
-21. Open **Raise third-party invoices**. Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier — clearing the payroll liabilities into payables. Fill in: Run document or journal number. Press OK and point out the result line and the list on the right.
+21. Open **Raise third-party invoices**. Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier - clearing the payroll liabilities into payables. Fill in: Run document or journal number. Press OK and point out the result line and the list on the right.
 
 ## Payroll setup
-22. Open **Pay elements and tax tables**. Create a pay element, assign one to (or end one for) an employee, create a tax table — bands as 'from-to:rate' separated by ';', the last open-ended, e.g. Fill in: Step, Element type, Calculation, Tax table effective from, Recovers (deduction), Rounding. Press OK and point out the result line and the list on the right.
+22. Open **Pay elements and tax tables**. Create a pay element, assign one to (or end one for) an employee, create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. Fill in: Step, Element type, Calculation, Tax table effective from, Recovers (deduction), Rounding. Press OK and point out the result line and the list on the right.
 23. Open **Tax credits**. Credits taken off the tax the table works out, never below nil: a fixed amount a month (say an elderly credit from 65) or a percentage of a pay element (say half the medical-aid deduction), for everyone or only the employees given it. Fill in: Step, Credit code, Basis, Monthly amount (fixed), Percent (of an element). Press OK and point out the result line and the list on the right.
 24. Open **Set the tax year**. The month the tax year starts in (1 = January; 3 for a March–February year). Fill in: First month of the tax year (1–12). Press OK and point out the result line and the list on the right.
 

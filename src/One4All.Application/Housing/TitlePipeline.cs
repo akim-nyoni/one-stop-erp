@@ -16,8 +16,8 @@ public sealed record TitleAge(TitleStage Stage, DateOnly StageSince, DateOnly Ap
 public sealed record StageAgeing(TitleStage Stage, int Count, int AverageDays, int OldestDays);
 
 /// <summary>
-/// The title deed pipeline (brief §4.10.6): which stage may follow which — applied, conveyancer assigned, lodged, then
-/// any number of registry queries raised and resolved, registered, received into council custody, handed over — and the
+/// The title deed pipeline (brief §4.10.6): which stage may follow which - applied, conveyancer assigned, lodged, then
+/// any number of registry queries raised and resolved, registered, received into council custody, handed over - and the
 /// ageing of open applications at each stage. Pure and unit-tested.
 /// </summary>
 public static class TitlePipeline

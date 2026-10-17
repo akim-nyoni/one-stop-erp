@@ -62,7 +62,7 @@ public sealed class ReviewedBillingRunTests
         (await scope.ServiceProvider.GetRequiredService<ISalesLedgerService>().PostInvoiceAsync(new SalesInvoiceRequest
         {
             CompanyId = companyId, CustomerId = owner.Id, DocumentNumber = "MAR-B4", DocumentDate = new DateOnly(2026, 3, 15), Currency = Scenario.Usd, NetAmount = 10m,
-            SalesAccountCode = "4000", Narrative = "Refuse Removal — stand B4",
+            SalesAccountCode = "4000", Narrative = "Refuse Removal - stand B4",
         })).IsSuccess.Should().BeTrue();
 
         IBillingRunService runs = scope.ServiceProvider.GetRequiredService<IBillingRunService>();

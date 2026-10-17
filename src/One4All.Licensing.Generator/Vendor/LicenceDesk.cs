@@ -510,7 +510,7 @@ public sealed class LicenceDesk
         StringBuilder html = new();
         html.Append("<!doctype html><html><head><meta charset=\"utf-8\"><title>Licence certificate</title><style>body{font-family:Segoe UI,Arial,sans-serif;margin:40px;color:#222}"
             + "h1{color:#1b5e20}table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:4px 10px;text-align:left}code{word-break:break-all;font-size:11px}</style></head><body>");
-        html.Append(CultureInfo.InvariantCulture, $"<h1>One4All ERP — Licence Certificate</h1><p><b>{E(customer?.Name)}</b> ({E(licence.CustomerId)})<br>{E(customer?.Contact)}</p>");
+        html.Append(CultureInfo.InvariantCulture, $"<h1>One4All ERP - Licence Certificate</h1><p><b>{E(customer?.Name)}</b> ({E(licence.CustomerId)})<br>{E(customer?.Contact)}</p>");
         html.Append(CultureInfo.InvariantCulture, $"<p>Licence <b>{E(licence.LicenceId)}</b> · {licence.Edition} · {licence.LicenceType} · issued {licence.IssuedAt:yyyy-MM-dd} ({E(licence.Action)})<br>");
         html.Append(CultureInfo.InvariantCulture, $"Valid {licence.ValidFrom:yyyy-MM-dd} to {(licence.ValidTo?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "perpetual")}"
             + $"{(licence.Fingerprints.Count > 0 ? $" · bound to {licence.Fingerprints.Count} machine(s)" : string.Empty)}</p>");

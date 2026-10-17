@@ -135,7 +135,7 @@ public partial class ReportViewerWindow : Window
         _lastHit = (_lastHit + 1) % hits.Count;
         (int page, string text) = hits[_lastHit];
         Viewer.GoToPage(page);
-        SearchResult.Text = $"{_lastHit + 1} of {hits.Count}: page {page} — {(text.Length > 40 ? text[..40] + "…" : text)}";
+        SearchResult.Text = $"{_lastHit + 1} of {hits.Count}: page {page} - {(text.Length > 40 ? text[..40] + "…" : text)}";
     }
 
     private void Print_Executed(object sender, System.Windows.Input.ExecutedRoutedEventArgs e) => Print_Click(sender, e);

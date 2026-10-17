@@ -5,7 +5,7 @@ namespace One4All.Core.Security;
 /// <summary>
 /// The master list of every permission in the system, grouped by module. This is the source of truth
 /// (brief §18.3): it is seeded into <c>sec.permission</c> and drives the permission-grid UI. Adding a
-/// feature means adding a line here — never scattering permission strings through the code.
+/// feature means adding a line here - never scattering permission strings through the code.
 /// </summary>
 public static class PermissionCatalogue
 {

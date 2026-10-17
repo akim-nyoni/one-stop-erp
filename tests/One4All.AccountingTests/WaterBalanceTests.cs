@@ -67,6 +67,6 @@ public sealed class WaterBalanceTests
         string exceptions = await Render("M158");
         exceptions.Should().Contain($"WB-A-{companyId},WB-1,2026-02-01,2026-02-01,0,Tamper suspected") // the tampered reading is held, not accepted
             .And.Contain($"WB-B-{companyId},WB-2,2026-03-01,2026-02-01,").And.Contain("Running on estimates")
-            .And.Contain($"WB-C-{companyId},—,").And.Contain("Unread for 165 days");
+            .And.Contain($"WB-C-{companyId},-,").And.Contain("Unread for 165 days");
     }
 }

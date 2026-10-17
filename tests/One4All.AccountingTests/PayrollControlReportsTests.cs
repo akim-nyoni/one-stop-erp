@@ -79,7 +79,7 @@ public sealed class PayrollControlReportsTests
         }
 
         (await Render("PR22", new DateOnly(2026, 1, 31))).Should().Contain("PC-2 Bob Leaver,LN-9,2025-06-01,600.00,100.00,0.00,6,Active,600");
-        (await Render("PR42", new DateOnly(2026, 1, 31))).Should().Contain("PC-1 Alice Clerk,PC-JOB,8,100.00,\"2,000.00\",5.0%,1900").And.Contain("PC-2 Bob Leaver,—,0,0.00,\"1,500.00\",0.0%,1500");
+        (await Render("PR42", new DateOnly(2026, 1, 31))).Should().Contain("PC-1 Alice Clerk,PC-JOB,8,100.00,\"2,000.00\",5.0%,1900").And.Contain("PC-2 Bob Leaver,-,0,0.00,\"1,500.00\",0.0%,1500");
         (await Render("PR53", new DateOnly(2026, 2, 28))).Should().Contain("PC-2 Bob Leaver,2026-01-31,Resigned,PC-LAP,10,3,600");
         string accrual = await Render("PR63", new DateOnly(2026, 2, 28));
         accrual.Should().Contain("PC-1 Alice Clerk,Finance,2026-01-25,Not yet paid,2000").And.NotContain("Bob Leaver");

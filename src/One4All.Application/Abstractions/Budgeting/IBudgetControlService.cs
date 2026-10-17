@@ -67,7 +67,7 @@ public sealed record VoteBookRow(string AccountCode, string Name, decimal Origin
 /// <summary>
 /// Budget control for councils and grant-funded bodies (brief §4.18.4–4.18.5): virements between budget lines, requested
 /// with a justification and approved by a different user, never exceeding what the source line has left; the virement
-/// register; and the vote book — appropriation, expenditure, commitments and unexpended balance per vote.
+/// register; and the vote book - appropriation, expenditure, commitments and unexpended balance per vote.
 /// </summary>
 public interface IBudgetControlService
 {

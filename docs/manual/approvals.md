@@ -105,7 +105,7 @@ The list beside the form shows: Waiting on me.
 
 ### Request a master-data change
 
-Changes a tariff's rates or a customer's, supplier's or item's field — held for the "MasterDataChange" workflow when one is defined, applied at once otherwise. Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.
+Changes a tariff's rates or a customer's, supplier's or item's field - held for the "MasterDataChange" workflow when one is defined, applied at once otherwise. Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.
 
 | Field | Required | Notes |
 | --- | --- | --- |

@@ -33,7 +33,7 @@ public sealed class FirstWeighRequest
     /// <summary>Gets the delivery site.</summary>
     public string? Site { get; init; }
 
-    /// <summary>Gets the stockpile the load is drawn from (outbound) — its stock is issued when the ticket completes.</summary>
+    /// <summary>Gets the stockpile the load is drawn from (outbound) - its stock is issued when the ticket completes.</summary>
     public long? WarehouseId { get; init; }
 
     /// <summary>Gets the haulage distance.</summary>
@@ -153,7 +153,7 @@ public interface IWeighbridgeService
 
     /// <summary>
     /// Completes a ticket with the second weight and the time out, charges haulage by zone, and for an outbound load from a stockpile
-    /// issues the net tonnes from stock — all together or not at all.
+    /// issues the net tonnes from stock - all together or not at all.
     /// </summary>
     /// <param name="request">The second weigh.</param>
     /// <param name="ct">Cancellation token.</param>

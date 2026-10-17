@@ -9,7 +9,7 @@ Goal: show that customers, quotes and orders, invoices, receipts, statements and
 
 ## Quotes and orders
 4. Open **Quotations**. Quotes a customer (ITEM:quantity@price; …, valid until a date), records it sent, accepted or declined, and converts an accepted quotation into a sales order. Fill in: Step, Quotation number, Valid until (create), Date. Press OK and point out the result line and the list on the right.
-5. Open **Sales orders**. Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; lines ITEM:quantity, or blank for everything outstanding — a part despatch leaves the rest on back order), invoice what has been despatched (tax at each line's tax code), take back goods returned from a despatch, or cancel what is left of the order. Fill in: Step, Order number, Date. Press OK and point out the result line and the list on the right.
+5. Open **Sales orders**. Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; lines ITEM:quantity, or blank for everything outstanding - a part despatch leaves the rest on back order), invoice what has been despatched (tax at each line's tax code), take back goods returned from a despatch, or cancel what is left of the order. Fill in: Step, Order number, Date. Press OK and point out the result line and the list on the right.
 6. Open **Amend a sales order**. Changes ordered quantities and prices as a new version of the order, keeping the earlier one with the reason. Fill in: Sales order number, Lines: ITEM:quantity:unit price; …, Reason, Date. Press OK and point out the result line and the list on the right.
 
 ## Deliveries

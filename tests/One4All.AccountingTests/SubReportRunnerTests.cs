@@ -61,7 +61,7 @@ public sealed class SubReportRunnerTests
                     Type = BandType.Detail, Height = 20,
                     Elements =
                     [
-                        new ReportElement { Kind = ElementKind.RichText, Name = "head", Text = "Rep **{Rep}** — {Customer}", Width = 300, Height = 14 },
+                        new ReportElement { Kind = ElementKind.RichText, Name = "head", Text = "Rep **{Rep}** - {Customer}", Width = 300, Height = 14 },
                         new ReportElement
                         {
                             Kind = ElementKind.SubReport, Name = "statement", SubReportCode = "AR46", X = 10, Y = 16, Width = 400, Height = 20,
@@ -79,10 +79,10 @@ public sealed class SubReportRunnerTests
         var rendered = await runner.RenderAsync(companyId, code, new Dictionary<string, object?> { ["FromDate"] = new DateOnly(2026, 5, 1), ["ToDate"] = new DateOnly(2026, 5, 31) }, ReportFormat.Html);
         rendered.IsSuccess.Should().BeTrue(rendered.IsFailure ? rendered.Error.ToString() : null);
         string html = Encoding.UTF8.GetString(rendered.Value.Content);
-        html.Should().Contain("Rep <strong>SR-NORTH</strong> — CUST-ALPHA").And.Contain("Rep <strong>SR-SOUTH</strong> — CUST-BETA").And.NotContain("not available");
+        html.Should().Contain("Rep <strong>SR-NORTH</strong> - CUST-ALPHA").And.Contain("Rep <strong>SR-SOUTH</strong> - CUST-BETA").And.NotContain("not available");
 
         // Each detail row is followed by its own rep's statement only.
-        int northRow = html.IndexOf("Rep <strong>SR-NORTH</strong> — CUST-ALPHA", StringComparison.Ordinal);
+        int northRow = html.IndexOf("Rep <strong>SR-NORTH</strong> - CUST-ALPHA", StringComparison.Ordinal);
         int nextRow = html.IndexOf("data-band=\"Detail\"", northRow, StringComparison.Ordinal);
         string northBand = html[northRow..(nextRow < 0 ? html.Length : nextRow)];
         northBand.Should().Contain("CUST-ALPHA").And.Contain("40").And.NotContain("CUST-BETA");

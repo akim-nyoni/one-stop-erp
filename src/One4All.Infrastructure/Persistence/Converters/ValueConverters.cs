@@ -20,7 +20,7 @@ public sealed class CurrencyCodeConverter : ValueConverter<CurrencyCode, string>
 /// </summary>
 public sealed class StringListConverter : ValueConverter<IReadOnlyList<string>, string>
 {
-    private const char Separator = ''; // ASCII unit separator — safe against commas in values.
+    private const char Separator = ''; // ASCII unit separator - safe against commas in values.
 
     /// <summary>Creates the converter.</summary>
     public StringListConverter()

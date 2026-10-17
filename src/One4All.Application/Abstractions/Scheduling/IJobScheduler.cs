@@ -80,7 +80,7 @@ public interface IJobScheduler
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> SetEnabledAsync(long companyId, string code, bool enabled, DateTimeOffset now, CancellationToken ct = default);
 
-    /// <summary>Runs every enabled job that is due — across all companies, or one — and schedules each one's next run.</summary>
+    /// <summary>Runs every enabled job that is due - across all companies, or one - and schedules each one's next run.</summary>
     /// <param name="now">The moment.</param>
     /// <param name="companyId">Only this company's jobs, when given.</param>
     /// <param name="ct">Cancellation token.</param>

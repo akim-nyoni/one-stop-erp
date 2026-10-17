@@ -5,16 +5,16 @@ namespace One4All.Core.System;
 /// <summary>The posting status of a period for a module (brief §3.4).</summary>
 public enum PeriodStatus
 {
-    /// <summary>Future period — posting blocked unless the company allows future posting.</summary>
+    /// <summary>Future period - posting blocked unless the company allows future posting.</summary>
     Future = 0,
 
-    /// <summary>Open — posting permitted.</summary>
+    /// <summary>Open - posting permitted.</summary>
     Open = 1,
 
-    /// <summary>Soft-closed — posting blocked, adjustments allowed with permission.</summary>
+    /// <summary>Soft-closed - posting blocked, adjustments allowed with permission.</summary>
     Closed = 2,
 
-    /// <summary>Hard-closed — no posting ever again.</summary>
+    /// <summary>Hard-closed - no posting ever again.</summary>
     PermanentlyClosed = 3,
 }
 

@@ -190,7 +190,7 @@ public sealed class ContractControlService : IContractControlService
             if (preview.Value.ErrorCount > 0)
             {
                 BoqImportLine first = preview.Value.Lines.First(l => l.Error is not null);
-                return Error.Validation("Job.BoqErrors", $"{preview.Value.ErrorCount} line(s) have errors — first, line {first.Line}: {first.Error}");
+                return Error.Validation("Job.BoqErrors", $"{preview.Value.ErrorCount} line(s) have errors - first, line {first.Line}: {first.Error}");
             }
 
             foreach (BoqImportLine line in preview.Value.Lines)

@@ -46,7 +46,7 @@ The list beside the form shows: Overhead rates.
 
 ### Contract revenue, losses and budget
 
-Recognise a contract's revenue by stage of completion (cost to date over budgeted cost) against certified billing — the difference to the contract asset or liability; provide for a foreseeable loss (the whole expected loss at once, the provision trued up); or revise the budgeted cost with the reason.
+Recognise a contract's revenue by stage of completion (cost to date over budgeted cost) against certified billing - the difference to the contract asset or liability; provide for a foreseeable loss (the whole expected loss at once, the provision trued up); or revise the budgeted cost with the reason.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ The list beside the form shows: Job contracts.
 
 ### Client certificates, advance and retention
 
-Certify progress (cumulative work, approved variation work and materials on site; retention held and any client advance recovered at its percentage), receive a client advance, record practical completion with the defects-liability period, and release retention — half after completion, the rest when the period ends.
+Certify progress (cumulative work, approved variation work and materials on site; retention held and any client advance recovered at its percentage), receive a client advance, record practical completion with the defects-liability period, and release retention - half after completion, the rest when the period ends.
 
 | Field | Required | Notes |
 | --- | --- | --- |

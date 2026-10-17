@@ -73,7 +73,7 @@ public sealed class AttendanceTests
         (await Render("PR40")).Should().Contain("AT-A Ann,0,1,15,1,1,1,Full pay").And.Contain("AT-B Ben,1,0,0,1,1,1,Full pay");
         (await Render("PR41")).Should().Contain("2026-03-31,AT-A Ann,Annual,3,80.00,240");
         string exceptions = await Render("PR43");
-        exceptions.Should().Contain("2026-03-11,AT-A Ann,08:15,23:30,15.25,Over 12 hours").And.Contain("2026-03-10,AT-B Ben,08:00,—,—,No clock-out")
+        exceptions.Should().Contain("2026-03-11,AT-A Ann,08:15,23:30,15.25,Over 12 hours").And.Contain("2026-03-10,AT-B Ben,08:00,-,-,No clock-out")
             .And.Contain("2026-03-16,AT-B Ben,08:00,19:00,11,Unapproved overtime 3 h").And.NotContain("2026-03-10,AT-A Ann");
     }
 }

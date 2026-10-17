@@ -50,7 +50,7 @@ public class One4AllDbContext : DbContext
 
     /// <summary>
     /// Gets or sets the company this context is limited to: while set, every company-scoped entity reads only that company's rows (a second
-    /// line of defence behind each service's own company check). Unset, nothing is filtered by company — background jobs, the desktop
+    /// line of defence behind each service's own company check). Unset, nothing is filtered by company - background jobs, the desktop
     /// running as several companies, and tests.
     /// </summary>
     public long? CompanyScope { get; set; }
@@ -764,7 +764,7 @@ public class One4AllDbContext : DbContext
             modelBuilder.Entity(entityType.ClrType).HasQueryFilter(CompanyFilter, System.Linq.Expressions.Expression.Lambda(body, row));
         }
 
-        // Scope rules: list == null || column == null (or "") || list.Contains(column) — codes compared in upper case.
+        // Scope rules: list == null || column == null (or "") || list.Contains(column) - codes compared in upper case.
         foreach (Microsoft.EntityFrameworkCore.Metadata.IMutableEntityType entityType in modelBuilder.Model.GetEntityTypes().ToList())
         {
             if (entityType.BaseType is not null || entityType.IsOwned())

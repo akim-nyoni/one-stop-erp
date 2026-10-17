@@ -18,7 +18,7 @@ public sealed record ArrangementStanding(decimal DueToDate, decimal Paid, decima
 
 /// <summary>
 /// Payment arrangement schedules and default tracking (brief §4.9 debt management): monthly instalments from the start
-/// date, the last one smaller where the total does not divide evenly, and an arrangement's standing on a date — paid in
+/// date, the last one smaller where the total does not divide evenly, and an arrangement's standing on a date - paid in
 /// order against the schedule, honoured once the total is paid, defaulted once a set number of instalments are missed.
 /// Pure and unit-tested.
 /// </summary>

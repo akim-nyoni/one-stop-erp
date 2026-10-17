@@ -69,7 +69,7 @@ public sealed class SchemeBudgetTests
         var rendered = await scope.ServiceProvider.GetRequiredService<IReportRunner>().RenderAsync(companyId, "H84", new Dictionary<string, object?>(), ReportFormat.Csv);
         rendered.IsSuccess.Should().BeTrue(rendered.IsFailure ? rendered.Error.Message : null);
         string report = Encoding.UTF8.GetString(rendered.Value.Content);
-        report.Should().Contain($"{scheme.Code},Land,\"10,000.00\",\"9,000.00\",90.0,1000").And.Contain($"{scheme.Code},Servicing,—,0.00,—,0")
-            .And.Contain($"{scheme.Code},ProfessionalFees,\"1,000.00\",\"1,000.01\",100.0,-0.01").And.Contain($"{scheme.Code},Overheads,—,300.00,—,-300");
+        report.Should().Contain($"{scheme.Code},Land,\"10,000.00\",\"9,000.00\",90.0,1000").And.Contain($"{scheme.Code},Servicing,-,0.00,-,0")
+            .And.Contain($"{scheme.Code},ProfessionalFees,\"1,000.00\",\"1,000.01\",100.0,-0.01").And.Contain($"{scheme.Code},Overheads,-,300.00,-,-300");
     }
 }

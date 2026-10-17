@@ -85,7 +85,7 @@ public sealed class ContractControlTests
         }
 
         (await Render("JC191")).Should().Contain("CC-1,VO-1,Extra room,2026-03-01,Approved,2026-03-05,\"6,000.00\",10000").And.Contain("CC-1,VO-2,Canopy,2026-03-02,Rejected,2026-03-06,\"3,000.00\",5000")
-            .And.Contain("CC-1,VO-3,Paving,2026-03-10,Submitted,—,\"1,000.00\",2000");
+            .And.Contain("CC-1,VO-3,Paving,2026-03-10,Submitted,-,\"1,000.00\",2000");
         (await Render("JC193")).Should().Contain("CC-1,JC-E1 Ann Mason,Labour,2,14,10.00,140").And.Contain("CC-1,JC-E2 Ben Fixer,Labour,1,8,12.00,96");
         (await Render("JC195")).Should().Contain("CC-1,2026-03-04,JC-CEM Cement,JC-WH,3,8.00,24");
         (await Render("JC196")).Should().Contain("CC-1,B1,Excavation,m3,100,110,10,110.0%,2200").And.Contain("CC-1,B2,Concrete,m3,40,0,-40,0.0%,0");

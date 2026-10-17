@@ -5,7 +5,7 @@ using System.Text;
 namespace One4All.Reporting.Engine;
 
 /// <summary>
-/// Exports report rows to a minimal, valid <c>.xlsx</c> (OpenXML SpreadsheetML) workbook — a single sheet
+/// Exports report rows to a minimal, valid <c>.xlsx</c> (OpenXML SpreadsheetML) workbook - a single sheet
 /// with a bold header row of the field names and one row per record. Numeric values are written as numbers so
 /// Excel totals and formats them; everything else is written as an inline string. Built with the BCL
 /// <see cref="ZipArchive"/> only, so the reporting layer takes no extra dependency.

@@ -54,7 +54,7 @@ public enum CalculationBasis
 }
 
 /// <summary>
-/// A configured pay element (brief §4.15.2, <c>pay.element</c>) — never code. Carries its calculation
+/// A configured pay element (brief §4.15.2, <c>pay.element</c>) - never code. Carries its calculation
 /// basis, taxable/pensionable flags, calculation sequence (order matters), and GL account mapping. Formula
 /// elements reuse the report expression engine so payroll formulas are written and tested the same way.
 /// </summary>
@@ -102,7 +102,7 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// <summary>The calculation basis.</summary>
     public CalculationBasis Basis { get; private set; }
 
-    /// <summary>The calculation sequence (order matters — e.g. pension before tax).</summary>
+    /// <summary>The calculation sequence (order matters - e.g. pension before tax).</summary>
     public int Sequence { get; private set; }
 
     /// <summary>A default fixed amount (for <see cref="CalculationBasis.FixedAmount"/>).</summary>
@@ -148,7 +148,7 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     public CurrencyCode? PaidInCurrency { get; set; }
 
     /// <summary>
-    /// Gets or sets the deduction's suspension priority under net-pay protection: 0 (the default — tax, pension, court orders) is never
+    /// Gets or sets the deduction's suspension priority under net-pay protection: 0 (the default - tax, pension, court orders) is never
     /// suspended; otherwise the highest number is suspended first.
     /// </summary>
     public int SuspensionPriority { get; set; }
@@ -171,7 +171,7 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>
     /// Gets or sets a value indicating whether the earning is an annual payment (bonus, 13th cheque): a non-cumulative tax-table element taxes
-    /// it annualised and apportioned — the annual tax on twelve periods of regular pay plus the payment, less that on the regular pay alone —
+    /// it annualised and apportioned - the annual tax on twelve periods of regular pay plus the payment, less that on the regular pay alone -
     /// rather than at one period's marginal rate.
     /// </summary>
     public bool IsAnnualPayment { get; set; }

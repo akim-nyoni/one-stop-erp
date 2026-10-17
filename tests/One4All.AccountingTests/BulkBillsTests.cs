@@ -11,7 +11,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// A posted billing run's bills go out in bulk: an SMS to each ratepayer with a mobile number, and one printed page per ratepayer — all of them, or only
+/// A posted billing run's bills go out in bulk: an SMS to each ratepayer with a mobile number, and one printed page per ratepayer - all of them, or only
 /// those without an email address.
 /// </summary>
 [Collection(AccountingCollection.Name)]

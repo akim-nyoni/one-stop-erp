@@ -68,7 +68,7 @@ public sealed record PriorityScore(decimal Total, IReadOnlyList<ScoreLine> Lines
 
 /// <summary>
 /// Waiting-list qualification and priority scoring (brief §4.10.3): the configurable rules an applicant must meet, and
-/// a points score from years on the list, residency, dependants, disability and housing conditions — with a full
+/// a points score from years on the list, residency, dependants, disability and housing conditions - with a full
 /// explanation an officer can print for the applicant. Pure and unit-tested.
 /// </summary>
 public static class WaitingListRules

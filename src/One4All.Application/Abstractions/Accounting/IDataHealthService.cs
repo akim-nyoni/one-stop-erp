@@ -19,7 +19,7 @@ public sealed record DataHealthReport(DateOnly AsAtDate, HealthStatus Overall, I
 
 /// <summary>
 /// The Data Health dashboard (brief §4.17): orphan records, unbalanced batches, control account variances, negative stock
-/// and unposted batches — with the rest of the ledger integrity check — in one graded view.
+/// and unposted batches - with the rest of the ledger integrity check - in one graded view.
 /// </summary>
 public interface IDataHealthService
 {

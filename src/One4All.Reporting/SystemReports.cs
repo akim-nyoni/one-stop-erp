@@ -220,7 +220,7 @@ public static class SystemReports
     /// <summary>Builds the Income Statement definition (brief §14 report 7).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition IncomeStatement() => Listing(IncomeStatementCode, "Income Statement", "GeneralLedger",
-        "Income and expenses for a period; the difference is the net profit — beside the same period a year earlier and the change.", "IncomeStatement",
+        "Income and expenses for a period; the difference is the net profit - beside the same period a year earlier and the change.", "IncomeStatement",
         [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This period", 95, true), new Column("PriorAmount", "Prior year", 95, true),
             new Column("Change", "Change", 90, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
@@ -260,21 +260,21 @@ public static class SystemReports
     /// <summary>Builds the Journal Daybook definition (audit journal listing).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",
-        "Every journal over a period — date, number, source module, document, narrative and base total (draft and deferred too when asked; a branch, cost centre or department narrows the lines counted).", "JournalDaybook",
+        "Every journal over a period - date, number, source module, document, narrative and base total (draft and deferred too when asked; a branch, cost centre or department narrows the lines counted).", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the VAT Return by Code definition (multi-rate breakdown).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition VatReturnByCode() => Listing(VatReturnByCodeCode, "VAT Return by Code", "GeneralLedger",
-        "Output and input tax by tax code for a period, with the net per code — the multi-rate VAT breakdown.", "VatReturnByCode",
+        "Output and input tax by tax code for a period, with the net per code - the multi-rate VAT breakdown.", "VatReturnByCode",
         [new Column("TaxCode", "Tax code", 120), new Column("OutputTax", "Output", 110, true), new Column("InputTax", "Input", 110, true), new Column("Net", "Net", 110, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Control-Account Reconciliation definition (GL vs sub-ledgers).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition ControlReconciliation() => Listing(ControlReconciliationCode, "Control Reconciliation", "GeneralLedger",
-        "GL control-account balances (AR, AP, Stock) versus their sub-ledger totals, with the difference — zero when they agree.", "ControlReconciliation",
+        "GL control-account balances (AR, AP, Stock) versus their sub-ledger totals, with the difference - zero when they agree.", "ControlReconciliation",
         [new Column("Control", "Control", 160), new Column("AccountCode", "Account", 90), new Column("GlBalance", "GL balance", 110, true), new Column("SubLedgerBalance", "Sub-ledger", 110, true), new Column("Difference", "Difference", 100, true)],
         [("AsAtDate", ParameterType.Date)]);
 
@@ -309,7 +309,7 @@ public static class SystemReports
     /// <summary>Builds the Balance Sheet definition (brief §14 report 6).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition BalanceSheet() => Listing(BalanceSheetCode, "Balance Sheet", "GeneralLedger",
-        "Assets, liabilities and equity as at a date; assets equal liabilities plus equity — beside the position a year earlier and the change.", "BalanceSheet",
+        "Assets, liabilities and equity as at a date; assets equal liabilities plus equity - beside the position a year earlier and the change.", "BalanceSheet",
         [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This year", 95, true), new Column("PriorAmount", "Prior year", 95, true),
             new Column("Change", "Change", 90, true)],
         [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
@@ -483,7 +483,7 @@ public static class SystemReports
     /// <summary>Builds the Stock Valuation definition (brief §4.11 inventory).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition StockValuation() => Listing(StockValuationCode, "Stock Valuation", "Inventory",
-        "Quantity on hand and value per item and warehouse, with the item's category and costing method — now, or as at any earlier date (from the stock movements to it).", "StockValuation",
+        "Quantity on hand and value per item and warehouse, with the item's category and costing method - now, or as at any earlier date (from the stock movements to it).", "StockValuation",
         [new Column("ItemCode", "Item", 80), new Column("Description", "Description", 160), new Column("Category", "Category", 80), new Column("Costing", "Costing", 85),
             new Column("WarehouseCode", "Warehouse", 80), new Column("Quantity", "Qty", 65, true), new Column("AverageCost", "Avg cost", 75, true), new Column("Value", "Value", 90, true)],
         [("AsAtDate", ParameterType.Date)]);
@@ -491,14 +491,14 @@ public static class SystemReports
     /// <summary>Builds the Stock Movements definition (inventory transaction history).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition StockMovements() => Listing(StockMovementsCode, "Stock Movements", "Inventory",
-        "Every stock movement over a period — receipts, issues, transfers, adjustments and reversals.", "StockMovements",
+        "Every stock movement over a period - receipts, issues, transfers, adjustments and reversals.", "StockMovements",
         [new Column("Date", "Date", 95), new Column("Item", "Item", 100), new Column("Warehouse", "Warehouse", 90), new Column("Type", "Type", 90), new Column("Qty", "Qty", 70, true), new Column("Value", "Value", 90, true), new Column("Reference", "Reference", 120)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Reorder definition (inventory replenishment).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition Reorder() => Listing(ReorderCode, "Reorder Report", "Inventory",
-        "Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid.", "Reorder",
+        "Items at or below their reorder level, with the suggested reorder quantity - a purchasing aid.", "Reorder",
         [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 190), new Column("OnHand", "On hand", 80, true), new Column("ReorderLevel", "Reorder level", 90, true), new Column("Suggested", "Suggested order", 100, true)],
         []);
 
@@ -512,7 +512,7 @@ public static class SystemReports
     /// <summary>Builds the Slow-moving Stock definition (dead-stock analysis).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition SlowStock() => Listing(SlowStockCode, "Slow-moving Stock", "Inventory",
-        "Items on hand with no movement since the given date — capital tied up in dead stock.", "SlowStock",
+        "Items on hand with no movement since the given date - capital tied up in dead stock.", "SlowStock",
         [new Column("ItemCode", "Item", 100), new Column("Description", "Description", 180), new Column("Warehouse", "Warehouse", 90), new Column("Quantity", "Qty", 70, true), new Column("Value", "Value", 90, true), new Column("LastMovement", "Last movement", 110)],
         [("SinceDate", ParameterType.Date)]);
 
@@ -533,7 +533,7 @@ public static class SystemReports
     /// <summary>Builds the Asset Disposals definition (fixed assets).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition AssetDisposals() => Listing(AssetDisposalsCode, "Asset Disposals", "FixedAssets",
-        "Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal — newest first.", "AssetDisposals",
+        "Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal - newest first.", "AssetDisposals",
         [new Column("AssetNumber", "Asset", 90), new Column("Date", "Date", 95), new Column("Proceeds", "Proceeds", 100, true), new Column("NetBookValue", "NBV", 100, true), new Column("GainOrLoss", "Gain/(loss)", 100, true), new Column("Journal", "Journal", 100)],
         []);
 
@@ -568,14 +568,14 @@ public static class SystemReports
     /// <summary>Builds the Employee Loans definition (Payroll module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition EmployeeLoans() => Listing(EmployeeLoansCode, "Employee Loans", "Payroll",
-        "Outstanding employee loans — principal, balance, installment and status.", "EmployeeLoans",
+        "Outstanding employee loans - principal, balance, installment and status.", "EmployeeLoans",
         [new Column("Employee", "Employee", 180), new Column("Reference", "Reference", 100), new Column("Principal", "Principal", 100, true), new Column("Outstanding", "Outstanding", 100, true), new Column("Installment", "Installment", 100, true)],
         []);
 
     /// <summary>Builds the Leave Balances definition (Payroll module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition LeaveBalances() => Listing(LeaveBalancesCode, "Leave Balances", "Payroll",
-        "Employee leave balances by type — days accrued, taken and available.", "LeaveBalances",
+        "Employee leave balances by type - days accrued, taken and available.", "LeaveBalances",
         [new Column("Employee", "Employee", 180), new Column("LeaveType", "Type", 90), new Column("Accrued", "Accrued", 90, true), new Column("Taken", "Taken", 90, true), new Column("Balance", "Balance", 90, true)],
         []);
 
@@ -596,7 +596,7 @@ public static class SystemReports
     /// <summary>Builds the Period Status definition (month-end close aid).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition PeriodStatus() => Listing(PeriodStatusCode, "Period Status", "System",
-        "Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid.", "PeriodStatus",
+        "Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) - a month-end close aid.", "PeriodStatus",
         [new Column("Period", "Period", 140), new Column("Start", "Start", 95), new Column("End", "End", 95), new Column("GL", "GL", 80), new Column("AR", "AR", 80), new Column("AP", "AP", 80)],
         []);
 
@@ -617,7 +617,7 @@ public static class SystemReports
     /// <summary>Builds the CRM Pipeline definition (brief §4.16).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition Pipeline() => Listing(PipelineCode, "Sales Pipeline", "CRM",
-        "Open opportunities by stage — estimated value, win probability and the probability-weighted value.", "Pipeline",
+        "Open opportunities by stage - estimated value, win probability and the probability-weighted value.", "Pipeline",
         [new Column("Name", "Opportunity", 170), new Column("Contact", "Contact", 130), new Column("Stage", "Stage", 100), new Column("Probability", "Prob %", 70, true), new Column("Estimated", "Estimated", 100, true), new Column("Weighted", "Weighted", 100, true)],
         []);
 
@@ -826,14 +826,14 @@ public static class SystemReports
     /// <summary>Builds the Menu Engineering definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition MenuEngineering() => Listing(MenuEngineeringCode, "Menu Engineering", "Restaurant",
-        "Sales mix by menu item — quantity, revenue, recipe cost, margin and menu-engineering class.", "MenuEngineering",
+        "Sales mix by menu item - quantity, revenue, recipe cost, margin and menu-engineering class.", "MenuEngineering",
         [new Column("Item", "Item", 150), new Column("QtySold", "Qty", 70), new Column("Revenue", "Revenue", 90, true), new Column("Cost", "Cost", 90, true), new Column("Margin", "Margin", 90, true), new Column("Class", "Class", 90)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Table Reservations definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition Reservations() => Listing(ReservationsCode, "Table Reservations", "Restaurant",
-        "Upcoming table bookings — when, table, guest, party size and contact.", "Reservations",
+        "Upcoming table bookings - when, table, guest, party size and contact.", "Reservations",
         [new Column("When", "When", 130), new Column("Table", "Table", 70), new Column("Guest", "Guest", 130), new Column("Party", "Party", 60), new Column("Phone", "Phone", 100)],
         []);
 
@@ -847,7 +847,7 @@ public static class SystemReports
     /// <summary>Builds the Combined Tables definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition TableGroups() => Listing(TableGroupsCode, "Combined Tables", "Restaurant",
-        "Active table groups — the combined tables, their primary and total seats.", "TableGroups",
+        "Active table groups - the combined tables, their primary and total seats.", "TableGroups",
         [new Column("Group", "Group", 130), new Column("Primary", "Primary", 80), new Column("Tables", "Tables", 70), new Column("Seats", "Seats", 70)],
         []);
 
@@ -861,14 +861,14 @@ public static class SystemReports
     /// <summary>Builds the Section Sales definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition SectionSales() => Listing(SectionSalesCode, "Section Sales", "Restaurant",
-        "Billed sales by floor-plan section over a period — orders, net, tax and gross.", "SectionSales",
+        "Billed sales by floor-plan section over a period - orders, net, tax and gross.", "SectionSales",
         [new Column("Section", "Section", 140), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
     /// <summary>Builds the Voids &amp; Comps definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition VoidsAndComps() => Listing(VoidsAndCompsCode, "Voids &amp; Comps", "Restaurant",
-        "Voided and comped order lines over a period, with reasons and the authorising manager — for oversight.", "VoidsAndComps",
+        "Voided and comped order lines over a period, with reasons and the authorising manager - for oversight.", "VoidsAndComps",
         [new Column("Date", "Date", 100), new Column("Order", "Order", 90), new Column("Item", "Item", 130), new Column("Qty", "Qty", 55), new Column("Type", "Type", 60), new Column("Reason", "Reason", 160), new Column("Authorised", "Authorised", 120)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
@@ -882,14 +882,14 @@ public static class SystemReports
     /// <summary>Builds the Active Deliveries definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition Deliveries() => Listing(DeliveriesCode, "Active Deliveries", "Restaurant",
-        "Delivery orders still in progress — customer, address, driver and dispatch state.", "Deliveries",
+        "Delivery orders still in progress - customer, address, driver and dispatch state.", "Deliveries",
         [new Column("Order", "Order", 100), new Column("Customer", "Customer", 120), new Column("Address", "Address", 180), new Column("Driver", "Driver", 110), new Column("Status", "Status", 110)],
         []);
 
     /// <summary>Builds the Server Sales definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition ServerSales() => Listing(ServerSalesCode, "Server Sales", "Restaurant",
-        "Billed sales by waiter over a period — orders, net, tax and gross (for tip-out and performance).", "ServerSales",
+        "Billed sales by waiter over a period - orders, net, tax and gross (for tip-out and performance).", "ServerSales",
         [new Column("Server", "Server", 140), new Column("Orders", "Orders", 70), new Column("Net", "Net", 100, true), new Column("Tax", "Tax", 90, true), new Column("Gross", "Gross", 100, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
@@ -910,7 +910,7 @@ public static class SystemReports
     /// <summary>Builds the Bills definition (Restaurant module).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition Bills() => Listing(BillsCode, "Bills", "Restaurant",
-        "Every restaurant bill over a period — net, tax, service charge, tip, discount and gross.", "Bills",
+        "Every restaurant bill over a period - net, tax, service charge, tip, discount and gross.", "Bills",
         [new Column("Date", "Date", 95), new Column("Order", "Order", 90), new Column("Net", "Net", 90, true), new Column("Tax", "Tax", 80, true), new Column("Service", "Service", 80, true), new Column("Tip", "Tip", 70, true), new Column("Discount", "Discount", 85, true), new Column("Gross", "Gross", 95, true)],
         [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
 
@@ -1006,7 +1006,7 @@ public static class SystemReports
 
     /// <summary>
     /// Reconstructs the <see cref="Column"/> list from a listing definition previously built by
-    /// <see cref="Listing"/> — pairing each <c>d_*</c> detail field with its <c>h_*</c> page-header label —
+    /// <see cref="Listing"/> - pairing each <c>d_*</c> detail field with its <c>h_*</c> page-header label -
     /// so a designer can round-trip a listing report (extract → edit → rebuild via <see cref="Listing"/>).
     /// Returns an empty array for a definition that is not in the listing shape.
     /// </summary>

@@ -76,7 +76,7 @@ public sealed record BackpayRequest
 }
 
 /// <summary>
-/// Payroll corrections after commit (brief §4.15.6): a committed run is never edited — it is corrected by a visible supplementary
+/// Payroll corrections after commit (brief §4.15.6): a committed run is never edited - it is corrected by a visible supplementary
 /// run, settled as backpay in a later period, or undone by a formally approved reversal that writes a reversing journal. Also the
 /// go-live parallel run: the legacy system's figures are imported for line-by-line comparison (PR8).
 /// </summary>

@@ -10,7 +10,7 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Create or copy a budget
 
-Create a budget for a fiscal year from lines ACCOUNT:period:amount[:cost centre]; or copy an existing budget as the start of a new version (a revision, a supplementary budget or a reforecast), optionally uplifted by a percentage — the copy records which budget it came from.
+Create a budget for a fiscal year from lines ACCOUNT:period:amount[:cost centre]; or copy an existing budget as the start of a new version (a revision, a supplementary budget or a reforecast), optionally uplifted by a percentage - the copy records which budget it came from.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -55,7 +55,7 @@ The list beside the form shows: Assumptions.
 
 ### Multi-year framework, archive and lock
 
-Outer years: indicative amounts for the years after the budget year ("1:6100:1300; 2:6100:1400" — years after:account:amount), set before approval. Show: the framework by account. Roll forward: next year's draft from an approved framework. Archive a superseded version (seal verified), then Lock it for good.
+Outer years: indicative amounts for the years after the budget year ("1:6100:1300; 2:6100:1400" - years after:account:amount), set before approval. Show: the framework by account. Roll forward: next year's draft from an approved framework. Archive a superseded version (seal verified), then Lock it for good.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -154,7 +154,7 @@ The list beside the form shows: Budgets in preparation.
 
 ### Preparation deadlines and budget alerts
 
-Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go and their thresholds — with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). The scheduled task budget.notices does both daily.
+Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go and their thresholds - with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). The scheduled task budget.notices does both daily.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -197,7 +197,7 @@ The list beside the form shows: Budgets in preparation.
 
 ### Move money between budget lines (virements)
 
-Moves budget from one vote to another — between cost centres, or to another department's budget of the same year — requested with a justification, approved or rejected by another user whose authorisation level covers the amount's band (Bands: limit:level; …, blank limit for the top band); the register shows each vote's original, virements in and out, and current amount.
+Moves budget from one vote to another - between cost centres, or to another department's budget of the same year - requested with a justification, approved or rejected by another user whose authorisation level covers the amount's band (Bands: limit:level; …, blank limit for the top band); the register shows each vote's original, virements in and out, and current amount.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -235,7 +235,7 @@ The list beside the form shows: Re-phasing requests.
 
 ### Carry unspent capital forward
 
-Year-end: Propose lists each capital vote's approved budget, what was spent and what may still be carried; Approve carries the given amounts (VOTE:amount; …) into a later year's capital budget under the approval reference — a separate act, recorded for audit.
+Year-end: Propose lists each capital vote's approved budget, what was spent and what may still be carried; Approve carries the given amounts (VOTE:amount; …) into a later year's capital budget under the approval reference - a separate act, recorded for audit.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -250,7 +250,7 @@ The list beside the form shows: Capital budgets.
 
 ### Budget methods and forecasts
 
-Builds a draft budget incrementally from a prior year's actuals or budget with an uplift (accounts the draft already has are left alone); reforecasts a budget with the actuals to a period and the budget for the rest (a new Reforecast version); and shows its cash budget — each line turned into cash by its timing (prefix:p0/p1/…; e.g. 4:50/30/20 collects sales over three months) from the opening cash.
+Builds a draft budget incrementally from a prior year's actuals or budget with an uplift (accounts the draft already has are left alone); reforecasts a budget with the actuals to a period and the budget for the rest (a new Reforecast version); and shows its cash budget - each line turned into cash by its timing (prefix:p0/p1/…; e.g. 4:50/30/20 collects sales over three months) from the opening cash.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -313,7 +313,7 @@ The material variances between budget and actual to a period (over a value or a 
 
 ### Budget-holder statements
 
-Each department's active budget against actuals to the period of the date — budget and actual to date, the variance and the share of the year's budget used, with votes past the utilisation thresholds called out. Preview shows one department's; Send emails every budget holder with an address (the scheduled budget notices send them on the first of each month for the month just ended).
+Each department's active budget against actuals to the period of the date - budget and actual to date, the variance and the share of the year's budget used, with votes past the utilisation thresholds called out. Preview shows one department's; Send emails every budget holder with an address (the scheduled budget notices send them on the first of each month for the month just ended).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -357,9 +357,9 @@ The list beside the form shows: Open commitments.
 | B11 | Budget Version Register | Every budget version of the year ever created: number, type, status, author and date, why it was raised, who approved it under which resolution, and its seal hash with whether it still verifies. |
 | B12 | Budget Version Comparison | For each budget with more than one version: the latest against the one before, per account. |
 | B13 | Original vs Recommended vs Approved | Per department and account: what was first requested, the last draft recommended, what was approved, and the cut. |
-| B14 | Budget Approval Audit | Every status change of the year's budgets — submitted, approved, activated, superseded — with who made it and the days since the previous step. |
+| B14 | Budget Approval Audit | Every status change of the year's budgets - submitted, approved, activated, superseded - with who made it and the days since the previous step. |
 | B15 | Multi-Year Budget & Actual Comparison | Each budgeted account's budget and actual for this year and the two before. |
-| B16 | Archived Budget Retrieval | Any sealed budget of the date's year in full, exactly as approved — every account by quarter — headed by its seal hash re-verified against the lines. Choose the budget by label and version (latest sealed by default). |
+| B16 | Archived Budget Retrieval | Any sealed budget of the date's year in full, exactly as approved - every account by quarter - headed by its seal hash re-verified against the lines. Choose the budget by label and version (latest sealed by default). |
 | B17 | Budget Versions, Seals & Superseded Budgets | Every budget held: type, version, status, why it was revised, and whether its seal still verifies. |
 | B18 | Budget Line Change Log | Every recorded change to budget lines in the year, with who made it and the fields changed. |
 | B19 | Approved Budget Register by Vote & Department | The appropriation of record: every in-force budget line for the year by account and department, by quarter. |
@@ -377,7 +377,7 @@ The list beside the form shows: Open commitments.
 | B3 | Target vs Submission Gap | Per department: the ceiling issued, what its latest draft requests, and the gap still to reconcile. |
 | B30 | Unspent Capital Carry-Forward Schedule | Per capital vote: the year's capital budget, spent to the date, and the unspent balance proposed to carry forward. |
 | B31 | Budget vs Actual vs Commitment vs Available | At account, department or division level, for the date's period, the year to date or the full year: budget, actual, open commitments, what is available and the share used, with the number of postings behind each actual. |
-| B32 | Budget Holder Statement | Per budget holder: their department's votes — budget, spent and committed to date, available and utilisation. |
+| B32 | Budget Holder Statement | Per budget holder: their department's votes - budget, spent and committed to date, available and utilisation. |
 | B33 | Budget Utilisation (RAG) | Year-to-date use of each budgeted account's year-to-date budget: green under 90%, amber to 100%, red over. |
 | B34 | Over-Budget & Threshold Exceptions | Only the budgeted accounts at amber or red, worst first. |
 | B35 | Variance Decomposition | Year-to-date variance per budget line split into volume (actual vs budgeted quantity at budget price), FX (foreign amounts at actual vs planned rate) and price / rate. |
@@ -394,8 +394,8 @@ The list beside the form shows: Open commitments.
 | B45 | Budget Audit Trail | Every recorded change in the year to budgets, lines, virements, commitments and variance comments. |
 | B5 | Assumption & Driver Register | The year's planning drivers with their value and the budget lines each one feeds. |
 | B6 | Assumption Sensitivity / What-If | Change one driver: each dependent line scaled to the new value, the change per line and on the total. |
-| B7 | Budget Preparation Basis | How every line of the year's budgets was arrived at — zero-based, incremental, actuals-based or driver-based — with the driver. |
+| B7 | Budget Preparation Basis | How every line of the year's budgets was arrived at - zero-based, incremental, actuals-based or driver-based - with the driver. |
 | B8 | Establishment-Driven Staff Budget | Per department: approved posts at their annual cost less the vacancy factor, against the staff budget held for the department. |
-| B9 | Capital Budget Submission & Phasing | The year's capital budgets per vote by month, with the cumulative share spent of the year — the S-curve. |
+| B9 | Capital Budget Submission & Phasing | The year's capital budgets per vote by month, with the cumulative share spent of the year - the S-curve. |
 | BUD-BVA | Budget vs Actual | Active budget compared to GL actuals by account, with the variance. |
 | BUD-LIST | Budget Listing | All budget versions with type, department, status, active flag and annual total. |

@@ -64,7 +64,7 @@ public sealed class JobWbsTests
             .RenderAsync(companyId, "JC186", new Dictionary<string, object?>(), One4All.Application.Abstractions.Reporting.ReportFormat.Csv);
         report.IsSuccess.Should().BeTrue(report.IsFailure ? report.Error.Message : null);
         System.Text.Encoding.UTF8.GetString(report.Value.Content).Should().Contain("WBS-1,Clinic,Masonry,Labour,\"20,000.00\",0.00,\"12,000.00\",93.8%,8000")
-            .And.Contain("WBS-1,Clinic,Roofing,—,\"15,000.00\",\"14,000.00\",0.00,0.0%,1000");
+            .And.Contain("WBS-1,Clinic,Roofing,-,\"15,000.00\",\"14,000.00\",0.00,0.0%,1000");
     }
 
     private static Application.JobCosting.WbsLine WbsLineOf(WbsBreakdown breakdown, string code) => breakdown.Lines.Single(l => l.Code == code);

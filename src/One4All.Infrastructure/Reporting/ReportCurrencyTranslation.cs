@@ -10,7 +10,7 @@ namespace One4All.Infrastructure.Reporting;
 
 /// <summary>
 /// Translates a listing's money columns into the reporting currency asked for (brief §9 common parameters: "currency basis") and says
-/// which rate it used — the closing rate at the report date, the period average, the daily rate, or a keyed rate — so the header can
+/// which rate it used - the closing rate at the report date, the period average, the daily rate, or a keyed rate - so the header can
 /// show it. Money columns are the fields the listing formats as amounts; cells may be numbers or already-formatted text.
 /// </summary>
 internal static class ReportCurrencyTranslation

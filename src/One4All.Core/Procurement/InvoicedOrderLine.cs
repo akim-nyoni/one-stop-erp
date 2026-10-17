@@ -4,7 +4,7 @@ namespace One4All.Core.Procurement;
 
 /// <summary>
 /// An order line matched to a supplier invoice (<c>pop.invoiced_order_line</c>): the quantity invoiced at the order price and at the invoice
-/// price — the purchase price variance the supplier scorecard reports.
+/// price - the purchase price variance the supplier scorecard reports.
 /// </summary>
 public sealed class InvoicedOrderLine : Entity, ICompanyScoped
 {

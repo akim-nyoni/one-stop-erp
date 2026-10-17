@@ -80,7 +80,7 @@ public sealed class DeveloperAgreementTests
         (await developers.ChargePenaltiesAsync(companyId, number, new DateOnly(2026, 6, 15), "4400")).Value.Should().Be(200m);
         (await developers.ChargePenaltiesAsync(companyId, number, new DateOnly(2026, 6, 15), "4400")).Value.Should().Be(0m);
 
-        // Handed over on 10 July — three months late in all; the next charge invoices only the extra month.
+        // Handed over on 10 July - three months late in all; the next charge invoices only the extra month.
         (await developers.HandOverAsync(companyId, number, stands[1].Id, new DateOnly(2026, 7, 10))).IsSuccess.Should().BeTrue();
         (await developers.ChargePenaltiesAsync(companyId, number, new DateOnly(2026, 8, 1), "4400")).Value.Should().Be(100m);
         DeveloperReconciliation august = (await developers.ReconcileAsync(companyId, number, new DateOnly(2026, 8, 1))).Value;

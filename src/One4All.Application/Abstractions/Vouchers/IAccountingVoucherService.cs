@@ -50,7 +50,7 @@ public interface IAccountingVoucherService
     Task<Result<string>> ApproveAsync(long companyId, long voucherId, long approverUserId, CancellationToken ct = default);
 
     /// <summary>
-    /// Checks a draft voucher — the "checked by" signature between preparer and approver. The checker is neither the preparer nor (later)
+    /// Checks a draft voucher - the "checked by" signature between preparer and approver. The checker is neither the preparer nor (later)
     /// the approver.
     /// </summary>
     Task<Result> CheckAsync(long companyId, long voucherId, long checkerUserId, CancellationToken ct = default);

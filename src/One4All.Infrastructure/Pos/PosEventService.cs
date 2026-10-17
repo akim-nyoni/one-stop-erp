@@ -361,7 +361,7 @@ public sealed class PosEventService : IPosEventService
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId, SourceModule = "POS", PostingDate = request.Date, TransactionCurrency = company.BaseCurrency, EnforceManualJournalRules = false, DocumentType = "PosRefund",
-            DocumentNumber = document, Narrative = $"Refund without receipt: {item.Code} — {request.Reason.Trim()}", Lines = lines,
+            DocumentNumber = document, Narrative = $"Refund without receipt: {item.Code} - {request.Reason.Trim()}", Lines = lines,
         }, ct).ConfigureAwait(false);
         if (posting.IsFailure)
         {

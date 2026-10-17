@@ -28,7 +28,7 @@ public sealed class FiscalOptions
 }
 
 /// <summary>
-/// The reference implementation skeleton (brief §3.5): a fiscal device reached over HTTPS as a revenue authority's fiscal data management system — the
+/// The reference implementation skeleton (brief §3.5): a fiscal device reached over HTTPS as a revenue authority's fiscal data management system - the
 /// day is opened and closed with its Z report, each receipt, refund, invoice and credit note is posted for signing and the code and verification URL
 /// come back, and a device that cannot be reached queues the receipt for the retry task. The JSON shapes are the simplest a real API uses; an
 /// authority's own field names are a mapping change in this file.

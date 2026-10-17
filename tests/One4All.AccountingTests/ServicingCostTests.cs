@@ -57,7 +57,7 @@ public sealed class ServicingCostTests
         (await servicing.LinkAsync(companyId, scheme.Id, roads, ServicingBasis.ByArea)).IsSuccess.Should().BeTrue();
         (await servicing.LinkAsync(companyId, scheme.Id, roads, ServicingBasis.Equal)).Error.Code.Should().Be("Hse.ContractLinked");
 
-        // March: 9,000 of roads by area — 3,000 and 6,000; the sold stand takes none.
+        // March: 9,000 of roads by area - 3,000 and 6,000; the sold stand takes none.
         IReadOnlyList<ServicingRunLine> march = (await servicing.ApportionAsync(companyId, scheme.Id, new DateOnly(2026, 3, 31), "1450", "1460")).Value;
         march.Should().ContainSingle().Which.Apportioned.Should().Be(9000m);
         (await servicing.ApportionAsync(companyId, scheme.Id, new DateOnly(2026, 3, 31), "1450", "1460")).Value.Single().Apportioned.Should().Be(0m);

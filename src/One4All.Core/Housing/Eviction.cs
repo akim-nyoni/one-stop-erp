@@ -39,7 +39,7 @@ public enum EvictionCaseStatus
 
 /// <summary>
 /// An eviction case against a council tenancy in arrears (<c>hse.eviction_case</c>, brief §4.10.7): its stages, each
-/// recorded with its date and reference, the notice period honoured, ending in eviction — which ends the tenancy — or
+/// recorded with its date and reference, the notice period honoured, ending in eviction - which ends the tenancy - or
 /// withdrawal. A tenancy has one open case at a time.
 /// </summary>
 public sealed class EvictionCase : AuditableEntity, ICompanyScoped

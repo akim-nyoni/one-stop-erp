@@ -10,7 +10,7 @@ namespace One4All.Desktop;
 
 /// <summary>
 /// The Explorer: menus; a toolbar with Exit, Back / Forward, Favourites and Search; the tree (module ▸ kind of work ▸ screen) with a filter;
-/// and document tabs — Home, each module's page, and each list opened. A screen's list opens as a tab; its form opens in a window of its own.
+/// and document tabs - Home, each module's page, and each list opened. A screen's list opens as a tab; its form opens in a window of its own.
 /// </summary>
 public partial class ShellWindow : Window
 {
@@ -148,7 +148,7 @@ public partial class ShellWindow : Window
     }
 
     // Every hour the licence is re-read (an expiry, a revocation list or a new licence installed elsewhere takes effect), and from seven days
-    // before expiry — or while it is in grace, read-only or unusable — the user is reminded once a day (brief §11.5).
+    // before expiry - or while it is in grace, read-only or unusable - the user is reminded once a day (brief §11.5).
     private void StartLicenceChecks(ShellViewModel viewModel)
     {
         Application.Abstractions.Licensing.ILicenceService licence = (Application.Abstractions.Licensing.ILicenceService)_services.GetService(typeof(Application.Abstractions.Licensing.ILicenceService))!;

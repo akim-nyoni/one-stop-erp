@@ -14,7 +14,7 @@ namespace One4All.Infrastructure.Payroll;
 
 /// <summary>
 /// Payslips as password-protected PDFs (brief §4.15.7): the committed payslip for a period (every run of it together) written as a
-/// PDF opened by the password the company's rule gives — national ID, date of birth or employee number — and queued by e-mail to each
+/// PDF opened by the password the company's rule gives - national ID, date of birth or employee number - and queued by e-mail to each
 /// employee of a run through the messaging service.
 /// </summary>
 public sealed class PayslipDistributionService : IPayslipDistributionService

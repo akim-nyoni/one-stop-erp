@@ -14,7 +14,7 @@ public enum RefundType
 
 /// <summary>
 /// A refund paid to a payer (brief §RCP-9, <c>rcp.refund</c>). Persisted when a credit balance or deposit is
-/// refunded, so the refunds register (RC41) and the audit trail have a record — paid through the bank/safe,
+/// refunded, so the refunds register (RC41) and the audit trail have a record - paid through the bank/safe,
 /// never the till.
 /// </summary>
 public sealed class RefundRecord : AuditableEntity, ICompanyScoped

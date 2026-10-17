@@ -38,14 +38,14 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = stock, Title = "Stock availability and back orders", ListTitle = "Back orders",
-            Description = "An item's stock on hand, allocated to sales orders, on order and free — available to promise; the list shows every back-ordered sales order line and whether "
+            Description = "An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether "
                 + "stock now covers it.",
             Fields = [ItemPick("Item", "Product"), Opt("Warehouse", "Warehouse code (blank: all)")],
             Run = async (c, i) =>
             {
                 long? warehouse = i.Optional("Warehouse") is string code ? await WarehouseAsync(c, code).ConfigureAwait(true) : null;
                 StockAvailability a = Check(await c.Get<IStockAvailabilityService>().AvailabilityAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true), warehouse).ConfigureAwait(true));
-                return $"{a.ItemCode}: on hand {Q(a.OnHand)}, allocated {Q(a.AllocatedToOrders)}, free {Q(a.Free)}, on order {Q(a.OnOrder)} — available to promise {Q(a.AvailableToPromise)}.";
+                return $"{a.ItemCode}: on hand {Q(a.OnHand)}, allocated {Q(a.AllocatedToOrders)}, free {Q(a.Free)}, on order {Q(a.OnOrder)} - available to promise {Q(a.AvailableToPromise)}.";
             },
             List = async c => Table(await c.Get<IStockAvailabilityService>().BackOrdersAsync(c.CompanyId).ConfigureAwait(true),
                 ("Order", b => b.OrderNumber), ("Date", b => D(b.OrderDate)), ("Item", b => b.ItemCode), ("Outstanding", b => Q(b.Outstanding)), ("On hand", b => Q(b.OnHand)), ("Can fulfil", b => b.CanFulfil),

@@ -22,7 +22,7 @@ public static class ReportCatalogueDocument
         List<ReportDefinition> reports = [.. definitions];
         StringBuilder md = new();
         md.Append("# Report Catalogue\n\n");
-        md.Append("Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — ");
+        md.Append("Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - ");
         md.Append("run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.\n\n");
         md.Append($"{reports.Count} reports. Every report renders to {Formats}.\n");
 
@@ -59,5 +59,5 @@ public static class ReportCatalogueDocument
 
     // Table cells: pipes escaped, line breaks flattened, empty shown as a dash.
     private static string Cell(string? text)
-        => string.IsNullOrWhiteSpace(text) ? "—" : text.Replace("|", "\\|", StringComparison.Ordinal).Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal).Trim();
+        => string.IsNullOrWhiteSpace(text) ? "-" : text.Replace("|", "\\|", StringComparison.Ordinal).Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal).Trim();
 }

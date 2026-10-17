@@ -27,7 +27,7 @@ public partial class LockWindow : Window
         _services = services;
         _sessionId = sessionId;
         InitializeComponent();
-        UserText.Text = $"{userName} — {reason}";
+        UserText.Text = $"{userName} - {reason}";
         Loaded += (_, _) => PasswordBox.Focus();
     }
 

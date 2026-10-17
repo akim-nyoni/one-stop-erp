@@ -378,7 +378,7 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
 }
 
 /// <summary>
-/// An asset class (<c>fa.asset_class</c>, brief §4.13): the defaults an asset registered in it takes — method, useful life, residual value
+/// An asset class (<c>fa.asset_class</c>, brief §4.13): the defaults an asset registered in it takes - method, useful life, residual value
 /// as a percentage of cost, reducing-balance rate, and the cost, accumulated depreciation, depreciation expense and impairment accounts.
 /// </summary>
 public sealed class FixedAssetClass : AuditableEntity, ICompanyScoped

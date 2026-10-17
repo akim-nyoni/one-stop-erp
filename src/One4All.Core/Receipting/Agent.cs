@@ -3,7 +3,7 @@ using One4All.Core.Common;
 namespace One4All.Core.Receipting;
 
 /// <summary>
-/// A third-party collection agent (brief §RCP-11, <c>rcp.agent</c>) — a shop, kiosk or aggregator that
+/// A third-party collection agent (brief §RCP-11, <c>rcp.agent</c>) - a shop, kiosk or aggregator that
 /// collects on the council's behalf. Money the agent collects is held by the agent until remitted; the
 /// running collected-minus-remitted balance is the agent's outstanding (the ageing of money not yet in).
 /// </summary>

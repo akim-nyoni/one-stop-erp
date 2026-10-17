@@ -6,7 +6,7 @@ public enum LicenseStatus
     /// <summary>Valid and fully usable.</summary>
     Valid = 0,
 
-    /// <summary>Expired but within the grace period — still usable, warn the user.</summary>
+    /// <summary>Expired but within the grace period - still usable, warn the user.</summary>
     Grace = 1,
 
     /// <summary>Past grace on a non-hard-stop licence: usable read-only (view/print), no posting.</summary>
@@ -145,7 +145,7 @@ public sealed class LicenseValidationResult
 /// <summary>
 /// Validates a licence token end to end (brief §11.5): signature, product, clock-rollback, validity
 /// window with grace, hard-stop vs read-only degradation, and machine binding. Fully offline and
-/// deterministic — no network call is ever made.
+/// deterministic - no network call is ever made.
 /// </summary>
 public sealed class LicenseValidator
 {

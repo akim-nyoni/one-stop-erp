@@ -54,7 +54,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Till favourites", ListTitle = "Favourites",
-            Description = "Items pinned to the till's ★ Favourites tabs — for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
+            Description = "Items pinned to the till's ★ Favourites tabs - for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
                 + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. "
                 + "Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.",
             Fields = [Pick("Step", "Step", ["Favourite", "Profile", "Function keys"]), ItemPick("Item", "Product", required: false), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
@@ -151,7 +151,7 @@ public static partial class OperationCatalogue
                 return parent.Length == 0 ? $"{code} is a top-level category." : $"{code} now sits under {parent}.";
             },
             List = async c => Table(await c.Db.ItemCategories.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ParentCode).ThenBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Under", x => x.ParentCode ?? "—"), ("Costing", x => x.CostingMethod?.ToString() ?? "—"), ("Active", x => x.IsActive)),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Under", x => x.ParentCode ?? "-"), ("Costing", x => x.CostingMethod?.ToString() ?? "-"), ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {
@@ -200,7 +200,7 @@ public static partial class OperationCatalogue
                         return $"Redeemed: tender {M(Check(await loyalty.RedeemAsync(c.CompanyId, i.Text("Member"), i.Number("Amount"), i.Date("Date"), i.Optional("Reference") ?? "MANUAL").ConfigureAwait(true)))} on the loyalty liability account.";
                     default:
                         LoyaltyStatement s = Check(await loyalty.StatementAsync(c.CompanyId, i.Text("Member"), i.Date("Date")).ConfigureAwait(true));
-                        return $"{s.MemberNumber} {s.Name} — {s.Tier ?? "no tier"}, {Q(s.Balance)} points worth {M(s.BalanceValue)}{Environment.NewLine}"
+                        return $"{s.MemberNumber} {s.Name} - {s.Tier ?? "no tier"}, {Q(s.Balance)} points worth {M(s.BalanceValue)}{Environment.NewLine}"
                             + string.Join(Environment.NewLine, s.Movements.Select(m => $"{D(m.Date)}  {m.Kind,-7} {Q(m.Points),10}  {m.Reference}"));
                 }
             },
@@ -322,7 +322,7 @@ public static partial class OperationCatalogue
                     Lines = [new PosRefundLine(line.Id, i.Number("Quantity"))], Restock = i.Flag("Restock"),
                     TillSessionId = i.OptionalNumber("Session") is decimal session ? (long)session : null,
                 }).ConfigureAwait(true));
-                return $"Refunded {M(refund.Gross)} on {sale.SaleNumber} — journal {refund.JournalNumber}.";
+                return $"Refunded {M(refund.Gross)} on {sale.SaleNumber} - journal {refund.JournalNumber}.";
             },
             List = RecentTillEventsAsync,
         };
@@ -592,7 +592,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Set an item's replenishment policy", ListTitle = "Replenishment policies",
             Description = "Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. "
-                + "With a forecast window, the reorder level rises to the average daily issues over that window times the lead time — scaled, with seasonal factors, by the "
+                + "With a forecast window, the reorder level rises to the average daily issues over that window times the lead time - scaled, with seasonal factors, by the "
                 + "factor for the month the lead time ends in (twelve numbers, January first).",
             Fields = [ItemPick("Item", "Product"), Num("Level", "Reorder level (minimum)", "0"), Num("Quantity", "Reorder quantity", "0"), Num("Maximum", "Maximum stock", "0"),
                 Num("LeadTime", "Lead time (days)", "0"), Num("Window", "Forecast window (days, 0 = none)", "0"), Opt("Seasonal", "Seasonal factors Jan…Dec (e.g. 0.8,0.8,1,…)")],
@@ -792,8 +792,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Start a cycle count", ListTitle = "Blind count sheets (draft stocktakes)",
             Description = "Counts only the items due: never-counted items first, then A items every 30 days, B every 90 and C every 180 (change the days below). "
                 + "Classify items A / B / C first so the busiest items are counted most often. Count, recount and post it like a stocktake.",
-            Fields = [WarehousePick("Warehouse", "Warehouse"), Today(), Req("Reference", "Count reference"), Num("ADays", "Days between counts — A items", "30"),
-                Num("BDays", "Days between counts — B items", "90"), Num("CDays", "Days between counts — C items", "180"), Num("Max", "Most items in this count", "50"),
+            Fields = [WarehousePick("Warehouse", "Warehouse"), Today(), Req("Reference", "Count reference"), Num("ADays", "Days between counts - A items", "30"),
+                Num("BDays", "Days between counts - B items", "90"), Num("CDays", "Days between counts - C items", "180"), Num("Max", "Most items in this count", "50"),
                 OptNum("Tolerance", "Recount tolerance % (blank: none)")],
             Run = async (c, i) => Check(await c.Get<IStocktakeService>().StartCycleCountAsync(c.CompanyId, await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), i.Date("Date"),
                 i.Text("Reference"), new Application.Inventory.CycleCountRule((int)i.Number("ADays"), (int)i.Number("BDays"), (int)i.Number("CDays"), (int)i.Number("Max")),

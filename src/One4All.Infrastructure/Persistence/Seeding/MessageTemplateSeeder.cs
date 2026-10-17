@@ -6,7 +6,7 @@ namespace One4All.Infrastructure.Persistence.Seeding;
 /// <summary>
 /// Seeds the standard message templates every company starts with (brief §8): the customer statement (STATEMENT), the school
 /// fee statement (FEES), the dunning reminder (REMINDER) and the municipal bill (BILL, by email and by SMS), in English. A
-/// template a company already has — reworded or not — is left alone; only the missing ones are added, so the seeder is safe to
+/// template a company already has - reworded or not - is left alone; only the missing ones are added, so the seeder is safe to
 /// run at every start-up and after a new company is created.
 /// </summary>
 public sealed class MessageTemplateSeeder

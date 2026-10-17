@@ -52,7 +52,7 @@ public interface IPricingService
 
     /// <summary>
     /// Creates a new (non-default) list in the same currency as a source list, with every price break copied
-    /// and adjusted by a percentage and rounded — e.g. a trade list at −10% of standard.
+    /// and adjusted by a percentage and rounded - e.g. a trade list at −10% of standard.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="sourcePriceListId">The list to copy.</param>

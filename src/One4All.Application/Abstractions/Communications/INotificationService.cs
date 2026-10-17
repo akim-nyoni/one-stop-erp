@@ -112,7 +112,7 @@ public interface INotificationService
     /// <returns>The batch id, or why it was refused.</returns>
     Task<Result<long>> QueueAsync(long companyId, string name, string code, string language, MessageChannel channel, IReadOnlyList<DespatchRecipient> recipients, CancellationToken ct = default);
 
-    /// <summary>Queues one message, written out rather than from a template, to each recipient — with an attachment if given.</summary>
+    /// <summary>Queues one message, written out rather than from a template, to each recipient - with an attachment if given.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="name">What the batch is.</param>
     /// <param name="channel">The channel.</param>

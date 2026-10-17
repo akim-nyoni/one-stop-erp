@@ -111,7 +111,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             numbers[other.Id] = other.JournalNumber;
         }
 
-        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "-";
         return [.. journals.Select(j => Row(("Journal", j.JournalNumber), ("Date", Date(j.PostingDate)), ("Status", j.AwaitingApproval ? "Awaiting approval" : j.Status.ToString()), ("Source", j.SourceModule),
             ("Document", $"{j.DocumentType} {j.DocumentNumber}".Trim()), ("Manual", j.IsManual ? "Yes" : string.Empty), ("PreparedBy", Who(j.PreparedByUserId ?? j.CreatedByUserId)),
             ("ApprovedBy", Who(j.ApprovedByUserId)), ("Reversal", j.ReversalOfJournalId is long r ? $"of {numbers.GetValueOrDefault(r, "?")}" : string.Empty), ("Value", j.Lines.Sum(l => l.BaseDebit))))];
@@ -165,7 +165,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             decimal committed = commitments.Where(c => c.AccountCode == b.Key.AccountCode && (b.Key.Department.Length == 0 || c.Department == b.Key.Department)).Sum(c => c.Amount);
             return Row(("Account", b.Key.AccountCode), ("Name", account?.Name ?? "?"), ("Department", b.Key.Department.Length == 0 ? "All" : b.Key.Department), ("Budget", Money(b.Value)),
                 ("Actual", Money(actual)), ("Committed", Money(committed)),
-                ("Used", b.Value == 0m ? "—" : ((actual + committed) * 100m / b.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Available", b.Value - actual - committed));
+                ("Used", b.Value == 0m ? "-" : ((actual + committed) * 100m / b.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Available", b.Value - actual - committed));
         })];
     }
 
@@ -180,7 +180,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             .Where(j => documentType(j.DocumentType!))];
         return [.. journals.SelectMany(j => j.Lines.Where(l => pnl.Contains(l.AccountCode)).Select(l => revaluation
             ? Row(("Date", Date(j.PostingDate)), ("Journal", j.JournalNumber), ("Type", j.DocumentType), ("Narrative", j.Narrative ?? string.Empty), ("Account", l.AccountCode), ("Amount", l.BaseCredit - l.BaseDebit))
-            : Row(("Date", Date(j.PostingDate)), ("Journal", j.JournalNumber), ("Document", j.DocumentNumber ?? "—"), ("Narrative", j.Narrative ?? string.Empty), ("Account", l.AccountCode), ("Amount", l.BaseCredit - l.BaseDebit))))];
+            : Row(("Date", Date(j.PostingDate)), ("Journal", j.JournalNumber), ("Document", j.DocumentNumber ?? "-"), ("Narrative", j.Narrative ?? string.Empty), ("Account", l.AccountCode), ("Amount", l.BaseCredit - l.BaseDebit))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SuspenseAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -246,7 +246,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             {
                 status = $"Not due: {notDue}";
             }
-            return Row(("Code", t.Code), ("Description", t.Description), ("LastPosted", t.LastPostedPeriod is int lp ? $"{lp / 100}-{lp % 100:00}" : "—"), ("Status", status),
+            return Row(("Code", t.Code), ("Description", t.Description), ("LastPosted", t.LastPostedPeriod is int lp ? $"{lp / 100}-{lp % 100:00}" : "-"), ("Status", status),
                 ("Value", t.Lines.Where(x => x.IsDebit).Sum(x => x.Amount)), ("Schedule", Schedule(t)));
         })];
 
@@ -294,8 +294,8 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         return [.. own.Select(j =>
         {
             var mirror = mirrors.FirstOrDefault(m => m.DocumentNumber == j.DocumentNumber);
-            return Row(("Document", j.DocumentNumber ?? "—"), ("Date", Date(j.PostingDate)), ("Narrative", j.Narrative ?? string.Empty),
-                ("Counterparty", mirror is null ? "—" : companies.GetValueOrDefault(mirror.CompanyId, "?")), ("Status", mirror is null ? "Unmatched" : mirror.Status == JournalStatus.Posted ? "Matched" : $"Mirror {mirror.Status}"),
+            return Row(("Document", j.DocumentNumber ?? "-"), ("Date", Date(j.PostingDate)), ("Narrative", j.Narrative ?? string.Empty),
+                ("Counterparty", mirror is null ? "-" : companies.GetValueOrDefault(mirror.CompanyId, "?")), ("Status", mirror is null ? "Unmatched" : mirror.Status == JournalStatus.Posted ? "Matched" : $"Mirror {mirror.Status}"),
                 ("Amount", j.Lines.Sum(l => l.BaseDebit)));
         })];
     }
@@ -369,7 +369,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             decimal p = Sum(period, a => a.Type == AccountType.Expense && a.ReportCategory == category), y = Sum(ytd, a => a.Type == AccountType.Expense && a.ReportCategory == category);
             if (p != 0m || y != 0m)
             {
-                Add("Results", $"Expenses — {(category.Length == 0 ? "other" : category)}", Money(p), Money(y));
+                Add("Results", $"Expenses - {(category.Length == 0 ? "other" : category)}", Money(p), Money(y));
             }
         }
 
@@ -388,7 +388,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     }
 
     private static string Margin(decimal income, decimal expense)
-        => income == 0m ? "—" : ((income - expense) / income * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        => income == 0m ? "-" : ((income - expense) / income * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     // Group-wide: each intercompany document's journals in every company; it eliminates when two companies hold equal postings.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EliminationsAsync(DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -405,7 +405,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             decimal a = first.Lines.Sum(l => l.BaseDebit), b = second?.Lines.Sum(l => l.BaseDebit) ?? 0m;
             string status = second is null ? "Unmatched" : a == b ? "Eliminated" : "Amounts differ";
             return Row(("Document", g.Key), ("Date", Date(first.PostingDate)), ("FromCompany", companies.GetValueOrDefault(first.CompanyId, "?")), ("FromAmount", Money(a)),
-                ("ToCompany", second is null ? "—" : companies.GetValueOrDefault(second.CompanyId, "?")), ("ToAmount", second is null ? "—" : Money(b)), ("Status", status), ("Eliminated", status == "Eliminated" ? a : 0m));
+                ("ToCompany", second is null ? "-" : companies.GetValueOrDefault(second.CompanyId, "?")), ("ToAmount", second is null ? "-" : Money(b)), ("Status", status), ("Eliminated", status == "Eliminated" ? a : 0m));
         })];
     }
 
@@ -452,7 +452,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         var checklist = await _services.GetRequiredService<Application.Abstractions.Accounting.IPeriodCloseService>().ChecklistAsync(companyId, year.EndDate, ct).ConfigureAwait(false);
         foreach (var check in checklist.Checks)
         {
-            Add("Close checklist", check.Name, check.Count == 0 ? "clear" : $"{check.Count} item(s), {Money(check.Value)}{(check.IsBlocking ? " — BLOCKING" : string.Empty)}");
+            Add("Close checklist", check.Name, check.Count == 0 ? "clear" : $"{check.Count} item(s), {Money(check.Value)}{(check.IsBlocking ? " - BLOCKING" : string.Empty)}");
         }
 
         List<LedgerAccount> accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
@@ -519,12 +519,12 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         List<IReadOnlyDictionary<string, object?>> rows = [];
         foreach (Core.System.FiscalPeriod period in year.Periods.Where(p => p.StartDate <= asAt).OrderBy(p => p.PeriodNumber))
         {
-            string status = period.ModuleStatuses.Count == 0 ? "—"
+            string status = period.ModuleStatuses.Count == 0 ? "-"
                 : string.Join(", ", period.ModuleStatuses.OrderBy(m => m.ModuleCode, StringComparer.Ordinal).Select(m => $"{m.ModuleCode} {m.Status}"));
             var checklist = await close.ChecklistAsync(companyId, period.EndDate, ct).ConfigureAwait(false);
             string ready = checklist.IsReadyToClose ? (checklist.Outstanding == 0 ? "Yes" : "Yes (warnings)") : "No";
             rows.AddRange(checklist.Checks.Select(c => Row(("Period", period.Name), ("Ends", Date(period.EndDate)), ("Status", status), ("Ready", ready), ("Check", c.Name),
-                ("Count", c.Count), ("Value", Money(c.Value)), ("Blocking", c.Passes ? "—" : c.IsBlocking ? "Blocks" : "Warns"), ("Detail", c.Detail))));
+                ("Count", c.Count), ("Value", Money(c.Value)), ("Blocking", c.Passes ? "-" : c.IsBlocking ? "Blocks" : "Warns"), ("Detail", c.Detail))));
         }
 
         return rows;

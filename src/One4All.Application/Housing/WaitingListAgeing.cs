@@ -20,7 +20,7 @@ public enum WaitingAgeBand
 }
 
 /// <summary>
-/// How long applicants have been waiting (brief §14 H20 Waiting List Age Analysis): &lt;1 year, 1–3, 3–5, 5–10, 10+ —
+/// How long applicants have been waiting (brief §14 H20 Waiting List Age Analysis): &lt;1 year, 1–3, 3–5, 5–10, 10+ -
 /// in completed years from the registration date, each band including its lower bound. Pure and unit-tested.
 /// </summary>
 public static class WaitingListAgeing

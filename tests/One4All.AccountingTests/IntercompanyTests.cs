@@ -38,7 +38,7 @@ public sealed class IntercompanyTests
             subsidiary = await Scenario.SeedAsync(db);
             db.Accounts.Add(new LedgerAccount(parent, DueFrom, "Due from Subsidiary", AccountType.Asset));
             db.Accounts.Add(new LedgerAccount(subsidiary, DueTo, "Due to Parent", AccountType.Liability));
-            // Note: only the parent has 1700 and only the subsidiary has 2700 — the mirror is deliberate.
+            // Note: only the parent has 1700 and only the subsidiary has 2700 - the mirror is deliberate.
             await db.SaveChangesAsync();
         }
 

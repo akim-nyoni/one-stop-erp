@@ -8,7 +8,7 @@ public enum PendingTenderStatus
     /// <summary>Claimed but not yet confirmed on the bank statement.</summary>
     Pending = 1,
 
-    /// <summary>Confirmed — cleared from the uncleared-effects control to the bank.</summary>
+    /// <summary>Confirmed - cleared from the uncleared-effects control to the bank.</summary>
     Confirmed = 2,
 }
 

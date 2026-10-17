@@ -8,7 +8,7 @@ namespace One4All.Licensing.Core;
 /// <summary>
 /// Encrypts the vendor's Ed25519 private key at rest with a passphrase (brief §11.2): PBKDF2-SHA256 to
 /// derive a key, then AES-256-GCM for authenticated encryption. The on-disk form is a small JSON blob
-/// carrying the salt, nonce, ciphertext, tag and iteration count — everything needed to decrypt except
+/// carrying the salt, nonce, ciphertext, tag and iteration count - everything needed to decrypt except
 /// the passphrase.
 /// </summary>
 public sealed class ProtectedPrivateKey

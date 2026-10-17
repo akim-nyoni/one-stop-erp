@@ -60,7 +60,7 @@ public sealed record VoidUnit(string UnitCode, DateOnly VacantSince, int DaysVoi
 
 /// <summary>
 /// Council rental housing (brief §4.10.7): the unit register; tenancies with the deposit held as a liability; the
-/// monthly rent debit run, pro rata for part months and never billing a month twice; ending a tenancy — final rent, the
+/// monthly rent debit run, pro rata for part months and never billing a month twice; ending a tenancy - final rent, the
 /// deposit applied to arrears and the rest refunded; and the voids report with the rent lost.
 /// </summary>
 public interface IRentalHousingService

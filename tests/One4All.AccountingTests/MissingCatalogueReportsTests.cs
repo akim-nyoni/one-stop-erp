@@ -72,7 +72,7 @@ public sealed class MissingCatalogueReportsTests
         string statement = await Render("CB69", new() { ["BankCode"] = code.ToLowerInvariant(), ["AsAtDate"] = asAt });
         statement.Should().Contain("Balance per bank statement").And.Contain("492").And.Contain("payments not yet presented").And.Contain("-120")
             .And.Contain("receipts not yet on the statement").And.Contain("75").And.Contain("statement items not yet in the cash book").And.Contain("Balance per cash book")
-            .And.Contain("455").And.Contain("Reconciled — no difference");
+            .And.Contain("455").And.Contain("Reconciled - no difference");
 
         string balances = await Render("CB71", new() { ["AsAtDate"] = asAt });
         balances.Should().Contain(code.ToUpperInvariant()).And.Contain("455").And.Contain("never");

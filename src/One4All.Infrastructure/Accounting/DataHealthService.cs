@@ -93,7 +93,7 @@ public sealed class DataHealthService : IDataHealthService
         List<IntegrityIssue> others = [.. checkedLedger.Value.Issues.Where(i => i.Check != IntegrityCheck.UnbalancedJournal)];
         indicators.Add(new HealthIndicator(HealthIndicatorKind.LedgerIntegrity,
             DataHealthGrading.Grade(HealthIndicatorKind.LedgerIntegrity, others.Count, others.Any(i => i.Severity == IntegritySeverity.Error)),
-            others.Count, 0m, [.. others.Take(MaxItems).Select(i => $"{i.Check} — {i.Subject}: {i.Detail}")]));
+            others.Count, 0m, [.. others.Take(MaxItems).Select(i => $"{i.Check} - {i.Subject}: {i.Detail}")]));
 
         return new DataHealthReport(asAtDate, DataHealthGrading.Overall(indicators.Select(i => i.Status)), indicators);
     }

@@ -99,7 +99,7 @@ public sealed partial class PeriodCloseViewModel : ObservableObject
                     : run.Value.JournalNumber is null ? $"{name}: nothing to post" : $"{name}: {run.Value.Posted:N2} posted ({run.Value.JournalNumber})");
             }
 
-            StatusMessage = $"Revalued — {string.Join("; ", parts)}.";
+            StatusMessage = $"Revalued - {string.Join("; ", parts)}.";
         }
         catch (Exception ex)
         {
@@ -127,7 +127,7 @@ public sealed partial class PeriodCloseViewModel : ObservableObject
 
             StatusMessage = result.Failed.Count == 0
                 ? $"Released {result.Released.Count} deferred journal(s)."
-                : $"Released {result.Released.Count}; {result.Failed.Count} could not be released — {string.Join("; ", result.Failed.Take(3).Select(f => $"{f.JournalNumber}: {f.Reason}"))}.";
+                : $"Released {result.Released.Count}; {result.Failed.Count} could not be released - {string.Join("; ", result.Failed.Take(3).Select(f => $"{f.JournalNumber}: {f.Reason}"))}.";
         }
         catch (Exception ex)
         {

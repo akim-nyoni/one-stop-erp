@@ -77,7 +77,7 @@ public sealed class Result<TValue> : Result
     /// <summary>
     /// The produced value. Only valid when <see cref="Result.IsSuccess"/> is true.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown if accessed on a failed result — a programming error the caller must fix.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if accessed on a failed result - a programming error the caller must fix.</exception>
     public TValue Value => IsSuccess
         ? _value!
         : throw new InvalidOperationException("The value of a failed result cannot be accessed.");
@@ -101,7 +101,7 @@ public sealed class Result<TValue> : Result
     public static implicit operator Result<TValue>(Error error) => Failure(error);
 
     /// <summary>
-    /// Returns <paramref name="value"/> set to the success value and true, or default and false on failure —
+    /// Returns <paramref name="value"/> set to the success value and true, or default and false on failure -
     /// enabling <c>if (result.TryGetValue(out var v))</c> call sites.
     /// </summary>
     /// <param name="value">Receives the value on success.</param>

@@ -31,7 +31,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Back up or restore the database", ListTitle = "Backups",
             Description = "Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database "
-                + "(type RESTORE <name> to confirm) — the live database is never overwritten. Restore a file: an off-site copy or another server's backup with no record here, into a new database. "
+                + "(type RESTORE <name> to confirm) - the live database is never overwritten. Restore a file: an off-site copy or another server's backup with no record here, into a new database. "
                 + "Switch over: the restored database takes the live name and the old live one is kept as <live>_retired_<stamp> (type SWITCH TO <name>); restart the server and every desktop afterwards.",
             Fields = [Pick("Do", "Action", ["Back up now", "Check a backup", "Restore into a new database", "Restore a file into a new database", "Switch over to a restored database"]),
                 OptNum("Backup", "Backup id (check / restore)"), Opt("File", "Backup file path (restore a file)"), Opt("Database", "New / restored database name"),
@@ -105,7 +105,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Review direct database changes", ListTitle = "Sensitive-table changes made outside One4All (last 30 days)",
-            Description = "Database triggers record every change to users, roles, permissions, prices, tariffs, meters and the licence — including changes made with SQL tools, listed here.",
+            Description = "Database triggers record every change to users, roles, permissions, prices, tariffs, meters and the licence - including changes made with SQL tools, listed here.",
             Fields = [Num("Days", "Look back (days)", "30"), Tick("All", "Include the application's own changes")],
             Run = async (c, i) =>
             {
@@ -440,7 +440,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Burst a report by email", ListTitle = "Report subscriptions",
-            Description = "Run a report once, split it by a field (e.g. Customer code) and email each part as its own PDF — to the address in a field of the rows, or to the contacts of the "
+            Description = "Run a report once, split it by a field (e.g. Customer code) and email each part as its own PDF - to the address in a field of the rows, or to the contacts of the "
                 + "customer or supplier the key names. Parameters as Name=value; ... (dates as yyyy-MM-dd). Parts with nobody to send to are listed.",
             Fields = [Req("Report", "Report code"), Req("Key", "Split by field"), Opt("EmailField", "Field holding the email (optional)"), Pick("Ledger", "Or send to the contacts of", ["(email field)", "Customers", "Suppliers"]),
                 Opt("Parameters", "Parameters")],
@@ -469,7 +469,7 @@ public static partial class OperationCatalogue
                     + (missing.Count == 0 ? string.Empty : $" No email address for: {string.Join(", ", missing.Take(20))}{(missing.Count > 20 ? " ..." : string.Empty)}.");
             },
             List = async c => Table(await c.Db.Set<Core.Reporting.ReportSubscription>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "—"), ("Recipients", x => x.BurstKeyField is null ? string.Join(", ", x.Recipients) : x.BurstRecipientField ?? (x.BurstLedger == 2 ? "supplier contacts" : "customer contacts")),
+                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "-"), ("Recipients", x => x.BurstKeyField is null ? string.Join(", ", x.Recipients) : x.BurstRecipientField ?? (x.BurstLedger == 2 ? "supplier contacts" : "customer contacts")),
                 ("Active", x => x.IsActive)),
         };
         yield return new Operation
@@ -499,12 +499,12 @@ public static partial class OperationCatalogue
                 return $"Subscription {i.Text("Code").ToUpperInvariant()} created.";
             },
             List = async c => Table(await c.Db.Set<Core.Reporting.ReportSubscription>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "—"), ("Active", x => x.IsActive)),
+                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "-"), ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {
             Module = module, Title = "Application log", ListTitle = "Application log (latest 300)",
-            Description = "What the desktop, server and scheduler logged (information and above) — one table for every machine, beside each host's daily log file. "
+            Description = "What the desktop, server and scheduler logged (information and above) - one table for every machine, beside each host's daily log file. "
                 + "The list shows the latest 300 lines, newest first; Run removes lines older than the days kept.",
             Fields = [Num("Keep", "Keep (days)", "90")],
             Run = async (c, i) =>
@@ -661,7 +661,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Set the reporting currency", ListTitle = "Company currencies",
             Description = "A second currency every posting is also kept in (e.g. USD beside ZWG), each at the base→reporting rate of its day, so statements can be drawn in it "
-                + "(General Ledger report GL2R). It applies to postings from now on — posted journals cannot change — so set it before go-live. Leave blank to stop keeping it.",
+                + "(General Ledger report GL2R). It applies to postings from now on - posted journals cannot change - so set it before go-live. Leave blank to stop keeping it.",
             Fields = [Opt("Currency", "Reporting currency (blank: none)")],
             Run = async (c, i) =>
             {
@@ -672,12 +672,12 @@ public static partial class OperationCatalogue
                 return currency is CurrencyCode set ? $"Postings are now also kept in {set.Value}." : "No reporting currency is kept.";
             },
             List = async c => Table(await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).ToListAsync().ConfigureAwait(true),
-                ("Company", x => x.Name), ("Base", x => x.BaseCurrency.Value), ("Reporting", x => x.ReportingCurrency?.Value ?? "—")),
+                ("Company", x => x.Name), ("Base", x => x.BaseCurrency.Value), ("Reporting", x => x.ReportingCurrency?.Value ?? "-")),
         };
         yield return new Operation
         {
             Module = module, Title = "Create a fiscal year", ListTitle = "Fiscal years",
-            Description = "Monthly periods from the start date (any month — e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit "
+            Description = "Monthly periods from the start date (any month - e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit "
                 + "and year-end adjustments. Tick to open the periods for every ledger at once.",
             Fields = [Req("Code", "Year code"), Today("Start", "First day"), Num("Months", "Periods (monthly)", "12"), Pick("Calendar", "Calendar", ["Monthly", "4-4-5 weeks"]),
                 Tick("Adjust", "Add an adjustment period"), Tick("Open", "Open all periods now")],
@@ -872,7 +872,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "API keys for integrations", ListTitle = "API clients",
             Description = "An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). "
-                + "The key is shown once — copy it then; rotating issues a new one and the old stops working; revoking stops the client.",
+                + "The key is shown once - copy it then; rotating issues a new one and the old stops working; revoking stops the client.",
             Fields = [Pick("Step", "Step", ["Create", "Rotate", "Revoke"]), Opt("Name", "Client name (create)"), Opt("User", "Service user it acts as (create)"),
                 new("Expires", "Expires on (create)", FieldKind.Date, Required: false), OptNum("Rate", "Requests per minute (create; blank: the server's)"), Opt("Client", "Client id (rotate / revoke)")],
             Run = async (c, i) =>
@@ -888,7 +888,7 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Get<IApiClientService>().ListAsync().ConfigureAwait(true), ("Client", r => r.ClientId), ("Name", r => r.Name), ("Acts as", r => r.ActsAs),
-                ("Active", r => r.IsActive), ("Expires", r => r.ExpiresOn is DateOnly d ? D(d) : "—"), ("Rate/min", r => r.RequestsPerMinute?.ToString(CultureInfo.CurrentCulture) ?? "server"),
+                ("Active", r => r.IsActive), ("Expires", r => r.ExpiresOn is DateOnly d ? D(d) : "-"), ("Rate/min", r => r.RequestsPerMinute?.ToString(CultureInfo.CurrentCulture) ?? "server"),
                 ("Last used", r => r.LastUsedOnUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "never")),
         };
         yield return new Operation
@@ -934,7 +934,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Compare roles or change many at once", ListTitle = "Roles",
             Description = "Compare shows where two roles differ, permission by permission. Bulk change adds, removes or sets operations (View, Create, Edit, Delete, Print, Export, Post, "
-                + "Approve, VoidReverse — comma separated) on a permission code or a pattern such as Payroll.* across several roles (comma separated) at once. System roles are left alone.",
+                + "Approve, VoidReverse - comma separated) on a permission code or a pattern such as Payroll.* across several roles (comma separated) at once. System roles are left alone.",
             Fields = [Pick("Step", "Step", ["Compare", "Bulk change"]), Req("Roles", "Role(s) (compare: two)"), Opt("Pattern", "Permission code or pattern (bulk)"),
                 Opt("Operations", "Operations (bulk)"), Pick("Mode", "Bulk change", Enum.GetNames<BulkGrantMode>())],
             Run = async (c, i) =>

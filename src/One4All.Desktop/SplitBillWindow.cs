@@ -217,7 +217,7 @@ public sealed class SplitBillWindow : Window
         var plan = SplitBill.Plan(_lines, Shares());
         for (int p = 0; p < _payerRows.Count; p++)
         {
-            _payerRows[p].Amount.Text = plan.IsSuccess ? $"pays {SplitBill.Gross(plan.Value[p]).ToString("N2", CultureInfo.CurrentCulture)}" : "—";
+            _payerRows[p].Amount.Text = plan.IsSuccess ? $"pays {SplitBill.Gross(plan.Value[p]).ToString("N2", CultureInfo.CurrentCulture)}" : "-";
         }
 
         _problem.Text = plan.IsSuccess ? string.Empty : plan.Error.Message;

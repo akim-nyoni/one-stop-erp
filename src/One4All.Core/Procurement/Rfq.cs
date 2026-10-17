@@ -18,7 +18,7 @@ public enum RfqStatus
 /// <summary>
 /// A request for quotation / tender (<c>pop.rfq</c>, brief §4.3): requirements sent to invited suppliers, their quotes
 /// captured line by line with a lead time, compared and scored, and awarded to one supplier as a purchase order. The
-/// award records who made it and, when it does not go to the best-scored quote, why — the adjudication trail.
+/// award records who made it and, when it does not go to the best-scored quote, why - the adjudication trail.
 /// </summary>
 public sealed class Rfq : AuditableEntity, ICompanyScoped
 {

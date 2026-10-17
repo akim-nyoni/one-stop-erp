@@ -13,7 +13,7 @@ public interface IDataScopeService
     Task<DataScope> ForUserAsync(long userId, CancellationToken ct = default);
 
     /// <summary>
-    /// Whether the user may reach a record by its id on a dimension (company, branch, warehouse, till, cost centre, department or job —
+    /// Whether the user may reach a record by its id on a dimension (company, branch, warehouse, till, cost centre, department or job -
     /// scopes may list either the record's code or its id). Wards are matched by code only.
     /// </summary>
     /// <param name="userId">The user.</param>

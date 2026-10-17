@@ -10,8 +10,8 @@ namespace One4All.Application.Abstractions.Housing;
 public sealed record LevyRaised(string LevyCode, decimal Amount, string DocumentNumber);
 
 /// <summary>
-/// Development and infrastructure levies (brief §4.10.2): configurable charge types — flat, per square metre or a
-/// percentage of the price — raised on the sales ledger when an allocation is accepted (on the beneficiary, at the price
+/// Development and infrastructure levies (brief §4.10.2): configurable charge types - flat, per square metre or a
+/// percentage of the price - raised on the sales ledger when an allocation is accepted (on the beneficiary, at the price
 /// frozen at offer) or on a change of ownership (on the incoming holder, on the consideration); each levy is raised once
 /// per event, however often the trigger is run.
 /// </summary>

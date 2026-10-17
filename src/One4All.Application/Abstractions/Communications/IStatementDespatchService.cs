@@ -12,7 +12,7 @@ public sealed record StatementDespatch(long? BatchId, int Queued, int NoEmail, i
 /// <summary>
 /// Bulk customer statements by email (brief §8: bulk despatch of statements): every customer owing at least the minimum
 /// as at a date, with an email address, gets the statement merged into the statement template (fields Name, Account,
-/// Balance, Currency, AsAt and Statement — the printed statement text) and queued as one despatch batch.
+/// Balance, Currency, AsAt and Statement - the printed statement text) and queued as one despatch batch.
 /// </summary>
 public interface IStatementDespatchService
 {

@@ -66,7 +66,7 @@ public sealed class PayrollApprovalTests
         (await approval.CommitRunAsync(companyId, january.DraftId, clerk.Id)).Value.TotalNet.Should().Be(3000m);
         (await approval.ApproveRunAsync(companyId, january.DraftId, director.Id)).Error.Code.Should().Be("Payroll.DraftNotPending");
 
-        // February: Ben's raise moves net pay 33% — two different approvers, and the exception report says why.
+        // February: Ben's raise moves net pay 33% - two different approvers, and the exception report says why.
         ben.BasicSalary = 3000m;
         await db.SaveChangesAsync();
         PayrollDraftResult february = (await approval.CalculateRunAsync(Draft(2))).Value;

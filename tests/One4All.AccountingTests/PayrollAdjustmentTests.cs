@@ -70,7 +70,7 @@ public sealed class PayrollAdjustmentTests
         supplementary.Value.TotalNet.Should().Be(90m);
         (await adjustments.RunSupplementaryAsync(Supplementary("2026-01", "PA-S1", "Again", new SupplementaryLine(al.Id, "BASIC", 1m)))).Error.Code.Should().Be("Payroll.DuplicateRun");
 
-        // Reversal: approved by a user, once, never of a reversal; the period can then be run again — once.
+        // Reversal: approved by a user, once, never of a reversal; the period can then be run again - once.
         (await payroll.RunAsync(companyId, "2026-02", new DateOnly(2026, 2, 25), "2420", "PA-02")).IsSuccess.Should().BeTrue();
         (await adjustments.ReverseRunAsync(companyId, "PA-02", new DateOnly(2026, 2, 26), "Wrong rates", 0)).Error.Code.Should().Be("Payroll.ApproverNotFound");
         (await adjustments.ReverseRunAsync(companyId, "PA-02", new DateOnly(2026, 2, 26), " ", approver.Id)).Error.Code.Should().Be("Payroll.ReasonRequired");
@@ -82,7 +82,7 @@ public sealed class PayrollAdjustmentTests
         (await payroll.RunAsync(companyId, "2026-02", new DateOnly(2026, 2, 27), "2420", "PA-02B")).IsSuccess.Should().BeTrue();
         (await payroll.RunAsync(companyId, "2026-02", new DateOnly(2026, 2, 27), "2420", "PA-02C")).Error.Code.Should().Be("Payroll.PeriodAlreadyRun");
 
-        // Backpay: Bea's 2,200 from January — both periods short by 200 basic and 20 PAYE.
+        // Backpay: Bea's 2,200 from January - both periods short by 200 basic and 20 PAYE.
         IReadOnlyList<BackpayPreviewLine> owed = (await adjustments.CalculateBackpayAsync(companyId, bea.Id, 2200m, new DateOnly(2026, 1, 1))).Value;
         owed.Should().BeEquivalentTo(new[]
         {

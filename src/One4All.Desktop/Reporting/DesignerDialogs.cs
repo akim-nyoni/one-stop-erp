@@ -23,12 +23,12 @@ public static class DesignerDialogs
     public static BandFlow? AskBandFlow(Window owner, ReportBand band)
     {
         ArgumentNullException.ThrowIfNull(band);
-        TextBox suppress = new() { Text = band.SuppressWhen ?? string.Empty, FontFamily = new System.Windows.Media.FontFamily("Consolas"), ToolTip = "e.g. Amount == 0 — the band is left out where this is true" };
+        TextBox suppress = new() { Text = band.SuppressWhen ?? string.Empty, FontFamily = new System.Windows.Media.FontFamily("Consolas"), ToolTip = "e.g. Amount == 0 - the band is left out where this is true" };
         CheckBox repeat = new() { Content = "Repeat at the top of each page its group continues on", IsChecked = band.RepeatOnNewPage, IsEnabled = band.Type == BandType.GroupHeader };
         CheckBox keep = new() { Content = "Keep with the first row (never alone at a page's foot)", IsChecked = band.KeepTogether, IsEnabled = band.Type == BandType.GroupHeader };
         CheckBox before = new() { Content = "Start a new page before this band", IsChecked = band.PageBreakBefore };
         CheckBox after = new() { Content = "Start a new page after this band", IsChecked = band.PageBreakAfter };
-        return Ask(owner, $"{band.Type} — flow", [("Hide when", suppress), (string.Empty, repeat), (string.Empty, keep), (string.Empty, before), (string.Empty, after)])
+        return Ask(owner, $"{band.Type} - flow", [("Hide when", suppress), (string.Empty, repeat), (string.Empty, keep), (string.Empty, before), (string.Empty, after)])
             ? new BandFlow(suppress.Text, repeat.IsChecked == true, keep.IsChecked == true, before.IsChecked == true, after.IsChecked == true)
             : null;
     }

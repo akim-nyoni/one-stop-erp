@@ -150,7 +150,7 @@ public static class CertificateLayout
                 '(' => "\\(",
                 ')' => "\\)",
                 '\\' => "\\\\",
-                '—' => "-",
+                '-' => "-",
                 '·' => "·",
                 _ when c > 'ÿ' || c < ' ' => "?",
                 _ => c.ToString(),

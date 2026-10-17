@@ -59,7 +59,7 @@ public sealed record SupplierReconciliation(IReadOnlyList<SupplierReconLine> Lin
 /// <summary>
 /// Reconciles a supplier's open-item statement to our outstanding purchase-ledger items (brief §4.6). First
 /// pass pairs by document number (case, space and punctuation insensitive); a second pass pairs what is left
-/// by equal amount within a date window — which is how payments, described in the supplier's own words,
+/// by equal amount within a date window - which is how payments, described in the supplier's own words,
 /// are agreed. Every line resolves to Agreed, AmountDiffers, MissingFromLedger or NotOnStatement, and the line
 /// differences always sum to the balance difference. Pure and unit-tested.
 /// </summary>

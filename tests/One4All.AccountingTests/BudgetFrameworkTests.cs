@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the multi-year framework and the end of a budget's life: outer years are set before approval and shown beside year 1, an approved framework
-/// rolls forward into next year's draft (year 2 spread over the periods, later years moved up), and a superseded version is archived then locked —
+/// rolls forward into next year's draft (year 2 spread over the periods, later years moved up), and a superseded version is archived then locked -
 /// after which it cannot be activated or changed.
 /// </summary>
 [Collection(AccountingCollection.Name)]

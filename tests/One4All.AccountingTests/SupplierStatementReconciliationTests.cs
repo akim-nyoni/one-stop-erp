@@ -39,7 +39,7 @@ public sealed class SupplierStatementReconciliationTests
             IPurchaseLedgerService ap = scope.ServiceProvider.GetRequiredService<IPurchaseLedgerService>();
             IAllocationService alloc = scope.ServiceProvider.GetRequiredService<IAllocationService>();
 
-            // A settled invoice (paid and allocated) — it should appear on neither side.
+            // A settled invoice (paid and allocated) - it should appear on neither side.
             long settledInvoice = (await ap.PostInvoiceAsync(Invoice(companyId, supplierId, "S-100", new DateOnly(2026, 4, 1), 400m))).Value.OpenItemId;
             long settledPayment = (await ap.PostPaymentAsync(Payment(companyId, supplierId, "PAY-1", new DateOnly(2026, 4, 20), 400m))).Value.OpenItemId;
             (await alloc.AllocateAsync(companyId, TradingLedger.AccountsPayable, settledPayment, settledInvoice, 400m, new DateOnly(2026, 4, 20))).IsSuccess.Should().BeTrue();

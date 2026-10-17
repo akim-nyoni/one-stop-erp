@@ -117,7 +117,7 @@ public sealed class WeighbridgeTests
         (await Render("WB198")).Should().Contain($"{firstNumber},2026-03-10,ABC123,John,Builder,Sand,").And.Contain(",32000,10000,0,13.2,22").And.Contain(",TRK7,,,Sand,");
         (await Render("WB199")).Should().Contain("2026-03-10,Sand,Builder,ABC123,John,1,13.2,22").And.Contain("2026-03-10,Sand,Builder,XYZ9,Mary,1,3,5");
         string vehicles = await Render("WB200");
-        vehicles.Should().Contain("ABC123,Haul Co,1,0,0,0,1,22").And.Contain("TRK7,—,0,—,—,1,0,0");
+        vehicles.Should().Contain("ABC123,Haul Co,1,0,0,0,1,22").And.Contain("TRK7,-,0,-,-,1,0,0");
         (await Render("WB201")).Should().Contain("Builder,Site A,2,32,17.2,88").And.Contain("Builder,Plot 2,1,5,3,30");
         (await Render("WB202")).Should().Contain(",XYZ9,").And.Contain("Scale offline,5");
         (await Render("WB203")).Should().Contain("WSAND Sand,WPILE,0,0,100,27,0,73");

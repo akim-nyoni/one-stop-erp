@@ -61,7 +61,7 @@ public interface IItemCatalogueService
     /// <returns>The link id.</returns>
     Task<Result<long>> LinkSupplierAsync(ItemSupplierRequest request, CancellationToken ct = default);
 
-    /// <summary>Searches items by code, PLU, barcode (item, pack or alias), synonym, brand and description — exact matches first.</summary>
+    /// <summary>Searches items by code, PLU, barcode (item, pack or alias), synonym, brand and description - exact matches first.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="term">What was typed.</param>
     /// <param name="take">How many to return.</param>

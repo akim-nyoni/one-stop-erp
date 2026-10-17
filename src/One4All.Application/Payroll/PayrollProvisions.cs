@@ -48,7 +48,7 @@ public static class PayrollProvisions
 
     /// <summary>
     /// The present value of a benefit paid at retirement (IAS 19 projected unit credit, simplified): the amount earned to date at today's pay,
-    /// grown with salaries to the retirement date and discounted back at the discount rate — so a provision for long-dated gratuities is not
+    /// grown with salaries to the retirement date and discounted back at the discount rate - so a provision for long-dated gratuities is not
     /// overstated. With no date of birth, or nothing to discount, the amount is left as it is.
     /// </summary>
     /// <param name="earned">The benefit earned to date at today's pay.</param>

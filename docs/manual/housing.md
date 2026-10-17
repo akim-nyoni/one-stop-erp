@@ -46,7 +46,7 @@ The list beside the form shows: Applicants.
 
 ### Applicant intake and duplicate queue
 
-Contact: an applicant's gender, addresses, phone and employer. Lodge / Verify: supporting documents (ID copy, proof of residence, payslip, affidavit) verified one by one with the officer's name — the applicant is verified once all are. Death: adds to the deceased register. Scan: finds suspected duplicates (same ID, similar name with the same birth date, same phone) and applicants on the deceased register and queues them. Merge (keeps the earlier registration), Reject (removes the second) or Clear a case, with a reason.
+Contact: an applicant's gender, addresses, phone and employer. Lodge / Verify: supporting documents (ID copy, proof of residence, payslip, affidavit) verified one by one with the officer's name - the applicant is verified once all are. Death: adds to the deceased register. Scan: finds suspected duplicates (same ID, similar name with the same birth date, same phone) and applicants on the deceased register and queues them. Merge (keeps the earlier registration), Reject (removes the second) or Clear a case, with a reason.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -130,7 +130,7 @@ The list beside the form shows: Rules in force.
 
 ### Land, schemes and stands
 
-Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands ("S1:300; S2:250" — number:size m²), its cost apportioned equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available).
+Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands ("S1:300; S2:250" - number:size m²), its cost apportioned equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -202,7 +202,7 @@ The list beside the form shows: Stands.
 
 ### Stand pricing
 
-Proposes a pricing rule — for one stand, a size band or a whole scheme, from a date: cost plus overhead %, levies per stand and per m², margin %, rounded — which another user approves; Quote shows a stand's price build-up under the rule in force.
+Proposes a pricing rule - for one stand, a size band or a whole scheme, from a date: cost plus overhead %, levies per stand and per m², margin %, rounded - which another user approves; Quote shows a stand's price build-up under the rule in force.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -330,7 +330,7 @@ The list beside the form shows: Compensation claims.
 
 ### Stand blocks and caveats
 
-Places a block on a stand (court interdict, family dispute, suspected fraud, double allocation, boundary dispute…) with its document — a blocked stand cannot be allocated, sold, leased or transferred — or lifts it with the reason. History shows every block on a stand.
+Places a block on a stand (court interdict, family dispute, suspected fraud, double allocation, boundary dispute…) with its document - a blocked stand cannot be allocated, sold, leased or transferred - or lifts it with the reason. History shows every block on a stand.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -494,7 +494,7 @@ The list beside the form shows: Allocation certificates.
 
 ### Instalment arrears and default notices
 
-The arrears stages: a reminder from the first unpaid instalment, a letter of demand after 30 days, a notice of breach after 60 and a notice of cancellation after 90 (once the breach notice has stood 30 days) — each issued only after the previous one is served, with proof of service recorded. Penalty: sets an agreement's annual penalty rate on arrears; Charge penalties invoices a month's penalty interest on each agreement's arrears once.
+The arrears stages: a reminder from the first unpaid instalment, a letter of demand after 30 days, a notice of breach after 60 and a notice of cancellation after 90 (once the breach notice has stood 30 days) - each issued only after the previous one is served, with proof of service recorded. Penalty: sets an agreement's annual penalty rate on arrears; Charge penalties invoices a month's penalty interest on each agreement's arrears once.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -635,7 +635,7 @@ Where every title deed application stands.
 
 ### Sectional title schemes
 
-Registers a sectional title scheme on a stand with its units' floor areas ("U1:80; U2:120" — participation quotas follow from the areas), transfers a unit, lists the units and their owners, and raises a period's levy shared by participation quota.
+Registers a sectional title scheme on a stand with its units' floor areas ("U1:80; U2:120" - participation quotas follow from the areas), transfers a unit, lists the units and their owners, and raises a period's levy shared by participation quota.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -718,7 +718,7 @@ The list beside the form shows: Lodger permits.
 
 ### Rental maintenance
 
-Report a repair on a unit; complete it with its cost (recharged to the tenant when they caused it); record an inspection with its condition grade (1–5) and whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition. Void details record why a void unit is empty and its refurbishment job. The planned maintenance programme: plan a task (due on the date, then every so many months), list what is due, and mark one done — which raises the repair that carries its cost.
+Report a repair on a unit; complete it with its cost (recharged to the tenant when they caused it); record an inspection with its condition grade (1–5) and whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition. Void details record why a void unit is empty and its refurbishment job. The planned maintenance programme: plan a task (due on the date, then every so many months), list what is due, and mark one done - which raises the repair that carries its cost.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -799,7 +799,7 @@ The list beside the form shows: Schemes.
 
 ### Scheme progress
 
-Records survey progress on stands (pegged, diagram lodged, diagram approved — several stands comma-separated), a bulk-service servicing certificate (water, sewer, roads, electricity, storm water: % complete and stands reached), and a land parcel's valuation.
+Records survey progress on stands (pegged, diagram lodged, diagram approved - several stands comma-separated), a bulk-service servicing certificate (water, sewer, roads, electricity, storm water: % complete and stands reached), and a land parcel's valuation.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -861,7 +861,7 @@ The list beside the form shows: Developer agreements.
 
 ### Development levies
 
-Defines a levy charged on allocation or on transfer — flat, per m² or a percentage of the price — to an income account, or deactivates it; charges the levies due on an allocation certificate or a transfer application.
+Defines a levy charged on allocation or on transfer - flat, per m² or a percentage of the price - to an income account, or deactivates it; charges the levies due on an allocation certificate or a transfer application.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -981,16 +981,16 @@ Assesses the IFRS 9 expected credit loss on housing debtors (instalment buyers a
 | H13 | Servicing Status by Scheme | Water, sewer, roads, electricity and storm water % complete, with stands serviced and unserviced. |
 | H14 | Servicing Cost Apportionment Schedule | Servicing cost per stand by contract and basis. |
 | H15 | Cost per Stand / Selling Price Build-up | Land and servicing cost, overhead, levy and margin to price, with margin %. |
-| H16 | Price List by Scheme & Stand Size Band | Every pricing rule with its scope, effective date, terms and approval — the price change history. |
+| H16 | Price List by Scheme & Stand Size Band | Every pricing rule with its scope, effective date, terms and approval - the price change history. |
 | H17 | Stand Inventory Movement & Reconciliation | Year to date: opening stands + created + repossessed − sold = closing, in units and cost, reconciled to the stands control account. |
 | H18 | Waiting List Register | Active applicants by category in seniority order with score and position. |
 | H19 | Waiting List Summary | Active applicants by category, income band and age band. |
 | H2 | Land Acquisition Register | Acquisitions by method with counterparty, council resolution, status and cost. |
 | H20 | Waiting List Age Analysis | How long active applicants have been waiting, by category. |
-| H21 | Applicant Detail / Verification Sheet | One applicant: every captured detail, notices, date changes and the score derivation — printable for the applicant. |
+| H21 | Applicant Detail / Verification Sheet | One applicant: every captured detail, notices, date changes and the score derivation - printable for the applicant. |
 | H22 | Priority Score Derivation | How each active applicant's points were computed, factor by factor. |
 | H23 | Duplicate & Suspected Fraudulent Applicants | Fuzzy name, ID and date-of-birth matches across the waiting list, stand holders and the property register. |
-| H24 | Applicants Already Owning Property | Active applicants holding a council stand or owning rated property — disqualification candidates. |
+| H24 | Applicants Already Owning Property | Active applicants holding a council stand or owning rated property - disqualification candidates. |
 | H25 | Registration Renewal Compliance | Applicants by status with last confirmation, months since and the notices sent. |
 | H26 | Registration Date Change Audit | Every requested change to a seniority date: who asked, who decided, why. |
 | H27 | Registration Fee Collection Report | Waiting-list fees received, and applicants registered without paying the registration fee. |
@@ -1001,23 +1001,23 @@ Assesses the IFRS 9 expected credit loss on housing debtors (instalment buyers a
 | H31 | Allocation Register | Allocations with stand, beneficiary, certificate, frozen price and approval. |
 | H32 | Ballot / Draw Result Report | Ballot runs with the stored seed and input hash, re-verified now. |
 | H33 | Allocations by Scheme, Month and Approver | Approved allocations counted by scheme, approval month and approving officer. |
-| H34 | Skipped Applicant / Substitution Report | Per allocation run: listed applicants left out and why, and offers declined, lapsed or cancelled — the appeal-defence report. |
+| H34 | Skipped Applicant / Substitution Report | Per allocation run: listed applicants left out and why, and offers declined, lapsed or cancelled - the appeal-defence report. |
 | H35 | Offers Outstanding / Expiring / Expired | Open offers with the acceptance deadline countdown. |
 | H36 | Declined, Lapsed & Cancelled Offers | Offers that did not proceed, with when and why. |
 | H37 | Quota Compliance Report | Per scheme: allocations to each beneficiary group against its policy quota. |
 | H38 | Appeals Register & Outcomes | Appeals lodged against allocation runs with hearing and outcome. |
-| H39 | Double Allocation Exception Report | Stands promised through more than one route — must always be empty; any row is an incident. |
+| H39 | Double Allocation Exception Report | Stands promised through more than one route - must always be empty; any row is an incident. |
 | H4 | Due Diligence Outstanding | Open acquisitions and the due-diligence items blocking each. |
 | H40 | Beneficiaries with More Than One Stand | People (by national ID) holding or allocated more than one stand across schemes. |
 | H41 | Allocation-to-Agreement Conversion | Accepted allocations with no agreement or instalment sale yet, with age since acceptance. |
 | H42 | Agreement Register | Agreements by type with party, stand, version in force, signature and price. |
-| H43 | Beneficiary Account Statement | Charges, instalments, receipts and balance per beneficiary, with the next instalment — one or all (burst by beneficiary). |
-| H44 | Instalment Amortisation Schedule | Each instalment's capital, interest and balance — for one agreement or all. |
+| H43 | Beneficiary Account Statement | Charges, instalments, receipts and balance per beneficiary, with the next instalment - one or all (burst by beneficiary). |
+| H44 | Instalment Amortisation Schedule | Each instalment's capital, interest and balance - for one agreement or all. |
 | H45 | Housing Debtors Age Analysis | Instalment debtors aged 30/60/90/120+ by tenure type and scheme, as at any date. |
 | H46 | Instalment Arrears & Default Report | Active instalment sales with overdue instalments, amount owing and last payment. |
 | H47 | Payment Arrangements Register | Arrangements with housing debtors and tenants: terms, status and standing as at the date. |
 | H48 | Collections Report | Receipts from housing debtors and tenants in the month, by scheme or tenancy, day, method, currency and officer. |
-| H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application — the most actionable list. |
+| H49 | Fully Paid / Ready for Transfer | Sold stands whose holders owe nothing and have no title application - the most actionable list. |
 | H5 | Compulsory Acquisition Compensation Register | Compulsory acquisitions: notice served, objections, assessed, offered, paid and outstanding, and possession. |
 | H50 | Early Settlement & Rebate Report | Instalment sales settled early with the interest rebated. |
 | H51 | Deposits Held Register | Liability listing as at the date: purchase deposits against accepted offers and tenancy deposits, by scheme and beneficiary. |
@@ -1035,17 +1035,17 @@ Assesses the IFRS 9 expected credit loss on housing debtors (instalment buyers a
 | H62 | Development Levy & Transfer Fee Collection | Levies and fees raised, by levy, with the event they were raised on. |
 | H63 | Transfer Duty Deducted and Remitted | Duty collected as agent on each transfer, and whether it has been paid over. |
 | H64 | Title Deed Pipeline Report | Open title applications with stage, days at the stage, days since applied and conveyancer. |
-| H65 | Title Deeds Held but Uncollected | Deeds in council custody not yet handed over, aged, with the owner's contact — the chase list. |
+| H65 | Title Deeds Held but Uncollected | Deeds in council custody not yet handed over, aged, with the owner's contact - the chase list. |
 | H66 | Deeds Register | Registered deeds with registration date and current custody. |
 | H67 | Conveyancer Performance | Files allocated, registered, average days to registration and registry queries per conveyancer. |
 | H68 | Caveats, Blocks & Disputes Register | Every block placed: reason, particulars, document, who placed and lifted it, age. |
-| H69 | Stands with No Recorded Owner / Broken Ownership Chain | Data-integrity exceptions — must be empty. |
+| H69 | Stands with No Recorded Owner / Broken Ownership Chain | Data-integrity exceptions - must be empty. |
 | H7 | Encumbrances, Servitudes & Caveats on Land | Every right or restriction registered against land, in force or lifted. |
 | H70 | Sectional Title Unit Register & Participation Quotas | Units of every sectional scheme with floor area, quota and owner. |
 | H71 | Rent Roll | Let units with tenant, rent and arrears. |
 | H72 | Housing Stock Register & Condition | Every unit with type, rooms, occupancy and its latest inspection grade. |
 | H73 | Occupancy & Voids Report | Void units with days void and rent lost to voids. |
-| H74 | Tenant Statement | Rent charges, receipts and balance per tenant — one or all (burst by tenant). |
+| H74 | Tenant Statement | Rent charges, receipts and balance per tenant - one or all (burst by tenant). |
 | H75 | Rent Arrears Age Analysis | Tenants' arrears aged 30/60/90/120+ by unit type, as at any date. |
 | H76 | Eviction Pipeline & Register | Eviction cases with the current stage, its date and the arrears at opening. |
 | H77 | Lease Expiry & Renewal Due | Stand leases and tenancies ending within a year of the date. |
@@ -1062,11 +1062,11 @@ Assesses the IFRS 9 expected credit loss on housing debtors (instalment buyers a
 | H87 | Informal Settlement / Enumeration Register | Settlements with ward, cut-off date, households counted and eligible. |
 | H88 | Regularisation Progress Report | Per settlement: enumerated → eligible → waiting-listed or regularised → outstanding. |
 | H89 | Housing Subsidy & Grant Utilisation | Grants received, spent, recognised and deferred (IAS 20), with conditions. |
-| H9 | Land Bank Valuation vs Carrying Value (IAS 2 NRV test) | Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell — the write-down working paper. |
-| H90 | Housing Audit Trail Report | Every recorded change to housing records — before and after values, user, time. |
-| H91 | Allocation & Ownership Change Approval Audit | Who requested and who approved each run, transfer, seniority change, price rule and block lift — turnaround and dual-authorisation exceptions. |
-| H92 | Segregation of Duties Violations — Housing | Users whose permissions combine housing duties that must be separated. |
-| H93 | Manual Override & Exception Report | Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted — each with the stated reason. |
+| H9 | Land Bank Valuation vs Carrying Value (IAS 2 NRV test) | Undivided parcels against their latest valuation and unsold stands against their approved price, less costs to sell - the write-down working paper. |
+| H90 | Housing Audit Trail Report | Every recorded change to housing records - before and after values, user, time. |
+| H91 | Allocation & Ownership Change Approval Audit | Who requested and who approved each run, transfer, seniority change, price rule and block lift - turnaround and dual-authorisation exceptions. |
+| H92 | Segregation of Duties Violations - Housing | Users whose permissions combine housing duties that must be separated. |
+| H93 | Manual Override & Exception Report | Seniority dates changed, stand-specific prices, offers without an approved price and blocks lifted - each with the stated reason. |
 | H94 | Housing Revenue Summary | Year to date against the same period last year: stand sales, instalment interest, rentals and recharges, development levies. |
 | H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. |
 | H96 | Housing Delivery / Statutory Return | Stands delivered in the year by density, tenure and beneficiary category. |

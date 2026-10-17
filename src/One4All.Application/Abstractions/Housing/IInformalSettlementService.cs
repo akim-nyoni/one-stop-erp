@@ -82,7 +82,7 @@ public sealed record SettlementSummary(string Code, string Name, DateOnly? PlanA
 /// <summary>
 /// Informal settlements and regularisation (brief §4.10.8): the settlement register with its cut-off date and upgrading
 /// plan; enumeration exercises recording households, structures and occupants with an eligibility assessment; and the
-/// conversion of an eligible household into a waiting-list registration or a direct allocation of a stand — with the same
+/// conversion of an eligible household into a waiting-list registration or a direct allocation of a stand - with the same
 /// anti-double-allocation checks as the rest of the housing module.
 /// </summary>
 public interface IInformalSettlementService

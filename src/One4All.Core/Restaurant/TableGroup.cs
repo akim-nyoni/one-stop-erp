@@ -5,10 +5,10 @@ namespace One4All.Core.Restaurant;
 /// <summary>The state of a table group (Restaurant module).</summary>
 public enum TableGroupStatus
 {
-    /// <summary>Active — the tables are combined.</summary>
+    /// <summary>Active - the tables are combined.</summary>
     Active = 1,
 
-    /// <summary>Released — the tables have been separated again.</summary>
+    /// <summary>Released - the tables have been separated again.</summary>
     Released = 2,
 }
 

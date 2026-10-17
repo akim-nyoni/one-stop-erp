@@ -10,7 +10,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
     /// <list type="bullet">
     /// <item>its lines cannot be deleted, and no line's journal, account, dimensions, currency, rate or amounts can change;</item>
     /// <item>the journal cannot be deleted, and its number, company, dates, period, module, currencies, document fields and
-    /// narrative cannot change — the only allowed changes are Posted → Reversed, setting the reversal link once, and the
+    /// narrative cannot change - the only allowed changes are Posted → Reversed, setting the reversal link once, and the
     /// audit stamps.</item>
     /// </list>
     /// Corrections are made by reversal, as the posting engine already does. Draft and deferred journals are unaffected.

@@ -107,7 +107,7 @@ public sealed record EnquiryReading(string MeterSerial, DateOnly Date, decimal R
 public sealed record EnquiryMessage(DateTimeOffset At, bool Outgoing, string Channel, string Party, string Subject, string Status);
 
 /// <summary>
-/// The consumer enquiry desk (brief §4.9): one read-only view of a property — owners and ratepayer, services with their
+/// The consumer enquiry desk (brief §4.9): one read-only view of a property - owners and ratepayer, services with their
 /// tariffs and meters, the account balance and what is overdue, recent bills and payments, and the indigent subsidy,
 /// payment arrangement, open service orders, licences and clearance on it.
 /// </summary>

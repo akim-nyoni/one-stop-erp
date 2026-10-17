@@ -161,7 +161,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LandBankAsync(long companyId, CancellationToken ct)
         => [.. (await _db.LandParcels.AsNoTracking().Where(p => p.CompanyId == companyId).OrderBy(p => p.ParcelNumber).ToListAsync(ct).ConfigureAwait(false))
             .Select(p => Row(("Parcel", p.ParcelNumber), ("Description", p.Description), ("AreaM2", p.AreaSquareMetres),
-                ("MappedM2", p.Boundary is { } b ? b.AreaSquareMetres.ToString("N0", CultureInfo.InvariantCulture) : "—"), ("Status", p.Status.ToString()), ("Cost", p.AcquisitionCost)))];
+                ("MappedM2", p.Boundary is { } b ? b.AreaSquareMetres.ToString("N0", CultureInfo.InvariantCulture) : "-"), ("Status", p.Status.ToString()), ("Cost", p.AcquisitionCost)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AcquisitionsAsync(long companyId, CancellationToken ct)
         => [.. (await _db.Set<LandAcquisition>().AsNoTracking().Include(a => a.Costs).Where(a => a.CompanyId == companyId).OrderBy(a => a.AcquisitionNumber).ToListAsync(ct).ConfigureAwait(false))
@@ -208,7 +208,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             LayoutPlanVersion shown = inForce ?? latest;
             return Row(("Plan", p.PlanNumber), ("Parcel", parcels.GetValueOrDefault(p.LandParcelId, "?")), ("Version", shown.Version), ("Status", status),
                 ("Stands", LayoutChanges.Stands(shown.Uses.ToDictionary(u => u.Use, u => u.Stands))),
-                ("TurnaroundDays", inForce?.ApprovedOn is DateOnly approved ? (approved.DayNumber - inForce.SubmittedOn.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"));
+                ("TurnaroundDays", inForce?.ApprovedOn is DateOnly approved ? (approved.DayNumber - inForce.SubmittedOn.DayNumber).ToString(CultureInfo.InvariantCulture) : "-"));
         })];
     }
 
@@ -276,7 +276,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        orderby c.Id
                        select new { a.WaitingListNumber, c.OldDate, c.NewDate, c.Reason, c.Status, c.RequestedByUserId, c.DecidedByUserId }).ToListAsync(ct).ConfigureAwait(false))
             .Select(c => Row(("WaitingListNumber", c.WaitingListNumber), ("OldDate", Date(c.OldDate)), ("NewDate", Date(c.NewDate)), ("Reason", c.Reason), ("Status", c.Status.ToString()),
-                ("RequestedBy", c.RequestedByUserId), ("DecidedBy", c.DecidedByUserId?.ToString(CultureInfo.InvariantCulture) ?? "—")))];
+                ("RequestedBy", c.RequestedByUserId), ("DecidedBy", c.DecidedByUserId?.ToString(CultureInfo.InvariantCulture) ?? "-")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AllocationsAsync(long companyId, CancellationToken ct)
         => [.. (await (from a in _db.Set<StandAllocation>().AsNoTracking()
@@ -287,7 +287,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        orderby a.CertificateNumber
                        select new { a.CertificateNumber, r.RunNumber, s.StandNumber, p.WaitingListNumber, p.FullName, a.Status, r.ApprovedOn, a.OfferedPrice }).ToListAsync(ct).ConfigureAwait(false))
             .Select(a => Row(("Certificate", a.CertificateNumber), ("Run", a.RunNumber), ("Stand", a.StandNumber), ("WaitingListNumber", a.WaitingListNumber), ("Beneficiary", a.FullName),
-                ("Status", a.Status.ToString()), ("ApprovedOn", a.ApprovedOn is DateOnly d ? Date(d) : "—"), ("Price", a.OfferedPrice ?? 0m)))];
+                ("Status", a.Status.ToString()), ("ApprovedOn", a.ApprovedOn is DateOnly d ? Date(d) : "-"), ("Price", a.OfferedPrice ?? 0m)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OffersAsync(long companyId, DateOnly asAt, CancellationToken ct)
         => [.. (await (from a in _db.Set<StandAllocation>().AsNoTracking()
@@ -311,7 +311,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        orderby a.AppealNumber
                        select new { a.AppealNumber, p.WaitingListNumber, r.RunNumber, a.LodgedOn, a.Status, a.HearingDate, a.OutcomeReasons }).ToListAsync(ct).ConfigureAwait(false))
             .Select(a => Row(("Appeal", a.AppealNumber), ("WaitingListNumber", a.WaitingListNumber), ("Run", a.RunNumber), ("Lodged", Date(a.LodgedOn)), ("Status", a.Status.ToString()),
-                ("Hearing", a.HearingDate is DateOnly h ? Date(h) : "—"), ("Outcome", a.OutcomeReasons ?? "—")))];
+                ("Hearing", a.HearingDate is DateOnly h ? Date(h) : "-"), ("Outcome", a.OutcomeReasons ?? "-")))];
 
     // Every route a stand can be promised through, counted per stand; more than one is an incident.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DoubleAllocationsAsync(long companyId, CancellationToken ct)
@@ -339,7 +339,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         Dictionary<long, string> numbers = await _db.HousingStands.AsNoTracking().Where(s => ids.Contains(s.Id)).ToDictionaryAsync(s => s.Id, s => s.StandNumber, ct).ConfigureAwait(false);
         return [.. doubled.OrderBy(g => numbers[g.Key], StringComparer.Ordinal)
             .Select(g => Row(("Stand", numbers[g.Key]), ("Claims", g.Count()), ("Routes", string.Join("; ", g.Select(c => c.Route)))))
-            .Concat(blocked.Select(b => Row(("Stand", b.StandNumber), ("Claims", 1), ("Routes", $"refused: run {b.RunNumber} approval on {b.AttemptedOnUtc:yyyy-MM-dd} — {b.Reason}"))))];
+            .Concat(blocked.Select(b => Row(("Stand", b.StandNumber), ("Claims", 1), ("Routes", $"refused: run {b.RunNumber} approval on {b.AttemptedOnUtc:yyyy-MM-dd} - {b.Reason}"))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReadyForTitleAsync(long companyId, CancellationToken ct)
@@ -356,7 +356,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         return [.. sold.Where(s => owing.GetValueOrDefault(s.CurrentHolderCustomerId!.Value) <= 0m).Select(s =>
         {
             OwnershipRecord? sale = s.Ownership.LastOrDefault(o => o.ChangeType is OwnershipChangeType.Sale or OwnershipChangeType.Cession);
-            return Row(("Stand", s.StandNumber), ("Holder", sale?.HolderName ?? "?"), ("Status", s.Status.ToString()), ("SoldOn", sale is null ? "—" : Date(sale.EffectiveDate)), ("Price", s.SellingPrice));
+            return Row(("Stand", s.StandNumber), ("Holder", sale?.HolderName ?? "?"), ("Status", s.Status.ToString()), ("SoldOn", sale is null ? "-" : Date(sale.EffectiveDate)), ("Price", s.SellingPrice));
         })];
     }
 
@@ -382,7 +382,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        orderby t.DecidedOn, t.ApplicationNumber
                        select new { t.ApplicationNumber, s.StandNumber, t.TransferType, From = f.Name, To = c.Name, t.DecidedOn, t.ClearanceNumber, t.Consideration }).ToListAsync(ct).ConfigureAwait(false))
             .Select(t => Row(("Application", t.ApplicationNumber), ("Stand", t.StandNumber), ("Type", t.TransferType.ToString()), ("From", t.From), ("To", t.To),
-                ("Completed", t.DecidedOn is DateOnly d ? Date(d) : "—"), ("Clearance", t.ClearanceNumber ?? "—"), ("Consideration", t.Consideration)))];
+                ("Completed", t.DecidedOn is DateOnly d ? Date(d) : "-"), ("Clearance", t.ClearanceNumber ?? "-"), ("Consideration", t.Consideration)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TransfersOpenAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
@@ -422,7 +422,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TitlePipelineAsync(long companyId, DateOnly asAt, CancellationToken ct)
         => [.. (await _titles.PipelineAsync(companyId, asAt, ct).ConfigureAwait(false)).Applications
             .Select(t => Row(("Application", t.ApplicationNumber), ("Stand", t.StandNumber), ("Stage", t.Stage.ToString()), ("DaysAtStage", t.DaysAtStage),
-                ("DaysSinceApplied", t.DaysSinceApplied), ("Conveyancer", t.Conveyancer ?? "—")))];
+                ("DaysSinceApplied", t.DaysSinceApplied), ("Conveyancer", t.Conveyancer ?? "-")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DeedsUncollectedAsync(long companyId, DateOnly asAt, CancellationToken ct)
         => [.. (await (from t in _db.Set<TitleDeed>().AsNoTracking()
@@ -431,7 +431,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        where t.CompanyId == companyId && t.Stage == TitleStage.InCustody && t.StageSince <= asAt
                        orderby t.StageSince
                        select new { t.ApplicationNumber, s.StandNumber, t.DeedNumber, c.Name, c.Email, c.MobileNumber, t.StageSince }).ToListAsync(ct).ConfigureAwait(false))
-            .Select(t => Row(("Application", t.ApplicationNumber), ("Stand", t.StandNumber), ("Deed", t.DeedNumber ?? "—"), ("Owner", t.Name),
+            .Select(t => Row(("Application", t.ApplicationNumber), ("Stand", t.StandNumber), ("Deed", t.DeedNumber ?? "-"), ("Owner", t.Name),
                 ("Contact", Contact(t.MobileNumber, t.Email)), ("DaysHeld", asAt.DayNumber - t.StageSince.DayNumber)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DeedsAsync(long companyId, CancellationToken ct)
@@ -440,7 +440,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        where t.CompanyId == companyId && t.DeedNumber != null
                        orderby t.RegisteredOn, t.DeedNumber
                        select new { t.DeedNumber, s.StandNumber, t.RegisteredOn, t.Stage, t.Conveyancer, t.ReceivedBy }).ToListAsync(ct).ConfigureAwait(false))
-            .Select(t => Row(("Deed", t.DeedNumber), ("Stand", t.StandNumber), ("Registered", t.RegisteredOn is DateOnly r ? Date(r) : "—"),
+            .Select(t => Row(("Deed", t.DeedNumber), ("Stand", t.StandNumber), ("Registered", t.RegisteredOn is DateOnly r ? Date(r) : "-"),
                 ("Custody", t.Stage switch
                 {
                     TitleStage.HandedOver => $"Handed over to {t.ReceivedBy}",
@@ -469,7 +469,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         {
             if (!stand.VerifyOwnershipChain())
             {
-                rows.Add(Row(("Stand", stand.StandNumber), ("Problem", "The ownership chain does not verify — a record was altered or removed.")));
+                rows.Add(Row(("Stand", stand.StandNumber), ("Problem", "The ownership chain does not verify - a record was altered or removed.")));
             }
 
             if (stand.Status is StandStatus.Sold or StandStatus.Transferred && stand.CurrentHolderCustomerId is null)
@@ -535,7 +535,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         Dictionary<long, UnitInspection> latest = (await _db.Set<UnitInspection>().AsNoTracking().Where(i => i.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(i => i.UnitId).ToDictionary(g => g.Key, g => g.OrderBy(i => i.InspectedOn).ThenBy(i => i.Id).Last());
         return [.. units.Select(u => Row(("Unit", u.Code), ("Description", u.Description), ("Type", u.UnitType.ToString()), ("Rooms", u.Rooms), ("Occupancy", u.IsLet ? "Let" : "Void"),
-            ("Inspected", latest.TryGetValue(u.Id, out UnitInspection? i) ? Date(i.InspectedOn) : "never"), ("Grade", latest.TryGetValue(u.Id, out UnitInspection? g) ? g.ConditionGrade.ToString(CultureInfo.InvariantCulture) : "—")))];
+            ("Inspected", latest.TryGetValue(u.Id, out UnitInspection? i) ? Date(i.InspectedOn) : "never"), ("Grade", latest.TryGetValue(u.Id, out UnitInspection? g) ? g.ConditionGrade.ToString(CultureInfo.InvariantCulture) : "-")))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VoidsAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -599,7 +599,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             reasons.AddRange(inspections[unit.Id].Where(i => i.FollowUpRequired && i.FollowUpDoneOn is null).Select(i => $"Follow-up outstanding from {Date(i.InspectedOn)}: {i.Findings}"));
             if (reasons.Count > 0)
             {
-                rows.Add(Row(("Unit", unit.Code), ("LastInspected", last is null ? "never" : Date(last.InspectedOn)), ("Grade", last?.ConditionGrade.ToString(CultureInfo.InvariantCulture) ?? "—"),
+                rows.Add(Row(("Unit", unit.Code), ("LastInspected", last is null ? "never" : Date(last.InspectedOn)), ("Grade", last?.ConditionGrade.ToString(CultureInfo.InvariantCulture) ?? "-"),
                     ("Due", string.Join(" ", reasons))));
             }
         }
@@ -623,7 +623,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             {
                 bool council = quota.Quota == StandQuota.Council;
                 rows.Add(Row(("Agreement", number), ("Quota", quota.Quota.ToString()), ("Contracted", quota.Contracted), ("HandedOver", quota.HandedOver), ("Outstanding", quota.Outstanding),
-                    ("OverdueMilestones", council ? (reconciled.Value.OverdueMilestones.Count == 0 ? "—" : string.Join(", ", reconciled.Value.OverdueMilestones)) : string.Empty),
+                    ("OverdueMilestones", council ? (reconciled.Value.OverdueMilestones.Count == 0 ? "-" : string.Join(", ", reconciled.Value.OverdueMilestones)) : string.Empty),
                     ("PenaltyAccrued", council ? reconciled.Value.PenaltyAccrued : 0m)));
             }
         }
@@ -703,7 +703,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        where s.CompanyId == companyId
                        orderby p.ParcelNumber, s.StandNumber
                        select new { p.ParcelNumber, s.StandNumber, s.SizeSquareMetres, Scheme = sc == null ? null : sc.Code, s.Status, s.AllocatedCost }).ToListAsync(ct).ConfigureAwait(false))
-            .Select(s => Row(("Parcel", s.ParcelNumber), ("Stand", s.StandNumber), ("SizeM2", s.SizeSquareMetres.ToString("0.##", CultureInfo.InvariantCulture)), ("Scheme", s.Scheme ?? "—"),
+            .Select(s => Row(("Parcel", s.ParcelNumber), ("Stand", s.StandNumber), ("SizeM2", s.SizeSquareMetres.ToString("0.##", CultureInfo.InvariantCulture)), ("Scheme", s.Scheme ?? "-"),
                 ("Status", s.Status.ToString()), ("Cost", s.AllocatedCost)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PriceListAsync(long companyId, CancellationToken ct)
@@ -803,7 +803,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             var verified = await _allocations.VerifyDrawAsync(companyId, run.RunNumber, ct).ConfigureAwait(false);
             string outcome = verified.IsFailure ? verified.Error.Message
                 : verified.Value.HashMatches && verified.Value.OrderMatches ? "Inputs and draw reproduce" : $"MISMATCH (inputs {(verified.Value.HashMatches ? "ok" : "altered")}, draw {(verified.Value.OrderMatches ? "ok" : "differs")})";
-            rows.Add(Row(("Run", run.RunNumber), ("Status", run.Status.ToString()), ("Seed", run.Seed?.ToString(CultureInfo.InvariantCulture) ?? "—"), ("InputHash", run.InputHash), ("Verified", outcome)));
+            rows.Add(Row(("Run", run.RunNumber), ("Status", run.Status.ToString()), ("Seed", run.Seed?.ToString(CultureInfo.InvariantCulture) ?? "-"), ("InputHash", run.InputHash), ("Verified", outcome)));
         }
 
         return rows;
@@ -828,7 +828,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                        orderby a.DecidedOn, a.CertificateNumber
                        select new { a.CertificateNumber, s.StandNumber, p.FullName, a.Status, a.DecidedOn, a.Reason }).ToListAsync(ct).ConfigureAwait(false))
             .Select(a => Row(("Certificate", a.CertificateNumber), ("Stand", a.StandNumber), ("Applicant", a.FullName), ("Status", a.Status.ToString()),
-                ("DecidedOn", a.DecidedOn is DateOnly d ? Date(d) : "—"), ("Reason", a.Reason ?? "—")))];
+                ("DecidedOn", a.DecidedOn is DateOnly d ? Date(d) : "-"), ("Reason", a.Reason ?? "-")))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MultipleStandsAsync(long companyId, CancellationToken ct)
     {
@@ -864,7 +864,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                            && !_db.Set<InstalmentAgreement>().Any(i => i.StandId == a.StandId)
                        orderby a.DecidedOn
                        select new { a.CertificateNumber, s.StandNumber, p.FullName, a.DecidedOn }).ToListAsync(ct).ConfigureAwait(false))
-            .Select(a => Row(("Certificate", a.CertificateNumber), ("Stand", a.StandNumber), ("Beneficiary", a.FullName), ("AcceptedOn", a.DecidedOn is DateOnly d ? Date(d) : "—"),
+            .Select(a => Row(("Certificate", a.CertificateNumber), ("Stand", a.StandNumber), ("Beneficiary", a.FullName), ("AcceptedOn", a.DecidedOn is DateOnly d ? Date(d) : "-"),
                 ("DaysWaiting", a.DecidedOn is DateOnly accepted ? asAt.DayNumber - accepted.DayNumber : 0)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AgreementsAsync(long companyId, CancellationToken ct)
@@ -879,7 +879,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             AgreementVersion latest = a.Latest;
             string status = inForce is null ? "Draft (unsigned)" : latest.SignedOn is null ? $"Signed; v{latest.Version} amendment pending" : $"Signed {Date(inForce.SignedOn!.Value)}";
             return Row(("Agreement", a.AgreementNumber), ("Type", a.AgreementType.ToString()), ("Party", parties.GetValueOrDefault(a.PartyCustomerId, "?")),
-                ("Stand", a.StandId is long id ? stands.GetValueOrDefault(id, "?") : "—"), ("Version", inForce?.Version.ToString(CultureInfo.InvariantCulture) ?? "—"), ("Status", status),
+                ("Stand", a.StandId is long id ? stands.GetValueOrDefault(id, "?") : "-"), ("Version", inForce?.Version.ToString(CultureInfo.InvariantCulture) ?? "-"), ("Status", status),
                 ("Price", (inForce ?? latest).Price));
         })];
     }
@@ -986,7 +986,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, string> names = await CustomerNamesAsync(companyId, ct).ConfigureAwait(false);
         return [.. settled.Select(a => Row(("Agreement", a.AgreementNumber), ("Stand", stands.GetValueOrDefault(a.StandId, "?")), ("Buyer", names.GetValueOrDefault(a.BuyerCustomerId, "?")),
-            ("SettledOn", a.SettledOn is DateOnly d ? Date(d) : "—"), ("Rebated", a.Lines.Count(l => l.Rebated)), ("InterestRebated", a.Lines.Where(l => l.Rebated).Sum(l => l.Interest))))];
+            ("SettledOn", a.SettledOn is DateOnly d ? Date(d) : "-"), ("Rebated", a.Lines.Count(l => l.Rebated)), ("InterestRebated", a.Lines.Where(l => l.Rebated).Sum(l => l.Interest))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EclAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -1031,7 +1031,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             .Select(g =>
             {
                 List<int> days = [.. g.Where(t => t.RegisteredOn is not null).Select(t => t.RegisteredOn!.Value.DayNumber - t.AppliedOn.DayNumber)];
-                return Row(("Conveyancer", g.Key), ("Files", g.Count()), ("Registered", days.Count), ("AverageDays", days.Count == 0 ? "—" : Math.Round(days.Average()).ToString(CultureInfo.InvariantCulture)),
+                return Row(("Conveyancer", g.Key), ("Files", g.Count()), ("Registered", days.Count), ("AverageDays", days.Count == 0 ? "-" : Math.Round(days.Average()).ToString(CultureInfo.InvariantCulture)),
                     ("Queries", g.Sum(t => t.Steps.Count(s => s.Stage == TitleStage.QueryRaised))));
             })];
 
@@ -1080,7 +1080,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         var entries = await _db.ChangeLog.AsNoTracking().Where(c => c.CompanyId == companyId && housingTypes.Contains(c.EntityType) && c.OccurredOnUtc <= until)
             .OrderByDescending(c => c.Id).Take(5000).ToListAsync(ct).ConfigureAwait(false);
         return [.. entries.OrderBy(c => c.Id).Select(c => Row(("When", c.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", c.UserName), ("Entity", c.EntityType),
-            ("Id", c.EntityId ?? "—"), ("Action", c.Action.ToString()), ("Changed", c.ChangedFields.Count == 0 ? "—" : string.Join(", ", c.ChangedFields))))];
+            ("Id", c.EntityId ?? "-"), ("Action", c.Action.ToString()), ("Changed", c.ChangedFields.Count == 0 ? "-" : string.Join(", ", c.ChangedFields))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SodViolationsAsync(CancellationToken ct)
@@ -1173,7 +1173,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             var enquiry = await _waitingList.EnquireAsync(companyId, applicant.WaitingListNumber, asAt, ct).ConfigureAwait(false);
             if (enquiry.IsSuccess)
             {
-                Add("Score", "Position by seniority", enquiry.Value.PositionBySeniority?.ToString(CultureInfo.InvariantCulture) ?? "—");
+                Add("Score", "Position by seniority", enquiry.Value.PositionBySeniority?.ToString(CultureInfo.InvariantCulture) ?? "-");
                 foreach (ScoreLine line in enquiry.Value.Score.Lines)
                 {
                     Add("Score", line.Factor, $"{line.Points.ToString("0.##", CultureInfo.InvariantCulture)} ({line.Detail})");
@@ -1216,7 +1216,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             List<ApplicantNotice> sent = notices.GetValueOrDefault(a.Id) ?? [];
             return Row(("Status", a.Status.ToString()), ("WaitingListNumber", a.WaitingListNumber), ("Applicant", a.FullName),
                 ("LastConfirmed", a.LastConfirmedOn is DateOnly d ? Date(d) : "never (registered " + Date(a.RegistrationDate) + ")"), ("MonthsSince", Math.Max(0, months)), ("Notices", sent.Count),
-                ("LastNotice", sent.Count == 0 ? "—" : $"{sent[^1].NoticeType} {Date(sent[^1].SentOn)}"));
+                ("LastNotice", sent.Count == 0 ? "-" : $"{sent[^1].NoticeType} {Date(sent[^1].SentOn)}"));
         })];
     }
 
@@ -1355,7 +1355,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             int basis = Math.Max(scheme.TargetBeneficiaries, own.Count);
             return Row(("Scheme", scheme.Code), ("Target", scheme.TargetBeneficiaries), ("Stands", own.Count), ("Serviced", own.Count(s => s.Serviced)),
                 ("Allocated", own.Count(s => s.Allocated || s.Held)), ("Sold", own.Count(s => s.Status is StandStatus.Sold or StandStatus.Transferred)), ("Titled", titled),
-                ("Delivered", basis == 0 ? "—" : (titled * 100m / basis).ToString("0.0", CultureInfo.InvariantCulture) + "%"));
+                ("Delivered", basis == 0 ? "-" : (titled * 100m / basis).ToString("0.0", CultureInfo.InvariantCulture) + "%"));
         })];
     }
 
@@ -1371,8 +1371,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             decimal cost = own.Sum(s => s.AllocatedCost);
             decimal revenue = own.Where(s => s.Sold).Sum(s => s.SellingPrice);
             return Row(("Scheme", scheme.Code), ("Stands", own.Count), ("Sold", own.Count(s => s.Sold)), ("Cost", Money(cost)), ("Revenue", Money(revenue)),
-                ("Recovered", cost == 0m ? "—" : (revenue * 100m / cost).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
-                ("CostPerStand", own.Count == 0 ? "—" : Money(Math.Round(cost / own.Count, 2, MidpointRounding.AwayFromZero))),
+                ("Recovered", cost == 0m ? "-" : (revenue * 100m / cost).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
+                ("CostPerStand", own.Count == 0 ? "-" : Money(Math.Round(cost / own.Count, 2, MidpointRounding.AwayFromZero))),
                 ("Margin", revenue - own.Where(s => s.Sold).Sum(s => s.AllocatedCost)));
         })];
     }
@@ -1405,7 +1405,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         return [.. (await _db.Set<LandDisposal>().AsNoTracking().Where(d => d.CompanyId == companyId).OrderBy(d => d.Date).ThenBy(d => d.DisposalNumber).ToListAsync(ct).ConfigureAwait(false))
             .Select(d => Row(("Disposal", d.DisposalNumber), ("Date", Date(d.Date)), ("Parcel", parcels.GetValueOrDefault(d.LandParcelId, "?")), ("Type", d.Type.ToString()),
                 ("Counterparty", d.Counterparty), ("Resolution", d.ResolutionReference), ("Area", d.AreaSquareMetres.ToString("N2", CultureInfo.InvariantCulture)), ("Cost", Money(d.CostDerecognised)),
-                ("Consideration", Money(d.Consideration)), ("Received", d.ExchangeParcelId is long r ? parcels.GetValueOrDefault(r, "?") : "—"), ("GainOrLoss", d.GainOrLoss)))];
+                ("Consideration", Money(d.Consideration)), ("Received", d.ExchangeParcelId is long r ? parcels.GetValueOrDefault(r, "?") : "-"), ("GainOrLoss", d.GainOrLoss)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EncumbrancesAsync(long companyId, CancellationToken ct)
@@ -1427,7 +1427,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         return [.. disputes.Select(d => (Dispute: d, Step: d.Steps.Where(s => s.Date <= asAt).OrderBy(s => s.Stage).Last()))
             .Where(x => x.Step.Stage != LandDisputeStage.Resolved)
             .Select(x => Row(("Dispute", x.Dispute.DisputeNumber), ("Parcel", parcels.GetValueOrDefault(x.Dispute.LandParcelId, "?")),
-                ("Stand", x.Dispute.StandId is long s ? stands.GetValueOrDefault(s, "?") : "—"), ("Type", x.Dispute.Type.ToString()), ("Claimant", x.Dispute.Claimant),
+                ("Stand", x.Dispute.StandId is long s ? stands.GetValueOrDefault(s, "?") : "-"), ("Type", x.Dispute.Type.ToString()), ("Claimant", x.Dispute.Claimant),
                 ("Opened", Date(x.Dispute.OpenedOn)), ("Stage", x.Step.Stage.ToString()), ("StageSince", Date(x.Step.Date)),
                 ("AgeDays", LandRegisterRules.AgeInDays(x.Dispute.OpenedOn, null, asAt))))];
     }
@@ -1441,8 +1441,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         void Add(string item, string kind, string scheme, decimal carrying, string basis, decimal? price)
         {
             NrvAssessment? test = price is decimal p ? SchemeProgressRules.Assess(carrying, p, 0m, costToSell) : null;
-            rows.Add(Row(("Item", item), ("Kind", kind), ("Scheme", scheme), ("Carrying", Money(carrying)), ("Basis", basis), ("Price", price is decimal q ? Money(q) : "—"),
-                ("CostsToSell", test is null ? "—" : Money(test.CostsToSell)), ("Nrv", test is null ? "—" : Money(test.NetRealisableValue)), ("WriteDown", test?.WriteDown ?? 0m)));
+            rows.Add(Row(("Item", item), ("Kind", kind), ("Scheme", scheme), ("Carrying", Money(carrying)), ("Basis", basis), ("Price", price is decimal q ? Money(q) : "-"),
+                ("CostsToSell", test is null ? "-" : Money(test.CostsToSell)), ("Nrv", test is null ? "-" : Money(test.NetRealisableValue)), ("WriteDown", test?.WriteDown ?? 0m)));
         }
 
         List<LandParcel> parcels = await _db.LandParcels.AsNoTracking().Where(p => p.CompanyId == companyId && p.Status == LandParcelStatus.Acquired && p.AcquisitionCost > 0m)
@@ -1453,7 +1453,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         foreach (LandParcel parcel in parcels)
         {
             LandValuation? valuation = valuations.GetValueOrDefault(parcel.Id);
-            Add(parcel.ParcelNumber, "Parcel", "—", parcel.AcquisitionCost, valuation is null ? "No valuation" : $"Valuation {Date(valuation.Date)} ({valuation.Valuer})", valuation?.Value);
+            Add(parcel.ParcelNumber, "Parcel", "-", parcel.AcquisitionCost, valuation is null ? "No valuation" : $"Valuation {Date(valuation.Date)} ({valuation.Valuer})", valuation?.Value);
         }
 
         List<HousingStand> stands = await _db.HousingStands.AsNoTracking()
@@ -1464,7 +1464,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             StandPriceQuote? quote = await StandPrices.QuoteAsync(_db, stand, asAt, ct).ConfigureAwait(false);
             (string basis, decimal? price) = quote is not null ? ($"Price rule {quote.Scope} from {Date(quote.EffectiveFrom)}", quote.BuildUp.Price)
                 : stand.SellingPrice > 0m ? ("Recorded selling price", stand.SellingPrice) : ("No price evidence", (decimal?)null);
-            Add(stand.StandNumber, "Stand", stand.SchemeId is long sid ? schemes.GetValueOrDefault(sid, "?") : "—", stand.AllocatedCost, basis, price);
+            Add(stand.StandNumber, "Stand", stand.SchemeId is long sid ? schemes.GetValueOrDefault(sid, "?") : "-", stand.AllocatedCost, basis, price);
         }
 
         return rows;
@@ -1482,7 +1482,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             List<StandSurveyStep?> steps = [.. g.Select(s => latest.GetValueOrDefault(s.Id))];
             List<int> waits = [.. steps.Where(s => s?.Stage == SurveyStage.DiagramLodged).Select(s => asAt.DayNumber - s!.Date.DayNumber)];
             return Row(("Scheme", g.Key), ("Stands", steps.Count), ("NotPegged", steps.Count(s => s is null)), ("Pegged", steps.Count(s => s?.Stage == SurveyStage.Pegged)),
-                ("AwaitingSg", waits.Count), ("Approved", steps.Count(s => s?.Stage == SurveyStage.DiagramApproved)), ("LongestWait", waits.Count == 0 ? "—" : waits.Max().ToString(CultureInfo.InvariantCulture)));
+                ("AwaitingSg", waits.Count), ("Approved", steps.Count(s => s?.Stage == SurveyStage.DiagramApproved)), ("LongestWait", waits.Count == 0 ? "-" : waits.Max().ToString(CultureInfo.InvariantCulture)));
         })];
     }
 
@@ -1496,7 +1496,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             .GroupBy(p => (p.SchemeId, p.Service)).ToDictionary(g => g.Key, g => g.OrderBy(p => p.Date).ThenBy(p => p.Id).Last());
         return [.. schemes.Select(scheme =>
         {
-            string Percent(BulkService service) => latest.TryGetValue((scheme.Id, service), out SchemeServicingProgress? p) ? p.PercentComplete.ToString("0.#", CultureInfo.InvariantCulture) + "%" : "—";
+            string Percent(BulkService service) => latest.TryGetValue((scheme.Id, service), out SchemeServicingProgress? p) ? p.PercentComplete.ToString("0.#", CultureInfo.InvariantCulture) + "%" : "-";
             int stands = standCounts.GetValueOrDefault(scheme.Id);
             int serviced = SchemeProgressRules.ServicedStands(latest.Where(x => x.Key.Item1 == scheme.Id).ToDictionary(x => x.Key.Item2, x => x.Value.StandsReached), stands);
             return Row(("Scheme", scheme.Code), ("Water", Percent(BulkService.Water)), ("Sewer", Percent(BulkService.Sewer)), ("Roads", Percent(BulkService.Roads)),
@@ -1528,7 +1528,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                 _ => "Already holds a live allocation from another run",
             })));
             rows.AddRange(run.Allocations.Where(a => a.Status is AllocationStatus.Declined or AllocationStatus.Lapsed or AllocationStatus.Cancelled).OrderBy(a => a.Sequence)
-                .Select(a => Line(a.ApplicantId, a.Status.ToString(), a.Reason ?? (a.Status == AllocationStatus.Lapsed ? "Offer not accepted in time" : "—"))));
+                .Select(a => Line(a.ApplicantId, a.Status.ToString(), a.Reason ?? (a.Status == AllocationStatus.Lapsed ? "Offer not accepted in time" : "-"))));
         }
 
         return rows;
@@ -1575,7 +1575,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ApprovalAuditAsync(long companyId, CancellationToken ct)
     {
         Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
-        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "-";
         List<(string Area, string Reference, long? By, string ApprovedBy, DateOnly Requested, DateOnly? Approved, string Exception, decimal Value)> entries = [];
 
         foreach (AllocationRun run in await _db.Set<AllocationRun>().AsNoTracking().Include(r => r.Allocations).Where(r => r.CompanyId == companyId && r.ApprovedOn != null).ToListAsync(ct).ConfigureAwait(false))
@@ -1615,14 +1615,14 @@ public sealed class HousingReportDataProvider : IReportDataProvider
 
         return [.. entries.OrderBy(e => e.Approved ?? e.Requested).ThenBy(e => e.Area, StringComparer.Ordinal).ThenBy(e => e.Reference, StringComparer.Ordinal)
             .Select(e => Row(("Area", e.Area), ("Reference", e.Reference), ("RequestedBy", Who(e.By)), ("ApprovedBy", e.ApprovedBy), ("Requested", Date(e.Requested)),
-                ("Approved", e.Approved is DateOnly a ? Date(a) : "—"), ("Days", e.Approved is DateOnly d ? Math.Max(0, d.DayNumber - e.Requested.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"),
-                ("Exception", e.Exception.Length == 0 ? "—" : e.Exception), ("Value", e.Value)))];
+                ("Approved", e.Approved is DateOnly a ? Date(a) : "-"), ("Days", e.Approved is DateOnly d ? Math.Max(0, d.DayNumber - e.Requested.DayNumber).ToString(CultureInfo.InvariantCulture) : "-"),
+                ("Exception", e.Exception.Length == 0 ? "-" : e.Exception), ("Value", e.Value)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OverridesAsync(long companyId, CancellationToken ct)
     {
         Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
-        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        string Who(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "-";
         Dictionary<long, string> stands = await StandNumbersAsync(companyId, ct).ConfigureAwait(false);
         var applicants = await _db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == companyId).ToDictionaryAsync(a => a.Id, a => a.WaitingListNumber ?? a.IdNumber, ct).ConfigureAwait(false);
         List<(DateOnly Date, string Type, string Reference, string Detail, string By, string Reason)> entries = [];
@@ -1632,14 +1632,14 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                 applicants.GetValueOrDefault(c.ApplicantId, "?"), $"{Date(c.OldDate)} → {Date(c.NewDate)}", Who(c.DecidedByUserId), c.Reason)));
         entries.AddRange((await _db.Set<StandPricingRule>().AsNoTracking().Where(r => r.CompanyId == companyId && r.Scope == PricingScope.Stand && r.StandId != null).ToListAsync(ct).ConfigureAwait(false))
             .Select(r => (r.EffectiveFrom, "Stand-specific price", stands.GetValueOrDefault(r.StandId!.Value, "?"),
-                $"margin {r.MarginPercent:0.##}%, overhead {r.OverheadPercent:0.##}%{(r.ApprovedOn is null ? " (not approved)" : string.Empty)}", Who(r.ApprovedByUserId ?? r.ProposedByUserId), "—")));
+                $"margin {r.MarginPercent:0.##}%, overhead {r.OverheadPercent:0.##}%{(r.ApprovedOn is null ? " (not approved)" : string.Empty)}", Who(r.ApprovedByUserId ?? r.ProposedByUserId), "-")));
         entries.AddRange((await _db.Set<StandAllocation>().AsNoTracking().Where(a => a.CompanyId == companyId && a.CertificateNumber != null && a.OfferedPrice == null).ToListAsync(ct).ConfigureAwait(false))
-            .Select(a => (a.OfferExpires ?? DateOnly.MinValue, "Offer without an approved price", a.CertificateNumber!, $"stand {stands.GetValueOrDefault(a.StandId, "?")}", "—",
+            .Select(a => (a.OfferExpires ?? DateOnly.MinValue, "Offer without an approved price", a.CertificateNumber!, $"stand {stands.GetValueOrDefault(a.StandId, "?")}", "-",
                 "No approved price rule applied on the offer date")));
         entries.AddRange((await _db.Set<StandBlock>().AsNoTracking().Where(b => b.CompanyId == companyId && b.LiftedOn != null).ToListAsync(ct).ConfigureAwait(false))
-            .Select(b => (b.LiftedOn!.Value, "Block lifted", stands.GetValueOrDefault(b.StandId, "?"), $"{b.Reason}: {b.Detail}", Who(b.LiftedByUserId), b.LiftReason ?? "—")));
+            .Select(b => (b.LiftedOn!.Value, "Block lifted", stands.GetValueOrDefault(b.StandId, "?"), $"{b.Reason}: {b.Detail}", Who(b.LiftedByUserId), b.LiftReason ?? "-")));
         return [.. entries.OrderBy(e => e.Date).ThenBy(e => e.Type, StringComparer.Ordinal)
-            .Select(e => Row(("Type", e.Type), ("Reference", e.Reference), ("Detail", e.Detail), ("Date", e.Date == DateOnly.MinValue ? "—" : Date(e.Date)), ("By", e.By), ("Reason", e.Reason)))];
+            .Select(e => Row(("Type", e.Type), ("Reference", e.Reference), ("Detail", e.Detail), ("Date", e.Date == DateOnly.MinValue ? "-" : Date(e.Date)), ("By", e.By), ("Reason", e.Reason)))];
     }
 
     // Stand movements from the ownership chain: created (origination), repossessed and sold in the year; cost at each stand's carried cost.
@@ -1672,7 +1672,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         int unexplained = opening.Count + created.Count + repossessed.Count - sold.Count - closing.Count;
         if (unexplained != 0)
         {
-            rows.Add(Row(("Line", "Unexplained movement (units)"), ("Units", unexplained.ToString(CultureInfo.InvariantCulture)), ("Value", "—")));
+            rows.Add(Row(("Line", "Unexplained movement (units)"), ("Units", unexplained.ToString(CultureInfo.InvariantCulture)), ("Value", "-")));
         }
 
         if (Text(parameters, "StandsAccountCode") is string account)
@@ -1680,8 +1680,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             var tb = await _services.GetRequiredService<IGeneralLedgerReports>().TrialBalanceAsync(companyId, asAt, ct).ConfigureAwait(false);
             TrialBalanceRow? control = tb.Rows.FirstOrDefault(r => r.AccountCode == account);
             decimal ledger = control is null ? 0m : control.Debit - control.Credit;
-            rows.Add(Row(("Line", $"Stands control account {account}"), ("Units", "—"), ("Value", Money(ledger))));
-            rows.Add(Row(("Line", "Difference (register − ledger)"), ("Units", "—"), ("Value", Money(closing.Sum(s => s.AllocatedCost) - ledger))));
+            rows.Add(Row(("Line", $"Stands control account {account}"), ("Units", "-"), ("Value", Money(ledger))));
+            rows.Add(Row(("Line", "Difference (register − ledger)"), ("Units", "-"), ("Value", Money(closing.Sum(s => s.AllocatedCost) - ledger))));
         }
 
         return rows;
@@ -1731,7 +1731,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             {
                 Core.Receipting.Receipt? receipt = cashier.GetValueOrDefault(r.Id);
                 string method = receipt is null ? "Ledger receipt" : receipt.Tenders.Select(t => t.Type).Distinct().Count() == 1 ? receipt.Tenders[0].Type.ToString() : "Mixed";
-                string officer = receipt is null ? "—" : users.GetValueOrDefault(receipt.CashierUserId, $"user {receipt.CashierUserId}");
+                string officer = receipt is null ? "-" : users.GetValueOrDefault(receipt.CashierUserId, $"user {receipt.CashierUserId}");
                 return (Group: groups[r.TraderId], r.DocumentDate, Method: method, r.Currency, Officer: officer, r.OriginalBase);
             })
             .GroupBy(x => (x.Group, x.DocumentDate, x.Method, x.Currency, x.Officer))
@@ -1778,7 +1778,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             ("Development levies", levies.Where(l => l.ChargedOn >= start && l.ChargedOn <= asAt).Sum(l => l.Amount), levies.Where(l => l.ChargedOn >= priorStart && l.ChargedOn <= priorEnd).Sum(l => l.Amount)),
         ];
         return [.. streams.Select(x => Row(("Stream", x.Item1), ("PriorYear", Money(x.Item3)),
-            ("Change", x.Item3 == 0m ? "—" : ((x.Item2 - x.Item3) * 100m / x.Item3).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("YearToDate", x.Item2)))];
+            ("Change", x.Item3 == 0m ? "-" : ((x.Item2 - x.Item3) * 100m / x.Item3).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("YearToDate", x.Item2)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WardPackAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly asAt, CancellationToken ct)
@@ -1832,7 +1832,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             ("WaitingListNumber", applicants[f.ApplicantId].WaitingListNumber), ("Applicant", applicants[f.ApplicantId].FullName), ("Type", f.FeeType.ToString()),
             ("Receipt", f.ReceiptReference), ("Amount", f.Amount)))];
         rows.AddRange(applicants.Where(a => !registered.Contains(a.Key)).OrderBy(a => a.Value.WaitingListNumber, StringComparer.Ordinal).Select(a => Row(("Date", Date(a.Value.RegistrationDate)),
-            ("WaitingListNumber", a.Value.WaitingListNumber), ("Applicant", a.Value.FullName), ("Type", "Registration fee not paid"), ("Receipt", "—"), ("Amount", 0m))));
+            ("WaitingListNumber", a.Value.WaitingListNumber), ("Applicant", a.Value.FullName), ("Type", "Registration fee not paid"), ("Receipt", "-"), ("Amount", 0m))));
         return rows;
     }
 
@@ -1855,7 +1855,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             var standing = Application.Trading.InstalmentSchedule.Assess(Application.Trading.InstalmentSchedule.Build(a.TotalAmount, a.InstalmentAmount, a.StartDate), paid, asAt, 0, int.MaxValue);
             return Row(("Scheme", groups[a.CustomerId]), ("Debtor", names.GetValueOrDefault(a.CustomerId, "?")), ("Started", Date(a.StartDate)), ("Total", Money(a.TotalAmount)),
                 ("Instalment", Money(a.InstalmentAmount)), ("Status", a.Status.ToString()), ("DueToDate", Money(standing.DueToDate)), ("Paid", Money(standing.Paid)),
-                ("Missed", standing.InstalmentsMissed), ("NextDue", standing.NextDue is { } next ? Date(next.DueDate) : "—"), ("Shortfall", standing.Shortfall));
+                ("Missed", standing.InstalmentsMissed), ("NextDue", standing.NextDue is { } next ? Date(next.DueDate) : "-"), ("Shortfall", standing.Shortfall));
         })];
     }
 
@@ -1866,7 +1866,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
                             where d.CompanyId == companyId orderby d.WithheldOn, t.ApplicationNumber select new { t.ApplicationNumber, t.StandId, Duty = d }).ToListAsync(ct).ConfigureAwait(false);
         return [.. duties.Select(x => Row(("Application", x.ApplicationNumber), ("Stand", stands.GetValueOrDefault(x.StandId, "?")), ("Consideration", Money(x.Duty.Consideration)),
             ("Rate", x.Duty.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Withheld", Date(x.Duty.WithheldOn)), ("Receipt", x.Duty.ReceiptReference),
-            ("Remitted", x.Duty.RemittedOn is DateOnly r ? Date(r) : "Held"), ("Acknowledgement", x.Duty.RemittanceReference ?? "—"), ("Amount", x.Duty.Amount)))];
+            ("Remitted", x.Duty.RemittedOn is DateOnly r ? Date(r) : "Held"), ("Acknowledgement", x.Duty.RemittanceReference ?? "-"), ("Amount", x.Duty.Amount)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DepositsHeldAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -1933,8 +1933,8 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             {
                 decimal budget = budgets.GetValueOrDefault((scheme.Id, element));
                 BudgetComparison comparison = SchemeCostRules.Compare(budget, actual[element]);
-                rows.Add(Row(("Scheme", scheme.Code), ("Element", element.ToString()), ("Budget", budgets.ContainsKey((scheme.Id, element)) ? Money(budget) : "—"), ("Actual", Money(actual[element])),
-                    ("Used", comparison.UsedPercent is decimal used ? used.ToString("0.0", CultureInfo.InvariantCulture) : "—"), ("Variance", comparison.Variance)));
+                rows.Add(Row(("Scheme", scheme.Code), ("Element", element.ToString()), ("Budget", budgets.ContainsKey((scheme.Id, element)) ? Money(budget) : "-"), ("Actual", Money(actual[element])),
+                    ("Used", comparison.UsedPercent is decimal used ? used.ToString("0.0", CultureInfo.InvariantCulture) : "-"), ("Variance", comparison.Variance)));
             }
         }
 
@@ -1949,7 +1949,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
 
-    private static string PerM2(decimal amount, decimal area) => area <= 0m ? "—" : (amount / area).ToString("N2", CultureInfo.InvariantCulture);
+    private static string PerM2(decimal amount, decimal area) => area <= 0m ? "-" : (amount / area).ToString("N2", CultureInfo.InvariantCulture);
 
     private Task<Dictionary<long, string>> CustomerNamesAsync(long companyId, CancellationToken ct)
         => _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.Name, ct);

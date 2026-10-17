@@ -7,7 +7,7 @@ namespace One4All.UnitTests.Reporting;
 
 /// <summary>
 /// Covers the report designer's core transformation: a listing definition can be decomposed into columns
-/// and rebuilt through <see cref="SystemReports.Listing"/> without loss — extract → edit → rebuild.
+/// and rebuilt through <see cref="SystemReports.Listing"/> without loss - extract → edit → rebuild.
 /// </summary>
 public class ListingColumnRoundTripTests
 {

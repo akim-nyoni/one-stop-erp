@@ -12,7 +12,7 @@ public sealed record RentTariffRate(RentalUnitType UnitType, string? Suburb, Ren
 
 /// <summary>
 /// Picks the rent a tariff sets (brief §4.10.7 rent tariffs by unit type, suburb and income category): among the tariffs for the kind of unit in force
-/// on the date, the most specific wins — suburb and category, then suburb, then category, then the general rate — and of those the latest. Pure.
+/// on the date, the most specific wins - suburb and category, then suburb, then category, then the general rate - and of those the latest. Pure.
 /// </summary>
 public static class RentTariffs
 {

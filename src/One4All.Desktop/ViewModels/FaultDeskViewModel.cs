@@ -136,7 +136,7 @@ public sealed partial class FaultDeskViewModel : ObservableObject
             return;
         }
 
-        StatusMessage = $"Logged {logged.Value} — give the reporter this reference.";
+        StatusMessage = $"Logged {logged.Value} - give the reporter this reference.";
         (StandNumber, ReporterName, ReporterContact, Description) = (string.Empty, string.Empty, string.Empty, string.Empty);
         await RefreshAsync(ct).ConfigureAwait(true);
     }

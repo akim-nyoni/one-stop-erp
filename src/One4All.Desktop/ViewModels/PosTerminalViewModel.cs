@@ -128,9 +128,9 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// <summary>Gets what to do next, in one line: open the till, add products, take the payment.</summary>
     public string GuideText => _companyId == 0 ? "Loading the till…"
         : _allProducts.Count == 0 ? "No products are priced for the till yet. Add selling prices first (Stock & Products › Prices › Price lists), then reopen the till."
-        : !IsSessionOpen ? "Step 1 of 3 — type the cash you are starting with (the float) and press Open Till."
-        : Cart.Count == 0 ? "Step 2 of 3 — tap a product tile, or scan / type its barcode in the box and press Add. Each tap adds one."
-        : "Step 3 of 3 — type the amount handed over on the keypad, press CASH (or CARD / MOBILE), then PAY / COMPLETE. New Sale starts the next customer.";
+        : !IsSessionOpen ? "Step 1 of 3 - type the cash you are starting with (the float) and press Open Till."
+        : Cart.Count == 0 ? "Step 2 of 3 - tap a product tile, or scan / type its barcode in the box and press Add. Each tap adds one."
+        : "Step 3 of 3 - type the amount handed over on the keypad, press CASH (or CARD / MOBILE), then PAY / COMPLETE. New Sale starts the next customer.";
 
     /// <summary>Gets the guide strip's colour: amber until the till is open, green while trading.</summary>
     public System.Windows.Media.Brush GuideBrush => _allProducts.Count == 0 ? System.Windows.Media.Brushes.Firebrick
@@ -213,7 +213,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     }
 
     /// <summary>
-    /// The quick switch: the next cashier enters their name and PIN (or swipes their card) and takes the till as it is — the sale on the screen
+    /// The quick switch: the next cashier enters their name and PIN (or swipes their card) and takes the till as it is - the sale on the screen
     /// stays, nothing is counted; the drawer is shared until a hand-over or the Z-read. Needs the connection.
     /// </summary>
     /// <returns>A task.</returns>
@@ -353,7 +353,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
     /// <summary>
     /// The currency buttons on the till: one per currency taken today, the selected one highlighted, each one's tooltip giving its rate and
-    /// the balance due in it — one click (or F9 to cycle) switches the currency the next tender is in.
+    /// the balance due in it - one click (or F9 to cycle) switches the currency the next tender is in.
     /// </summary>
     public IReadOnlyList<CurrencyButton> CurrencyButtons => [.. TenderCurrencies.Select(c => new CurrencyButton(c, c.Code.Value, c == SelectedTenderCurrency,
         c.Code == _currency ? $"{c.Code.Value} (base): {_ticket.BalanceDue.ToString("N2", CultureInfo.CurrentCulture)} due"
@@ -527,7 +527,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         PosOfflineSnapshot? snapshot = await CatalogueStore.LoadAsync(ct).ConfigureAwait(true);
         if (snapshot is null)
         {
-            StatusMessage = "Offline, and this terminal has no saved catalogue yet — it needs the connection once before it can sell offline.";
+            StatusMessage = "Offline, and this terminal has no saved catalogue yet - it needs the connection once before it can sell offline.";
             return;
         }
 
@@ -564,11 +564,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         {
             TillSessionId = session;
             IsSessionOpen = true;
-            StatusMessage = $"Offline — selling from the catalogue saved {taken} in till session {session}; sales queue here ({PendingOfflineCount} so far) and sync when the connection returns.";
+            StatusMessage = $"Offline - selling from the catalogue saved {taken} in till session {session}; sales queue here ({PendingOfflineCount} so far) and sync when the connection returns.";
         }
         else
         {
-            StatusMessage = $"Offline — the catalogue saved {taken} is shown, but a till can only be opened with the connection.";
+            StatusMessage = $"Offline - the catalogue saved {taken} is shown, but a till can only be opened with the connection.";
         }
     }
 
@@ -580,7 +580,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         Company? company = await db.Companies.OrderBy(c => c.Id).FirstOrDefaultAsync(ct).ConfigureAwait(true);
         if (company is null)
         {
-            StatusMessage = "No company is set up — create one before using the terminal.";
+            StatusMessage = "No company is set up - create one before using the terminal.";
             return;
         }
 
@@ -611,7 +611,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         PendingOfflineCount = await LocalQueue.CountAsync(ct).ConfigureAwait(true);
 
         StatusMessage = _allProducts.Count == 0
-            ? "No products are priced for the till — add selling prices (Stock & Products › Prices) and reopen the till."
+            ? "No products are priced for the till - add selling prices (Stock & Products › Prices) and reopen the till."
             : PendingOfflineCount > 0
                 ? $"{PendingOfflineCount} offline sale(s) queued. Open the till to sync and trade."
                 : "Enter an opening float and press Open Till to start trading.";
@@ -687,7 +687,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private CancellationTokenSource? _searching;
     private List<OfflineCustomer> _customers = [];
 
-    // Seals what the terminal needs to sell offline; best effort — a terminal that cannot write its snapshot still sells online.
+    // Seals what the terminal needs to sell offline; best effort - a terminal that cannot write its snapshot still sells online.
     private async Task SaveSnapshotAsync(long? openSessionId)
     {
         if (_companyId == 0)
@@ -1223,7 +1223,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         StatusMessage = $"Till open (session {TillSessionId}). Ready to trade.";
         await SaveSnapshotAsync(TillSessionId).ConfigureAwait(true);
 
-        // The database is reachable (the till just opened) — flush anything captured offline earlier.
+        // The database is reachable (the till just opened) - flush anything captured offline earlier.
         if (PendingOfflineCount > 0)
         {
             await FlushOfflineAsync().ConfigureAwait(true);
@@ -2369,7 +2369,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
-            // The central database is unreachable — capture the sale locally and sync on reconnect.
+            // The central database is unreachable - capture the sale locally and sync on reconnect.
             await CaptureOfflineAsync(request).ConfigureAwait(true);
             _ticket.Clear();
             AgeVerified = false;
@@ -2458,7 +2458,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
-            StatusMessage = $"Still offline — {PendingOfflineCount} sale(s) remain queued.";
+            StatusMessage = $"Still offline - {PendingOfflineCount} sale(s) remain queued.";
         }
         finally
         {

@@ -12,8 +12,8 @@ using One4All.Reporting.Expressions;
 namespace One4All.Infrastructure.Payroll;
 
 /// <summary>
-/// Payroll (brief §4.15.6). Resolves each configured pay element in sequence — fixed, percentage,
-/// rate-per-unit or a formula evaluated by the shared report expression engine (brief §13.1) — to build a
+/// Payroll (brief §4.15.6). Resolves each configured pay element in sequence - fixed, percentage,
+/// rate-per-unit or a formula evaluated by the shared report expression engine (brief §13.1) - to build a
 /// payslip, and commits a run as one balanced GL journal (Dr earning expenses, Cr deduction/statutory
 /// liabilities, Cr net pay) through the central engine.
 /// </summary>
@@ -227,7 +227,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         return run;
     }
 
-    // Whether the period has a regular run that has not been reversed — for the pay group, or any group when none is given. Runs from
+    // Whether the period has a regular run that has not been reversed - for the pay group, or any group when none is given. Runs from
     // before the run register are known by their payslips.
     private async Task<bool> RegularRunIsLiveAsync(long companyId, string periodLabel, string? payGroup, CancellationToken ct)
     {
@@ -589,7 +589,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
 
     private static string Money(decimal value) => value.ToString("#,0.00", System.Globalization.CultureInfo.InvariantCulture);
 
-    // How an element's amount follows from its rule and the values it used — kept on the payslip line as the run's own trace.
+    // How an element's amount follows from its rule and the values it used - kept on the payslip line as the run's own trace.
     private static string Workings(PayElement element, EmployeePayElement assignment, IReadOnlyDictionary<string, object?> vars)
     {
         decimal Number(string name) => vars.GetValueOrDefault(name) is decimal value ? value : 0m;

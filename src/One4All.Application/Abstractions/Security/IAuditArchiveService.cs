@@ -18,8 +18,8 @@ public sealed record AuditArchiveEntry(int Year, string TableName, long RowCount
 public sealed record AuditYear(int Year, long Rows, bool Archived);
 
 /// <summary>
-/// Retention of the audit log (brief §5.1): the log is partitioned by year; a closed year is archived — its partition detached into the
-/// archive schema, never deleted — only with the licence holder's signed authorisation for that year, oldest first. The hash chain carries on
+/// Retention of the audit log (brief §5.1): the log is partitioned by year; a closed year is archived - its partition detached into the
+/// archive schema, never deleted - only with the licence holder's signed authorisation for that year, oldest first. The hash chain carries on
 /// across the archived years.
 /// </summary>
 public interface IAuditArchiveService

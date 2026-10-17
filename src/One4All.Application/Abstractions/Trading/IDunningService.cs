@@ -15,7 +15,7 @@ public readonly record struct DunningNotice(long CustomerId, string CustomerName
 /// <summary>
 /// Assesses customers for dunning (overdue reminders): scans the AR ledger for overdue balances and, using
 /// escalating day thresholds, assigns each overdue customer a reminder level with their overdue total and
-/// oldest days outstanding — the basis for reminder letters and collection follow-up.
+/// oldest days outstanding - the basis for reminder letters and collection follow-up.
 /// </summary>
 public interface IDunningService
 {

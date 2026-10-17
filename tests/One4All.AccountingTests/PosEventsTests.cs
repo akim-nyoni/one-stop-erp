@@ -110,13 +110,13 @@ public sealed class PosEventsTests
             return Encoding.UTF8.GetString(rendered.Value.Content);
         }
 
-        (await Render("POS106")).Should().Contain(",Sale,ES-2,Sale ES-2,Wrong item rung,—,2.3").And.Contain(",Line,ES-1,Chips,Customer changed mind,—,1.5");
+        (await Render("POS106")).Should().Contain(",Sale,ES-2,Sale ES-2,Wrong item rung,-,2.3").And.Contain(",Line,ES-1,Chips,Customer changed mind,-,1.5");
         (await Render("POS107")).Should().Contain($",ES-1,Soda 500ml,3,Damaged,").And.Contain($",{refund.JournalNumber},Restocked,6.9");
         (await Render("POS108")).Should().Contain(",ES-1,Soda 500ml,4.00,25.0%,Dented can,1");
         (await Render("POS109")).Should().Contain(",ES-1,Soda 500ml,2.00,1.50,Price match,-0.5");
         (await Render("POS110")).Should().Contain(",ETILL,").And.Contain(",Change for float,");
         string parked = await Render("POS111");
-        parked.Should().Contain(",ES-P1,Resumed,").And.Contain(",ES-P2,Abandoned,—,—,8");
+        parked.Should().Contain(",ES-P1,Resumed,").And.Contain(",ES-P2,Abandoned,-,-,8");
         (await Render("POS115")).Should().Contain("CARD-77,2,10,4,2026-03-02,6");
         (await Render("POS116")).Should().Contain(",ES-1,Customer copy,23");
         (await Render("POS121")).Should().Contain(",ES-1,FDMS-0001,Accepted,23");

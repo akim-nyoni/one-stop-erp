@@ -22,7 +22,7 @@ public sealed record AttachmentFile(string FileName, string ContentType, byte[] 
 
 /// <summary>
 /// Files attached to records (brief §4 attachments): checked by type, content signature and size, stored with a SHA-256 checksum verified on
-/// every open, listed by record, never deleted — a removal keeps the file with its reason, and posted journals and ledger documents keep
+/// every open, listed by record, never deleted - a removal keeps the file with its reason, and posted journals and ledger documents keep
 /// their evidence for good.
 /// </summary>
 public interface IAttachmentService

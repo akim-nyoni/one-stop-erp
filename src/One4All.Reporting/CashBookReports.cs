@@ -39,7 +39,7 @@ public static class CashBookReports
         yield return Listing("CB74", "Inter-account Transfers", "CashBook", "Transfers between bank accounts in the period, with the amount out, the amount in and any exchange difference.",
             "CashTransfers", [new Column("Date", "Date", 75), new Column("Journal", "Journal", 100), new Column("Document", "Document", 110), new Column("From", "From", 80), new Column("To", "To", 80),
              new Column("Out", "Out", 95), new Column("In", "In", 95), new Column("Difference", "FX difference", 95, true)], Period);
-        yield return Listing("CB75", "Cheque Register", "CashBook", "Every cheque written in the period by bank account: payee, amount and status — issued, presented, cancelled, voided, or stale when unpresented past the limit.",
+        yield return Listing("CB75", "Cheque Register", "CashBook", "Every cheque written in the period by bank account: payee, amount and status - issued, presented, cancelled, voided, or stale when unpresented past the limit.",
             "CashCheques", [new Column("Bank", "Bank", 70), new Column("Cheque", "Cheque", 70), new Column("Issued", "Written", 75), new Column("Payee", "Payee", 150), new Column("Document", "Payment", 90),
              new Column("Status", "Status", 80), new Column("StatusDate", "Since", 75), new Column("Days", "Days out", 55), new Column("Reason", "Reason", 140), new Column("Amount", "Amount", 95, true)],
             [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("StaleMonths", ParameterType.Integer)]);

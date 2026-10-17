@@ -22,7 +22,7 @@ public sealed record GeoBoundary(IReadOnlyList<GeoPoint> Ring, GeoPoint Centroid
 public sealed record MapFeature(long Id, string Label, string BoundaryWkt, IReadOnlyDictionary<string, string> Properties);
 
 /// <summary>
-/// GIS groundwork (brief §4.10.10 GIS hook): boundaries held as WKT polygons (PostGIS-ready — the same text loads into a
+/// GIS groundwork (brief §4.10.10 GIS hook): boundaries held as WKT polygons (PostGIS-ready - the same text loads into a
 /// geometry column later), checked as closed rings, measured for centroid and area, compared with the surveyed size, and
 /// exported as GeoJSON for any map. Pure and unit-tested.
 /// </summary>

@@ -7,7 +7,7 @@ namespace One4All.Infrastructure.Trading;
 
 /// <summary>
 /// The certificate checks every posting path shares (brief §3.5): whether a trader holds a valid exemption certificate, and whether a
-/// supplier is tax-cleared — by its clearance date or a clearance certificate — and so free of withholding on a payment.
+/// supplier is tax-cleared - by its clearance date or a clearance certificate - and so free of withholding on a payment.
 /// </summary>
 internal static class TraderCertificates
 {

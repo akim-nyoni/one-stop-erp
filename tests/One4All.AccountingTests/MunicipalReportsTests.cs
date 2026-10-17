@@ -78,10 +78,10 @@ public sealed class MunicipalReportsTests
         string exceptions = await Render("M147");
         exceptions.Should().Contain($"{proposed.RunNumber},MR3,AlreadyBilled").And.Contain($"{proposed.RunNumber},MR5,NothingToBill");
         (await Render("M148")).Should().Contain("Ward 1,Domestic,Refuse,1,");
-        (await Render("M152")).Should().Contain("MR1,Ward 1,—,—,Rates Payer,Refuse (REF-MR),—,0").And.Contain("Refuse (REF-MRF)");
+        (await Render("M152")).Should().Contain("MR1,Ward 1,-,-,Rates Payer,Refuse (REF-MR),-,0").And.Contain("Refuse (REF-MRF)");
 
-        (await Render("M168")).Should().Contain("REF-MR,Refuse Removal,Refuse,Flat,Domestic,All,2026-01-01,fixed 30,—,Yes")
-            .And.Contain("WAT-MR,Water Stepped,Water,Stepped,Domestic,All,2026-01-01,—,0–10 @ 1.5; 10–∞ @ 2.25,Yes");
+        (await Render("M168")).Should().Contain("REF-MR,Refuse Removal,Refuse,Flat,Domestic,All,2026-01-01,fixed 30,-,Yes")
+            .And.Contain("WAT-MR,Water Stepped,Water,Stepped,Domestic,All,2026-01-01,-,0–10 @ 1.5; 10–∞ @ 2.25,Yes");
 
         (await Render("M169")).Should().Contain("Billed: Refuse,4000,2,60");
         (await Render("M170")).Should().Contain("Ward Ward 1,Properties,4").And.Contain("Ward Ward 1,Billed 2026 to date,60.00");

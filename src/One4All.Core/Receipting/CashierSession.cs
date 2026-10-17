@@ -74,7 +74,7 @@ public enum SessionStatus
     /// <summary>Counted and closed by the cashier (awaiting verification).</summary>
     Closed = 2,
 
-    /// <summary>Verified by a supervisor — immutable.</summary>
+    /// <summary>Verified by a supervisor - immutable.</summary>
     Verified = 3,
 }
 

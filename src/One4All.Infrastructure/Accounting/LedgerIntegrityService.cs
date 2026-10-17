@@ -17,7 +17,7 @@ namespace One4All.Infrastructure.Accounting;
 /// <item>Cached GL period balances must equal the sums of the posted (and later reversed) journal lines.</item>
 /// <item>Stock quantity on hand must equal the sum of the movements; value may differ only by average-cost rounding,
 /// at most a cent per movement.</item>
-/// <item>An open item's outstanding amount must equal its original amount less the allocations not reversed — the only
+/// <item>An open item's outstanding amount must equal its original amount less the allocations not reversed - the only
 /// path that changes it.</item>
 /// </list>
 /// </summary>
@@ -158,7 +158,7 @@ public sealed class LedgerIntegrityService : ILedgerIntegrityService
                 continue;
             }
 
-            string subject = $"{Describe(key)} — {periodNames.GetValueOrDefault(periodId, periodId.ToString(CultureInfo.InvariantCulture))}";
+            string subject = $"{Describe(key)} - {periodNames.GetValueOrDefault(periodId, periodId.ToString(CultureInfo.InvariantCulture))}";
             string detail = balance is null
                 ? $"No cached balance; the posted lines total a net {Money(expectedNet)}."
                 : $"Cached balance (Dr {Money(balance.BaseDebit)} / Cr {Money(balance.BaseCredit)}) differs from the posted lines (Dr {Money(totals.BaseDebit)} / Cr {Money(totals.BaseCredit)}). Rebuild the period balances to correct it.";

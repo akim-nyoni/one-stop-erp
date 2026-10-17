@@ -152,7 +152,7 @@ public sealed class Employee : SoftDeletableEntity, ICompanyScoped
     public long? ReportsToEmployeeId { get; set; }
 
     /// <summary>
-    /// Gets or sets the payroll the employee is paid in (e.g. MONTHLY, WEEKLY, CASUAL — brief §4.15.6); null for the company's default
+    /// Gets or sets the payroll the employee is paid in (e.g. MONTHLY, WEEKLY, CASUAL - brief §4.15.6); null for the company's default
     /// payroll. Each pay group is run, guarded and reversed on its own.
     /// </summary>
     public string? PayGroup { get; set; }

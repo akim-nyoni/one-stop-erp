@@ -15,9 +15,9 @@ namespace One4All.Infrastructure.Receipting;
 
 /// <summary>
 /// Cashiering &amp; Receipting (brief §RCP-1/RCP-2). Posts receipts through the central engine using the §14
-/// posting patterns — a debtor payment credits the AR control (never income) and allocates oldest-first;
+/// posting patterns - a debtor payment credits the AR control (never income) and allocates oldest-first;
 /// sundry credits the income vote; deposits credit the deposit liability; unidentified money credits
-/// suspense — and runs the cashier session with a blind cash-up that posts the variance to shortages.
+/// suspense - and runs the cashier session with a blind cash-up that posts the variance to shortages.
 /// </summary>
 public sealed class ReceiptingService : IReceiptingService
 {
@@ -107,7 +107,7 @@ public sealed class ReceiptingService : IReceiptingService
 
         if (request.Lines.Any(l => l.Amount <= 0m))
         {
-            return Error.Rule("Rcp.NonPositiveLine", "Receipt lines must be positive — no zero or negative receipts.");
+            return Error.Rule("Rcp.NonPositiveLine", "Receipt lines must be positive - no zero or negative receipts.");
         }
 
         decimal total = request.Lines.Sum(l => l.Amount);
@@ -351,7 +351,7 @@ public sealed class ReceiptingService : IReceiptingService
             }
         }
 
-        // Coded portion: mirror the original journal — Cr cash, Dr each income/deposit/suspense account.
+        // Coded portion: mirror the original journal - Cr cash, Dr each income/deposit/suspense account.
         string? codedJournal = null;
         List<ReceiptLine> codedLines = receipt.Lines.Where(l => l.Type != ReceiptLineType.DebtorPayment).ToList();
         if (codedLines.Count > 0)
@@ -733,7 +733,7 @@ public sealed class ReceiptingService : IReceiptingService
         string drawer = receipt.PayerKind == PayerKind.Anonymous ? "(sundry)" : $"{receipt.PayerKind} #{receipt.PayerAccountId}";
         decimal amount = receipt.LineTotal;
 
-        // Reverse the original receipt — restores the debt and undoes every line.
+        // Reverse the original receipt - restores the debt and undoes every line.
         Result<ReceiptReversalResult> reversal = await ReverseReceiptAsync(companyId, receiptId, date, reverserUserId, $"Dishonoured: {reason}", ct).ConfigureAwait(false);
         if (reversal.IsFailure)
         {
@@ -759,7 +759,7 @@ public sealed class ReceiptingService : IReceiptingService
                 NetAmount = penaltyAmount,
                 TaxAmount = 0m,
                 SalesAccountCode = penaltyAccountCode!,
-                Narrative = $"Dishonour penalty — {receipt.ReceiptNumber}",
+                Narrative = $"Dishonour penalty - {receipt.ReceiptNumber}",
             }, ct).ConfigureAwait(false);
 
             if (penalty.IsFailure)
@@ -800,7 +800,7 @@ public sealed class ReceiptingService : IReceiptingService
             TransactionCurrency = company.BaseCurrency,
             DocumentType = "TENDER-CLR",
             DocumentNumber = tender.ReceiptNumber,
-            Narrative = $"Pending tender cleared — {tender.ReceiptNumber}",
+            Narrative = $"Pending tender cleared - {tender.ReceiptNumber}",
             Lines =
             [
                 new JournalLineRequest { AccountCode = bankAccountCode, Side = JournalSide.Debit, TransactionAmount = tender.Amount },

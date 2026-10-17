@@ -77,7 +77,7 @@ public sealed class RetailReportsTests
         })).IsSuccess.Should().BeTrue();
         (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Vouchers.IAllowanceVoucherService>().IssueAsync(companyId,
             new One4All.Application.Abstractions.Vouchers.AllowanceIssueRequest("RR", 1, 3, One4All.Core.Vouchers.AllowanceKind.Fuel, 40m, "Driver R. Dube", new DateOnly(2026, 3, 2), new DateOnly(2026, 12, 31)))).IsSuccess.Should().BeTrue();
-        (await Render("POS122")).Should().Contain($"GC-RR-{companyId},USD,2026-03-02,").And.Contain(",80.00,80");
+        (await Render("POS124")).Should().Contain($"GC-RR-{companyId},USD,2026-03-02,").And.Contain(",80.00,80");
         (await Render("POS123")).Should().Contain("Driver R. Dube,Fuel,3,0,").And.Contain(",120");
 
         foreach (string code in RetailReports.All().Select(r => r.Code))

@@ -83,6 +83,24 @@ public sealed class LicenceLimitInterceptor : SaveChangesInterceptor
 
         CheckTransactions(context);
         CheckBudgetDepartments(context);
+        CheckPayrolls(context);
+    }
+
+    // Payrolls (brief §11.3, the PAY module's "payrolls"): the companies running a payroll - a first hire in another company starts one more.
+    private void CheckPayrolls(DbContext context)
+    {
+        List<long> hiring = [.. context.ChangeTracker.Entries<Core.Payroll.Employee>().Where(e => e.State == EntityState.Added).Select(e => e.Entity.CompanyId).Distinct()];
+        if (hiring.Count == 0)
+        {
+            return;
+        }
+
+        List<long> running = [.. context.Set<Core.Payroll.Employee>().IgnoreQueryFilters().Where(e => e.Status != Core.Payroll.EmployeeStatus.Terminated).Select(e => e.CompanyId).Distinct()];
+        int starting = hiring.Count(c => !running.Contains(c));
+        if (starting > 0 && _licence.WithinLimit("payrolls", running.Count + starting, LicenceModules.Payroll) is { IsFailure: true } refused)
+        {
+            throw new LicenceLimitException(refused.Error.Message);
+        }
     }
 
     // Transactions a year (brief §11.3 "transactions_per_year"): journals dated in a calendar year, across the installation.

@@ -3,7 +3,7 @@ using One4All.Core.Common;
 namespace One4All.Core.Restaurant;
 
 /// <summary>
-/// Per-company Restaurant module policy (<c>res.policy</c>) — currently the automatic gratuity (service
+/// Per-company Restaurant module policy (<c>res.policy</c>) - currently the automatic gratuity (service
 /// charge) applied to large parties. One row per company. Operational configuration (no GL by itself).
 /// </summary>
 public sealed class RestaurantPolicy : AuditableEntity, ICompanyScoped

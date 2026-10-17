@@ -11,8 +11,8 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers consolidation across base currencies (IAS 21 current-rate method): a USD parent and a EUR subsidiary are
-/// presented in USD — the subsidiary's bank at the 1.20 closing rate, its capital and sales at the 1.10 rate of their
-/// posting dates — with the 150 difference as the translation reserve; presented in EUR the parent is translated
+/// presented in USD - the subsidiary's bank at the 1.20 closing rate, its capital and sales at the 1.10 rate of their
+/// posting dates - with the 150 difference as the translation reserve; presented in EUR the parent is translated
 /// through the inverse rates; and a date with no closing rate is refused.
 /// </summary>
 [Collection(AccountingCollection.Name)]

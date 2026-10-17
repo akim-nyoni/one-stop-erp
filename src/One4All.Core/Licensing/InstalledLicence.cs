@@ -5,7 +5,7 @@ namespace One4All.Core.Licensing;
 /// <summary>
 /// The licence token currently installed in this deployment (<c>lic.installed_licence</c>). At most one
 /// row is active; installing a new licence deactivates the previous one, keeping a history. The token is
-/// validated offline on every load — nothing here is trusted without a signature check.
+/// validated offline on every load - nothing here is trusted without a signature check.
 /// </summary>
 public sealed class InstalledLicence : AuditableEntity
 {

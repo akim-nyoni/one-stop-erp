@@ -33,7 +33,7 @@ public static class ConsumptionGraph
         ArgumentNullException.ThrowIfNull(meter);
         width = Math.Max(width, 40);
         StringBuilder sb = new();
-        sb.AppendLine(CultureInfo.InvariantCulture, $"Consumption — meter {meter.Serial} ({meter.Service})");
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Consumption - meter {meter.Serial} ({meter.Service})");
         decimal peak = meter.Months.Count == 0 ? 0m : meter.Months.Max(m => m.Units);
         int barWidth = width - 22;
         foreach (MonthlyConsumption month in meter.Months)

@@ -5,10 +5,10 @@ namespace One4All.Core.Budgeting;
 /// <summary>The status of a budget commitment (encumbrance).</summary>
 public enum CommitmentStatus
 {
-    /// <summary>Open — the amount is reserved against the budget and reduces the available balance.</summary>
+    /// <summary>Open - the amount is reserved against the budget and reduces the available balance.</summary>
     Open = 0,
 
-    /// <summary>Released — the reservation has been freed (e.g. the order was invoiced or cancelled).</summary>
+    /// <summary>Released - the reservation has been freed (e.g. the order was invoiced or cancelled).</summary>
     Released = 1,
 
     /// <summary>Lapsed at year end: the reservation ends with the year that made it.</summary>
@@ -21,7 +21,7 @@ public enum CommitmentStatus
 /// <summary>
 /// A budget commitment / encumbrance (brief §4.18 Commitment Control): an amount reserved against a budget
 /// line when spend is committed (typically a purchase order) but not yet actual. While open it reduces the
-/// available balance — available = budget − actual − open commitments — so a later order cannot over-commit
+/// available balance - available = budget − actual − open commitments - so a later order cannot over-commit
 /// the same funds. When the commitment turns into actual (an invoice posts) or is cancelled, it is released.
 /// Commitments never post to the GL; like budgets they are a control-side record joined by dimensions.
 /// </summary>

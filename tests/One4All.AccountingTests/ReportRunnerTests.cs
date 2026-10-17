@@ -48,12 +48,12 @@ public sealed class ReportRunnerTests
         {
             IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
 
-            // GL — Trial Balance (live period balances).
+            // GL - Trial Balance (live period balances).
             string tb = await RenderHtml(runner, companyId, "GL-TB", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });
             tb.Should().Contain("Trial Balance");
             tb.Should().Contain("1,234.00"); // the AR control / sales figure appears
 
-            // GL — Income Statement (Sales 1234 in the period).
+            // GL - Income Statement (Sales 1234 in the period).
             string income = await RenderHtml(runner, companyId, "GL-IS", new() { ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 3, 31) });
             income.Should().Contain("Income Statement");
             income.Should().Contain("1,234.00");
@@ -63,13 +63,13 @@ public sealed class ReportRunnerTests
             string position = await RenderHtml(runner, companyId, "GL-BS", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });
             position.Should().Contain("Prior year").And.Contain("1,234.00");
 
-            // AR — Aged Debtors (the customer with 1234 outstanding).
+            // AR - Aged Debtors (the customer with 1234 outstanding).
             string aged = await RenderHtml(runner, companyId, "AR-AGE", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });
             aged.Should().Contain("Aged Debtors");
             aged.Should().Contain("Report Customer");
             aged.Should().Contain("1,234.00");
 
-            // Receipting — Agent Collection Reconciliation (RC45), a whole-system RC report.
+            // Receipting - Agent Collection Reconciliation (RC45), a whole-system RC report.
             string agents = await RenderHtml(runner, companyId, "RC45", new() { ["AsAtDate"] = new DateOnly(2026, 3, 31) });
             agents.Should().Contain("Agent Collection Reconciliation");
             agents.Should().Contain("AGENTX");

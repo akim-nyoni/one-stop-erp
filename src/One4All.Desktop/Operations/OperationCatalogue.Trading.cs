@@ -411,7 +411,7 @@ public static partial class OperationCatalogue
                         long? forSupplier = i.Optional("Supplier") is string s ? await SupplierAsync(c, s).ConfigureAwait(true) : null;
                         IReadOnlyList<SupplierAdvanceRow> rows = await advances.ListAsync(c.CompanyId, forSupplier).ConfigureAwait(true);
                         return rows.Count == 0 ? "No advances."
-                            : string.Join(Environment.NewLine, rows.Select(r => $"{r.Id,6} {r.SupplierCode,-10} {r.DocumentNumber,-14} {D(r.Date)} {r.PurchaseOrderNumber ?? "—",-12} {r.Currency} paid {M(r.Amount),12} applied {M(r.Applied),12} refunded {M(r.Refunded),12} held {M(r.Outstanding),12}  {r.Status}"));
+                            : string.Join(Environment.NewLine, rows.Select(r => $"{r.Id,6} {r.SupplierCode,-10} {r.DocumentNumber,-14} {D(r.Date)} {r.PurchaseOrderNumber ?? "-",-12} {r.Currency} paid {M(r.Amount),12} applied {M(r.Applied),12} refunded {M(r.Refunded),12} held {M(r.Outstanding),12}  {r.Status}"));
                 }
             },
             List = c => OpenItemsAsync(c, TradingLedger.AccountsPayable),
@@ -478,7 +478,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = credit, Title = "Dunning reminders",
-            Description = "Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice — days configurable, or a dunning "
+            Description = "Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice - days configurable, or a dunning "
                 + "group's own; exempt groups are not chased), renders one customer's letter, or emails every letter due (not the same level again within the resend days). "
                 + "Groups and customer types are kept here too.",
             Fields = [Pick("Step", "Step", ["Assess", "Letter", "Send", "Save group", "Set customer"]), Opt("Customer", "Customer code (letter / set customer)"),
@@ -600,7 +600,7 @@ public static partial class OperationCatalogue
         {
             Module = credit, Title = "Credit limits", ListTitle = "Increases awaiting approval",
             Description = "Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user. Policy: what an invoice over "
-                + "the limit does — Block (refused unless a supervisor overrides), Warn (posted, flagged and logged) or Ignore.",
+                + "the limit does - Block (refused unless a supervisor overrides), Warn (posted, flagged and logged) or Ignore.",
             Fields = [Pick("Step", "Step", ["Lower", "Request increase", "Approve", "Reject", "Policy"]), CustomerPick("Customer", "Customer", required: false), Num("Limit", "New limit", "0"), Opt("Reason", "Reason"),
                 OptNum("Request", "Request id"), Pick("Policy", "Credit-limit policy", Enum.GetNames<Core.Trading.CreditLimitPolicy>())],
             Run = async (c, i) =>
@@ -669,7 +669,7 @@ public static partial class OperationCatalogue
                 }
 
                 PromiseReview review = await promises.ReviewAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true);
-                return $"Kept: {review.Kept.Count}. Broken: {review.Broken.Count}{(review.Broken.Count == 0 ? string.Empty : " — " + string.Join(", ", review.Broken.Select(b => $"{b.CustomerCode} {M(b.Amount)} by {D(b.PayBy)}")))}. "
+                return $"Kept: {review.Kept.Count}. Broken: {review.Broken.Count}{(review.Broken.Count == 0 ? string.Empty : " - " + string.Join(", ", review.Broken.Select(b => $"{b.CustomerCode} {M(b.Amount)} by {D(b.PayBy)}")))}. "
                     + $"Still open: {review.StillOpen}.";
             },
             List = async c => Table(await c.Get<IPromiseToPayService>().DiaryAsync(c.CompanyId, Core.Trading.PromiseStatus.Open).ConfigureAwait(true),

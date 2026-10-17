@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -130,6 +130,7 @@ public sealed class PerformanceTests
         watch.Stop();
         rendered.IsSuccess.Should().BeTrue(rendered.IsFailure ? rendered.Error.Message : string.Empty);
         _output.WriteLine($"100,000-row report rendered to PDF ({rendered.Value.Content.Length / 1024:N0} KB) in {watch.Elapsed.TotalSeconds:0.00} s.");
+        rows.Count.Should().Be(100_000, "the whole source is fetched; the row cap (thirteenth audit #16) no longer cuts a 100,000-row report");
         (fetch + layout).Should().BeLessThan(5, "the brief's target: the first page within 5 s (rows fetched and every page laid out)");
         watch.Elapsed.TotalSeconds.Should().BeLessThan(30, "the whole 100,000-row PDF (some 2,000 pages) is written within half a minute");
     }

@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers IAS 37 compensation on compulsory acquisition: two claims on a parcel bought for 100,000 (land WIP). The first
-/// is lodged (nothing provided), provided at 30,000 when probable, remeasured to 36,000, and settled for 35,000 — the
+/// is lodged (nothing provided), provided at 30,000 when probable, remeasured to 36,000, and settled for 35,000 - the
 /// 1,000 over-provision comes out of the land cost; the second is provided at 8,000 and withdrawn, releasing it. Land WIP
 /// ends at 135,000, the provision at nothing, the bank down 135,000 in all.
 /// </summary>

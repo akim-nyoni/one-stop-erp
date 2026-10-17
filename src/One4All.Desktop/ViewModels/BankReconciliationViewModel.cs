@@ -224,18 +224,18 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             Banks.Clear();
             foreach (var b in await db.Set<BankAccount>().Where(b => b.CompanyId == _companyId).OrderBy(b => b.Code).Select(b => new { b.Id, b.Code, b.Name }).ToListAsync(ct).ConfigureAwait(true))
             {
-                Banks.Add(new BankChoiceVm(b.Id, $"{b.Code} — {b.Name}"));
+                Banks.Add(new BankChoiceVm(b.Id, $"{b.Code} - {b.Name}"));
             }
 
             var customers = await db.Customers.Where(c => c.CompanyId == _companyId).OrderBy(c => c.Code).Select(c => new { c.Id, c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(true);
             var suppliers = await db.Suppliers.Where(s => s.CompanyId == _companyId).OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync(ct).ConfigureAwait(true);
             var accounts = await db.Accounts.Where(a => a.CompanyId == _companyId).OrderBy(a => a.AccountCode).Select(a => new { a.AccountCode, a.Name }).ToListAsync(ct).ConfigureAwait(true);
             _customers.Clear();
-            _customers.AddRange(customers.Select(c => new PostTargetVm(c.Id.ToString(CultureInfo.InvariantCulture), $"{c.Code} — {c.Name}")));
+            _customers.AddRange(customers.Select(c => new PostTargetVm(c.Id.ToString(CultureInfo.InvariantCulture), $"{c.Code} - {c.Name}")));
             _suppliers.Clear();
-            _suppliers.AddRange(suppliers.Select(s => new PostTargetVm(s.Id.ToString(CultureInfo.InvariantCulture), $"{s.Code} — {s.Name}")));
+            _suppliers.AddRange(suppliers.Select(s => new PostTargetVm(s.Id.ToString(CultureInfo.InvariantCulture), $"{s.Code} - {s.Name}")));
             _accounts.Clear();
-            _accounts.AddRange(accounts.Select(a => new PostTargetVm(a.AccountCode, $"{a.AccountCode} — {a.Name}")));
+            _accounts.AddRange(accounts.Select(a => new PostTargetVm(a.AccountCode, $"{a.AccountCode} - {a.Name}")));
             RefillTargets();
 
             StatusMessage = Banks.Count == 0 ? "No bank accounts are set up." : "Choose a bank account.";
@@ -331,7 +331,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             }
 
             summary = $"Bank rules posted and matched {run.Value.Posted.Count} line(s)"
-                + (run.Value.Failures.Count > 0 ? $"; {run.Value.Failures.Count} refused — {run.Value.Failures[0]}" : ".");
+                + (run.Value.Failures.Count > 0 ? $"; {run.Value.Failures.Count} refused - {run.Value.Failures[0]}" : ".");
             return Result.Success();
         }, () => summary);
     }

@@ -154,7 +154,7 @@
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Title}" FontWeight="SemiBold" Foreground="#2B3A42" />
                                                     <TextBlock FontSize="11" Foreground="#7A8A94">
-                                                        <Run Text="{Binding ModuleTitle, Mode=OneWay}" /><Run Text="  ›  " /><Run Text="{Binding GroupTitle, Mode=OneWay}" /><Run Text="  —  " /><Run Text="{Binding Purpose, Mode=OneWay}" />
+                                                        <Run Text="{Binding ModuleTitle, Mode=OneWay}" /><Run Text="  ›  " /><Run Text="{Binding GroupTitle, Mode=OneWay}" /><Run Text="  -  " /><Run Text="{Binding Purpose, Mode=OneWay}" />
                                                     </TextBlock>
                                                 </StackPanel>
                                             </DockPanel>
@@ -186,7 +186,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- Left: Filter, then the tree — module ▸ kind of work ▸ screen -->
+            <!-- Left: Filter, then the tree - module ▸ kind of work ▸ screen -->
             <DockPanel Grid.Column="0" Background="White">
                 <DockPanel DockPanel.Dock="Top" Margin="8,8,8,4">
                     <TextBlock Text="Filter:" FontSize="15" Foreground="#2B3A42" VerticalAlignment="Center" Margin="0,0,8,0" />
@@ -219,7 +219,7 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="#E3EAF0" />
 
-            <!-- Right: document tabs — Home, then each module, kind of work or list opened -->
+            <!-- Right: document tabs - Home, then each module, kind of work or list opened -->
             <TabControl x:Name="Tabs" Grid.Column="2" BorderThickness="0,1,0,0" BorderBrush="#CFD6DC" Padding="0" Background="White" ItemContainerStyle="{StaticResource DocTab}"
                         SelectionChanged="Tabs_SelectionChanged">
                 <TabItem x:Name="HomeTab" Header="Home">

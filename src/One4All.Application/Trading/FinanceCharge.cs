@@ -7,7 +7,7 @@ namespace One4All.Application.Trading;
 public readonly record struct ChargeableItem(DateOnly DueDate, DateOnly ChargeFrom, decimal Outstanding);
 
 /// <summary>A customer's unallocated payment or credit note.</summary>
-/// <param name="Date">Its date — from when it stops interest on what it covers.</param>
+/// <param name="Date">Its date - from when it stops interest on what it covers.</param>
 /// <param name="Amount">Its unallocated amount.</param>
 public readonly record struct UnallocatedCredit(DateOnly Date, decimal Amount);
 

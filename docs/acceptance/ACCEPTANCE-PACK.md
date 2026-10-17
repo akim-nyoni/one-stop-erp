@@ -11,98 +11,98 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Abc Analysis Report**
 - [ ] Abc analysis classifies items by cumulative value (`AbcAnalysisReportTests.Abc_analysis_classifies_items_by_cumulative_value`)
 
-**Academic Structure** — Covers the school's academic structure (brief §4.11): years and non-overlapping terms whose dates the term's fee structures take; classes with capacity that placement respects; and a once-a-year promotion moving each class up to its next grade, final-year classes staying put.
+**Academic Structure** - Covers the school's academic structure (brief §4.11): years and non-overlapping terms whose dates the term's fee structures take; classes with capacity that placement respects; and a once-a-year promotion moving each class up to its next grade, final-year classes staying put.
 - [ ] Terms date the fees classes hold their capacity and the year promotes once (`AcademicStructureTests.Terms_date_the_fees_classes_hold_their_capacity_and_the_year_promotes_once`)
 
-**Accent Insensitive Search** — Covers the quick search across the registers: properties (by stand or address) and students (by admission number or name) are found too, and names match without their accents and with a letter wrong.
+**Accent Insensitive Search** - Covers the quick search across the registers: properties (by stand or address) and students (by admission number or name) are found too, and names match without their accents and with a letter wrong.
 - [ ] Students properties and traders are found without accents (`AccentInsensitiveSearchTests.Students_properties_and_traders_are_found_without_accents`)
 
-**Accounting Voucher** — Covers accounting vouchers: a payment voucher for 120 of stationery and 30 of travel is numbered from the PV sequence, cannot be approved by its preparer, and posts on a second user's approval; a receipt voucher posts money in; an unbalanced journal voucher is refused and a balanced one posts; a cancelled petty cash voucher cannot be approved; a payment voucher to a control account is refused at approval; the printed voucher shows the posting.
+**Accounting Voucher** - Covers accounting vouchers: a payment voucher for 120 of stationery and 30 of travel is numbered from the PV sequence, cannot be approved by its preparer, and posts on a second user's approval; a receipt voucher posts money in; an unbalanced journal voucher is refused and a balanced one posts; a cancelled petty cash voucher cannot be approved; a payment voucher to a control account is refused at approval; the printed voucher shows the posting.
 - [ ] Vouchers are numbered approved by a second user and posted (`AccountingVoucherTests.Vouchers_are_numbered_approved_by_a_second_user_and_posted`)
 
-**Accrual Atomicity** — Covers an accrual whose automatic reversal cannot post (the next period is closed): the accrual itself is not left on the ledger un-reversed; once the period reopens, the accrual and its reversal post together.
+**Accrual Atomicity** - Covers an accrual whose automatic reversal cannot post (the next period is closed): the accrual itself is not left on the ledger un-reversed; once the period reopens, the accrual and its reversal post together.
 - [ ] An accrual without its reversal is not posted (`AccrualAtomicityTests.An_accrual_without_its_reversal_is_not_posted`)
 
 **Accrual Prepayment**
 - [ ] Accrual hits the period then auto reverses next period (`AccrualPrepaymentTests.Accrual_hits_the_period_then_auto_reverses_next_period`)
 - [ ] Prepayment defers the cost then releases it next period (`AccrualPrepaymentTests.Prepayment_defers_the_cost_then_releases_it_next_period`)
 
-**Ageing As At** — Covers ageing and credit exposure as at a past date: a payment allocated after the date does not reduce the past report, an un-allocation after the date does not either, and the current report reflects both.
+**Ageing As At** - Covers ageing and credit exposure as at a past date: a payment allocated after the date does not reduce the past report, an un-allocation after the date does not either, and the current report reflects both.
 - [ ] Ageing as at a past date ignores later allocations (`AgeingAsAtTests.Ageing_as_at_a_past_date_ignores_later_allocations`)
 
 **Agent And Stationery**
 - [ ] Agent collects then remits less commission and reconciles (`AgentAndStationeryTests.Agent_collects_then_remits_less_commission_and_reconciles`)
 - [ ] Stationery book controls serials and reports gaps (`AgentAndStationeryTests.Stationery_book_controls_serials_and_reports_gaps`)
 
-**Agreement Register** — Covers the agreement register: an instalment-sale agreement is drawn up with its generated document; it cannot be amended before signature or signed with one witness; signed with two it is in force; an amendment creates version 2 with its own document while version 1 stays in force until version 2 is signed; the history keeps both; a version cannot be signed twice; and a stored document altered behind the system's back is caught by verification.
+**Agreement Register** - Covers the agreement register: an instalment-sale agreement is drawn up with its generated document; it cannot be amended before signature or signed with one witness; signed with two it is in force; an amendment creates version 2 with its own document while version 1 stays in force until version 2 is signed; the history keeps both; a version cannot be signed twice; and a stored document altered behind the system's back is caught by verification.
 - [ ] Agreements are versioned signed and tamper evident (`AgreementRegisterTests.Agreements_are_versioned_signed_and_tamper_evident`)
 
-**Allocation Appeal** — Covers the appeals register: a one-stand run allocates the longest-waiting applicant; the allocated applicant cannot appeal, the other can (once); an appeal is not decided before its hearing; upheld with reasons; a certificate not issued to the appellant cannot be linked, while the certificate from a later run that allocated them can; the register shows it all.
+**Allocation Appeal** - Covers the appeals register: a one-stand run allocates the longest-waiting applicant; the allocated applicant cannot appeal, the other can (once); an appeal is not decided before its hearing; upheld with reasons; a certificate not issued to the appellant cannot be linked, while the certificate from a later run that allocated them can; the register shows it all.
 - [ ] Appeals are heard decided and linked to reallocations (`AllocationAppealTests.Appeals_are_heard_decided_and_linked_to_reallocations`)
 
-**Allocation Atomicity** — Covers allocation when its realised FX cannot be posted (the AR period is closed): the allocation fails without touching the items, so even a later save in the same scope persists nothing — check data stays clean — and once the period is reopened the same allocation succeeds with its realised gain.
+**Allocation Atomicity** - Covers allocation when its realised FX cannot be posted (the AR period is closed): the allocation fails without touching the items, so even a later save in the same scope persists nothing - check data stays clean - and once the period is reopened the same allocation succeeds with its realised gain.
 - [ ] A refused realised fx leaves the items untouched (`AllocationAtomicityTests.A_refused_realised_fx_leaves_the_items_untouched`)
 
-**Allocation Committee Decision** — Covers the allocation committee acting on individual pairings (brief §4.10.4): a pairing rejected with a reason leaves its stand available and the applicant recorded as rejected; a substitution puts the next eligible applicant on the pairing and records why the skipped one was skipped; the approval then offers only what stands, and keeps the meeting's minute reference, date and members.
+**Allocation Committee Decision** - Covers the allocation committee acting on individual pairings (brief §4.10.4): a pairing rejected with a reason leaves its stand available and the applicant recorded as rejected; a substitution puts the next eligible applicant on the pairing and records why the skipped one was skipped; the approval then offers only what stands, and keeps the meeting's minute reference, date and members.
 - [ ] The committee rejects and substitutes pairings before approving (`AllocationCommitteeDecisionTests.The_committee_rejects_and_substitutes_pairings_before_approving`)
 
-**Allocation Committee** — Covers the allocation committee, swaps and substitutions: a list approved on the committee's resolution, two allottees swapping stands on a swap document, and a declined stand offered to the next on the list in a substitution run.
+**Allocation Committee** - Covers the allocation committee, swaps and substitutions: a list approved on the committee's resolution, two allottees swapping stands on a swap document, and a declined stand offered to the next on the list in a substitution run.
 - [ ] The committee approves allottees swap and declined stands are substituted (`AllocationCommitteeTests.The_committee_approves_allottees_swap_and_declined_stands_are_substituted`)
 
-**Allocation Control Reports** — Covers allocation fairness and control (brief §14 H34, H37, H91, H93): a run proposed over a scheme where one stand is under a land dispute leaves that stand out (so approval succeeds) and records the suspended applicant it left out; one offer is declined; quotas are compared with the groups of those allocated; the approval audit and override report show who approved the run and the offers made without an approved price.
+**Allocation Control Reports** - Covers allocation fairness and control (brief §14 H34, H37, H91, H93): a run proposed over a scheme where one stand is under a land dispute leaves that stand out (so approval succeeds) and records the suspended applicant it left out; one offer is declined; quotas are compared with the groups of those allocated; the approval audit and override report show who approved the run and the offers made without an approved price.
 - [ ] Exclusions quotas and approvals are reported (`AllocationControlReportsTests.Exclusions_quotas_and_approvals_are_reported`)
 
-**Allowance Voucher** — Covers allowance vouchers: five 50 fuel vouchers issued to a driver for March; a fuel station's invoice billing three for 150 reconciles; billing one of them again, an unknown serial, a voucher used after it expired, the same serial twice, or a wrong total is refused and changes nothing; two remain outstanding, both expired by April.
+**Allowance Voucher** - Covers allowance vouchers: five 50 fuel vouchers issued to a driver for March; a fuel station's invoice billing three for 150 reconciles; billing one of them again, an unknown serial, a voucher used after it expired, the same serial twice, or a wrong total is refused and changes nothing; two remain outstanding, both expired by April.
 - [ ] Vouchers billed must be issued valid and billed once (`AllowanceVoucherTests.Vouchers_billed_must_be_issued_valid_and_billed_once`)
 
-**Api Access** — Covers API authorisation: a sales clerk with view-only customers may read the AR area but not change it nor touch the GL, may only act as themselves (a left-out acting user is filled in), and a company scope limits them to that company.
+**Api Access** - Covers API authorisation: a sales clerk with view-only customers may read the AR area but not change it nor touch the GL, may only act as themselves (a left-out acting user is filled in), and a company scope limits them to that company.
 - [ ] Requests are held to permissions company and acting user (`ApiAccessTests.Requests_are_held_to_permissions_company_and_acting_user`)
 
-**Api Body Access** — Covers the access check on JSON bodies: a body naming a company outside the user's scope is refused like a query naming it, a body may not contradict the query, and a body's acting or authorising user must be the signed-in user.
+**Api Body Access** - Covers the access check on JSON bodies: a body naming a company outside the user's scope is refused like a query naming it, a body may not contradict the query, and a body's acting or authorising user must be the signed-in user.
 - [ ] Bodies are held to the same company and actor checks (`ApiBodyAccessTests.Bodies_are_held_to_the_same_company_and_actor_checks`)
 
-**Api Client** — Covers API client credentials (brief §10): a key signs in as its service user, only its hash is stored, a rotated or revoked key stops working, and an expired client or a deactivated user is refused.
+**Api Client** - Covers API client credentials (brief §10): a key signs in as its service user, only its hash is stored, a rotated or revoked key stops working, and an expired client or a deactivated user is refused.
 - [ ] Keys sign in as their service user until rotated revoked or expired (`ApiClientTests.Keys_sign_in_as_their_service_user_until_rotated_revoked_or_expired`)
 
-**Api Report Data Provider** — Covers the web API report data source without a database: the command names a configured endpoint, parameters fill the path, the endpoint's key is sent, rows are read from a bare array or a wrapped one, and an endpoint nobody configured is refused rather than called.
+**Api Report Data Provider** - Covers the web API report data source without a database: the command names a configured endpoint, parameters fill the path, the endpoint's key is sent, rows are read from a bare array or a wrapped one, and an endpoint nobody configured is refused rather than called.
 - [ ] Reports read rows from configured web apis only (`ApiReportDataProviderTests.Reports_read_rows_from_configured_web_apis_only`)
 
-**Applicant Intake** — Covers waiting-list intake: contact details; documents verified one by one (the applicant once all are); the duplicate queue — the same phone under two IDs and an applicant on the deceased register are queued once, merged keeping the earlier registration, rejected and cleared with reasons.
+**Applicant Intake** - Covers waiting-list intake: contact details; documents verified one by one (the applicant once all are); the duplicate queue - the same phone under two IDs and an applicant on the deceased register are queued once, merged keeping the earlier registration, rejected and cleared with reasons.
 - [ ] Intake verifies documents and queues duplicates (`ApplicantIntakeTests.Intake_verifies_documents_and_queues_duplicates`)
 
-**Application Log** — Covers the logging stack (brief §2.2, ADR-0007): what a host logs through ILogger lands in the daily file and, batched, in sys.app_log with its level, source, message, exception and host, and a database that cannot be reached loses the line without failing the caller.
+**Application Log** - Covers the logging stack (brief §2.2, ADR-0007): what a host logs through ILogger lands in the daily file and, batched, in sys.app_log with its level, source, message, exception and host, and a database that cannot be reached loses the line without failing the caller.
 - [ ] Log lines reach the file and the table (`ApplicationLogTests.Log_lines_reach_the_file_and_the_table`)
 - [ ] A database that cannot be reached loses the line quietly (`ApplicationLogTests.A_database_that_cannot_be_reached_loses_the_line_quietly`)
 
-**Approval Sla Report** — Covers the approval SLA report (PO137): a document approved three hours after it started counts against a one-hour stage as a breach, and a document still waiting at that stage is counted with its wait.
+**Approval Sla Report** - Covers the approval SLA report (PO137): a document approved three hours after it started counts against a one-hour stage as a breach, and a document still waiting at that stage is counted with its wait.
 - [ ] Stage turnaround is measured against its escalation time (`ApprovalSlaReportTests.Stage_turnaround_is_measured_against_its_escalation_time`)
 
-**Approvals Inbox** — Covers the approvals inbox: an in-progress workflow appears for the user its stage names, not for others, and disappears once that user has acted.
+**Approvals Inbox** - Covers the approvals inbox: an in-progress workflow appears for the user its stage names, not for others, and disappears once that user has acted.
 - [ ] Inbox lists workflows waiting on the eligible approver (`ApprovalsInboxTests.Inbox_lists_workflows_waiting_on_the_eligible_approver`)
 
-**Area Based Tariff** — Covers area-based billing: a roads levy of 5 plus 0.02 per square metre bills an 800 m² stand 21 and a 1,500 m² stand 35 in the fixed-charge run.
+**Area Based Tariff** - Covers area-based billing: a roads levy of 5 plus 0.02 per square metre bills an 800 m² stand 21 and a 1,500 m² stand 35 in the fixed-charge run.
 - [ ] A stand is billed on its area (`AreaBasedTariffTests.A_stand_is_billed_on_its_area`)
 
-**Arrangement Review** — Covers payment arrangement default tracking: a debtor paying 200 a month on a 600 arrangement is honoured; one who paid only the first 300 of 900 has missed two instalments by 31 March and defaults; one whose first instalment of 100 is unpaid stays active with one missed; a second review sees only the arrangement still active.
+**Arrangement Review** - Covers payment arrangement default tracking: a debtor paying 200 a month on a 600 arrangement is honoured; one who paid only the first 300 of 900 has missed two instalments by 31 March and defaults; one whose first instalment of 100 is unpaid stays active with one missed; a second review sees only the arrangement still active.
 - [ ] Arrangements are honoured or defaulted against their schedules (`ArrangementReviewTests.Arrangements_are_honoured_or_defaulted_against_their_schedules`)
 
-**Assembly** — Covers bills of materials and assembly (brief §14 E 98–99): a run consumes components (standard or as keyed) through a clearing account that nets to zero, receives the output at their cost, refuses stray usage and rolls back whole when stock is short; INV98 rolls up the BOM cost and INV99 shows yield and usage variance.
+**Assembly** - Covers bills of materials and assembly (brief §14 E 98–99): a run consumes components (standard or as keyed) through a clearing account that nets to zero, receives the output at their cost, refuses stray usage and rolls back whole when stock is short; INV98 rolls up the BOM cost and INV99 shows yield and usage variance.
 - [ ] Assembly consumes components and reports yield (`AssemblyTests.Assembly_consumes_components_and_reports_yield`)
 
-**Asset Class Impairment** — Covers asset classes and impairment: an asset registered in a class takes its method, life, residual and accounts; an asset with no class and no accounts is refused; an impairment books the loss within accumulated depreciation and straight-line depreciation then spreads the new carrying amount over the life left; a recovery reverses the loss only up to the carrying amount the asset would have had unimpaired; every test is recorded.
+**Asset Class Impairment** - Covers asset classes and impairment: an asset registered in a class takes its method, life, residual and accounts; an asset with no class and no accounts is refused; an impairment books the loss within accumulated depreciation and straight-line depreciation then spreads the new carrying amount over the life left; a recovery reverses the loss only up to the carrying amount the asset would have had unimpaired; every test is recorded.
 - [ ] Classes default assets and impairment is booked and reversed within limits (`AssetClassImpairmentTests.Classes_default_assets_and_impairment_is_booked_and_reversed_within_limits`)
 
-**Asset Component** — Covers asset components and cost-centre analysis: a component is registered under its parent and depreciated on its own; the asset's journals carry its department and cost centre; a transfer moves cost and accumulated depreciation between analyses; a parent cannot be disposed of while it has components in use.
+**Asset Component** - Covers asset components and cost-centre analysis: a component is registered under its parent and depreciated on its own; the asset's journals carry its department and cost centre; a transfer moves cost and accumulated depreciation between analyses; a parent cannot be disposed of while it has components in use.
 - [ ] Components and analysis follow the asset (`AssetComponentTests.Components_and_analysis_follow_the_asset`)
 
-**Asset Control** — Covers asset verification, insurance / warranty and planned maintenance (brief §14 M 210, 213, 214): a count finds one asset in place, one elsewhere (moved on close) and an unregistered tag, and reports the unseen one missing; lapsing cover, under-insurance and expired warranties are flagged; a planned service logged as done rolls its next due date.
+**Asset Control** - Covers asset verification, insurance / warranty and planned maintenance (brief §14 M 210, 213, 214): a count finds one asset in place, one elsewhere (moved on close) and an unregistered tag, and reports the unseen one missing; lapsing cover, under-insurance and expired warranties are flagged; a planned service logged as done rolls its next due date.
 - [ ] Counts cover and maintenance are controlled and reported (`AssetControlTests.Counts_cover_and_maintenance_are_controlled_and_reported`)
 
-**Asset Convention** — Covers assets capitalised from supplier invoices (brief §4.14): the invoice's amount on the class's cost account becomes the asset without reposting, an invoice coded to a clearing account is moved to cost, and no more than the invoice is ever capitalised; and the depreciation conventions.
+**Asset Convention** - Covers assets capitalised from supplier invoices (brief §4.14): the invoice's amount on the class's cost account becomes the asset without reposting, an invoice coded to a clearing account is moved to cost, and no more than the invoice is ever capitalised; and the depreciation conventions.
 - [ ] Supplier invoices are capitalised once and conventions set the first charge (`AssetConventionTests.Supplier_invoices_are_capitalised_once_and_conventions_set_the_first_charge`)
 - [ ] Conventions set the first month charged and its share (`AssetConventionTests.Conventions_set_the_first_month_charged_and_its_share`)
 
-**Asset Disposal Depreciation** — Covers brief §4.14: a disposal charges depreciation up to the disposal date (the months not yet run, and the disposal month by the convention) before clearing the asset, so the gain or loss is on the carrying amount at the date; and the half-year convention charges six months in the acquisition year whatever the month.
+**Asset Disposal Depreciation** - Covers brief §4.14: a disposal charges depreciation up to the disposal date (the months not yet run, and the disposal month by the convention) before clearing the asset, so the gain or loss is on the carrying amount at the date; and the half-year convention charges six months in the acquisition year whatever the month.
 - [ ] Disposal charges depreciation to the date and the half year convention spreads six months (`AssetDisposalDepreciationTests.Disposal_charges_depreciation_to_the_date_and_the_half_year_convention_spreads_six_months`)
 
 **Asset Disposal Report**
@@ -111,25 +111,25 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Asset Maintenance**
 - [ ] Maintenance events are logged and listed (`AssetMaintenanceTests.Maintenance_events_are_logged_and_listed`)
 
-**Asset Tax Reports** — Covers the FA- and TX-numbered reports (brief §14 M, N): a vehicle registered, depreciated for two months and moved to a new location; the depreciation schedule, additions and transfers, and the movement note read it back; every FA / TX report renders.
+**Asset Tax Reports** - Covers the FA- and TX-numbered reports (brief §14 M, N): a vehicle registered, depreciated for two months and moved to a new location; the depreciation schedule, additions and transfers, and the movement note read it back; every FA / TX report renders.
 - [ ] Asset and tax reports reflect the register and ledger (`AssetTaxReportsTests.Asset_and_tax_reports_reflect_the_register_and_ledger`)
 
-**Atomic Work Tracker** — Covers what a failed unit of work leaves in the caller's change tracker: entities the caller was tracking and the work did not touch stay tracked — a caller looping over items (offline sync, bank rules) can still update and save them — while what the work changed is forgotten and never saved.
+**Atomic Work Tracker** - Covers what a failed unit of work leaves in the caller's change tracker: entities the caller was tracking and the work did not touch stay tracked - a caller looping over items (offline sync, bank rules) can still update and save them - while what the work changed is forgotten and never saved.
 - [ ] A failed unit keeps the callers untouched entities tracked (`AtomicWorkTrackerTests.A_failed_unit_keeps_the_callers_untouched_entities_tracked`)
 
-**Attachment** — Covers attachments: a file goes on an existing record only, the same file twice is refused, it opens checksum-verified and an altered file is refused; removal needs a reason and keeps the file; the support behind a posted journal cannot be removed.
+**Attachment** - Covers attachments: a file goes on an existing record only, the same file twice is refused, it opens checksum-verified and an altered file is refused; removal needs a reason and keeps the file; the support behind a posted journal cannot be removed.
 - [ ] Files attach to records verified and are never lost (`AttachmentTests.Files_attach_to_records_verified_and_are_never_lost`)
 
-**Attendance** — Covers dated leave and attendance (brief §14 O PR25, PR39–PR41, PR43): leave taken through the balance without overlaps, a Monday sick day and a Friday one, an encashment, overtime approved (never by oneself) and not, a missing clock-out and an over-long day.
+**Attendance** - Covers dated leave and attendance (brief §14 O PR25, PR39–PR41, PR43): leave taken through the balance without overlaps, a Monday sick day and a Friday one, an encashment, overtime approved (never by oneself) and not, a missing clock-out and an over-long day.
 - [ ] Leave and attendance are recorded and reported (`AttendanceTests.Leave_and_attendance_are_recorded_and_reported`)
 
-**Audit Archive** — Covers the partitioned audit log's retention (brief §5.1): a closed year is archived only with the licence holder's signed authorisation for that year, oldest first; its rows move to the archive schema (still readable, still append-only) and the company's hash chain verifies across the gap, carrying on from where the archive left it.
+**Audit Archive** - Covers the partitioned audit log's retention (brief §5.1): a closed year is archived only with the licence holder's signed authorisation for that year, oldest first; its rows move to the archive schema (still readable, still append-only) and the company's hash chain verifies across the gap, carrying on from where the archive left it.
 - [ ] A closed year is archived with the licence holders key and the chain still verifies (`AuditArchiveTests.A_closed_year_is_archived_with_the_licence_holders_key_and_the_chain_still_verifies`)
 
-**Audit Chain Concurrency** — Covers the audit hash chain under concurrent writers (brief §6): many transactions recording events for one company at the same moment each link to the entry before them, so the chain still verifies — without the chain lock, two of them would link to the same previous hash.
+**Audit Chain Concurrency** - Covers the audit hash chain under concurrent writers (brief §6): many transactions recording events for one company at the same moment each link to the entry before them, so the chain still verifies - without the chain lock, two of them would link to the same previous hash.
 - [ ] Concurrent writers keep the chain intact (`AuditChainConcurrencyTests.Concurrent_writers_keep_the_chain_intact`)
 
-**Audit Event** — Covers the audit trail's explicit events and its second net: overrides need a reason; sign-in and sign-out, role assignments and password resets are logged in the hash chain, which stays intact; a change made over a direct connection is caught by the database trigger and reported as outside the application, with secrets left out.
+**Audit Event** - Covers the audit trail's explicit events and its second net: overrides need a reason; sign-in and sign-out, role assignments and password resets are logged in the hash chain, which stays intact; a change made over a direct connection is caught by the database trigger and reported as outside the application, with secrets left out.
 - [ ] Explicit events and direct changes are audited (`AuditEventTests.Explicit_events_and_direct_changes_are_audited`)
 
 **Audit Paging**
@@ -138,21 +138,21 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Audit Trail Report**
 - [ ] Receipting actions appear on the rc21 audit trail (`AuditTrailReportTests.Receipting_actions_appear_on_the_rc21_audit_trail`)
 
-**Audit Trail** — Covers the audit trail service: querying a company's change log by entity and action, verifying an intact chain, and detecting (and locating) a historical row altered by direct SQL.
+**Audit Trail** - Covers the audit trail service: querying a company's change log by entity and action, verifying an intact chain, and detecting (and locating) a historical row altered by direct SQL.
 - [ ] Audit trail queries and detects tampering (`AuditTrailTests.Audit_trail_queries_and_detects_tampering`)
 
-**Audited Report Run** — Covers audited report runs: each purpose needs its permission flag; a repeated print of the same report and parameters becomes a numbered reprint needing the reprint flag; refused runs are not logged; unattributed (desktop) runs are; and the log carries parameters and the document fingerprint.
+**Audited Report Run** - Covers audited report runs: each purpose needs its permission flag; a repeated print of the same report and parameters becomes a numbered reprint needing the reprint flag; refused runs are not logged; unattributed (desktop) runs are; and the log carries parameters and the document fingerprint.
 - [ ] Report runs are permission checked and logged with reprints numbered (`AuditedReportRunTests.Report_runs_are_permission_checked_and_logged_with_reprints_numbered`)
 
-**Authentication Hardening** — Covers sign-in hardening: authenticator enrolment and the code at sign-in, password history and expiry, the concurrent-session limit (refusing, or ending the oldest) and the idle timeout that closes a session.
+**Authentication Hardening** - Covers sign-in hardening: authenticator enrolment and the code at sign-in, password history and expiry, the concurrent-session limit (refusing, or ending the oldest) and the idle timeout that closes a session.
 - [ ] Two factor and password history guard sign in (`AuthenticationHardeningTests.Two_factor_and_password_history_guard_sign_in`)
 - [ ] Sessions are limited timed out and passwords expire (`AuthenticationHardeningTests.Sessions_are_limited_timed_out_and_passwords_expire`)
 - [ ] A locked session unlocks with the password and code (`AuthenticationHardeningTests.A_locked_session_unlocks_with_the_password_and_code`)
 
-**Auto Allocation** — Covers auto-allocation through the real allocation service: AR receipts and a credit note settle invoices exact-first then oldest-first, AP payments settle supplier invoices, a ledger-wide run touches only traders with both sides, and a re-run does nothing.
+**Auto Allocation** - Covers auto-allocation through the real allocation service: AR receipts and a credit note settle invoices exact-first then oldest-first, AP payments settle supplier invoices, a ledger-wide run touches only traders with both sides, and a re-run does nothing.
 - [ ] Auto allocation settles receivables and payables (`AutoAllocationTests.Auto_allocation_settles_receivables_and_payables`)
 
-**Back Date And Credit Override** — Covers the back-date and credit-limit override permissions: a person posting further back than the company allows is refused unless they hold the back-date permission (postings by no named person, and dates within the allowance, are unaffected); an invoice over a customer's credit limit goes through only with a supervisor holding the override (not the person raising it, not a user without it), and each override is kept.
+**Back Date And Credit Override** - Covers the back-date and credit-limit override permissions: a person posting further back than the company allows is refused unless they hold the back-date permission (postings by no named person, and dates within the allowance, are unaffected); an invoice over a customer's credit limit goes through only with a supervisor holding the override (not the person raising it, not a user without it), and each override is kept.
 - [ ] Back dating and credit overrides need their permissions (`BackDateAndCreditOverrideTests.Back_dating_and_credit_overrides_need_their_permissions`)
 
 **Back Dated Receipt Report**
@@ -161,155 +161,155 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Back Order Report**
 - [ ] Back order book renders through the report runner (`BackOrderReportTests.Back_order_book_renders_through_the_report_runner`)
 
-**Backup** — Covers backups with the real PostgreSQL tools (skipped where pg_dump is not installed): a backup is taken, copied off-site and verified; restore refuses the live database and an unconfirmed request, then fills a new database; an altered file fails its check; retention prunes.
+**Backup** - Covers backups with the real PostgreSQL tools (skipped where pg_dump is not installed): a backup is taken, copied off-site and verified; restore refuses the live database and an unconfirmed request, then fills a new database; an altered file fails its check; retention prunes.
 - [ ] Backups are taken verified restored and pruned (`BackupTests.Backups_are_taken_verified_restored_and_pruned`)
 
 **Bad Debt Write Off**
 - [ ] Writing off a bad debt clears the debtor and charges bad debt expense (`BadDebtWriteOffTests.Writing_off_a_bad_debt_clears_the_debtor_and_charges_bad_debt_expense`)
 
-**Balance Forward Statement** — Covers balance-forward statements: a February invoice of 100 is brought forward into March, where a receipt of 40 and an invoice of 50 run the balance to 110; a customer set to balance-forward gets that style by default.
+**Balance Forward Statement** - Covers balance-forward statements: a February invoice of 100 is brought forward into March, where a receipt of 40 and an invoice of 50 run the balance to 110; a customer set to balance-forward gets that style by default.
 - [ ] The period opens with the balance brought forward and runs to the balance carried forward (`BalanceForwardStatementTests.The_period_opens_with_the_balance_brought_forward_and_runs_to_the_balance_carried_forward`)
 
-**Bank Auto Match Window** — Covers auto-matching through the service: a same-amount posting months away is not matched inside the default window, a reference ties the right posting even when another is closer, and a widened window picks up the stray.
+**Bank Auto Match Window** - Covers auto-matching through the service: a same-amount posting months away is not matched inside the default window, a reference ties the right posting even when another is closer, and a widened window picks up the stray.
 - [ ] Auto match respects the date window and prefers references (`BankAutoMatchWindowTests.Auto_match_respects_the_date_window_and_prefers_references`)
 
 **Bank Charge Interest**
 - [ ] Bank charge and interest post against the bank (`BankChargeInterestTests.Bank_charge_and_interest_post_against_the_bank`)
 
-**Bank File** — Covers bank payment files from stored layouts: payroll net pay written per beneficiary bank (split pay to its own account, held salaries and non-bank employees left out, a missing account refused), and a supplier payment run written in a bank's layout.
+**Bank File** - Covers bank payment files from stored layouts: payroll net pay written per beneficiary bank (split pay to its own account, held salaries and non-bank employees left out, a missing account refused), and a supplier payment run written in a bank's layout.
 - [ ] Payroll and supplier payments are written in the bank layout (`BankFileTests.Payroll_and_supplier_payments_are_written_in_the_bank_layout`)
 
-**Bank Manual Match** — Covers manual bank-statement matching: matching an unreconciled line to a specific cash-book posting, un-matching it again, and the refusals (already reconciled, not a cash-book line).
+**Bank Manual Match** - Covers manual bank-statement matching: matching an unreconciled line to a specific cash-book posting, un-matching it again, and the refusals (already reconciled, not a cash-book line).
 - [ ] A statement line can be manually matched and unmatched (`BankManualMatchTests.A_statement_line_can_be_manually_matched_and_unmatched`)
 
-**Bank Reconciliation Lock** — Covers signing off a bank reconciliation: a reconciled March is signed off to 31 March; afterwards an entry to the bank dated in March, a statement line in March, and undoing a March match are all refused, while April stays open; a second sign-off to the same date is refused, and April cannot be signed off while a statement line is missing from the ledger.
+**Bank Reconciliation Lock** - Covers signing off a bank reconciliation: a reconciled March is signed off to 31 March; afterwards an entry to the bank dated in March, a statement line in March, and undoing a March match are all refused, while April stays open; a second sign-off to the same date is refused, and April cannot be signed off while a statement line is missing from the ledger.
 - [ ] A signed off period is locked (`BankReconciliationLockTests.A_signed_off_period_is_locked`)
 
-**Bank Rule** — Covers bank rules: creation validation, a run that posts and matches only the lines its rules recognise (leaving the rest open), a re-run that does nothing, and a deactivated rule that no longer applies.
+**Bank Rule** - Covers bank rules: creation validation, a run that posts and matches only the lines its rules recognise (leaving the rest open), a re-run that does nothing, and a deactivated rule that no longer applies.
 - [ ] Rules post and match recognised statement lines (`BankRuleTests.Rules_post_and_match_recognised_statement_lines`)
 
 **Bank Statement Csv Import**
 - [ ] Clean csv imports and a bad line rejects the whole file (`BankStatementCsvImportTests.Clean_csv_imports_and_a_bad_line_rejects_the_whole_file`)
 
-**Bank Statement File Import** — Covers importing bank statements as MT940, camt.053 and OFX files (brief §4.7): all land as statement lines ready to reconcile, with signs and references kept; an MT940 file with an unreadable line is refused whole.
+**Bank Statement File Import** - Covers importing bank statements as MT940, camt.053 and OFX files (brief §4.7): all land as statement lines ready to reconcile, with signs and references kept; an MT940 file with an unreadable line is refused whole.
 - [ ] Mt940 and camt053 files import as statement lines (`BankStatementFileImportTests.Mt940_and_camt053_files_import_as_statement_lines`)
 
-**Bank Statement Posting** — Covers posting cash-book entries from statement lines: a receipt to a customer, a payment to a supplier and bank charges to an expense account, each matched in the same step so the reconciliation difference is nil; wrong-direction, already-reconciled and control-account postings are refused with nothing posted.
+**Bank Statement Posting** - Covers posting cash-book entries from statement lines: a receipt to a customer, a payment to a supplier and bank charges to an expense account, each matched in the same step so the reconciliation difference is nil; wrong-direction, already-reconciled and control-account postings are refused with nothing posted.
 - [ ] Statement lines post to customers suppliers and accounts and reconcile (`BankStatementPostingTests.Statement_lines_post_to_customers_suppliers_and_accounts_and_reconcile`)
 
 **Bank Transfer**
 - [ ] Bank transfer moves funds between own accounts (`BankTransferTests.Bank_transfer_moves_funds_between_own_accounts`)
 
-**Bank Work List** — Covers the reconciliation work list: statement lines carry their match, unpresented GL lines carry ids, a manual match through those ids moves a line across, and unmatching restores it.
+**Bank Work List** - Covers the reconciliation work list: statement lines carry their match, unpresented GL lines carry ids, a manual match through those ids moves a line across, and unmatching restores it.
 - [ ] Work list exposes ids for matching and unmatching (`BankWorkListTests.Work_list_exposes_ids_for_matching_and_unmatching`)
 
-**Batch Posting** — Covers the batch posting paths a billing run uses: several journals post as one unit with consecutive numbers, one period-balance update per account and one audit entry; a journal the batch cannot take is refused as a whole (the caller posts singly); several invoices post as one batch with an open item each, and a held customer or a credit-limit policy sends the batch to the single path.
+**Batch Posting** - Covers the batch posting paths a billing run uses: several journals post as one unit with consecutive numbers, one period-balance update per account and one audit entry; a journal the batch cannot take is refused as a whole (the caller posts singly); several invoices post as one batch with an open item each, and a held customer or a credit-limit policy sends the batch to the single path.
 - [ ] Journals post as one batch with consecutive numbers and summed balances (`BatchPostingTests.Journals_post_as_one_batch_with_consecutive_numbers_and_summed_balances`)
 - [ ] Invoices post as one batch and fall back when a customer needs the single path (`BatchPostingTests.Invoices_post_as_one_batch_and_fall_back_when_a_customer_needs_the_single_path`)
 
-**Benefits In Kind** — Covers taxable benefits in kind (brief §4.15.4): a company car valued from the vehicle scale by engine capacity, a housing benefit at its own value and an interest-free loan's benefit at the deemed rate are taxed and shown on the payslip as memo lines, but neither paid nor posted; a benefit that has ended no longer counts.
+**Benefits In Kind** - Covers taxable benefits in kind (brief §4.15.4): a company car valued from the vehicle scale by engine capacity, a housing benefit at its own value and an interest-free loan's benefit at the deemed rate are taxed and shown on the payslip as memo lines, but neither paid nor posted; a benefit that has ended no longer counts.
 - [ ] Benefits are taxed as memo lines without being paid (`BenefitsInKindTests.Benefits_are_taxed_as_memo_lines_without_being_paid`)
 - [ ] A loan charging the deemed rate has no benefit (`BenefitsInKindTests.A_loan_charging_the_deemed_rate_has_no_benefit`)
 
-**Bin** — Covers bins and warehouse-level replenishment: put-away limited to unbinned stock and bin capacity, moves and picks between bins, a pick walk in bin order with the unbinned remainder last, and reorder levels set per warehouse with the preferred supplier suggested.
+**Bin** - Covers bins and warehouse-level replenishment: put-away limited to unbinned stock and bin capacity, moves and picks between bins, a pick walk in bin order with the unbinned remainder last, and reorder levels set per warehouse with the preferred supplier suggested.
 - [ ] Stock is put away picked in walk order and reordered per warehouse (`BinTests.Stock_is_put_away_picked_in_walk_order_and_reordered_per_warehouse`)
 
-**Blind Cash Up** — Covers per-currency and blind cash-up: a till taking dollars and euros expects each currency separately (change given in dollars on a euro tender); a blind till refuses to show the expected cash or close until the count is declared, and the declared count cannot be changed; the variance is posted per currency at the session's rate (euros short, dollars over) with the net to over/short.
+**Blind Cash Up** - Covers per-currency and blind cash-up: a till taking dollars and euros expects each currency separately (change given in dollars on a euro tender); a blind till refuses to show the expected cash or close until the count is declared, and the declared count cannot be changed; the variance is posted per currency at the session's rate (euros short, dollars over) with the net to over/short.
 - [ ] A blind till is counted per currency before the expected cash is seen (`BlindCashUpTests.A_blind_till_is_counted_per_currency_before_the_expected_cash_is_seen`)
 
-**Boq Import** — Covers the BOQ import: a preview lists every line with its error without saving anything, an import with any error saves nothing, a clean file (header row and quoted descriptions allowed) imports whole, and the BOQ budget by cost head sits beside the value measured and the cost captured.
+**Boq Import** - Covers the BOQ import: a preview lists every line with its error without saving anything, an import with any error saves nothing, a clean file (header row and quoted descriptions allowed) imports whole, and the BOQ budget by cost head sits beside the value measured and the cost captured.
 - [ ] Boq files are previewed imported whole and budgeted by cost head (`BoqImportTests.Boq_files_are_previewed_imported_whole_and_budgeted_by_cost_head`)
 
-**Breakage Run** — Covers the bulk gift-card breakage run: expired cards with a residual balance are recognised as income, while a not-yet-expired card is left alone.
+**Breakage Run** - Covers the bulk gift-card breakage run: expired cards with a residual balance are recognised as income, while a not-yet-expired card is left alone.
 - [ ] Expired cards with balances are swept to breakage income (`BreakageRunTests.Expired_cards_with_balances_are_swept_to_breakage_income`)
 
-**Brief Performance** — The rest of the brief's §15 targets: a POS sale posted and its receipt printed within 2 s; a list's first page within 1 s on a million rows; an allocation run over a 100,000-row waiting list proposed within 60 s and the duplicate sweep across that list within 10 minutes; 40 departments preparing budgets at once without contention; and a driver change over 5,000 lines previewed and applied within 10 s. Heavy, so it runs only when ONE4ALL_PERF=1; it cleans up the bulk rows it creates.
+**Brief Performance** - The rest of the brief's §15 targets: a POS sale posted and its receipt printed within 2 s; a list's first page within 1 s on a million rows; an allocation run over a 100,000-row waiting list proposed within 60 s and the duplicate sweep across that list within 10 minutes; 40 departments preparing budgets at once without contention; and a driver change over 5,000 lines previewed and applied within 10 s. Heavy, so it runs only when ONE4ALL_PERF=1; it cleans up the bulk rows it creates.
 - [ ] A pos sale is posted and printed within 2 seconds (`BriefPerformanceTests.A_pos_sale_is_posted_and_printed_within_2_seconds`)
 - [ ] A list first page arrives within a second on a million rows (`BriefPerformanceTests.A_list_first_page_arrives_within_a_second_on_a_million_rows`)
 - [ ] An allocation run and the duplicate sweep over 100k applicants meet their targets (`BriefPerformanceTests.An_allocation_run_and_the_duplicate_sweep_over_100k_applicants_meet_their_targets`)
 - [ ] Forty departments prepare budgets at once without contention (`BriefPerformanceTests.Forty_departments_prepare_budgets_at_once_without_contention`)
 - [ ] A driver change over 5000 lines previews and applies within 10 seconds (`BriefPerformanceTests.A_driver_change_over_5000_lines_previews_and_applies_within_10_seconds`)
 
-**Budget And Allocation Workflow** — Covers routing a recommended budget and a proposed housing allocation run through the approval workflow: neither can be approved directly while its workflow runs; the workflow's approval approves the budget (the approver's comment is the resolution) and sends the run's offers; a rejection returns the budget to its preparers.
+**Budget And Allocation Workflow** - Covers routing a recommended budget and a proposed housing allocation run through the approval workflow: neither can be approved directly while its workflow runs; the workflow's approval approves the budget (the approver's comment is the resolution) and sends the run's offers; a rejection returns the budget to its preparers.
 - [ ] Budgets and allocation runs are approved through their workflows (`BudgetAndAllocationWorkflowTests.Budgets_and_allocation_runs_are_approved_through_their_workflows`)
 
-**Budget Commitment** — Covers commitment control (encumbrances): an open commitment reduces the available budget so funds can't be committed twice, and releasing it restores the availability.
+**Budget Commitment** - Covers commitment control (encumbrances): an open commitment reduces the available budget so funds can't be committed twice, and releasing it restores the availability.
 - [ ] Open commitments reduce availability and release restores it (`BudgetCommitmentTests.Open_commitments_reduce_availability_and_release_restores_it`)
 
-**Budget Control** — Covers virements and the vote book: office supplies (6800) has 1,000 approved, 300 spent and 100 committed, so a virement of 700 to travel (6700) is refused while one of 400 is accepted; its requester cannot approve it; once approved the register shows 6800 at 600 and 6700 at 900, and the vote book adds a supplementary 200 for 6800, leaving 400 unexpended there and 900 on travel.
+**Budget Control** - Covers virements and the vote book: office supplies (6800) has 1,000 approved, 300 spent and 100 committed, so a virement of 700 to travel (6700) is refused while one of 400 is accepted; its requester cannot approve it; once approved the register shows 6800 at 600 and 6700 at 900, and the vote book adds a supplementary 200 for 6800, leaving 400 unexpended there and 900 on travel.
 - [ ] Virements move budget with approval and the vote book reconciles (`BudgetControlTests.Virements_move_budget_with_approval_and_the_vote_book_reconciles`)
 
-**Budget Currency Db** — Covers a budget prepared in a foreign currency: the header holds the currency and budget rate, a new rate re-states the base equivalents, a missing rate is refused, the base currency clears it, and an activated (sealed) budget cannot change currency.
+**Budget Currency Db** - Covers a budget prepared in a foreign currency: the header holds the currency and budget rate, a new rate re-states the base equivalents, a missing rate is refused, the base currency clears it, and an activated (sealed) budget cannot change currency.
 - [ ] A budget is prepared in a currency at a budget rate (`BudgetCurrencyDbTests.A_budget_is_prepared_in_a_currency_at_a_budget_rate`)
 
-**Budget Department Isolation** — Covers department isolation in budget preparation: a Roads preparer (by their employee record) submits and revises the Roads budget but not Water's, and sees only Roads; a user tied to no department is not confined.
+**Budget Department Isolation** - Covers department isolation in budget preparation: a Roads preparer (by their employee record) submits and revises the Roads budget but not Water's, and sees only Roads; a user tied to no department is not confined.
 - [ ] Departments prepare only their own budgets (`BudgetDepartmentIsolationTests.Departments_prepare_only_their_own_budgets`)
 
-**Budget Driver Spread** — Covers budget planning: driver-based lines re-computed (previewed, then applied) when an assumption changes; annual figures spread by profile; the staff budget built from the establishment; and an approved budget re-phased between periods by someone other than the requester, the annual total unchanged and the seal intact.
+**Budget Driver Spread** - Covers budget planning: driver-based lines re-computed (previewed, then applied) when an assumption changes; annual figures spread by profile; the staff budget built from the establishment; and an approved budget re-phased between periods by someone other than the requester, the annual total unchanged and the seal intact.
 - [ ] Assumptions spreads staff and rephasing shape the budget (`BudgetDriverSpreadTests.Assumptions_spreads_staff_and_rephasing_shape_the_budget`)
 
-**Budget Framework** — Covers the multi-year framework and the end of a budget's life: outer years are set before approval and shown beside year 1, an approved framework rolls forward into next year's draft (year 2 spread over the periods, later years moved up), and a superseded version is archived then locked — after which it cannot be activated or changed.
+**Budget Framework** - Covers the multi-year framework and the end of a budget's life: outer years are set before approval and shown beside year 1, an approved framework rolls forward into next year's draft (year 2 spread over the periods, later years moved up), and a superseded version is archived then locked - after which it cannot be activated or changed.
 - [ ] Frameworks roll forward and superseded versions are archived then locked (`BudgetFrameworkTests.Frameworks_roll_forward_and_superseded_versions_are_archived_then_locked`)
 
-**Budget Gate Invoice** — Covers the budget gate on a supplier invoice with no order behind it (brief §4.18.5): it is checked against what is left of the vote at posting, an overrun is blocked, and spend within the budget posts and uses it up.
+**Budget Gate Invoice** - Covers the budget gate on a supplier invoice with no order behind it (brief §4.18.5): it is checked against what is left of the vote at posting, an overrun is blocked, and spend within the budget posts and uses it up.
 - [ ] An invoice without an order is checked against the budget (`BudgetGateInvoiceTests.An_invoice_without_an_order_is_checked_against_the_budget`)
 - [ ] An expense claim is checked against the budget when approved (`BudgetGateInvoiceTests.An_expense_claim_is_checked_against_the_budget_when_approved`)
 
-**Budget Gate Order** — Covers the budget gate on orders and invoices: a direct order is checked and commits its budgeted lines, invoicing uses the commitment up line by line, a price rise beyond it is checked again, cancelling frees the rest, and the reconciliation reports commitments that disagree with their orders.
+**Budget Gate Order** - Covers the budget gate on orders and invoices: a direct order is checked and commits its budgeted lines, invoicing uses the commitment up line by line, a price rise beyond it is checked again, cancelling frees the rest, and the reconciliation reports commitments that disagree with their orders.
 - [ ] Orders commit invoices use up and cancellation frees budget (`BudgetGateOrderTests.Orders_commit_invoices_use_up_and_cancellation_frees_budget`)
 
-**Budget Gate** — Covers the budget gate on requisitions: spend that fits passes and commits on approval; an overrun is warned, blocked or needs an approver who may override, by the most specific rule; a requisition's commitment moves to its order; reservations earmark budget.
+**Budget Gate** - Covers the budget gate on requisitions: spend that fits passes and commits on approval; an overrun is warned, blocked or needs an approver who may override, by the most specific rule; a requisition's commitment moves to its order; reservations earmark budget.
 - [ ] Requisitions are held to the available budget (`BudgetGateTests.Requisitions_are_held_to_the_available_budget`)
 
-**Budget Holder Statement** — Covers the monthly budget-holder statement: a department budgeted 100 a month on stationery that spent 950 by March shows budget and actual to date with the variance, flags the vote past 75% of the year's 1,200, and is queued to the holder's address.
+**Budget Holder Statement** - Covers the monthly budget-holder statement: a department budgeted 100 a month on stationery that spent 950 by March shows budget and actual to date with the variance, flags the vote past 75% of the year's 1,200, and is queued to the holder's address.
 - [ ] A budget holder gets the departments statement (`BudgetHolderStatementTests.A_budget_holder_gets_the_departments_statement`)
 
 **Budget List Report**
 - [ ] Budget listing shows versions with annual total and active flag (`BudgetListReportTests.Budget_listing_shows_versions_with_annual_total_and_active_flag`)
 
-**Budget Method** — Covers the budget methods: next year's draft built from this year's actuals with an uplift, a reforecast whose first months are the actuals and the rest the budget, and the cash budget with sales collected over two months.
+**Budget Method** - Covers the budget methods: next year's draft built from this year's actuals with an uplift, a reforecast whose first months are the actuals and the rest the budget, and the cash budget with sales collected over two months.
 - [ ] Budgets are built from history reforecast and turned into cash (`BudgetMethodTests.Budgets_are_built_from_history_reforecast_and_turned_into_cash`)
 
-**Budget Notice** — Covers budget-season notices: utilisation alerts are emailed once per vote and threshold (a vote crossing a higher one is alerted again); departments due within the reminder window and not yet submitted have their budget holders reminded, from the preparation board.
+**Budget Notice** - Covers budget-season notices: utilisation alerts are emailed once per vote and threshold (a vote crossing a higher one is alerted again); departments due within the reminder window and not yet submitted have their budget holders reminded, from the preparation board.
 - [ ] Alerts go once per threshold and holders are reminded before the deadline (`BudgetNoticeTests.Alerts_go_once_per_threshold_and_holders_are_reminded_before_the_deadline`)
 
-**Budget Planning** — Covers budget planning (brief §14 B3–B8, B10, B32): ceilings against drafts, the hierarchy roll-up, drivers and a what-if, the basis of each line, an establishment-driven staff budget, a driver-built revenue line and a budget holder's statement.
+**Budget Planning** - Covers budget planning (brief §14 B3–B8, B10, B32): ceilings against drafts, the hierarchy roll-up, drivers and a what-if, the basis of each line, an establishment-driven staff budget, a driver-built revenue line and a budget holder's statement.
 - [ ] Planning data drives the budget preparation reports (`BudgetPlanningTests.Planning_data_drives_the_budget_preparation_reports`)
 
-**Budget Preparation** — Covers budget preparation: a draft is submitted, reviewed, cut by a Finance proposal and returned; the department accepts the cut, revises another line and resubmits as round two; it is recommended and approved under a council resolution (not by the submitter), sealed, and only then activated; the trail keeps requested beside proposed figures.
+**Budget Preparation** - Covers budget preparation: a draft is submitted, reviewed, cut by a Finance proposal and returned; the department accepts the cut, revises another line and resubmits as round two; it is recommended and approved under a council resolution (not by the submitter), sealed, and only then activated; the trail keeps requested beside proposed figures.
 - [ ] A budget is negotiated and approved before activation (`BudgetPreparationTests.A_budget_is_negotiated_and_approved_before_activation`)
 
-**Budget Seal** — Covers the budget seal end to end: a draft has none; activation seals it and the seal verifies after reloading; an approved virement leaves it intact; a line altered directly in the database breaks it.
+**Budget Seal** - Covers the budget seal end to end: a draft has none; activation seals it and the seal verifies after reloading; an approved virement leaves it intact; a line altered directly in the database breaks it.
 - [ ] An active budget is sealed and tampering is detected (`BudgetSealTests.An_active_budget_is_sealed_and_tampering_is_detected`)
 
-**Budget Utilisation Alert** — Covers budget-holder alerts: stationery at 80% of its budget, travel at 92% through a commitment and salaries at 125% raise 100, 90 and 75 alerts, most used first; depreciation at 10% raises none.
+**Budget Utilisation Alert** - Covers budget-holder alerts: stationery at 80% of its budget, travel at 92% through a commitment and salaries at 125% raise 100, 90 and 75 alerts, most used first; depreciation at 10% raises none.
 - [ ] Votes raise the highest threshold they reach (`BudgetUtilisationAlertTests.Votes_raise_the_highest_threshold_they_reach`)
 
-**Budget Workbook** — Covers the budget's Excel round trip: export (identity row, P1–P12, a total formula), edits previewed then applied as revised figures with a trail entry, a workbook with bad rows refused whole, a workbook from another budget or not a workbook at all refused, and no import once the budget has been submitted.
+**Budget Workbook** - Covers the budget's Excel round trip: export (identity row, P1–P12, a total formula), edits previewed then applied as revised figures with a trail entry, a workbook with bad rows refused whole, a workbook from another budget or not a workbook at all refused, and no import once the budget has been submitted.
 - [ ] A budget goes out to Excel and comes back checked (`BudgetWorkbookTests.A_budget_goes_out_to_Excel_and_comes_back_checked`)
 
-**Budgeting Reports** — Covers the B-coded budgeting reports (brief §14 A-B): an operating budget revised from 100 to 120 a month, spending above it, and spending on an account with no budget; the version comparison, register, utilisation, exceptions and unappropriated-vote reports read them back; every B report renders.
+**Budgeting Reports** - Covers the B-coded budgeting reports (brief §14 A-B): an operating budget revised from 100 to 120 a month, spending above it, and spending on an account with no budget; the version comparison, register, utilisation, exceptions and unappropriated-vote reports read them back; every B report renders.
 - [ ] Budgeting reports reflect budgets and actuals (`BudgetingReportsTests.Budgeting_reports_reflect_budgets_and_actuals`)
 
 **Budgeting**
 - [ ] Budget vs actual joins gl actuals and checks availability (`BudgetingTests.Budget_vs_actual_joins_gl_actuals_and_checks_availability`)
 
-**Bulk Bills** — A posted billing run's bills go out in bulk: an SMS to each ratepayer with a mobile number, and one printed page per ratepayer — all of them, or only those without an email address.
+**Bulk Bills** - A posted billing run's bills go out in bulk: an SMS to each ratepayer with a mobile number, and one printed page per ratepayer - all of them, or only those without an email address.
 - [ ] A posted run is texted and printed in bulk (`BulkBillsTests.A_posted_run_is_texted_and_printed_in_bulk`)
 
-**Business Event Audit** — Covers the business events in the audit trail (brief §6): a posting writes Post, a reversal Void with its reason, a workflow decision Approve or Reject by the approver — each with the terminal it came from, which the journal keeps too — and the chain still verifies.
+**Business Event Audit** - Covers the business events in the audit trail (brief §6): a posting writes Post, a reversal Void with its reason, a workflow decision Approve or Reject by the approver - each with the terminal it came from, which the journal keeps too - and the chain still verifies.
 - [ ] Postings reversals and decisions are named in the audit trail (`BusinessEventAuditTests.Postings_reversals_and_decisions_are_named_in_the_audit_trail`)
 
-**Caller Identity** — Covers who and where in the trails: with the request's caller and address on the scoped identity (as the API and desktop now set it), a sign-in attempt records the source address, and a change is audited under the caller's name with the address.
+**Caller Identity** - Covers who and where in the trails: with the request's caller and address on the scoped identity (as the API and desktop now set it), a sign-in attempt records the source address, and a change is audited under the caller's name with the address.
 - [ ] Sign ins and changes carry the callers name and address (`CallerIdentityTests.Sign_ins_and_changes_carry_the_callers_name_and_address`)
 
 **Capital Carry Forward**
 - [ ] Unspent capital is carried by approval only (`CapitalCarryForwardTests.Unspent_capital_is_carried_by_approval_only`)
 
-**Capital Project** — Covers capital work in progress (brief §14 M 211): costs post into CWIP, capitalisation registers the asset at their total and clears CWIP, and FA211 rolls the project forward before and after.
+**Capital Project** - Covers capital work in progress (brief §14 M 211): costs post into CWIP, capitalisation registers the asset at their total and clears CWIP, and FA211 rolls the project forward before and after.
 - [ ] Cwip collects cost and clears on capitalisation (`CapitalProjectTests.Cwip_collects_cost_and_clears_on_capitalisation`)
 
-**Cash Book Reports** — Covers the CB-numbered cash book reports (brief §14 D): a deposit and a payment through the bank, a statement line not yet on the ledger, a petty cash top-up and spend; the cash book, unreconciled ageing and petty cash report read them; every CB report renders.
+**Cash Book Reports** - Covers the CB-numbered cash book reports (brief §14 D): a deposit and a payment through the bank, a statement line not yet on the ledger, a petty cash top-up and spend; the cash book, unreconciled ageing and petty cash report read them; every CB report renders.
 - [ ] Cash book reports reflect the bank (`CashBookReportsTests.Cash_book_reports_reflect_the_bank`)
 
 **Cash Control Report**
@@ -321,10 +321,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Cash Flow Report**
 - [ ] Cash flow statement renders through the report runner (`CashFlowReportTests.Cash_flow_statement_renders_through_the_report_runner`)
 
-**Cash Flow Statement** — Covers the Statement of Cash Flows (movement method): movements on tagged accounts are classified into operating, investing and financing activities, and — because every journal balances — their sum equals the change in cash.
+**Cash Flow Statement** - Covers the Statement of Cash Flows (movement method): movements on tagged accounts are classified into operating, investing and financing activities, and - because every journal balances - their sum equals the change in cash.
 - [ ] Classified movements reconcile to the change in cash (`CashFlowStatementTests.Classified_movements_reconcile_to_the_change_in_cash`)
 
-**Cash Forecast** — Covers the full cash-flow forecast: the bank balance opens it; an overdue receivable lands in the first week; a supplier in a saved payment run is paid on the run's date and not again on the invoice's due date, while a supplier left out of the run is paid when due; a standing order repeats monthly; an open sales order arrives on delivery plus terms; the week cash falls below the minimum is flagged.
+**Cash Forecast** - Covers the full cash-flow forecast: the bank balance opens it; an overdue receivable lands in the first week; a supplier in a saved payment run is paid on the run's date and not again on the invoice's due date, while a supplier left out of the run is paid when due; a standing order repeats monthly; an open sales order arrives on delivery plus terms; the week cash falls below the minimum is flagged.
 - [ ] Every source reaches the weekly forecast (`CashForecastTests.Every_source_reaches_the_weekly_forecast`)
 
 **Cash Movement**
@@ -342,34 +342,34 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Cashier Related Account**
 - [ ] A cashier cannot receipt against a related account (`CashierRelatedAccountTests.A_cashier_cannot_receipt_against_a_related_account`)
 
-**Cashier Switch** — Covers the quick cashier switch (brief §4.1 "fast cashier switch without closing the sale"): the open session passes to the next cashier with no count and no cash-up, the switch is a till event, sales then carry the new cashier, and a closed session or the same cashier is refused.
+**Cashier Switch** - Covers the quick cashier switch (brief §4.1 "fast cashier switch without closing the sale"): the open session passes to the next cashier with no count and no cash-up, the switch is a till event, sales then carry the new cashier, and a closed session or the same cashier is refused.
 - [ ] The till passes to the next cashier without a cash up (`CashierSwitchTests.The_till_passes_to_the_next_cashier_without_a_cash_up`)
 
-**Catch Weight** — Covers catch weight: receipts are weighed (and may be bought by weight) within the tolerance of the nominal piece weight, the balance carries pieces and weight, issues are costed by the weight that leaves, and the last pieces take whatever weight and value remain.
+**Catch Weight** - Covers catch weight: receipts are weighed (and may be bought by weight) within the tolerance of the nominal piece weight, the balance carries pieces and weight, issues are costed by the weight that leaves, and the last pieces take whatever weight and value remain.
 - [ ] Catch weight items are weighed in and costed by weight out (`CatchWeightTests.Catch_weight_items_are_weighed_in_and_costed_by_weight_out`)
 
-**Cemetery** — Covers the cemetery register: three plots at 300 are added to section B of Westpark (a repeat is refused), a single plot and a family plot for two; an unsold plot cannot take an interment; the single plot is sold (300 invoiced) and cannot be sold again; one burial with a 50 fee fills it; the family plot sold for 300 takes two burials and then refuses a third; the available list and burial register reflect it all; plot and burial income is 650.
+**Cemetery** - Covers the cemetery register: three plots at 300 are added to section B of Westpark (a repeat is refused), a single plot and a family plot for two; an unsold plot cannot take an interment; the single plot is sold (300 invoiced) and cannot be sold again; one burial with a 50 fee fills it; the family plot sold for 300 takes two burials and then refuses a third; the available list and burial register reflect it all; plot and burial income is 650.
 - [ ] Plots are sold and interments recorded up to capacity (`CemeteryTests.Plots_are_sold_and_interments_recorded_up_to_capacity`)
 
 **Chart Of Accounts Report**
 - [ ] Chart of accounts lists accounts with type and control flag (`ChartOfAccountsReportTests.Chart_of_accounts_lists_accounts_with_type_and_control_flag`)
 
-**Cheque Run** — Covers paying a supplier run by cheque: each supplier gets a cheque numbered on from the first, written in the cheque register and printable with the amount in words; a cheque run makes no bank file.
+**Cheque Run** - Covers paying a supplier run by cheque: each supplier gets a cheque numbered on from the first, written in the cheque register and printable with the amount in words; a cheque run makes no bank file.
 - [ ] A cheque run writes numbered cheques that print in words (`ChequeRunTests.A_cheque_run_writes_numbered_cheques_that_print_in_words`)
 
-**Cheques And Statements** — Covers cheques, wallets and supplier statements (brief §14 C 61, D 75–76): a stale, a presented, a voided and a cancelled cheque; a mobile wallet whose unmatched items explain the gap; a supplier statement that differs from our ledger.
+**Cheques And Statements** - Covers cheques, wallets and supplier statements (brief §14 C 61, D 75–76): a stale, a presented, a voided and a cancelled cheque; a mobile wallet whose unmatched items explain the gap; a supplier statement that differs from our ledger.
 - [ ] Cheques wallets and supplier statements are reconciled (`ChequesAndStatementsTests.Cheques_wallets_and_supplier_statements_are_reconciled`)
 
-**Chunked Billing Run** — Covers chunked, resumable billing: a 30-stand run approved with a cap posts in chunks reporting progress and stays Posting; a bill posted outside the run in the meantime is recognised, not posted twice; a ratepayer on hold fails alone while the rest post; the resumed run finishes Posted with its counts.
+**Chunked Billing Run** - Covers chunked, resumable billing: a 30-stand run approved with a cap posts in chunks reporting progress and stays Posting; a bill posted outside the run in the meantime is recognised, not posted twice; a ratepayer on hold fails alone while the rest post; the resumed run finishes Posted with its counts.
 - [ ] A large run posts in resumable chunks (`ChunkedBillingRunTests.A_large_run_posts_in_resumable_chunks`)
 
-**Clearance Certificate** — Covers rates clearance: a stand billed 90 a month for three months owes 270 plus two months (180) in advance; the certificate is refused while 450 and then 50 is due, and issued once the advance is paid, valid for 60 days; an unknown property has no quote.
+**Clearance Certificate** - Covers rates clearance: a stand billed 90 a month for three months owes 270 plus two months (180) in advance; the certificate is refused while 450 and then 50 is due, and issued once the advance is paid, valid for 60 days; an unknown property has no quote.
 - [ ] Clearance needs arrears and advance paid (`ClearanceCertificateTests.Clearance_needs_arrears_and_advance_paid`)
 
 **Clock Import**
 - [ ] Clock punches become attendance days (`ClockImportTests.Clock_punches_become_attendance_days`)
 
-**Clock Mark Store** — Covers the clock-rollback high-water mark: it is kept sealed in both the database and a file and only moves forward; deleting the file or emptying the database does not wind it back; a tampered or foreign copy is ignored. (The validator's refusal of a clock set back beyond the mark is covered by the licensing unit tests.)
+**Clock Mark Store** - Covers the clock-rollback high-water mark: it is kept sealed in both the database and a file and only moves forward; deleting the file or emptying the database does not wind it back; a tampered or foreign copy is ignored. (The validator's refusal of a clock set back beyond the mark is covered by the licensing unit tests.)
 - [ ] The mark survives losing either copy and never moves back (`ClockMarkStoreTests.The_mark_survives_losing_either_copy_and_never_moves_back`)
 
 **Collection By Service Report**
@@ -381,169 +381,169 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Commission To Payroll**
 - [ ] Commission goes to the reps payslip (`CommissionToPayrollTests.Commission_goes_to_the_reps_payslip`)
 
-**Commitment Year End** — Covers year-end commitments: of 2026's open commitments, the 100 order chosen is carried into 2027 as a new open commitment linked to it, the 50 order lapses, and a commitment already released is left alone. A commitment not open in the year cannot be carried, and a second run has nothing left to decide.
+**Commitment Year End** - Covers year-end commitments: of 2026's open commitments, the 100 order chosen is carried into 2027 as a new open commitment linked to it, the 50 order lapses, and a commitment already released is left alone. A commitment not open in the year cannot be carried, and a second run has nothing left to decide.
 - [ ] Open commitments lapse or carry forward at year end (`CommitmentYearEndTests.Open_commitments_lapse_or_carry_forward_at_year_end`)
 
-**Company Messaging** — Covers per-company messaging: a company's own SMS provider is used for its messages while another company falls back to the server's (here none); a company on Microsoft Graph gets an app token and a sendMail call on its mailbox; secrets are stored encrypted and kept when left blank, and never shown back.
+**Company Messaging** - Covers per-company messaging: a company's own SMS provider is used for its messages while another company falls back to the server's (here none); a company on Microsoft Graph gets an app token and a sendMail call on its mailbox; secrets are stored encrypted and kept when left blank, and never shown back.
 - [ ] Companies send through their own sms provider and graph mailbox (`CompanyMessagingTests.Companies_send_through_their_own_sms_provider_and_graph_mailbox`)
 
-**Company Scope Filter** — Covers the DbContext's company query filter (brief §2): a context scoped to one company cannot read another company's rows — by code, by id, or when deleted rows are included — while an unscoped context sees every company, and the intercompany and consolidation services, which work across companies by design, still do so from a scoped request.
+**Company Scope Filter** - Covers the DbContext's company query filter (brief §2): a context scoped to one company cannot read another company's rows - by code, by id, or when deleted rows are included - while an unscoped context sees every company, and the intercompany and consolidation services, which work across companies by design, still do so from a scoped request.
 - [ ] A scoped context reads only its company until the scope is lifted (`CompanyScopeFilterTests.A_scoped_context_reads_only_its_company_until_the_scope_is_lifted`)
 - [ ] Intercompany and consolidation work across companies from a scoped request (`CompanyScopeFilterTests.Intercompany_and_consolidation_work_across_companies_from_a_scoped_request`)
 
-**Compensation** — Covers IAS 37 compensation on compulsory acquisition: two claims on a parcel bought for 100,000 (land WIP). The first is lodged (nothing provided), provided at 30,000 when probable, remeasured to 36,000, and settled for 35,000 — the 1,000 over-provision comes out of the land cost; the second is provided at 8,000 and withdrawn, releasing it. Land WIP ends at 135,000, the provision at nothing, the bank down 135,000 in all.
+**Compensation** - Covers IAS 37 compensation on compulsory acquisition: two claims on a parcel bought for 100,000 (land WIP). The first is lodged (nothing provided), provided at 30,000 when probable, remeasured to 36,000, and settled for 35,000 - the 1,000 over-provision comes out of the land cost; the second is provided at 8,000 and withdrawn, releasing it. Land WIP ends at 135,000, the provision at nothing, the bank down 135,000 in all.
 - [ ] Compensation is provided when probable and capitalised into land (`CompensationTests.Compensation_is_provided_when_probable_and_capitalised_into_land`)
 
-**Compulsory Acquisition** — Covers the compulsory acquisition sub-process: the notice opens an objection window, the assessment, an accepted offer or an award moves the provision, part payments come out of it, possession waits for the window to close with no objection standing, and the register shows it all.
+**Compulsory Acquisition** - Covers the compulsory acquisition sub-process: the notice opens an objection window, the assessment, an accepted offer or an award moves the provision, part payments come out of it, possession waits for the window to close with no objection standing, and the register shows it all.
 - [ ] Notice objections assessment offers award payments and possession (`CompulsoryAcquisitionTests.Notice_objections_assessment_offers_award_payments_and_possession`)
 
-**Concurrent Posting** — Covers two postings racing for the journal number sequence: while one user's posting holds its transaction open, another user's posting reads the same next number, waits on the locked sequence row, loses the race when the first commits — and is retried rather than failing, taking the following number. Both journals post, numbering stays gapless and check data is clean.
+**Concurrent Posting** - Covers two postings racing for the journal number sequence: while one user's posting holds its transaction open, another user's posting reads the same next number, waits on the locked sequence row, loses the race when the first commits - and is retried rather than failing, taking the following number. Both journals post, numbering stays gapless and check data is clean.
 - [ ] A posting that loses the race is retried (`ConcurrentPostingTests.A_posting_that_loses_the_race_is_retried`)
 
-**Concurrent Stock Issue** — Covers two stock issues of the same item racing: while one issue holds its transaction (and the stock balance and journal sequence rows) open, a second issue reads the balance as it was, loses the race when the first commits and is retried against the new balance — both issues stand, on-hand is right and agrees with the movements.
+**Concurrent Stock Issue** - Covers two stock issues of the same item racing: while one issue holds its transaction (and the stock balance and journal sequence rows) open, a second issue reads the balance as it was, loses the race when the first commits and is retried against the new balance - both issues stand, on-hand is right and agrees with the movements.
 - [ ] A stock issue that loses the race is retried (`ConcurrentStockIssueTests.A_stock_issue_that_loses_the_race_is_retried`)
 
-**Consolidation** — Covers multi-company consolidation: two companies' ledgers sum into one balanced trial balance, and companies with different base currencies are refused.
+**Consolidation** - Covers multi-company consolidation: two companies' ledgers sum into one balanced trial balance, and companies with different base currencies are refused.
 - [ ] Two companies consolidate into one balanced trial balance (`ConsolidationTests.Two_companies_consolidate_into_one_balanced_trial_balance`)
 - [ ] Companies with different base currencies are refused (`ConsolidationTests.Companies_with_different_base_currencies_are_refused`)
 
-**Consumption Graph** — Covers the consumption graph: a stand's water meter read in January (20 units), February (none) and March (40) shows each month of the three to March with its units and an average of 20, and the graph scales its bars to the busiest month.
+**Consumption Graph** - Covers the consumption graph: a stand's water meter read in January (20 units), February (none) and March (40) shows each month of the three to March with its units and an average of 20, and the graph scales its bars to the busiest month.
 - [ ] A stands meters show their monthly consumption (`ConsumptionGraphTests.A_stands_meters_show_their_monthly_consumption`)
 
-**Contract Advance And Defects** — Covers client certificates on a contract (brief §4.12): approved variation work is certified apart and never beyond what was approved; a client advance is recovered from each certificate at its percentage, never past what is outstanding; and retention is released half at practical completion and the rest when the defects-liability period ends.
+**Contract Advance And Defects** - Covers client certificates on a contract (brief §4.12): approved variation work is certified apart and never beyond what was approved; a client advance is recovered from each certificate at its percentage, never past what is outstanding; and retention is released half at practical completion and the rest when the defects-liability period ends.
 - [ ] Certificates take variations recover the advance and retention follows the defects period (`ContractAdvanceAndDefectsTests.Certificates_take_variations_recover_the_advance_and_retention_follows_the_defects_period`)
 
-**Contract Control** — Covers contract controls (brief §14 K 191, 193, 196): an approved variation moves value and budget, a rejected one does not and neither can be decided twice; BOQ lines are measured forward only; timesheets cost labour into the job and refuse more than 24 hours a day; JC191, JC193 and JC196 read them back.
+**Contract Control** - Covers contract controls (brief §14 K 191, 193, 196): an approved variation moves value and budget, a rejected one does not and neither can be decided twice; BOQ lines are measured forward only; timesheets cost labour into the job and refuse more than 24 hours a day; JC191, JC193 and JC196 read them back.
 - [ ] Variations boq and timesheets are controlled and reported (`ContractControlTests.Variations_boq_and_timesheets_are_controlled_and_reported`)
 
-**Control Account Guard** — Covers the database guards on journal lines (brief §3.1): a manual journal cannot reach a control account even when a line is changed directly in the database; system postings still reach control accounts; and a posted journal cannot gain extra lines.
+**Control Account Guard** - Covers the database guards on journal lines (brief §3.1): a manual journal cannot reach a control account even when a line is changed directly in the database; system postings still reach control accounts; and a posted journal cannot gain extra lines.
 - [ ] Manual journals cannot reach control accounts and posted journals cannot grow (`ControlAccountGuardTests.Manual_journals_cannot_reach_control_accounts_and_posted_journals_cannot_grow`)
 
-**Control Reconciliation As At** — Covers the control reconciliation for a past date with later activity: an allocation and a stock issue after the date must not leak into it, so March still reconciles after April's receipt and issue — and April reconciles too.
+**Control Reconciliation As At** - Covers the control reconciliation for a past date with later activity: an allocation and a stock issue after the date must not leak into it, so March still reconciles after April's receipt and issue - and April reconciles too.
 - [ ] Past date reconciliation ignores later allocations and movements (`ControlReconciliationAsAtTests.Past_date_reconciliation_ignores_later_allocations_and_movements`)
 
 **Control Reconciliation Report**
 - [ ] Reconciliation shows gl control agreeing with sub ledger (`ControlReconciliationReportTests.Reconciliation_shows_gl_control_agreeing_with_sub_ledger`)
 
-**Control Reports** — Covers the SYS-numbered control and system reports (brief §14 P, R): a journal entered today but dated in January is flagged back-dated; a new customer appears among master-data changes; the company settings and number sequences list; every SYS report renders.
+**Control Reports** - Covers the SYS-numbered control and system reports (brief §14 P, R): a journal entered today but dated in January is flagged back-dated; a new customer appears among master-data changes; the company settings and number sequences list; every SYS report renders.
 - [ ] Control reports flag back dating and list the system (`ControlReportsTests.Control_reports_flag_back_dating_and_list_the_system`)
 
-**Cooperative Account** — Covers a cooperative's account: linked to a customer, charged 1,000, two members contribute 300 and 200 (receipted on its account), a non-member is refused; the statement opens at nil, runs to 500 owed and lists each member's contributions.
+**Cooperative Account** - Covers a cooperative's account: linked to a customer, charged 1,000, two members contribute 300 and 200 (receipted on its account), a non-member is refused; the statement opens at nil, runs to 500 owed and lists each member's contributions.
 - [ ] A cooperative keeps its own account with members contributions (`CooperativeAccountTests.A_cooperative_keeps_its_own_account_with_members_contributions`)
 
-**Cooperative** — Covers cooperative allocations: a cooperative with three members (a duplicate ID refused) is allocated two stands, which become allocated (a stand cannot go to a second cooperative); one stand is sub-allocated to a member; the same member cannot take a second stand, a member who has left cannot take one, the other active member takes the second; a stand outside the cooperative cannot be sub-allocated; the register shows both levels.
+**Cooperative** - Covers cooperative allocations: a cooperative with three members (a duplicate ID refused) is allocated two stands, which become allocated (a stand cannot go to a second cooperative); one stand is sub-allocated to a member; the same member cannot take a second stand, a member who has left cannot take one, the other active member takes the second; a stand outside the cooperative cannot be sub-allocated; the register shows both levels.
 - [ ] Stands go to the cooperative then one each to its members (`CooperativeTests.Stands_go_to_the_cooperative_then_one_each_to_its_members`)
 
 **Cost Centre Income Statement**
 - [ ] Income statement can be filtered to one cost centre (`CostCentreIncomeStatementTests.Income_statement_can_be_filtered_to_one_cost_centre`)
 
-**Cost Plus And Sale Limit** — Covers cost-plus price lists (markup on average cost, margin on standard cost, list prices still winning) and the till's item limits (age check, most per sale across lines, prescription-only).
+**Cost Plus And Sale Limit** - Covers cost-plus price lists (markup on average cost, margin on standard cost, list prices still winning) and the till's item limits (age check, most per sale across lines, prescription-only).
 - [ ] Lists price from cost when they have no price (`CostPlusAndSaleLimitTests.Lists_price_from_cost_when_they_have_no_price`)
 - [ ] Till enforces age checks quantity limits and prescriptions (`CostPlusAndSaleLimitTests.Till_enforces_age_checks_quantity_limits_and_prescriptions`)
 
-**Council Licensing** — Covers council licensing: an annual liquor licence (fee 200) and a quarterly hawker permit (fee 30) are issued and invoiced; the hawker permit is due for renewal first; a failed inspection suspends the liquor licence and blocks its renewal until an inspection passes; the hawker permit renewed months late pays two cycles plus a 10% penalty; the liquor licence renewed on time pays one cycle; a revoked permit can be neither renewed nor inspected.
+**Council Licensing** - Covers council licensing: an annual liquor licence (fee 200) and a quarterly hawker permit (fee 30) are issued and invoiced; the hawker permit is due for renewal first; a failed inspection suspends the liquor licence and blocks its renewal until an inspection passes; the hawker permit renewed months late pays two cycles plus a 10% penalty; the liquor licence renewed on time pays one cycle; a revoked permit can be neither renewed nor inspected.
 - [ ] Licences are issued inspected renewed and revoked (`CouncilLicensingTests.Licences_are_issued_inspected_renewed_and_revoked`)
 
-**Credit Control** — Covers credit control: the review places over-limit and overdue customers on stop (and leaves the rest alone), a held customer is refused new sales orders and invoices, and release restores trading.
+**Credit Control** - Covers credit control: the review places over-limit and overdue customers on stop (and leaves the rest alone), a held customer is refused new sales orders and invoices, and release restores trading.
 - [ ] Review holds over limit and overdue customers and blocks orders until released (`CreditControlTests.Review_holds_over_limit_and_overdue_customers_and_blocks_orders_until_released`)
 
 **Credit Exposure Report**
 - [ ] Credit exposure shows limit balance available and flags (`CreditExposureReportTests.Credit_exposure_shows_limit_balance_available_and_flags`)
 
-**Credit Limit Approval** — Covers the credit limit approval workflow: with a 1,000 limit a 1,200 invoice is refused; lowering the limit to 800 takes effect at once; raising it to 2,000 is requested, cannot be approved by the requester or requested twice, and takes effect only on a second user's approval, after which the invoice posts; a rejected request to remove the limit changes nothing.
+**Credit Limit Approval** - Covers the credit limit approval workflow: with a 1,000 limit a 1,200 invoice is refused; lowering the limit to 800 takes effect at once; raising it to 2,000 is requested, cannot be approved by the requester or requested twice, and takes effect only on a second user's approval, after which the invoice posts; a rejected request to remove the limit changes nothing.
 - [ ] Credit limits rise only with a second users approval (`CreditLimitApprovalTests.Credit_limits_rise_only_with_a_second_users_approval`)
 
-**Credit Limit Concurrency** — Covers the credit-limit check under concurrency: a customer with a 1,000 limit is sent eight 200 invoices at once, from separate connections. Five fit, so exactly five post and three are refused for the limit; none fails for contention.
+**Credit Limit Concurrency** - Covers the credit-limit check under concurrency: a customer with a 1,000 limit is sent eight 200 invoices at once, from separate connections. Five fit, so exactly five post and three are refused for the limit; none fails for contention.
 - [ ] Concurrent invoices cannot together breach the credit limit (`CreditLimitConcurrencyTests.Concurrent_invoices_cannot_together_breach_the_credit_limit`)
 
 **Credit Limit Policy**
 - [ ] Each customer has its own credit limit policy (`CreditLimitPolicyTests.Each_customer_has_its_own_credit_limit_policy`)
 
-**Credit Review Credits** — Covers the credit review netting unallocated credits: a customer whose unallocated receipt covers the overdue invoice is not put on stop, and one whose receipt covers only part of it is held for the remainder.
+**Credit Review Credits** - Covers the credit review netting unallocated credits: a customer whose unallocated receipt covers the overdue invoice is not put on stop, and one whose receipt covers only part of it is held for the remainder.
 - [ ] Unallocated receipts keep paid customers off stop (`CreditReviewCreditsTests.Unallocated_receipts_keep_paid_customers_off_stop`)
 
 **Creditor Write Back**
 - [ ] Writing back a stale creditor clears the balance to income (`CreditorWriteBackTests.Writing_back_a_stale_creditor_clears_the_balance_to_income`)
 
-**Crm Lead** — Covers CRM leads and activities: a lead is captured (a repeat flagged by its phone), worked, qualified and converted into an opportunity with its customer, its activities following; the agenda shows what is due; a quotation link moves the opportunity to Proposal; the funnel counts by source.
+**Crm Lead** - Covers CRM leads and activities: a lead is captured (a repeat flagged by its phone), worked, qualified and converted into an opportunity with its customer, its activities following; the agenda shows what is due; a quotation link moves the opportunity to Proposal; the funnel counts by source.
 - [ ] Leads become opportunities with their history (`CrmLeadTests.Leads_become_opportunities_with_their_history`)
 
 **Crm Pipeline Report**
 - [ ] Pipeline report lists open opportunities with weighted value (`CrmPipelineReportTests.Pipeline_report_lists_open_opportunities_with_weighted_value`)
 
-**Customer Contract** — Covers customer contracts and call-offs: each call-off is a sales order at the contract price, drawing the contract down, refused beyond what remains, for items not on the contract, or outside its dates.
+**Customer Contract** - Covers customer contracts and call-offs: each call-off is a sales order at the contract price, drawing the contract down, refused beyond what remains, for items not on the contract, or outside its dates.
 - [ ] Contracts are drawn down by call offs (`CustomerContractTests.Contracts_are_drawn_down_by_call_offs`)
 
 **Customer Credit Control**
 - [ ] Invoices are refused over the credit limit or when the customer is on hold (`CustomerCreditControlTests.Invoices_are_refused_over_the_credit_limit_or_when_the_customer_is_on_hold`)
 
-**Cycle Count** — A cycle count takes only the items due a count — never-counted first, A items more often than C — and posts like a stocktake; the next cycle count judges each item by its last posted count.
+**Cycle Count** - A cycle count takes only the items due a count - never-counted first, A items more often than C - and posts like a stocktake; the next cycle count judges each item by its last posted count.
 - [ ] A cycle count takes the items due and the next one follows the last counts (`CycleCountTests.A_cycle_count_takes_the_items_due_and_the_next_one_follows_the_last_counts`)
 
-**Dashboard Reports** — Covers the DB-numbered dashboards (brief §14 Q): sales in two months, an expense and a customer invoice on the day; the executive dashboard, daily flash, KPI scorecard and trend read them; every DB report renders.
+**Dashboard Reports** - Covers the DB-numbered dashboards (brief §14 Q): sales in two months, an expense and a customer invoice on the day; the executive dashboard, daily flash, KPI scorecard and trend read them; every DB report renders.
 - [ ] Dashboards reflect the ledgers (`DashboardReportsTests.Dashboards_reflect_the_ledgers`)
 
-**Data Health** — Covers the Data Health dashboard: a clean company is all OK; then a deferred journal shows as unposted (warning), a system journal into the receivables control account shows as a control variance (error), a deleted customer still owing shows as an orphan (warning), and a stock balance below zero shows as negative stock (error) — which the integrity check also catches — and the dashboard is graded by its worst indicator.
+**Data Health** - Covers the Data Health dashboard: a clean company is all OK; then a deferred journal shows as unposted (warning), a system journal into the receivables control account shows as a control variance (error), a deleted customer still owing shows as an orphan (warning), and a stock balance below zero shows as negative stock (error) - which the integrity check also catches - and the dashboard is graded by its worst indicator.
 - [ ] The dashboard finds each kind of problem (`DataHealthTests.The_dashboard_finds_each_kind_of_problem`)
 
-**Data Scope** — Covers row-level scopes in use: a storeman limited to one warehouse (by code) reaches it and not the other, through the scope service and API requests naming the warehouse; a ward code is checked by code; joining a group with roles opens the scope.
+**Data Scope** - Covers row-level scopes in use: a storeman limited to one warehouse (by code) reaches it and not the other, through the scope service and API requests naming the warehouse; a ward code is checked by code; joining a group with roles opens the scope.
 - [ ] Warehouse and ward scopes limit what a user reaches (`DataScopeTests.Warehouse_and_ward_scopes_limit_what_a_user_reaches`)
 
 **Database Bootstrap**
 - [ ] The database is created on first run and left alone after (`DatabaseBootstrapTests.The_database_is_created_on_first_run_and_left_alone_after`)
 
-**Debit Note And Forecast Entry** — Covers customer debit notes (a further charge against an invoice, kept as a debit-note open item) and flows keyed into the cash forecast by hand, once or monthly.
+**Debit Note And Forecast Entry** - Covers customer debit notes (a further charge against an invoice, kept as a debit-note open item) and flows keyed into the cash forecast by hand, once or monthly.
 - [ ] Debit notes add to an invoice and hand keyed flows join the forecast (`DebitNoteAndForecastEntryTests.Debit_notes_add_to_an_invoice_and_hand_keyed_flows_join_the_forecast`)
 
-**Debt Collection** — Covers debt collection: a debtor with nothing overdue cannot be handed over; one owing 500 overdue is, and cannot be handed over twice; a summons is recorded and listed on the register; the write-off cannot be approved before it is asked for or by the person who asked; once approved both invoices are written off and the case is closed.
+**Debt Collection** - Covers debt collection: a debtor with nothing overdue cannot be handed over; one owing 500 overdue is, and cannot be handed over twice; a summons is recorded and listed on the register; the write-off cannot be approved before it is asked for or by the person who asked; once approved both invoices are written off and the case is closed.
 - [ ] Handed over debts are summonsed and written off with approval (`DebtCollectionTests.Handed_over_debts_are_summonsed_and_written_off_with_approval`)
 
-**Deferred Posting Release** — Covers releasing deferred journals: a deferred journal is numbered but absent from the ledger, release posts it (balances move, status Posted), a posted journal cannot be released again, the batch release takes everything up to a date oldest first, and the period-close checklist clears.
+**Deferred Posting Release** - Covers releasing deferred journals: a deferred journal is numbered but absent from the ledger, release posts it (balances move, status Posted), a posted journal cannot be released again, the batch release takes everything up to a date oldest first, and the period-close checklist clears.
 - [ ] Deferred journals stay off the ledger until released (`DeferredPostingReleaseTests.Deferred_journals_stay_off_the_ledger_until_released`)
 
-**Deferred School Fees** — Covers school fees billed in advance and earned over the term (brief §3.7, IFRS 15): billing credits deferred income rather than revenue; the end-of-January run earns 31 of the term's 90 days; a repeat run posts nothing; the end-of-term run earns the rest.
+**Deferred School Fees** - Covers school fees billed in advance and earned over the term (brief §3.7, IFRS 15): billing credits deferred income rather than revenue; the end-of-January run earns 31 of the term's 90 days; a repeat run posts nothing; the end-of-term run earns the rest.
 - [ ] Term fees are deferred and earned over the term (`DeferredSchoolFeesTests.Term_fees_are_deferred_and_earned_over_the_term`)
 
-**Delivery Charge** — Covers delivery charges: a zone's base charge plus rates per kilogram and cubic metre of the goods sent, free above a goods value, invoiced to the customer once per delivery.
+**Delivery Charge** - Covers delivery charges: a zone's base charge plus rates per kilogram and cubic metre of the goods sent, free above a goods value, invoiced to the customer once per delivery.
 - [ ] Deliveries are charged by zone weight and volume (`DeliveryChargeTests.Deliveries_are_charged_by_zone_weight_and_volume`)
 
-**Delivery Schedule** — Covers purchase order delivery schedules: a line spread over due dates, receipts matched earliest-due first, and the expediting list of late and soon-due deliveries (unscheduled lines due on the required-by date).
+**Delivery Schedule** - Covers purchase order delivery schedules: a line spread over due dates, receipts matched earliest-due first, and the expediting list of late and soon-due deliveries (unscheduled lines due on the required-by date).
 - [ ] Schedules drive the expediting list (`DeliveryScheduleTests.Schedules_drive_the_expediting_list`)
 
-**Delivery Tracking** — Covers delivery tracking (brief §14 H 140–142): despatches raise delivery notes on vehicles and routes; proof of delivery is signed once and never before despatch; OTIF judges each order by its requested date; unsigned deliveries and the load sheet are listed.
+**Delivery Tracking** - Covers delivery tracking (brief §14 H 140–142): despatches raise delivery notes on vehicles and routes; proof of delivery is signed once and never before despatch; OTIF judges each order by its requested date; unsigned deliveries and the load sheet are listed.
 - [ ] Deliveries are tracked to proof of delivery and reported (`DeliveryTrackingTests.Deliveries_are_tracked_to_proof_of_delivery_and_reported`)
 
 **Departmental Income Statement Report**
 - [ ] Departmental income statement renders through the report runner (`DepartmentalIncomeStatementReportTests.Departmental_income_statement_renders_through_the_report_runner`)
 
-**Departmental Income Statement** — Covers the departmental income statement: the profit-and-loss restricted to journal lines tagged with a department dimension.
+**Departmental Income Statement** - Covers the departmental income statement: the profit-and-loss restricted to journal lines tagged with a department dimension.
 - [ ] Income statement can be filtered to one department (`DepartmentalIncomeStatementTests.Income_statement_can_be_filtered_to_one_department`)
 
-**Depreciation Atomicity** — Covers a depreciation run refused by a closed GL period: the assets are not marked as depreciated for the month, even if the scope saves afterwards, so once the period is reopened the month is charged rather than skipped.
+**Depreciation Atomicity** - Covers a depreciation run refused by a closed GL period: the assets are not marked as depreciated for the month, even if the scope saves afterwards, so once the period is reopened the month is charged rather than skipped.
 - [ ] A refused run does not mark the month as charged (`DepreciationAtomicityTests.A_refused_run_does_not_mark_the_month_as_charged`)
 
 **Depreciation Forecast**
 - [ ] Forecast projects straight line depreciation and stops at residual (`DepreciationForecastTests.Forecast_projects_straight_line_depreciation_and_stops_at_residual`)
 
-**Depreciation Forecast Timing** — Covers forecast timing: an asset bought later in the window is only forecast from its acquisition month, and a month the run has already charged is not forecast again — so the forecast agrees with what the runs will actually post.
+**Depreciation Forecast Timing** - Covers forecast timing: an asset bought later in the window is only forecast from its acquisition month, and a month the run has already charged is not forecast again - so the forecast agrees with what the runs will actually post.
 - [ ] Forecast respects acquisition month and months already charged (`DepreciationForecastTimingTests.Forecast_respects_acquisition_month_and_months_already_charged`)
 
-**Depreciation Run Guard** — Covers the depreciation run guards: an asset acquired after the run month is not charged, re-running a month posts nothing, and the next month charges again — with accumulated depreciation equal to the ledger.
+**Depreciation Run Guard** - Covers the depreciation run guards: an asset acquired after the run month is not charged, re-running a month posts nothing, and the next month charges again - with accumulated depreciation equal to the ledger.
 - [ ] Runs skip future assets and never charge a month twice (`DepreciationRunGuardTests.Runs_skip_future_assets_and_never_charge_a_month_twice`)
 
 **Desktop Row Scope**
 - [ ] Payroll rows follow the signed in users scope (`DesktopRowScopeTests.Payroll_rows_follow_the_signed_in_users_scope`)
 
-**Developer Agreement** — Covers developer agreements: scheme stands are assigned to the council and developer quotas (not beyond the quota, not outside the scheme, not already promised); milestones are tracked; a council stand handed over returns to the council's pool (and can then be allocated, here to a cooperative) while a developer stand stays blocked; the reconciliation shows contracted vs handed over, overdue milestones and the penalty; and the penalty is invoiced to the developer as it accrues, never twice.
+**Developer Agreement** - Covers developer agreements: scheme stands are assigned to the council and developer quotas (not beyond the quota, not outside the scheme, not already promised); milestones are tracked; a council stand handed over returns to the council's pool (and can then be allocated, here to a cooperative) while a developer stand stays blocked; the reconciliation shows contracted vs handed over, overdue milestones and the penalty; and the penalty is invoiced to the developer as it accrues, never twice.
 - [ ] Developer delivery is reconciled and late council stands are penalised (`DeveloperAgreementTests.Developer_delivery_is_reconciled_and_late_council_stands_are_penalised`)
 
-**Development Covenant** — Covers development covenants: two stands carry two-year covenants from 1 January 2024. One holder submits and gets plans approved (milestones in order; a skipped or back-dated one refused), builds and completes — the covenant is complied with. The other does nothing: the breach run on 2 January 2026 flags it and levies 500 once (a repeat levies nothing); a paid extension of six months (fee 200) reopens it; breached again after the extension, it is levied again and a notice of intention to repossess is issued, after which it cannot be extended. Covenant income is 1,200.
+**Development Covenant** - Covers development covenants: two stands carry two-year covenants from 1 January 2024. One holder submits and gets plans approved (milestones in order; a skipped or back-dated one refused), builds and completes - the covenant is complied with. The other does nothing: the breach run on 2 January 2026 flags it and levies 500 once (a repeat levies nothing); a paid extension of six months (fee 200) reopens it; breached again after the extension, it is levied again and a notice of intention to repossess is issued, after which it cannot be extended. Covenant income is 1,200.
 - [ ] Covenants track milestones extensions and breaches (`DevelopmentCovenantTests.Covenants_track_milestones_extensions_and_breaches`)
 
-**Development Levy** — Covers development levies: allocation levies (flat, per m², % of the price frozen at offer) are raised on the beneficiary's account once the allocation is accepted, never twice, and not at all for a deactivated levy or a beneficiary with no account; transfer levies are raised on the incoming holder on the consideration, and not on a rejected transfer.
+**Development Levy** - Covers development levies: allocation levies (flat, per m², % of the price frozen at offer) are raised on the beneficiary's account once the allocation is accepted, never twice, and not at all for a deactivated levy or a beneficiary with no account; transfer levies are raised on the incoming holder on the consideration, and not on a rejected transfer.
 - [ ] Levies are raised once per allocation and transfer (`DevelopmentLevyTests.Levies_are_raised_once_per_allocation_and_transfer`)
 
-**Disassembly And Recount** — Covers disassembly (finished goods' cost split over the components recovered by their value) and blind stocktakes with recounts (counts outside the tolerance recounted by someone else before posting).
+**Disassembly And Recount** - Covers disassembly (finished goods' cost split over the components recovered by their value) and blind stocktakes with recounts (counts outside the tolerance recounted by someone else before posting).
 - [ ] Kits are taken apart and counts outside tolerance are recounted (`DisassemblyAndRecountTests.Kits_are_taken_apart_and_counts_outside_tolerance_are_recounted`)
 
 **Disassembly By Sales Value**
@@ -556,7 +556,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Invoices carry their analysis to the ledger (`DocumentAnalysisTests.Invoices_carry_their_analysis_to_the_ledger`)
 - [ ] Voucher lines carry their analysis to the ledger (`DocumentAnalysisTests.Voucher_lines_carry_their_analysis_to_the_ledger`)
 
-**Document Layout** — Covers the standard document layouts (brief §14 S, B 50, C 67, E 94, H 139): a quotation, an order confirmation, delivery and packing notes, a requisition, a goods received note and shelf labels, each built from its records.
+**Document Layout** - Covers the standard document layouts (brief §14 S, B 50, C 67, E 94, H 139): a quotation, an order confirmation, delivery and packing notes, a requisition, a goods received note and shelf labels, each built from its records.
 - [ ] Business documents render from their records (`DocumentLayoutTests.Business_documents_render_from_their_records`)
 - [ ] Debit notes bills fee invoices and payment certificates render (`DocumentLayoutTests.Debit_notes_bills_fee_invoices_and_payment_certificates_render`)
 
@@ -567,25 +567,25 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Field names imply drill targets (`DrillThroughTests.Field_names_imply_drill_targets`)
 - [ ] Documents stands and tax codes drill to text (`DrillThroughTests.Documents_stands_and_tax_codes_drill_to_text`)
 
-**Drop Ship** — Covers drop-shipment: the supplier sends order lines straight to the customer — never more than is left to send — and its confirmed delivery puts the supplier's invoice to cost of sales and makes the lines invoiceable, with no stock movement.
+**Drop Ship** - Covers drop-shipment: the supplier sends order lines straight to the customer - never more than is left to send - and its confirmed delivery puts the supplier's invoice to cost of sales and makes the lines invoiceable, with no stock movement.
 - [ ] Suppliers deliver straight to the customer (`DropShipTests.Suppliers_deliver_straight_to_the_customer`)
 
-**Dunning Credit Accounting** — Covers dunning with unallocated credits: a customer whose unallocated receipt covers the overdue invoice is not chased (and a letter is refused), and one whose credit note covers the oldest invoice drops from a final notice to a first reminder for the remainder, with the deduction shown on the letter.
+**Dunning Credit Accounting** - Covers dunning with unallocated credits: a customer whose unallocated receipt covers the overdue invoice is not chased (and a letter is refused), and one whose credit note covers the oldest invoice drops from a final notice to a first reminder for the remainder, with the deduction shown on the letter.
 - [ ] Unallocated credits reduce or remove reminders (`DunningCreditAccountingTests.Unallocated_credits_reduce_or_remove_reminders`)
 
-**Dunning Group** — Covers dunning groups and sending: a government group chased later, an exempt group not at all, letters emailed to those due one (and not again at the same level within the resend interval), and those without email counted for posting.
+**Dunning Group** - Covers dunning groups and sending: a government group chased later, an exempt group not at all, letters emailed to those due one (and not again at the same level within the resend interval), and those without email counted for posting.
 - [ ] Groups set the timetable and reminders are emailed once (`DunningGroupTests.Groups_set_the_timetable_and_reminders_are_emailed_once`)
 
-**Dunning Letter** — End-to-end reminder letter: a customer's overdue invoices are listed at the dunning level the oldest warrants, and customers with nothing overdue are refused.
+**Dunning Letter** - End-to-end reminder letter: a customer's overdue invoices are listed at the dunning level the oldest warrants, and customers with nothing overdue are refused.
 - [ ] Reminder letter lists overdue invoices at the warranted level (`DunningLetterTests.Reminder_letter_lists_overdue_invoices_at_the_warranted_level`)
 
-**Dunning** — End-to-end dunning assessment: overdue customers are assigned escalating reminder levels from the age of their oldest overdue item, and a customer inside the first threshold is not dunned.
+**Dunning** - End-to-end dunning assessment: overdue customers are assigned escalating reminder levels from the age of their oldest overdue item, and a customer inside the first threshold is not dunned.
 - [ ] Overdue customers are assigned escalating reminder levels (`DunningTests.Overdue_customers_are_assigned_escalating_reminder_levels`)
 
-**Duplicate Supplier Invoice** — Covers the duplicate supplier-invoice control on both entry routes: direct purchase-ledger entry and the three-way match. The same number (however punctuated) for the same supplier is refused; another supplier may use it; nothing is posted for a refused invoice.
+**Duplicate Supplier Invoice** - Covers the duplicate supplier-invoice control on both entry routes: direct purchase-ledger entry and the three-way match. The same number (however punctuated) for the same supplier is refused; another supplier may use it; nothing is posted for a refused invoice.
 - [ ] The same supplier invoice cannot be entered twice (`DuplicateSupplierInvoiceTests.The_same_supplier_invoice_cannot_be_entered_twice`)
 
-**Effective Pricing** — Covers date-effective pricing: a price scheduled in the past is refused; a scheduled price and a scheduled list-wide increase apply from their dates only, so an order dated before keeps the earlier price and one dated after takes the new; the history keeps every price.
+**Effective Pricing** - Covers date-effective pricing: a price scheduled in the past is refused; a scheduled price and a scheduled list-wide increase apply from their dates only, so an order dated before keeps the earlier price and one dated after takes the new; the history keeps every price.
 - [ ] Scheduled prices apply from their date and orders take the price of their date (`EffectivePricingTests.Scheduled_prices_apply_from_their_date_and_orders_take_the_price_of_their_date`)
 
 **Employee Leave**
@@ -597,7 +597,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Employee Loan**
 - [ ] Loan advance and repayments move the receivable and settle (`EmployeeLoanTests.Loan_advance_and_repayments_move_the_receivable_and_settle`)
 
-**Employee Placement** — Covers the employee record's placement and personal details (brief §4.15.1): branch, project and fund drive the payroll journal; whom they report to, next of kin, marital status, nationality, social security number and union are kept; unknown placements are refused.
+**Employee Placement** - Covers the employee record's placement and personal details (brief §4.15.1): branch, project and fund drive the payroll journal; whom they report to, next of kin, marital status, nationality, social security number and union are kept; unknown placements are refused.
 - [ ] Placement drives the payroll journal and details are kept (`EmployeePlacementTests.Placement_drives_the_payroll_journal_and_details_are_kept`)
 
 **Employee Profile**
@@ -606,19 +606,19 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Employee Register Report**
 - [ ] Employee register lists employees with department and basic (`EmployeeRegisterReportTests.Employee_register_lists_employees_with_department_and_basic`)
 
-**Employee Self Service** — Covers employee self-service: the signed-in user sees only their own payslips, tax certificate and leave; leave applications and detail changes wait for HR, nobody decides their own, and approval takes the leave or applies the change.
+**Employee Self Service** - Covers employee self-service: the signed-in user sees only their own payslips, tax certificate and leave; leave applications and detail changes wait for HR, nobody decides their own, and approval takes the leave or applies the change.
 - [ ] Employees serve themselves and HR decides (`EmployeeSelfServiceTests.Employees_serve_themselves_and_HR_decides`)
 
-**Employer Contribution Posting** — Employer contributions reach the ledger: a run with a contribution but no expense account is refused (it used to be left off silently); with one, the run charges the cost to the expense account and owes it on the element's liability.
+**Employer Contribution Posting** - Employer contributions reach the ledger: a run with a contribution but no expense account is refused (it used to be left off silently); with one, the run charges the cost to the expense account and owes it on the element's liability.
 - [ ] Employer contributions are charged and owed (`EmployerContributionPostingTests.Employer_contributions_are_charged_and_owed`)
 
-**Eviction** — Covers the eviction workflow: a tenant owing March and April rent gets a case opened with a reminder (a paid-up tenancy and a second case are refused); demand and notice follow; legal handover waits out the 30-day notice; the court order needs its reference; eviction on 1 August ends the tenancy — rent billed to that day, the deposit applied — and returns the unit as void. A second tenant's case is withdrawn once the arrears are paid.
+**Eviction** - Covers the eviction workflow: a tenant owing March and April rent gets a case opened with a reminder (a paid-up tenancy and a second case are refused); demand and notice follow; legal handover waits out the 30-day notice; the court order needs its reference; eviction on 1 August ends the tenancy - rent billed to that day, the deposit applied - and returns the unit as void. A second tenant's case is withdrawn once the arrears are paid.
 - [ ] Evictions follow the stages and end the tenancy (`EvictionTests.Evictions_follow_the_stages_and_end_the_tenancy`)
 
-**Exchange Rate Route** — Covers how a posting finds its exchange rate (brief §3.3): a currency quoted only the other way round (USD→ZAR) is converted with the inverse quote; one quoted only against a third currency (GBP→EUR, with EUR→USD) is triangulated through it; and a currency with no route at all is refused.
+**Exchange Rate Route** - Covers how a posting finds its exchange rate (brief §3.3): a currency quoted only the other way round (USD→ZAR) is converted with the inverse quote; one quoted only against a third currency (GBP→EUR, with EUR→USD) is triangulated through it; and a currency with no route at all is refused.
 - [ ] Rates are found inverse or triangulated (`ExchangeRateRouteTests.Rates_are_found_inverse_or_triangulated`)
 
-**Expected Credit Loss** — Covers the IFRS 9 allowance end to end: at 30 April a 119-day debt (1,000 at 50%), a 10-day debt (400 at 3%) and a not-yet-due invoice (200 at 1%) call for 514, while a debt covered by an unallocated receipt needs nothing; posting books 514, a repeat posts nothing, and once the old debt is paid the May run releases the allowance to 46.
+**Expected Credit Loss** - Covers the IFRS 9 allowance end to end: at 30 April a 119-day debt (1,000 at 50%), a 10-day debt (400 at 3%) and a not-yet-due invoice (200 at 1%) call for 514, while a debt covered by an unallocated receipt needs nothing; posting books 514, a repeat posts nothing, and once the old debt is paid the May run releases the allowance to 46.
 - [ ] The allowance follows the matrix and is released on collection (`ExpectedCreditLossTests.The_allowance_follows_the_matrix_and_is_released_on_collection`)
 
 **Expense Claim Report**
@@ -629,44 +629,44 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Draft claim can be rejected and not reimbursed (`ExpenseClaimTests.Draft_claim_can_be_rejected_and_not_reimbursed`)
 - [ ] Empty or non positive claims are refused (`ExpenseClaimTests.Empty_or_non_positive_claims_are_refused`)
 
-**Facility Booking** — Covers facility hire: the town hall at 200 a day is booked 10–12 May (600 invoiced); a booking sharing the 12th is refused while 13–14 May is taken (400); the calendar shows both; cancelling the second with a 50% refund credits 200 and frees the days for another booking; a cancelled booking cannot be cancelled again. Hire income nets to 1,000.
+**Facility Booking** - Covers facility hire: the town hall at 200 a day is booked 10–12 May (600 invoiced); a booking sharing the 12th is refused while 13–14 May is taken (400); the calendar shows both; cancelling the second with a 50% refund credits 200 and frees the days for another booking; a cancelled booking cannot be cancelled again. Hire income nets to 1,000.
 - [ ] Facilities are booked without clashes and cancelled with refunds (`FacilityBookingTests.Facilities_are_booked_without_clashes_and_cancelled_with_refunds`)
 
 **Fee Reminder**
 - [ ] Payers who owe fees are sent reminders (`FeeReminderTests.Payers_who_owe_fees_are_sent_reminders`)
 
-**Field Collection** — A field collector's handheld numbers receipts from its issued range and stops at its end; the collector's day reconciles on RC47 and the route on RC48.
+**Field Collection** - A field collector's handheld numbers receipts from its issued range and stops at its end; the collector's day reconciles on RC47 and the route on RC48.
 - [ ] A collector issues from the range and reconciles the day (`FieldCollectionTests.A_collector_issues_from_the_range_and_reconciles_the_day`)
 
-**Field Sensitivity** — Covers field-level sensitivity in reports: a report runner without cost rights gets the bill-of-materials costing with its cost columns left out; one with stock valuation (ViewCost) sees them.
+**Field Sensitivity** - Covers field-level sensitivity in reports: a report runner without cost rights gets the bill-of-materials costing with its cost columns left out; one with stock valuation (ViewCost) sees them.
 - [ ] Cost columns are left out for users without cost rights (`FieldSensitivityTests.Cost_columns_are_left_out_for_users_without_cost_rights`)
 
-**Fifo Costing** — Covers FIFO costing through every stock path: receipts of 10 at 5 and 10 at 8; an issue of 15 costs 50 + 40; its reversal returns 15 at 90 as a new layer; a transfer of 8 carries the layers it takes (5 at 8 and 3 at 6) to the other warehouse; a stocktake shortage of 2 costs 12; an issue of 10 there, allowed below zero, costs its 8 layered units (58) plus 2 at the average (14.50); the next receipt of 4 at 10 settles the deficit, leaving one layer of 2 worth 25.50. The layers always add up to the stock balances, and the ledger and check data agree.
+**Fifo Costing** - Covers FIFO costing through every stock path: receipts of 10 at 5 and 10 at 8; an issue of 15 costs 50 + 40; its reversal returns 15 at 90 as a new layer; a transfer of 8 carries the layers it takes (5 at 8 and 3 at 6) to the other warehouse; a stocktake shortage of 2 costs 12; an issue of 10 there, allowed below zero, costs its 8 layered units (58) plus 2 at the average (14.50); the next receipt of 4 at 10 settles the deficit, leaving one layer of 2 worth 25.50. The layers always add up to the stock balances, and the ledger and check data agree.
 - [ ] Fifo items are costed from their oldest layers (`FifoCostingTests.Fifo_items_are_costed_from_their_oldest_layers`)
 
-**File Local Offline Queue** — Covers the terminal-local file queue that captures sales while the central database is unreachable: enqueue/list/remove round-trip, enqueue-once by operation id, capture-order listing, durability across a new instance over the same directory, and tolerance of a corrupt entry file.
+**File Local Offline Queue** - Covers the terminal-local file queue that captures sales while the central database is unreachable: enqueue/list/remove round-trip, enqueue-once by operation id, capture-order listing, durability across a new instance over the same directory, and tolerance of a corrupt entry file.
 - [ ] Enqueue list and remove round trip (`FileLocalOfflineQueueTests.Enqueue_list_and_remove_round_trip`)
 - [ ] Enqueue is idempotent by operation id (`FileLocalOfflineQueueTests.Enqueue_is_idempotent_by_operation_id`)
 - [ ] Entries list in capture order (`FileLocalOfflineQueueTests.Entries_list_in_capture_order`)
 - [ ] Entries survive a new instance over the same directory (`FileLocalOfflineQueueTests.Entries_survive_a_new_instance_over_the_same_directory`)
 - [ ] A corrupt entry file is ignored not thrown (`FileLocalOfflineQueueTests.A_corrupt_entry_file_is_ignored_not_thrown`)
 
-**Final Catalogue Reports** — Covers the last catalogue reports: GL19 period close status, AR44 customer deposits held, INV95 item master with the variant matrix, POS118 tabs, POS119 kitchen volumes with a void after the ticket was sent, POS122 slips at three paper widths and TX223 the tax invoice compliance layout.
+**Final Catalogue Reports** - Covers the last catalogue reports: GL19 period close status, AR44 customer deposits held, INV95 item master with the variant matrix, POS118 tabs, POS119 kitchen volumes with a void after the ticket was sent, POS122 slips at three paper widths and TX223 the tax invoice compliance layout.
 - [ ] Last catalogue reports render (`FinalCatalogueReportsTests.Last_catalogue_reports_render`)
 
-**Finance Charge Credit Accounting** — Covers finance charges with unallocated receipts: interest stops on the part a receipt covers from the receipt's date, so a customer who paid in full on 2 March is charged 60 days, not 90; a part-payer is charged on both pieces; and the next month's run charges only the part still unpaid.
+**Finance Charge Credit Accounting** - Covers finance charges with unallocated receipts: interest stops on the part a receipt covers from the receipt's date, so a customer who paid in full on 2 March is charged 60 days, not 90; a part-payer is charged on both pieces; and the next month's run charges only the part still unpaid.
 - [ ] Unallocated receipts stop interest from their date (`FinanceChargeCreditAccountingTests.Unallocated_receipts_stop_interest_from_their_date`)
 
-**Finance Charge Exemption** — Covers interest exemptions and compounding: three accounts each owe 1,000 from 1 January at 36.5% a year; the account flagged exempt and the indigent ratepayer are not charged, the other is charged 30 for January; in the next run the compounding rule also charges interest on that 30 (0.90), which the default rule would not.
+**Finance Charge Exemption** - Covers interest exemptions and compounding: three accounts each owe 1,000 from 1 January at 36.5% a year; the account flagged exempt and the indigent ratepayer are not charged, the other is charged 30 for January; in the next run the compounding rule also charges interest on that 30 (0.90), which the default rule would not.
 - [ ] Exempt accounts are skipped and compounding charges interest on interest (`FinanceChargeExemptionTests.Exempt_accounts_are_skipped_and_compounding_charges_interest_on_interest`)
 
-**Finance Charge Rerun** — Covers repeated finance-charge runs: each run charges only the days since the last one, a re-run of the same date charges nothing, and earlier finance charges never earn interest themselves.
+**Finance Charge Rerun** - Covers repeated finance-charge runs: each run charges only the days since the last one, a re-run of the same date charges nothing, and earlier finance charges never earn interest themselves.
 - [ ] Monthly runs charge each day once and never interest on interest (`FinanceChargeRerunTests.Monthly_runs_charge_each_day_once_and_never_interest_on_interest`)
 
-**Finance Charge** — End-to-end finance charges: interest is raised on an overdue customer balance (posting a finance-charge invoice that ages like any other), while a customer still within grace is not charged, and the books balance.
+**Finance Charge** - End-to-end finance charges: interest is raised on an overdue customer balance (posting a finance-charge invoice that ages like any other), while a customer still within grace is not charged, and the books balance.
 - [ ] Overdue balances are charged interest and grace is respected (`FinanceChargeTests.Overdue_balances_are_charged_interest_and_grace_is_respected`)
 
-**Finance Charges Task** — The scheduled finance-charge task charges interest on the company's saved policy, does nothing without one, and a re-run the same day charges nothing more.
+**Finance Charges Task** - The scheduled finance-charge task charges interest on the company's saved policy, does nothing without one, and a re-run the same day charges nothing more.
 - [ ] The monthly task charges interest on the saved policy (`FinanceChargesTaskTests.The_monthly_task_charges_interest_on_the_saved_policy`)
 
 **Financial Reports**
@@ -678,14 +678,14 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Financial Snapshot Report**
 - [ ] Snapshot summarises balance sheet and ytd profit (`FinancialSnapshotReportTests.Snapshot_summarises_balance_sheet_and_ytd_profit`)
 
-**Financing Component** — Covers the significant financing component of a long instalment sale (IFRS 15): sold over two years interest-free while credit costs 12%, the sale is its present value; the rest is deferred and earned as interest instalment by instalment, the remainder when the buyer settles early.
+**Financing Component** - Covers the significant financing component of a long instalment sale (IFRS 15): sold over two years interest-free while credit costs 12%, the sale is its present value; the rest is deferred and earned as interest instalment by instalment, the remainder when the buyer settles early.
 - [ ] A plan below the market rate is discounted and the discount unwinds in full (`FinancingComponentTests.A_plan_below_the_market_rate_is_discounted_and_the_discount_unwinds_in_full`)
 - [ ] A long interest free sale defers its financing and earns it over the term (`FinancingComponentTests.A_long_interest_free_sale_defers_its_financing_and_earns_it_over_the_term`)
 
-**Fiscalisation Extras** — Covers fiscalisation beyond sales (brief §3.5): a refund and a void are signed as refund receipts that reference the receipt they reverse, a sales ledger tax invoice and credit note are e-invoiced with the buyer's tax number, a device that is down queues them for the retry task, and the day close submits the Z report with the day's counts and totals.
+**Fiscalisation Extras** - Covers fiscalisation beyond sales (brief §3.5): a refund and a void are signed as refund receipts that reference the receipt they reverse, a sales ledger tax invoice and credit note are e-invoiced with the buyer's tax number, a device that is down queues them for the retry task, and the day close submits the Z report with the day's counts and totals.
 - [ ] Refunds voids invoices and the Z report are fiscalised (`FiscalisationExtrasTests.Refunds_voids_invoices_and_the_Z_report_are_fiscalised`)
 
-**Fiscalisation** — Covers fiscalisation at the till: opening a till opens the fiscal day; a sale is signed by the device and its receipt carries the fiscal code and verification; with the device unreachable the sale still completes but waits in the queue (its receipt says so), the retry signs it once the device is back; closing the last till closes the day, and the next till opens the next day.
+**Fiscalisation** - Covers fiscalisation at the till: opening a till opens the fiscal day; a sale is signed by the device and its receipt carries the fiscal code and verification; with the device unreachable the sale still completes but waits in the queue (its receipt says so), the retry signs it once the device is back; closing the last till closes the day, and the next till opens the next day.
 - [ ] Sales are fiscalised or queued and retried (`FiscalisationTests.Sales_are_fiscalised_or_queued_and_retried`)
 
 **Fixed Asset Revaluation**
@@ -700,22 +700,22 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Floor Plan**
 - [ ] Tables are placed and long tabs flagged (`FloorPlanTests.Tables_are_placed_and_long_tabs_flagged`)
 
-**Fund Control Override** — Covers fund-control blocks and overrides (brief §14 B27): a refused posting is recorded even though it rolls back; an override needs a reason and a supervisor other than the preparer, lets the posting through and is recorded too.
+**Fund Control Override** - Covers fund-control blocks and overrides (brief §14 B27): a refused posting is recorded even though it rolls back; an override needs a reason and a supervisor other than the preparer, lets the posting through and is recorded too.
 - [ ] Blocks and overrides are recorded and reported (`FundControlOverrideTests.Blocks_and_overrides_are_recorded_and_reported`)
 
-**Fund Control** — Covers fund control: with it on, expenditure against a vote (a budget-enabled expense account) is refused until the year's active budget appropriates it, whether by journal or by supplier invoice; a draft budget does not count, an account that is not a vote posts freely, and a department's budget appropriates only for that department.
+**Fund Control** - Covers fund control: with it on, expenditure against a vote (a budget-enabled expense account) is refused until the year's active budget appropriates it, whether by journal or by supplier invoice; a draft budget does not count, an account that is not a vote posts freely, and a department's budget appropriates only for that department.
 - [ ] Expenditure against a vote needs an appropriation (`FundControlTests.Expenditure_against_a_vote_needs_an_appropriation`)
 
-**Fund Project Analysis** — Covers project, fund and branch analysis: lines carry them (checked against the masters, required where the account says so), reversals keep them, fund accounting makes every line name a fund (the company's default fills sub-ledger postings) and each fund balance on its own, and budgets compare to actuals by fund and project.
+**Fund Project Analysis** - Covers project, fund and branch analysis: lines carry them (checked against the masters, required where the account says so), reversals keep them, fund accounting makes every line name a fund (the company's default fills sub-ledger postings) and each fund balance on its own, and budgets compare to actuals by fund and project.
 - [ ] Lines carry projects funds and branches and funds balance (`FundProjectAnalysisTests.Lines_carry_projects_funds_and_branches_and_funds_balance`)
 
-**Fx Revaluation Multi Currency** — Covers GL revaluation across two foreign currencies in one run (EUR bank gaining, CHF bank losing): previously refused as "mixed currencies" with no way to run per currency. Each currency gets its own journal and reversal.
+**Fx Revaluation Multi Currency** - Covers GL revaluation across two foreign currencies in one run (EUR bank gaining, CHF bank losing): previously refused as "mixed currencies" with no way to run per currency. Each currency gets its own journal and reversal.
 - [ ] Each foreign currency is revalued in its own journal (`FxRevaluationMultiCurrencyTests.Each_foreign_currency_is_revalued_in_its_own_journal`)
 
-**Gift Card Sale** — Covers selling and topping up gift cards at the till (brief §4.8.1): a ticket line on the GIFTCARD item loads the card through the till session (the tender is cash, card or mobile money; the value is a liability, not revenue), printed stock activates, an active card tops up, the card then pays for goods, and a void takes the load back unless the card has been spent.
+**Gift Card Sale** - Covers selling and topping up gift cards at the till (brief §4.8.1): a ticket line on the GIFTCARD item loads the card through the till session (the tender is cash, card or mobile money; the value is a liability, not revenue), printed stock activates, an active card tops up, the card then pays for goods, and a void takes the load back unless the card has been spent.
 - [ ] Gift cards are sold and topped up at the till (`GiftCardSaleTests.Gift_cards_are_sold_and_topped_up_at_the_till`)
 
-**Gift Card Servicing** — Covers gift card servicing: a 100 card is part-spent (30) and topped up by 50, leaving 120 on it; reported lost, it is blocked and can no longer be spent or topped up; a replacement takes over its 120 and can be spent; it cannot be replaced twice; both cards' histories read in order.
+**Gift Card Servicing** - Covers gift card servicing: a 100 card is part-spent (30) and topped up by 50, leaving 120 on it; reported lost, it is blocked and can no longer be spent or topped up; a replacement takes over its 120 and can be spent; it cannot be replaced twice; both cards' histories read in order.
 - [ ] Cards are topped up blocked and replaced with history (`GiftCardServicingTests.Cards_are_topped_up_blocked_and_replaced_with_history`)
 
 **Goods Return To Supplier**
@@ -724,43 +724,43 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Held Stock**
 - [ ] Goods held for others stay out of stock until used (`HeldStockTests.Goods_held_for_others_stay_out_of_stock_until_used`)
 
-**Housing Allocation Reports** — Covers the allocation and waiting-list depth reports (H3–H42): a ballot run is listed as proposed then re-verified; score derivations list each factor; an applicant who holds a council stand is flagged; a declined offer is reported with its reason; accepted allocations without an agreement are aged; and a person holding one stand and allocated another appears among beneficiaries with more than one stand.
+**Housing Allocation Reports** - Covers the allocation and waiting-list depth reports (H3–H42): a ballot run is listed as proposed then re-verified; score derivations list each factor; an applicant who holds a council stand is flagged; a declined offer is reported with its reason; accepted allocations without an agreement are aged; and a person holding one stand and allocated another appears among beneficiaries with more than one stand.
 - [ ] Allocation and waiting list reports reflect the registers (`HousingAllocationReportsTests.Allocation_and_waiting_list_reports_reflect_the_registers`)
 
-**Housing Approval Workflow** — Covers routing housing price rules and ownership transfers through the approval workflow: neither is approved directly while its workflow runs; the workflow's approval puts the price in force and approves the transfer for completion.
+**Housing Approval Workflow** - Covers routing housing price rules and ownership transfers through the approval workflow: neither is approved directly while its workflow runs; the workflow's approval puts the price in force and approves the transfer for completion.
 - [ ] Prices and ownership transfers are approved through their workflows (`HousingApprovalWorkflowTests.Prices_and_ownership_transfers_are_approved_through_their_workflows`)
 
-**Housing Delivery Reports** — Covers the applicant, statement and scheme-delivery housing reports (H21–H96): a scheme of three stands, one sold on instalments to a waiting-list applicant; two applicants who look like one person; a transfer missing its documents; a tenant billed rent. Each report reads those registers back.
+**Housing Delivery Reports** - Covers the applicant, statement and scheme-delivery housing reports (H21–H96): a scheme of three stands, one sold on instalments to a waiting-list applicant; two applicants who look like one person; a transfer missing its documents; a tenant billed rent. Each report reads those registers back.
 - [ ] Applicant statement and delivery reports reflect the registers (`HousingDeliveryReportsTests.Applicant_statement_and_delivery_reports_reflect_the_registers`)
 
-**Housing Deposits** — Covers purchase deposits and cancellations (brief §14 H51, H53): a deposit against an accepted offer is held, refunded, taken again and applied to the buyer's account; an instalment agreement cancelled at the buyer's request returns the stand and refunds what was paid less occupation rental and the admin charge; the registers read it back.
+**Housing Deposits** - Covers purchase deposits and cancellations (brief §14 H51, H53): a deposit against an accepted offer is held, refunded, taken again and applied to the buyer's account; an instalment agreement cancelled at the buyer's request returns the stand and refunds what was paid less occupation rental and the admin charge; the registers read it back.
 - [ ] Deposits are held and cleared and cancellations refund the buyer (`HousingDepositsTests.Deposits_are_held_and_cleared_and_cancellations_refund_the_buyer`)
 
-**Housing Ecl** — Covers housing ECL: an instalment buyer in a scheme owes 12,000 (net of a 1,000 deposit) 50 days past due and a tenant owes 300 rent 30 days past due, while an ordinary trade debtor's overdue 1,000 is left to the general provision. On the instalment matrix (2% current, 20% over 30 days) the scheme needs 2,400; on the rental matrix (5%, 50% from 30 days) rentals need 150. Posting raises 2,550 on the housing allowance; a repeat posts nothing.
+**Housing Ecl** - Covers housing ECL: an instalment buyer in a scheme owes 12,000 (net of a 1,000 deposit) 50 days past due and a tenant owes 300 rent 30 days past due, while an ordinary trade debtor's overdue 1,000 is left to the general provision. On the instalment matrix (2% current, 20% over 30 days) the scheme needs 2,400; on the rental matrix (5%, 50% from 30 days) rentals need 150. Posting raises 2,550 on the housing allowance; a repeat posts nothing.
 - [ ] Housing debtors are provided for by scheme and for rentals (`HousingEclTests.Housing_debtors_are_provided_for_by_scheme_and_for_rentals`)
 
-**Housing Fees** — Covers housing fees, duty and arrangements (brief §14 H27, H47, H63): a registration fee taken to income once; a listed applicant who has not paid it; transfer duty received on a transfer's consideration, held, then remitted, once only; and a payment arrangement with an instalment buyer measured against its schedule.
+**Housing Fees** - Covers housing fees, duty and arrangements (brief §14 H27, H47, H63): a registration fee taken to income once; a listed applicant who has not paid it; transfer duty received on a transfer's consideration, held, then remitted, once only; and a payment arrangement with an instalment buyer measured against its schedule.
 - [ ] Fees duty and arrangements are posted and reported (`HousingFeesTests.Fees_duty_and_arrangements_are_posted_and_reported`)
 
-**Housing Finance Reports** — Covers the housing debtors, finance and control reports (H44–H95): an instalment sale's amortisation schedule, its raised instalments aged and in arrears; a tenant's deposit and unpaid rent aged by unit type; repair cost per unit split between council and recharge; and the dashboard's counts.
+**Housing Finance Reports** - Covers the housing debtors, finance and control reports (H44–H95): an instalment sale's amortisation schedule, its raised instalments aged and in arrears; a tenant's deposit and unpaid rent aged by unit type; repair cost per unit split between council and recharge; and the dashboard's counts.
 - [ ] Debtor finance and control reports reflect the ledgers (`HousingFinanceReportsTests.Debtor_finance_and_control_reports_reflect_the_ledgers`)
 
-**Housing Grant** — Covers IAS 20 housing grants: a 250,000 grant towards a 1,000,000 servicing budget is received into deferred income; 400,000 spent while the conditions are not yet assured recognises nothing; once assured, 100,000 is recognised; at 700,000 spent the movement of 75,000 follows; expenditure cannot go down; the disclosure shows 75,000 deferred. A second grant with unfulfilled conditions is disclosed in full as deferred.
+**Housing Grant** - Covers IAS 20 housing grants: a 250,000 grant towards a 1,000,000 servicing budget is received into deferred income; 400,000 spent while the conditions are not yet assured recognises nothing; once assured, 100,000 is recognised; at 700,000 spent the movement of 75,000 follows; expenditure cannot go down; the disclosure shows 75,000 deferred. A second grant with unfulfilled conditions is disclosed in full as deferred.
 - [ ] Grants are deferred then recognised with expenditure (`HousingGrantTests.Grants_are_deferred_then_recognised_with_expenditure`)
 
-**Housing Money Reports** — Covers the housing money reports (brief §14 H17, H48, H94, H97): two stands created in a ward's scheme, one sold on instalments; the stand movement reconciles to the stands control account; the deposit shows as a collection; stand sales head the revenue summary; and the ward pack counts the ward's stands and arrears.
+**Housing Money Reports** - Covers the housing money reports (brief §14 H17, H48, H94, H97): two stands created in a ward's scheme, one sold on instalments; the stand movement reconciles to the stands control account; the deposit shows as a collection; stand sales head the revenue summary; and the ward pack counts the ward's stands and arrears.
 - [ ] Movement collections revenue and ward reports reflect the ledgers (`HousingMoneyReportsTests.Movement_collections_revenue_and_ward_reports_reflect_the_ledgers`)
 
-**Housing Municipal Link** — Covers housing → municipality: the council links stands on sale; selling a stand creates the billable property with the buyer as owner and ratepayer and the configured service starting on the sale date, so the first month's charge is pro-rata; a stand already rated is left alone; other events do nothing while the trigger is the sale.
+**Housing Municipal Link** - Covers housing → municipality: the council links stands on sale; selling a stand creates the billable property with the buyer as owner and ratepayer and the configured service starting on the sale date, so the first month's charge is pro-rata; a stand already rated is left alone; other events do nothing while the trigger is the sale.
 - [ ] A sold stand becomes a billable property charged pro rata (`HousingMunicipalLinkTests.A_sold_stand_becomes_a_billable_property_charged_pro_rata`)
 
 **Housing Register Details**
 - [ ] Registers carry the details the brief lists (`HousingRegisterDetailsTests.Registers_carry_the_details_the_brief_lists`)
 
-**Housing Rental Reports** — Covers the rental, scheme and partner housing reports (H54–H89): the rent roll shows the let unit with its billed rent as arrears; the void unit carries days void and rent lost; never-inspected units are due; the stock register shows occupancy; and an enumerated settlement appears in the settlement register and the regularisation progress report.
+**Housing Rental Reports** - Covers the rental, scheme and partner housing reports (H54–H89): the rent roll shows the let unit with its billed rent as arrears; the void unit carries days void and rent lost; never-inspected units are due; the stock register shows occupancy; and an enumerated settlement appears in the settlement register and the regularisation progress report.
 - [ ] Rental and scheme reports reflect the registers (`HousingRentalReportsTests.Rental_and_scheme_reports_reflect_the_registers`)
 
-**Housing Reports** — Covers the first H-series housing reports (brief §14 I-B): each renders through the generic runner against live data — the land bank and acquisitions with what blocks them, the waiting list in seniority order and its age analysis, the allocation register and offers with their countdown, and the double-allocation exception report, which is empty until a stand is promised twice.
+**Housing Reports** - Covers the first H-series housing reports (brief §14 I-B): each renders through the generic runner against live data - the land bank and acquisitions with what blocks them, the waiting list in seniority order and its age analysis, the allocation register and offers with their countdown, and the double-allocation exception report, which is empty until a stand is promised twice.
 - [ ] Housing reports render live registers and exceptions (`HousingReportsTests.Housing_reports_render_live_registers_and_exceptions`)
 
 **Housing Scheme Creation**
@@ -769,7 +769,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Housing**
 - [ ] Land bank wip to sale flows through ias2 inventory and ar (`HousingTests.Land_bank_wip_to_sale_flows_through_ias2_inventory_and_ar`)
 
-**Housing Title Reports** — Covers the ownership, title and control housing reports (H49, H56–H70): a paid-up holder appears ready for transfer until title is applied for; the chain of title verifies; an open transfer blocked by the transferor's arrears shows what is needed; the title pipeline and caveat register list their entries; and the broken-chain report stays empty.
+**Housing Title Reports** - Covers the ownership, title and control housing reports (H49, H56–H70): a paid-up holder appears ready for transfer until title is applied for; the chain of title verifies; an open transfer blocked by the transferor's arrears shows what is needed; the title pipeline and caveat register list their entries; and the broken-chain report stays empty.
 - [ ] Ownership title and control reports reflect the registers (`HousingTitleReportsTests.Ownership_title_and_control_reports_reflect_the_registers`)
 
 **Hr Cases**
@@ -778,32 +778,32 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Hr Expiry Alert**
 - [ ] Expiring permits contracts and documents are flagged to hr (`HrExpiryAlertTests.Expiring_permits_contracts_and_documents_are_flagged_to_hr`)
 
-**Hr Records** — Covers HR records (brief §14 O PR21, PR47, PR55–PR57): a court order collected through payroll down to its balance; establishment against headcount with vacancy savings and over-establishment; expired, expiring and missing documents; lapsed and live warnings; training renewals and an overdue appraisal.
+**Hr Records** - Covers HR records (brief §14 O PR21, PR47, PR55–PR57): a court order collected through payroll down to its balance; establishment against headcount with vacancy savings and over-establishment; expired, expiring and missing documents; lapsed and live warnings; training renewals and an overdue appraisal.
 - [ ] Hr records are kept and reported (`HrRecordsTests.Hr_records_are_kept_and_reported`)
 
-**Hyperinflation** — Covers the IAS 29 restated trial balance with the CPI at 100 in January, 110 in February and 121 in March: capital of 5,000 and equipment of 1,000 from January restate to 6,050 and 1,210; February sales of 1,100 to 1,210; March expenses of 242 stay; the bank (monetary) stays at 4,858; the restated balances leave a monetary loss of 950. Without an index for the reporting month the restatement is refused.
+**Hyperinflation** - Covers the IAS 29 restated trial balance with the CPI at 100 in January, 110 in February and 121 in March: capital of 5,000 and equipment of 1,000 from January restate to 6,050 and 1,210; February sales of 1,100 to 1,210; March expenses of 242 stay; the bank (monetary) stays at 4,858; the restated balances leave a monetary loss of 950. Without an index for the reporting month the restatement is refused.
 - [ ] The trial balance is restated with the monetary loss balancing it (`HyperinflationTests.The_trial_balance_is_restated_with_the_monetary_loss_balancing_it`)
 
-**Idempotency** — Covers idempotency keys: a journal posted twice with the same key posts once and returns the first journal; and the endpoint store runs a keyed request once, replays its response to a retry, refuses the key for a different request, reports one still running, lets the key go after a server failure, and purges keys past their retention.
+**Idempotency** - Covers idempotency keys: a journal posted twice with the same key posts once and returns the first journal; and the endpoint store runs a keyed request once, replays its response to a retry, refuses the key for a different request, reports one still running, lets the key go after a server failure, and purges keys past their retention.
 - [ ] A key posts once (`IdempotencyTests.A_key_posts_once`)
 - [ ] The store replays and guards keys (`IdempotencyTests.The_store_replays_and_guards_keys`)
 
-**Indigent Register** — Covers the indigent register: a household earning 300 against a 500 threshold is registered for a 50% subsidy until its June review, while one earning 900 is refused; March bills of 300 earn a 150 credit, once only; its review shows up as due in June; after the review date passes, July's bill earns nothing; a review finding 600 revokes it.
+**Indigent Register** - Covers the indigent register: a household earning 300 against a 500 threshold is registered for a 50% subsidy until its June review, while one earning 900 is refused; March bills of 300 earn a 150 credit, once only; its review shows up as due in June; after the review date passes, July's bill earns nothing; a review finding 600 revokes it.
 - [ ] Registered households get their subsidy until review (`IndigentRegisterTests.Registered_households_get_their_subsidy_until_review`)
 
-**Industry Setup** — Covers the Industry Setup Wizard: a retail and construction company gets the core and industry charts, VAT at the chosen rate, withholding tax, warehouses, an open year, starter roles and demo data, posts at once, and later adds schooling without duplicates.
+**Industry Setup** - Covers the Industry Setup Wizard: a retail and construction company gets the core and industry charts, VAT at the chosen rate, withholding tax, warehouses, an open year, starter roles and demo data, posts at once, and later adds schooling without duplicates.
 - [ ] A company is set up for its industries and can add more (`IndustrySetupTests.A_company_is_set_up_for_its_industries_and_can_add_more`)
 
-**Informal Settlement** — Covers informal-settlement regularisation: a settlement is registered and enumerated (one exercise open at a time, a person counted once); households occupying after the cut-off or headed by a minor do not qualify; no household is regularised before the upgrading plan is approved; an eligible household is allocated a stand directly, and that stand cannot then go to anyone else; another is registered on the waiting list with informal-settlement tenure; a household whose head already holds a cooperative stand is refused; and the summary counts each outcome.
+**Informal Settlement** - Covers informal-settlement regularisation: a settlement is registered and enumerated (one exercise open at a time, a person counted once); households occupying after the cut-off or headed by a minor do not qualify; no household is regularised before the upgrading plan is approved; an eligible household is allocated a stand directly, and that stand cannot then go to anyone else; another is registered on the waiting list with informal-settlement tenure; a household whose head already holds a cooperative stand is refused; and the summary counts each outcome.
 - [ ] Enumerated households are regularised or waiting listed without double allocation (`InformalSettlementTests.Enumerated_households_are_regularised_or_waiting_listed_without_double_allocation`)
 
-**Instalment Default** — Covers instalment default: a buyer who pays nothing after the deposit falls into arrears; the reminder, demand and breach notices are issued in turn, each only after the last is served; the cancellation notice waits for the breach notice to stand; penalty interest is charged once a month on the arrears.
+**Instalment Default** - Covers instalment default: a buyer who pays nothing after the deposit falls into arrears; the reminder, demand and breach notices are issued in turn, each only after the last is served; the cancellation notice waits for the breach notice to stand; penalty interest is charged once a month on the arrears.
 - [ ] Default notices follow the arrears with proof of service (`InstalmentDefaultTests.Default_notices_follow_the_arrears_with_proof_of_service`)
 
-**Instalment Sale** — Covers an instalment sale under the §4.10.9 ruling: a stand costing 25,000 sold for 13,000 cash price with a 1,000 deposit and 12,000 financed at 12% reducing over 12 months. Signature recognises sales of 13,000 and cost of sales of 25,000 at once; the deposit is banked; running to the end of March raises two instalments' interest (230.54) as interest income, and a repeat raises nothing; early settlement at mid-March rebates the remaining 563.69 of interest and leaves 10,098.16 principal plus the raised interest owing; nothing more is raised afterwards.
+**Instalment Sale** - Covers an instalment sale under the §4.10.9 ruling: a stand costing 25,000 sold for 13,000 cash price with a 1,000 deposit and 12,000 financed at 12% reducing over 12 months. Signature recognises sales of 13,000 and cost of sales of 25,000 at once; the deposit is banked; running to the end of March raises two instalments' interest (230.54) as interest income, and a repeat raises nothing; early settlement at mid-March rebates the remaining 563.69 of interest and leaves 10,098.16 principal plus the raised interest owing; nothing more is raised afterwards.
 - [ ] An instalment sale recognises the sale up front and interest over time (`InstalmentSaleTests.An_instalment_sale_recognises_the_sale_up_front_and_interest_over_time`)
 
-**Intercompany** — Covers intercompany postings: the mirrored pair lands in both companies (each balancing), the due-from and due-to agree, a failure on the second side rolls back the first, and consolidation eliminates the pair.
+**Intercompany** - Covers intercompany postings: the mirrored pair lands in both companies (each balancing), the due-from and due-to agree, a failure on the second side rolls back the first, and consolidation eliminates the pair.
 - [ ] Intercompany pair posts atomically and eliminates on consolidation (`IntercompanyTests.Intercompany_pair_posts_atomically_and_eliminates_on_consolidation`)
 
 **Inventory Adjustment**
@@ -818,7 +818,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Inventory Reorder Report**
 - [ ] Reorder report lists items at or below their reorder level (`InventoryReorderReportTests.Reorder_report_lists_items_at_or_below_their_reorder_level`)
 
-**Inventory Reports** — Covers the INV-numbered inventory reports (brief §14 E): two receipts at a rising cost and an issue; the register agrees with the stock control account, the item is overstocked against its reorder ceiling, the cost change is listed; every INV report renders.
+**Inventory Reports** - Covers the INV-numbered inventory reports (brief §14 E): two receipts at a rising cost and an issue; the register agrees with the stock control account, the item is overstocked against its reorder ceiling, the cost change is listed; every INV report renders.
 - [ ] Inventory reports reflect the stock register (`InventoryReportsTests.Inventory_reports_reflect_the_stock_register`)
 
 **Inventory Reversal**
@@ -836,46 +836,46 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Investment Property**
 - [ ] Rental units are carried and remeasured (`InvestmentPropertyTests.Rental_units_are_carried_and_remeasured`)
 
-**Invoice Dispute** — Covers the invoice dispute queue: against 10 widgets ordered and received at 5, an invoice at 5.50 (outside 5%) and one for 12 units are queued with their reasons rather than lost; the quantity dispute cannot be accepted, the price one is accepted with a note, posting AP at 55, clearing GRNI at 50 and putting 5 to price variance; the quantity one is rejected. An invoice 2% over on another order matches within tolerance but needs a variance account to post.
+**Invoice Dispute** - Covers the invoice dispute queue: against 10 widgets ordered and received at 5, an invoice at 5.50 (outside 5%) and one for 12 units are queued with their reasons rather than lost; the quantity dispute cannot be accepted, the price one is accepted with a note, posting AP at 55, clearing GRNI at 50 and putting 5 to price variance; the quantity one is rejected. An invoice 2% over on another order matches within tolerance but needs a variance account to post.
 - [ ] Mismatched invoices are queued and decided (`InvoiceDisputeTests.Mismatched_invoices_are_queued_and_decided`)
 
-**Invoice Document** — Covers the customer invoice / credit note document built from the AR open item and its journal: revenue legs become lines, the tax leg becomes VAT, totals and outstanding come from the open item, and non-document items (receipts) are refused.
+**Invoice Document** - Covers the customer invoice / credit note document built from the AR open item and its journal: revenue legs become lines, the tax leg becomes VAT, totals and outstanding come from the open item, and non-document items (receipts) are refused.
 - [ ] Invoice and credit note render from their open items (`InvoiceDocumentTests.Invoice_and_credit_note_render_from_their_open_items`)
 
-**Item Catalogue** — Covers the item master: extra barcodes (unique across items, packs and aliases), synonyms, pack units with their own barcodes, supplier links with one preferred source, search over all of it, scan / PLU look-up with the unit scanned, and ABC classes.
+**Item Catalogue** - Covers the item master: extra barcodes (unique across items, packs and aliases), synonyms, pack units with their own barcodes, supplier links with one preferred source, search over all of it, scan / PLU look-up with the unit scanned, and ABC classes.
 - [ ] Items are found by every code and classified (`ItemCatalogueTests.Items_are_found_by_every_code_and_classified`)
 
 **Item Master Report**
 - [ ] Item master lists items with uom and accounts (`ItemMasterReportTests.Item_master_lists_items_with_uom_and_accounts`)
 
-**Job Cost From Purchasing** — Covers job cost from purchasing and overheads: a job line on a purchase order needs the job's WIP account and shows as committed; goods received for it go straight to the job (out of stock to WIP) and onto its cost; an invoice priced above the order charges the difference to the job (its WIP account, not price variance); a direct supplier invoice charged to the job is captured; labour carries the overhead rate; the position shows actual, overheads and what is still on order.
+**Job Cost From Purchasing** - Covers job cost from purchasing and overheads: a job line on a purchase order needs the job's WIP account and shows as committed; goods received for it go straight to the job (out of stock to WIP) and onto its cost; an invoice priced above the order charges the difference to the job (its WIP account, not price variance); a direct supplier invoice charged to the job is captured; labour carries the overhead rate; the position shows actual, overheads and what is still on order.
 - [ ] Purchases for a job and overheads reach the job cost (`JobCostFromPurchasingTests.Purchases_for_a_job_and_overheads_reach_the_job_cost`)
 
 **Job Costing**
 - [ ] Progress certificate raises net ar and holds retention (`JobCostingTests.Progress_certificate_raises_net_ar_and_holds_retention`)
 
-**Job Wbs** — Covers the contract WBS: structure rules, actual cost from captured cost heads, committed cost from open subcontract value under the subcontract's own cost head, and the site's estimate to complete.
+**Job Wbs** - Covers the contract WBS: structure rules, actual cost from captured cost heads, committed cost from open subcontract value under the subcontract's own cost head, and the site's estimate to complete.
 - [ ] Breakdown forecasts cost to complete per activity (`JobWbsTests.Breakdown_forecasts_cost_to_complete_per_activity`)
 
 **Job Wip Report**
 - [ ] Wip report shows revenue recognised versus certified (`JobWipReportTests.Wip_report_shows_revenue_recognised_versus_certified`)
 
-**Joint Ownership** — Covers joint ownership: holders registered with shares (the current holder among them); survivorship under joint tenancy; a share transferred on its own under tenancy in common, and a deceased holder's share kept for the estate then passed on; a share transfer severing a joint tenancy so a later death no longer passes by survivorship; a blocked stand's shares frozen; and the holders on any date from the history.
+**Joint Ownership** - Covers joint ownership: holders registered with shares (the current holder among them); survivorship under joint tenancy; a share transferred on its own under tenancy in common, and a deceased holder's share kept for the estate then passed on; a share transfer severing a joint tenancy so a later death no longer passes by survivorship; a blocked stand's shares frozen; and the holders on any date from the history.
 - [ ] Shares pass by transfer survivorship or estate (`JointOwnershipTests.Shares_pass_by_transfer_survivorship_or_estate`)
 
-**Journal Approval** — Covers maker-checker approval of manual journals: above the threshold, a manual journal cannot post directly; a submitted journal is numbered and held, cannot be released by the deferred-journal run or approved by its preparer, and posts when a second user approves it. A rejected journal is cancelled, cannot be reversed, and keeps its number so the sequence shows no gap. The database itself refuses to post a held journal without an approver.
+**Journal Approval** - Covers maker-checker approval of manual journals: above the threshold, a manual journal cannot post directly; a submitted journal is numbered and held, cannot be released by the deferred-journal run or approved by its preparer, and posts when a second user approves it. A rejected journal is cancelled, cannot be reversed, and keeps its number so the sequence shows no gap. The database itself refuses to post a held journal without an approver.
 - [ ] Manual journals post only after a second user approves them (`JournalApprovalTests.Manual_journals_post_only_after_a_second_user_approves_them`)
 
 **Journal Daybook Report**
 - [ ] Daybook lists posted journals in range with totals (`JournalDaybookReportTests.Daybook_lists_posted_journals_in_range_with_totals`)
 
-**Journal Detail** — Covers the journal drill-down: every line with its account name and base / transaction amounts, debits first, balanced totals, the reversal links in both directions, deferred journals visible, and an unknown number returning null. Also checks a nominal-activity line drills to its own journal.
+**Journal Detail** - Covers the journal drill-down: every line with its account name and base / transaction amounts, debits first, balanced totals, the reversal links in both directions, deferred journals visible, and an unknown number returning null. Also checks a nominal-activity line drills to its own journal.
 - [ ] Journal detail shows lines totals and reversal links (`JournalDetailTests.Journal_detail_shows_lines_totals_and_reversal_links`)
 
-**Journal Import** — Covers importing manual journals from CSV: with an approval threshold of 500, a 100 journal posts and an 800 journal is held for approval; a file whose second journal hits a control account imports nothing at all; an unreadable file is refused before anything posts.
+**Journal Import** - Covers importing manual journals from CSV: with an approval threshold of 500, a 100 journal posts and an 800 journal is held for approval; a file whose second journal hits a control account imports nothing at all; an unreadable file is refused before anything posts.
 - [ ] Journal files import all or nothing with approval over the threshold (`JournalImportTests.Journal_files_import_all_or_nothing_with_approval_over_the_threshold`)
 
-**Journal Numbering Across Years** — Covers journal numbering when postings alternate between two open fiscal years (late adjustments into the prior year while the new year is already trading). Each year keeps its own counter, so no number is reissued and no posting fails on the unique journal-number index.
+**Journal Numbering Across Years** - Covers journal numbering when postings alternate between two open fiscal years (late adjustments into the prior year while the new year is already trading). Each year keeps its own counter, so no number is reissued and no posting fails on the unique journal-number index.
 - [ ] Alternating years continue each years own numbering (`JournalNumberingAcrossYearsTests.Alternating_years_continue_each_years_own_numbering`)
 
 **Journal Reversal**
@@ -887,182 +887,182 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] A short signing key is rejected (`JwtTokenServiceTests.A_short_signing_key_is_rejected`)
 - [ ] A token signed with a different key fails validation (`JwtTokenServiceTests.A_token_signed_with_a_different_key_fails_validation`)
 
-**Kit Explosion** — Covers kits sold (brief §4.2: phantom kits): despatching a kit issues the components of its bill of materials, scaled from the batch and with kits inside kits exploded, at their cost; a return puts the components back.
+**Kit Explosion** - Covers kits sold (brief §4.2: phantom kits): despatching a kit issues the components of its bill of materials, scaled from the batch and with kits inside kits exploded, at their cost; a return puts the components back.
 - [ ] Despatching a kit issues its components and a return restocks them (`KitExplosionTests.Despatching_a_kit_issues_its_components_and_a_return_restocks_them`)
 
 **Kitchen Station Print**
 - [ ] Fired tickets go to their station printers (`KitchenStationPrintTests.Fired_tickets_go_to_their_station_printers`)
 
-**Land Acquisition** — Covers land acquisition with due diligence: a purchase is opened once per parcel; its costs are capitalised into land WIP element by element and built up to the total parcel cost; it cannot complete until every due-diligence item is signed off acceptably by a permitted officer, a valuation is obtained and the price recorded; an unacceptable finding can be revised once resolved; completed, the parcel enters the land bank at the built-up cost and the case is closed; an abandoned acquisition's costs are written off.
+**Land Acquisition** - Covers land acquisition with due diligence: a purchase is opened once per parcel; its costs are capitalised into land WIP element by element and built up to the total parcel cost; it cannot complete until every due-diligence item is signed off acceptably by a permitted officer, a valuation is obtained and the price recorded; an unacceptable finding can be revised once resolved; completed, the parcel enters the land bank at the built-up cost and the case is closed; an abandoned acquisition's costs are written off.
 - [ ] Acquisitions complete only after due diligence at their built up cost (`LandAcquisitionTests.Acquisitions_complete_only_after_due_diligence_at_their_built_up_cost`)
 
 **Land Negotiation**
 - [ ] Offers are exchanged and the latest is agreed (`LandNegotiationTests.Offers_are_exchanged_and_the_latest_is_agreed`)
 - [ ] Broken off talks block completion until resolved (`LandNegotiationTests.Broken_off_talks_block_completion_until_resolved`)
 
-**Land Register** — Covers the land register (brief §14 H6–H8): a caveat on a parcel blocks the sale of its stands until lifted; an open boundary dispute over a stand blocks it too, and disputes only move forward; part of a parcel is sold at a gain and the rest exchanged at a loss, each posted with its cost pro rata to area; subdivided or disputed land cannot be disposed of; and the three register reports read it all back.
+**Land Register** - Covers the land register (brief §14 H6–H8): a caveat on a parcel blocks the sale of its stands until lifted; an open boundary dispute over a stand blocks it too, and disputes only move forward; part of a parcel is sold at a gain and the rest exchanged at a loss, each posted with its cost pro rata to area; subdivided or disputed land cannot be disposed of; and the three register reports read it all back.
 - [ ] Encumbrances disputes and disposals are registered enforced and posted (`LandRegisterTests.Encumbrances_disputes_and_disposals_are_registered_enforced_and_posted`)
 
-**Landed Cost** — Covers landed costs end to end: 32 of freight on a receipt of bolts (100) and nuts (60) is shared 20 / 12 by value; half the bolts have already been issued, so 10 of their share goes to cost of sales and 10 onto the bolts still on hand (average 10 → 12); the nuts take all 12 (average 2 → 2.40); the same charges cannot be applied twice and check data stays clean.
+**Landed Cost** - Covers landed costs end to end: 32 of freight on a receipt of bolts (100) and nuts (60) is shared 20 / 12 by value; half the bolts have already been issued, so 10 of their share goes to cost of sales and 10 onto the bolts still on hand (average 10 → 12); the nuts take all 12 (average 2 → 2.40); the same charges cannot be applied twice and check data stays clean.
 - [ ] Freight is capitalised on stock on hand and expensed on stock issued (`LandedCostTests.Freight_is_capitalised_on_stock_on_hand_and_expensed_on_stock_issued`)
 
-**Layby** — Covers lay-byes: a 500 television needs a 20% deposit, so 50 is refused and 100 accepted; the set is held out of free stock; instalments of 300 and 100 complete it, making the sale (revenue 500, cost 200) and issuing it, while an overpayment is refused. A second plan with a 10% forfeiture defaults after its final date: 20 is kept and 180 owed back. A third is cancelled with nothing forfeited. Deposits held net to nil and the ledger agrees with check data.
+**Layby** - Covers lay-byes: a 500 television needs a 20% deposit, so 50 is refused and 100 accepted; the set is held out of free stock; instalments of 300 and 100 complete it, making the sale (revenue 500, cost 200) and issuing it, while an overpayment is refused. A second plan with a 10% forfeiture defaults after its final date: 20 is kept and 180 owed back. A third is cancelled with nothing forfeited. Deposits held net to nil and the ledger agrees with check data.
 - [ ] Laybys hold payments until completion and forfeit on default (`LaybyTests.Laybys_hold_payments_until_completion_and_forfeit_on_default`)
 
-**Layby Vat And Licence Deferral** — Covers two revenue rules: a completed lay-bye at tax-inclusive prices accounts for its output tax when the sale is made; and an annual council licence fee is held in deferred income and earned month by month over the licence year.
+**Layby Vat And Licence Deferral** - Covers two revenue rules: a completed lay-bye at tax-inclusive prices accounts for its output tax when the sale is made; and an annual council licence fee is held in deferred income and earned month by month over the licence year.
 - [ ] A completed layby accounts for output tax and licence fees are earned over the year (`LaybyVatAndLicenceDeferralTests.A_completed_layby_accounts_for_output_tax_and_licence_fees_are_earned_over_the_year`)
 
-**Layout Plan** — Covers the layout plan register: a parcel's layout is submitted once (amendments are versions); it is approved by the planning authority; it cannot be amended while a version awaits approval; an amendment keeps the approved version in force until it is itself approved; the history shows what each version changed; and the plan in force is reconciled against the stands on the register.
+**Layout Plan** - Covers the layout plan register: a parcel's layout is submitted once (amendments are versions); it is approved by the planning authority; it cannot be amended while a version awaits approval; an amendment keeps the approved version in force until it is itself approved; the history shows what each version changed; and the plan in force is reconciled against the stands on the register.
 - [ ] Layouts are versioned approved and reconciled to the stand register (`LayoutPlanTests.Layouts_are_versioned_approved_and_reconciled_to_the_stand_register`)
 
-**Leave And Stocktake Workflow** — Covers routing leave applications and stocktake postings through the approval workflow: with a workflow defined, a leave application waits for it (HR cannot decide it directly) and is taken when approved; a stocktake's variances are held until approved, then posted, and a rejection releases them for correction.
+**Leave And Stocktake Workflow** - Covers routing leave applications and stocktake postings through the approval workflow: with a workflow defined, a leave application waits for it (HR cannot decide it directly) and is taken when approved; a stocktake's variances are held until approved, then posted, and a rejection releases them for correction.
 - [ ] Leave and stocktakes wait for their workflows (`LeaveAndStocktakeWorkflowTests.Leave_and_stocktakes_wait_for_their_workflows`)
 
-**Leave Cover And Toil** — Covers department cover and time off in lieu: with at most one of a department away at once, a second colleague's overlapping application is refused while one in another week is accepted; twelve overtime hours credit a day and a half of TOIL; grade days are saved and validated.
+**Leave Cover And Toil** - Covers department cover and time off in lieu: with at most one of a department away at once, a second colleague's overlapping application is refused while one in another week is accepted; twelve overtime hours credit a day and a half of TOIL; grade days are saved and validated.
 - [ ] Departments keep cover and overtime earns time off (`LeaveCoverAndToilTests.Departments_keep_cover_and_overtime_earns_time_off`)
 
-**Leave Policy** — Covers the leave policy run: monthly accrual with a service band and a pro-rata joiner, a month run twice accrues once, and as the leave year turns only the carry-over cap is kept (the excess forfeited) before the new month's accrual.
+**Leave Policy** - Covers the leave policy run: monthly accrual with a service band and a pro-rata joiner, a month run twice accrues once, and as the leave year turns only the carry-over cap is kept (the excess forfeited) before the new month's accrual.
 - [ ] Policies accrue monthly once and cap the carry over (`LeavePolicyTests.Policies_accrue_monthly_once_and_cap_the_carry_over`)
 
 **Leave Provision**
 - [ ] Leave provision trues up to the value of outstanding leave (`LeaveProvisionTests.Leave_provision_trues_up_to_the_value_of_outstanding_leave`)
 
-**Leave Recall And Provision** — Covers the leave calendar, cancelling and recalling leave (the days not taken go back to the balance), and the bonus and gratuity provisions trued up to what active employees have earned.
+**Leave Recall And Provision** - Covers the leave calendar, cancelling and recalling leave (the days not taken go back to the balance), and the bonus and gratuity provisions trued up to what active employees have earned.
 - [ ] Leave is recalled onto the calendar and provisions are trued up (`LeaveRecallAndProvisionTests.Leave_is_recalled_onto_the_calendar_and_provisions_are_trued_up`)
 
-**Leave Rules** — Covers the leave rules: a balance ceiling stops accrual, carried-over days lapse if not taken in time (taking leave uses them first), leave can be taken in advance only as far as the policy allows (and never paid out), and sick pay tiers turn sick days into a pay deduction.
+**Leave Rules** - Covers the leave rules: a balance ceiling stops accrual, carried-over days lapse if not taken in time (taking leave uses them first), leave can be taken in advance only as far as the policy allows (and never paid out), and sick pay tiers turn sick days into a pay deduction.
 - [ ] Ceiling lapse advance and sick tiers (`LeaveRulesTests.Ceiling_lapse_advance_and_sick_tiers`)
 
-**Ledger Database Guard** — Covers the ledger guards in the database itself: a journal line cannot carry a negative amount or be a debit and a credit at once, and a journal cannot become posted while its lines do not balance in base currency — even when written straight to the database.
+**Ledger Database Guard** - Covers the ledger guards in the database itself: a journal line cannot carry a negative amount or be a debit and a credit at once, and a journal cannot become posted while its lines do not balance in base currency - even when written straight to the database.
 - [ ] The database refuses bad signs and unbalanced posted journals (`LedgerDatabaseGuardTests.The_database_refuses_bad_signs_and_unbalanced_posted_journals`)
 
-**Ledger Integrity** — Covers check data: after ordinary activity across AR, AP, stock, deferred release and reversal the company is clean; then each kind of disagreement is planted directly in the database — a cached period balance, a stock quantity, an open item's outstanding, a deleted (deferred) journal leaving a number gap, and a posted line edited with its guard trigger disabled — and each is reported; rebuilding the period balances clears that class.
+**Ledger Integrity** - Covers check data: after ordinary activity across AR, AP, stock, deferred release and reversal the company is clean; then each kind of disagreement is planted directly in the database - a cached period balance, a stock quantity, an open item's outstanding, a deleted (deferred) journal leaving a number gap, and a posted line edited with its guard trigger disabled - and each is reported; rebuilding the period balances clears that class.
 - [ ] Check data is clean after normal activity and finds each planted fault (`LedgerIntegrityTests.Check_data_is_clean_after_normal_activity_and_finds_each_planted_fault`)
 
-**Ledger Report Options** — Covers the common report options: a deferred journal shows in the trial balance only when unposted journals are included, and the trial balance and statements translate into a reporting currency at the rate given.
+**Ledger Report Options** - Covers the common report options: a deferred journal shows in the trial balance only when unposted journals are included, and the trial balance and statements translate into a reporting currency at the rate given.
 - [ ] Unposted journals and a reporting currency are options (`LedgerReportOptionsTests.Unposted_journals_and_a_reporting_currency_are_options`)
 
-**Ledger Reports** — Covers the GL-numbered ledger reports (brief §14 A): sales, a reserve movement, a suspense posting and a reversing accrual; the multi-currency trial balance, equity statement, suspense review and accruals schedule read them back; every GL report renders.
+**Ledger Reports** - Covers the GL-numbered ledger reports (brief §14 A): sales, a reserve movement, a suspense posting and a reversing accrual; the multi-currency trial balance, equity statement, suspense review and accruals schedule read them back; every GL report renders.
 - [ ] Ledger reports reflect the journals (`LedgerReportsTests.Ledger_reports_reflect_the_journals`)
 
-**Licence Enforcement** — Covers enforcing the licence: unlicensed API modules are refused, terminals beyond the licensed number cannot open a till, an expiring licence warns, and a read-only licence refuses posting and API changes.
+**Licence Enforcement** - Covers enforcing the licence: unlicensed API modules are refused, terminals beyond the licensed number cannot open a till, an expiring licence warns, and a read-only licence refuses posting and API changes.
 - [ ] Enforced licence gates modules terminals and posting (`LicenceEnforcementTests.Enforced_licence_gates_modules_terminals_and_posting`)
 
-**Licence Limit** — Covers licence count limits at the point of creation: with an enforced licence allowing one more warehouse (installation-wide) and one more employee (the payroll module's limit), the next of each is saved and the one after is refused whole; terminated employees do not count.
+**Licence Limit** - Covers licence count limits at the point of creation: with an enforced licence allowing one more warehouse (installation-wide) and one more employee (the payroll module's limit), the next of each is saved and the one after is refused whole; terminated employees do not count.
 - [ ] Creating past a licence limit is refused (`LicenceLimitTests.Creating_past_a_licence_limit_is_refused`)
 
-**Licence Revocation** — Covers installing the vendor's revocation list: a list naming the installed licence makes it read-only (no posting), a list from an untrusted key or an older sequence is refused, and a later list without it restores the licence; the choice survives a reload.
+**Licence Revocation** - Covers installing the vendor's revocation list: a list naming the installed licence makes it read-only (no posting), a list from an untrusted key or an older sequence is refused, and a later list without it restores the licence; the choice survives a reload.
 - [ ] A revocation list turns the licence read only (`LicenceRevocationTests.A_revocation_list_turns_the_licence_read_only`)
 
 **Licence Usage**
 - [ ] Usage counts every company (`LicenceUsageTests.Usage_counts_every_company`)
 
-**Licence Volume Limit** — Covers the volume limits of a licence: journals a calendar year (transactions_per_year) and the departments budgeted for (budget_departments), refused past the limit at the point of creation.
+**Licence Volume Limit** - Covers the volume limits of a licence: journals a calendar year (transactions_per_year) and the departments budgeted for (budget_departments), refused past the limit at the point of creation.
 - [ ] Transactions a year and budget departments are limited (`LicenceVolumeLimitTests.Transactions_a_year_and_budget_departments_are_limited`)
 
-**Line Partition** — Covers the partitioned line tables (brief §2): journal, sale and payslip lines live in tables partitioned by year, each line stamped with its header's company and date so a posting lands in that year's partition, and a posted journal still reads back whole.
+**Line Partition** - Covers the partitioned line tables (brief §2): journal, sale and payslip lines live in tables partitioned by year, each line stamped with its header's company and date so a posting lands in that year's partition, and a posted journal still reads back whole.
 - [ ] Journal lines land in the posting years partition (`LinePartitionTests.Journal_lines_land_in_the_posting_years_partition`)
 
-**Loan Repayment From Pay** — Covers staff loans repaid from pay (brief §4.15.5): each run charges the period's interest and deducts the instalment, never taking net pay below zero; a suspended loan is not deducted; reversing the run puts the repayment back and takes the interest off.
+**Loan Repayment From Pay** - Covers staff loans repaid from pay (brief §4.15.5): each run charges the period's interest and deducts the instalment, never taking net pay below zero; a suspended loan is not deducted; reversing the run puts the repayment back and takes the interest off.
 - [ ] Runs charge interest and deduct instalments and a reversal undoes them (`LoanRepaymentFromPayTests.Runs_charge_interest_and_deduct_instalments_and_a_reversal_undoes_them`)
 - [ ] The instalment never exceeds the balance with its interest (`LoanRepaymentFromPayTests.The_instalment_never_exceeds_the_balance_with_its_interest`)
 
-**Local Encrypted Store** — Covers the terminal's encrypted local store (brief §6B): the protector seals and opens with a key kept (DPAPI-protected on Windows) beside the store and refuses altered or foreign data; the offline catalogue snapshot round-trips sealed and is ignored when tampered with; queued sales are written sealed, never as readable JSON, while entries written before encryption still flush; the snapshot finds a scanned code.
+**Local Encrypted Store** - Covers the terminal's encrypted local store (brief §6B): the protector seals and opens with a key kept (DPAPI-protected on Windows) beside the store and refuses altered or foreign data; the offline catalogue snapshot round-trips sealed and is ignored when tampered with; queued sales are written sealed, never as readable JSON, while entries written before encryption still flush; the snapshot finds a scanned code.
 - [ ] The protector round trips keeps its key and refuses altered or foreign data (`LocalEncryptedStoreTests.The_protector_round_trips_keeps_its_key_and_refuses_altered_or_foreign_data`)
 - [ ] The catalogue snapshot is sealed and ignored when tampered with (`LocalEncryptedStoreTests.The_catalogue_snapshot_is_sealed_and_ignored_when_tampered_with`)
 - [ ] Queued sales are sealed and plain entries from before still flush (`LocalEncryptedStoreTests.Queued_sales_are_sealed_and_plain_entries_from_before_still_flush`)
 - [ ] The snapshot finds a scanned barcode plu or code (`LocalEncryptedStoreTests.The_snapshot_finds_a_scanned_barcode_plu_or_code`)
 - [ ] Tabs parked offline are sealed listed and taken once (`LocalEncryptedStoreTests.Tabs_parked_offline_are_sealed_listed_and_taken_once`)
 
-**Localization Service** — Covers a company's language and terminology: an unknown locale refused, terms set and removed, the catalog in the company's language with its terms, and reports run in the company's locale with its terms on the labels.
+**Localization Service** - Covers a company's language and terminology: an unknown locale refused, terms set and removed, the catalog in the company's language with its terms, and reports run in the company's locale with its terms on the labels.
 - [ ] A company speaks its own language and words (`LocalizationServiceTests.A_company_speaks_its_own_language_and_words`)
 
-**Login Activity** — Covers sign-in logging (brief §14 P 236, 249): successes open sessions on two terminals at once, a wrong password and an unknown name are logged as failures, one session is ended; SYS236 and SYS249 read them back.
+**Login Activity** - Covers sign-in logging (brief §14 P 236, 249): successes open sessions on two terminals at once, a wrong password and an unknown name are logged as failures, one session is ended; SYS236 and SYS249 read them back.
 - [ ] Sign ins are logged and reported (`LoginActivityTests.Sign_ins_are_logged_and_reported`)
 
-**Lot Enforcement** — Covers enforced batch tracking end to end: a receipt of a batch-tracked item without batches is refused; a GRN carries them; an issue without batches takes the earliest-expiry batch, and one beyond the known batches is refused; a till sale takes batches by expiry; the recall trace leads from a batch back to the supplier and forward to the customers it reached, with what is left on hand.
+**Lot Enforcement** - Covers enforced batch tracking end to end: a receipt of a batch-tracked item without batches is refused; a GRN carries them; an issue without batches takes the earliest-expiry batch, and one beyond the known batches is refused; a till sale takes batches by expiry; the recall trace leads from a batch back to the supplier and forward to the customers it reached, with what is left on hand.
 - [ ] Batches are captured enforced and traced for a recall (`LotEnforcementTests.Batches_are_captured_enforced_and_traced_for_a_recall`)
 
-**Lot Tracking** — Covers batch, serial and expiry traceability and adjustment reasons (brief §14 E 82, 88–90): batches received with and without expiry, picked first-expiry-first-out and refused when short; serials one unit each and never received twice; adjustments analysed by an active reason code; INV82, INV88, INV89 and INV90 read them back.
+**Lot Tracking** - Covers batch, serial and expiry traceability and adjustment reasons (brief §14 E 82, 88–90): batches received with and without expiry, picked first-expiry-first-out and refused when short; serials one unit each and never received twice; adjustments analysed by an active reason code; INV82, INV88, INV89 and INV90 read them back.
 - [ ] Lots are traced through movements and reported (`LotTrackingTests.Lots_are_traced_through_movements_and_reported`)
 
-**Loyalty** — Covers the loyalty programme: members earn points (more in a higher tier), redeem them within their balance, lose unused points at expiry oldest first, and the points' value is carried as a liability that issuing builds and expiry releases.
+**Loyalty** - Covers the loyalty programme: members earn points (more in a higher tier), redeem them within their balance, lose unused points at expiry oldest first, and the points' value is carried as a liability that issuing builds and expiry releases.
 - [ ] Members earn redeem and lose points (`LoyaltyTests.Members_earn_redeem_and_lose_points`)
 
 **Margin Commission**
 - [ ] A margin rep earns on revenue less cost of sales (`MarginCommissionTests.A_margin_rep_earns_on_revenue_less_cost_of_sales`)
 
-**Master Data Approval** — Covers approvals for master data (brief §7): a change waits for the "MasterDataChange" workflow and is applied only when approved; approvers see the files attached to the document; and an emailed single-use link approves once, never twice.
+**Master Data Approval** - Covers approvals for master data (brief §7): a change waits for the "MasterDataChange" workflow and is applied only when approved; approvers see the files attached to the document; and an emailed single-use link approves once, never twice.
 - [ ] A change waits for approval by emailed link and is then applied (`MasterDataApprovalTests.A_change_waits_for_approval_by_emailed_link_and_is_then_applied`)
 
-**Master Data Export** — Covers master-data export: customers, items and the chart are written in their import layouts and read back by the importers into another company without an error; an unknown register is refused.
+**Master Data Export** - Covers master-data export: customers, items and the chart are written in their import layouts and read back by the importers into another company without an error; an unknown register is refused.
 - [ ] Exported registers load back through their importers (`MasterDataExportTests.Exported_registers_load_back_through_their_importers`)
 
 **Master Data Import Coverage**
 - [ ] Accounts warehouses and rental units import (`MasterDataImportCoverageTests.Accounts_warehouses_and_rental_units_import`)
 
-**Master Data** — Covers creating a company from nothing through the master data service: company and head office, a fiscal year opened for posting, the chart of accounts, a tax code, dimensions, traders and an item, with duplicates and missing references refused, and a journal posted in the new company.
+**Master Data** - Covers creating a company from nothing through the master data service: company and head office, a fiscal year opened for posting, the chart of accounts, a tax code, dimensions, traders and an item, with duplicates and missing references refused, and a journal posted in the new company.
 - [ ] A company is set up from nothing and can post (`MasterDataTests.A_company_is_set_up_from_nothing_and_can_post`)
 
-**Message Template Seeder** — The standard message templates (statement, fee statement, reminder, bill by email and SMS) are seeded for every company, left alone once reworded, render with the fields the bulk senders supply, and a batch queued on one reports its status.
+**Message Template Seeder** - The standard message templates (statement, fee statement, reminder, bill by email and SMS) are seeded for every company, left alone once reworded, render with the fields the bulk senders supply, and a batch queued on one reports its status.
 - [ ] Standard templates are seeded once and render for the bulk senders (`MessageTemplateSeederTests.Standard_templates_are_seeded_once_and_render_for_the_bulk_senders`)
 
-**Messaging Gateway** — Covers the outbound gateways without a database: SMS posts the filled template with the provider's auth header and reports refusals; email speaks SMTP to a local test server, attachment included; unconfigured or malformed recipients are refused without sending.
+**Messaging Gateway** - Covers the outbound gateways without a database: SMS posts the filled template with the provider's auth header and reports refusals; email speaks SMTP to a local test server, attachment included; unconfigured or malformed recipients are refused without sending.
 - [ ] Sms posts the filled template and reports refusals (`MessagingGatewayTests.Sms_posts_the_filled_template_and_reports_refusals`)
 - [ ] Email is delivered over smtp with its attachment (`MessagingGatewayTests.Email_is_delivered_over_smtp_with_its_attachment`)
 
 **Meter Reading Partition**
 - [ ] Readings land in their year partition (`MeterReadingPartitionTests.Readings_land_in_their_year_partition`)
 
-**Meter Reading** — Covers meter readings on a four-dial water meter: a high reading is flagged; a missed month is estimated at the historical rate (50); the next actual reading below the estimate bills nothing and credits 20 units, which the next reading nets off; a tampered and a negative reading are rejected; a wrap past 9999 is a rollover; replacing the meter takes its final reading, moves the water service to the new meter and retires the old one; the exceptions report lists every flagged reading.
+**Meter Reading** - Covers meter readings on a four-dial water meter: a high reading is flagged; a missed month is estimated at the historical rate (50); the next actual reading below the estimate bills nothing and credits 20 units, which the next reading nets off; a tampered and a negative reading are rejected; a wrap past 9999 is a rollover; replacing the meter takes its final reading, moves the water service to the new meter and retires the old one; the exceptions report lists every flagged reading.
 - [ ] Readings are validated estimated and carried over on replacement (`MeterReadingTests.Readings_are_validated_estimated_and_carried_over_on_replacement`)
 
-**Meter Register Import** — Covers the meter register import: each meter goes on the register with its opening reading and is linked to the property's service; a stand without the service, a service already metered or a serial already on the register fails the file before anything is written.
+**Meter Register Import** - Covers the meter register import: each meter goes on the register with its opening reading and is linked to the property's service; a stand without the service, a service already metered or a serial already on the register fails the file before anything is written.
 - [ ] Meters are registered with their opening readings and linked (`MeterRegisterImportTests.Meters_are_registered_with_their_opening_readings_and_linked`)
 
-**Missing Catalogue Reports** — Covers catalogue reports that were missing: CB69 bank reconciliation statement (unpresented payment, uncleared receipt, statement charge not yet booked, reconciled to nil), CB71 bank balances, POS102 Z/X-read per session with tenders per currency, SYS235 audit trail and SYS246 data health.
+**Missing Catalogue Reports** - Covers catalogue reports that were missing: CB69 bank reconciliation statement (unpresented payment, uncleared receipt, statement charge not yet booked, reconciled to nil), CB71 bank balances, POS102 Z/X-read per session with tenders per currency, SYS235 audit trail and SYS246 data health.
 - [ ] Bank pos audit and health reports render (`MissingCatalogueReportsTests.Bank_pos_audit_and_health_reports_render`)
 
-**Module Gating** — Covers the module registry in the running system: every registered scheduled task belongs to a module, and with an enforced licence a job whose module is not licensed is not run (its run says why) while a licensed module's job runs.
+**Module Gating** - Covers the module registry in the running system: every registered scheduled task belongs to a module, and with an enforced licence a job whose module is not licensed is not run (its run says why) while a licensed module's job runs.
 - [ ] Jobs run only for licensed modules (`ModuleGatingTests.Jobs_run_only_for_licensed_modules`)
 
-**Municipal Billing Run** — Covers the fixed-charge municipal billing run: every property linked to a flat service is billed its tariff's fixed charge on the ratepayer's account in one cycle.
+**Municipal Billing Run** - Covers the fixed-charge municipal billing run: every property linked to a flat service is billed its tariff's fixed charge on the ratepayer's account in one cycle.
 - [ ] Fixed charge run bills every linked property (`MunicipalBillingRunTests.Fixed_charge_run_bills_every_linked_property`)
 
-**Municipal Reports** — Covers the M-series municipal reports (brief §14 I): a reviewed refuse billing run (two stands billed, three exceptions) is summarised with its approver, its exceptions listed, the ratepayer aged by ward and service, and the property register shows each stand's services; every M report renders.
+**Municipal Reports** - Covers the M-series municipal reports (brief §14 I): a reviewed refuse billing run (two stands billed, three exceptions) is summarised with its approver, its exceptions listed, the ratepayer aged by ward and service, and the property register shows each stand's services; every M report renders.
 - [ ] Municipal reports reflect billing and registers (`MunicipalReportsTests.Municipal_reports_reflect_billing_and_registers`)
 
-**Municipal Service Type** — Covers council-defined services (brief §4.9): a service type billed like a built-in category, connected with a quantity and a deposit invoiced to the ratepayer; a billing run for that service bills only its active connections at the tariff times the quantity, leaving suspended ones out.
+**Municipal Service Type** - Covers council-defined services (brief §4.9): a service type billed like a built-in category, connected with a quantity and a deposit invoiced to the ratepayer; a billing run for that service bills only its active connections at the tariff times the quantity, leaving suspended ones out.
 - [ ] Council services bill by quantity take deposits and skip suspended connections (`MunicipalServiceTypeTests.Council_services_bill_by_quantity_take_deposits_and_skip_suspended_connections`)
 
 **Municipal**
 - [ ] Metered service bills ratepayer through ar and balances (`MunicipalTests.Metered_service_bills_ratepayer_through_ar_and_balances`)
 
-**Negative Stock Control** — Covers negative stock by exception: under the company's control an issue taking stock below zero needs a reason and a supervisor with the stock-issue authority; a till sale goes through but is recorded; when a receipt covers the shortfall its cost is corrected to the receipt cost (cost of sales against stock) so what is left carries the receipt cost, and the events are marked corrected.
+**Negative Stock Control** - Covers negative stock by exception: under the company's control an issue taking stock below zero needs a reason and a supervisor with the stock-issue authority; a till sale goes through but is recorded; when a receipt covers the shortfall its cost is corrected to the receipt cost (cost of sales against stock) so what is left carries the receipt cost, and the events are marked corrected.
 - [ ] Negative stock needs authority and is corrected on receipt (`NegativeStockControlTests.Negative_stock_needs_authority_and_is_corrected_on_receipt`)
 
-**Net Pay Protection** — Covers net-pay protection: deductions that would take net pay below the minimum take-home (an amount or a percentage of gross) are suspended — highest suspension priority first, statutory deductions never — carried forward as arrears, recovered when pay allows, undone by a run reversal, and listed in PR71.
+**Net Pay Protection** - Covers net-pay protection: deductions that would take net pay below the minimum take-home (an amount or a percentage of gross) are suspended - highest suspension priority first, statutory deductions never - carried forward as arrears, recovered when pay allows, undone by a run reversal, and listed in PR71.
 - [ ] Deductions are suspended to protect net pay and recovered later (`NetPayProtectionTests.Deductions_are_suspended_to_protect_net_pay_and_recovered_later`)
 
-**Notification** — Covers notifications and communications: templates per language with fallback to English and a preview; a bulk email despatch where an unmergeable recipient fails at once, a bouncing address is retried and then fails, and the rest are sent; a channel with no gateway stays queued with the reason; in-app messages land in the user's notification centre, which can be read and marked read.
+**Notification** - Covers notifications and communications: templates per language with fallback to English and a preview; a bulk email despatch where an unmergeable recipient fails at once, a bouncing address is retried and then fails, and the rest are sent; a channel with no gateway stays queued with the reason; in-app messages land in the user's notification centre, which can be read and marked read.
 - [ ] Templates are merged despatched with retry and delivered in app (`NotificationTests.Templates_are_merged_despatched_with_retry_and_delivered_in_app`)
 
 **Number Sequence**
 - [ ] Numbers are allocated sequentially per document type (`NumberSequenceTests.Numbers_are_allocated_sequentially_per_document_type`)
 
-**Offline Admin** — End-to-end offline outbox administration over the real database: an operation with no handler is dead-lettered, listed as failed, requeued (and fails again), then discarded.
+**Offline Admin** - End-to-end offline outbox administration over the real database: an operation with no handler is dead-lettered, listed as failed, requeued (and fails again), then discarded.
 - [ ] A dead lettered operation can be listed requeued and discarded (`OfflineAdminTests.A_dead_lettered_operation_can_be_listed_requeued_and_discarded`)
 
-**Onerous Contract** — Covers budget revision and the onerous-contract provision: a profitable contract provides nothing, a revised forecast above the contract value provides the whole loss at once, a further revision posts only the movement, and an improved forecast releases the provision — with the ledger balancing throughout.
+**Onerous Contract** - Covers budget revision and the onerous-contract provision: a profitable contract provides nothing, a revised forecast above the contract value provides the whole loss at once, a further revision posts only the movement, and an improved forecast releases the provision - with the ledger balancing throughout.
 - [ ] Budget revisions drive the expected loss provision up and down (`OnerousContractTests.Budget_revisions_drive_the_expected_loss_provision_up_and_down`)
 
-**Opening Balance** — Covers migrating a company: master data previewed then committed, opening stock, open receivables (with a credit) and payables, and the legacy trial balance — after which the suspense account nets to zero and the controls agree with their sub-ledgers.
+**Opening Balance** - Covers migrating a company: master data previewed then committed, opening stock, open receivables (with a credit) and payables, and the legacy trial balance - after which the suspense account nets to zero and the controls agree with their sub-ledgers.
 - [ ] A legacy company is migrated and reconciles (`OpeningBalanceTests.A_legacy_company_is_migrated_and_reconciles`)
 
-**Opening Register Import** — Take-on of housing instalment agreements (stand sold, schedule rebuilt, instalments to date raised, arrears as an open item) and of municipal arrears by property and service (an unpaid bill each on an opening billing run), both against the migration suspense account.
+**Opening Register Import** - Take-on of housing instalment agreements (stand sold, schedule rebuilt, instalments to date raised, arrears as an open item) and of municipal arrears by property and service (an unpaid bill each on an opening billing run), both against the migration suspense account.
 - [ ] Instalment agreements and municipal arrears are taken on (`OpeningRegisterImportTests.Instalment_agreements_and_municipal_arrears_are_taken_on`)
 
-**Operations Reports** — Covers the SC-, JC- and SO-numbered reports (brief §14 J, K, H): a term billed to two students, one on a 25% bursary; the billing summary, arrears, bursaries, enrolment and balances read it back; every SC / JC / SO report renders.
+**Operations Reports** - Covers the SC-, JC- and SO-numbered reports (brief §14 J, K, H): a term billed to two students, one on a 25% bursary; the billing summary, arrears, bursaries, enrolment and balances read it back; every SC / JC / SO report renders.
 - [ ] School job and order reports reflect their registers (`OperationsReportsTests.School_job_and_order_reports_reflect_their_registers`)
 
 **Opportunity Conversion**
@@ -1071,37 +1071,37 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Opportunity Pipeline**
 - [ ] Opportunities move and close (`OpportunityPipelineTests.Opportunities_move_and_close`)
 
-**Order Cancellation** — Covers order cancellation: an untouched sales or purchase order can be cancelled (and drops out of the stock commitment / inbound figures), one with goods moved cannot, and a reason is mandatory.
+**Order Cancellation** - Covers order cancellation: an untouched sales or purchase order can be cancelled (and drops out of the stock commitment / inbound figures), one with goods moved cannot, and a reason is mandatory.
 - [ ] Untouched orders cancel and release commitments but moved goods block it (`OrderCancellationTests.Untouched_orders_cancel_and_release_commitments_but_moved_goods_block_it`)
 
-**Order Numbering** — Covers automatic order numbering: a blank order number takes the next SO- / PO- number from the company's sequence (gapless, in order), while an explicit number is kept verbatim.
+**Order Numbering** - Covers automatic order numbering: a blank order number takes the next SO- / PO- number from the company's sequence (gapless, in order), while an explicit number is kept verbatim.
 - [ ] Blank order numbers are allocated from the sequence and explicit ones kept (`OrderNumberingTests.Blank_order_numbers_are_allocated_from_the_sequence_and_explicit_ones_kept`)
 
-**Over Receipt** — Covers the over-receipt tolerance: a receipt within the company's 10% goes through; beyond it is refused unless a supervisor with the GRN authorise permission (not the receiver, not a user without it) accepts it, who is recorded on the GRN; a supplier's own tolerance replaces the company's.
+**Over Receipt** - Covers the over-receipt tolerance: a receipt within the company's 10% goes through; beyond it is refused unless a supervisor with the GRN authorise permission (not the receiver, not a user without it) accepts it, who is recorded on the GRN; a supplier's own tolerance replaces the company's.
 - [ ] Receipts beyond the tolerance need an authorised supervisor (`OverReceiptTests.Receipts_beyond_the_tolerance_need_an_authorised_supervisor`)
 
-**Overhead Allocation Accounting** — Covers overhead recharges at period end: March rent of 1,000 in admin is recharged by floor area (IT 200, production 600, sales 200), then IT's 300 plus the 200 it received is recharged by usage (production 333.33, sales 166.67). A rerun posts nothing; a late 100 of rent is recharged on the next run and steps down through IT with new usage drivers.
+**Overhead Allocation Accounting** - Covers overhead recharges at period end: March rent of 1,000 in admin is recharged by floor area (IT 200, production 600, sales 200), then IT's 300 plus the 200 it received is recharged by usage (production 333.33, sales 166.67). A rerun posts nothing; a late 100 of rent is recharged on the next run and steps down through IT with new usage drivers.
 - [ ] Overheads are recharged step down and only once (`OverheadAllocationAccountingTests.Overheads_are_recharged_step_down_and_only_once`)
 
-**Park And Return** — Covers parked sales (held under a tag, resumed at another till once, discarded with a reason) and refunds without a receipt (supervised, within the company's limit, revenue and tax reversed and the goods restocked at average cost).
+**Park And Return** - Covers parked sales (held under a tag, resumed at another till once, discarded with a reason) and refunds without a receipt (supervised, within the company's limit, revenue and tax reversed and the goods restocked at average cost).
 - [ ] Sales are parked and goods returned without a receipt (`ParkAndReturnTests.Sales_are_parked_and_goods_returned_without_a_receipt`)
 
-**Pay Element Flag** — Covers the pay element flags of brief §4.15.2: a pro-rated allowance follows the days employed like basic; a balance-driven deduction takes its amount each run until the employee's balance is used up and no more; earnings flagged for union dues and terminal benefits feed the UNIONBASE and TERMINALBASE variables a formula can take a percentage of.
+**Pay Element Flag** - Covers the pay element flags of brief §4.15.2: a pro-rated allowance follows the days employed like basic; a balance-driven deduction takes its amount each run until the employee's balance is used up and no more; earnings flagged for union dues and terminal benefits feed the UNIONBASE and TERMINALBASE variables a formula can take a percentage of.
 - [ ] Pro rated balance driven and base flags shape the payslip (`PayElementFlagTests.Pro_rated_balance_driven_and_base_flags_shape_the_payslip`)
 
-**Pay Element Lookup** — Covers the table-lookup pay element basis and formula preview: a lookup element with bad bands is refused and a good one saved; a formula is worked out against an employee's basic pay and given values before it is saved, and a broken formula is reported.
+**Pay Element Lookup** - Covers the table-lookup pay element basis and formula preview: a lookup element with bad bands is refused and a good one saved; a formula is worked out against an employee's basic pay and given values before it is saved, and a broken formula is reported.
 - [ ] Lookup elements are checked and formulas previewed (`PayElementLookupTests.Lookup_elements_are_checked_and_formulas_previewed`)
 
-**Pay Element Rules Run** — Covers the pay element engine's rules in a run (brief §4.15.4): pensionable and social-security bases built by flagged earnings, a ceiling on social security, a percentage of an element group rounded up, a memo line that is neither paid nor posted, a provision posted as an employer accrual, and salaries posted to the department's own expense account.
+**Pay Element Rules Run** - Covers the pay element engine's rules in a run (brief §4.15.4): pensionable and social-security bases built by flagged earnings, a ceiling on social security, a percentage of an element group rounded up, a memo line that is neither paid nor posted, a provision posted as an employer accrual, and salaries posted to the department's own expense account.
 - [ ] Flags groups limits memos and provisions work in a run (`PayElementRulesRunTests.Flags_groups_limits_memos_and_provisions_work_in_a_run`)
 
-**Pay Frequency And Pro Rata** — Covers part-period pay and pay frequencies (brief §4.15.4): a mid-month joiner is paid basic for the days employed; a weekly-paid employee is paid their weekly wage in the weekly pay group, taxed on the monthly table's bands scaled to the week.
+**Pay Frequency And Pro Rata** - Covers part-period pay and pay frequencies (brief §4.15.4): a mid-month joiner is paid basic for the days employed; a weekly-paid employee is paid their weekly wage in the weekly pay group, taxed on the monthly table's bands scaled to the week.
 - [ ] Joiners are pro rated and weekly wages taxed on weekly bands (`PayFrequencyAndProRataTests.Joiners_are_pro_rated_and_weekly_wages_taxed_on_weekly_bands`)
 
-**Pay Group** — Covers multiple payrolls per company: each pay group (and the default payroll) pays only its own employees, the period guard and reversals apply per group, and PR2 totals by pay group.
+**Pay Group** - Covers multiple payrolls per company: each pay group (and the default payroll) pays only its own employees, the period guard and reversals apply per group, and PR2 totals by pay group.
 - [ ] Pay groups run independently (`PayGroupTests.Pay_groups_run_independently`)
 
-**Payables Reports** — Covers the AP-numbered payables reports (brief §14 C): two suppliers invoiced, one overpaid into debit; a bank detail change requested; the reports list, rank and flag them; every AP report renders.
+**Payables Reports** - Covers the AP-numbered payables reports (brief §14 C): two suppliers invoiced, one overpaid into debit; a bank detail change requested; the reports list, rank and flag them; every AP report renders.
 - [ ] Payables reports reflect the ledger (`PayablesReportsTests.Payables_reports_reflect_the_ledger`)
 
 **Payer Search**
@@ -1115,10 +1115,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Payment Arrangement**
 - [ ] Captured arrangement appears on rc42 (`PaymentArrangementTests.Captured_arrangement_appears_on_rc42`)
 
-**Payment Run Approval** — Covers supplier payment run approval: with approval required a direct run is refused; a saved proposal lists everyone due (a held supplier left out with the reason); a supplier is part-paid (oldest invoice first) and another left out; the proposer cannot approve; a second person's approval pays exactly the approved amounts and the run is closed.
+**Payment Run Approval** - Covers supplier payment run approval: with approval required a direct run is refused; a saved proposal lists everyone due (a held supplier left out with the reason); a supplier is part-paid (oldest invoice first) and another left out; the proposer cannot approve; a second person's approval pays exactly the approved amounts and the run is closed.
 - [ ] A saved run is edited and approved by a second person (`PaymentRunApprovalTests.A_saved_run_is_edited_and_approved_by_a_second_person`)
 
-**Payment Run Credits** — Covers the payment run netting supplier credits: an unused credit note is set against the oldest invoice before paying the remainder (no overpayment); a supplier whose payment on account covers everything due is settled with nothing paid and left out of the EFT file; a supplier on hold is proposed with nothing to pay and skipped; the proposal matches what the run then does; and a second run on the same day continues the payment numbering.
+**Payment Run Credits** - Covers the payment run netting supplier credits: an unused credit note is set against the oldest invoice before paying the remainder (no overpayment); a supplier whose payment on account covers everything due is settled with nothing paid and left out of the EFT file; a supplier on hold is proposed with nothing to pay and skipped; the proposal matches what the run then does; and a second run on the same day continues the payment numbering.
 - [ ] Credits are applied before paying and numbering continues (`PaymentRunCreditsTests.Credits_are_applied_before_paying_and_numbering_continues`)
 
 **Payment Run Pain001**
@@ -1127,75 +1127,75 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Payment Run Priority**
 - [ ] Short funds pay by priority and wallets are paid by mobile money (`PaymentRunPriorityTests.Short_funds_pay_by_priority_and_wallets_are_paid_by_mobile_money`)
 
-**Payment Run Withholding** — Covers withholding in the supplier payment run: the proposal shows the tax that will be withheld from an uncleared supplier, the run settles the invoice in full while the bank file carries only the net, and a cleared supplier is paid in full.
+**Payment Run Withholding** - Covers withholding in the supplier payment run: the proposal shows the tax that will be withheld from an uncleared supplier, the run settles the invoice in full while the bank file carries only the net, and a cleared supplier is paid in full.
 - [ ] The run withholds from uncleared suppliers and pays the net (`PaymentRunWithholdingTests.The_run_withholds_from_uncleared_suppliers_and_pays_the_net`)
 
 **Payments Due Report**
 - [ ] Payments due lists outstanding invoices by due date (`PaymentsDueReportTests.Payments_due_lists_outstanding_invoices_by_due_date`)
 
-**Payroll Accounting** — Covers period-end payroll accounting: salaries of employees not yet paid for the month are accrued and reversed on the first of the next, and contract timesheet labour is capitalised into WIP once per timesheet.
+**Payroll Accounting** - Covers period-end payroll accounting: salaries of employees not yet paid for the month are accrued and reversed on the first of the next, and contract timesheet labour is capitalised into WIP once per timesheet.
 - [ ] Salaries are accrued and timesheet labour capitalised (`PayrollAccountingTests.Salaries_are_accrued_and_timesheet_labour_capitalised`)
 
-**Payroll Adjustment** — Covers corrections after a payroll is committed: a supplementary run for a committed period, a formally approved reversal (after which the period may be run again), backpay for a retrospective increase, the legacy import for the parallel run, and the PR8–PR10 reports over them.
+**Payroll Adjustment** - Covers corrections after a payroll is committed: a supplementary run for a committed period, a formally approved reversal (after which the period may be run again), backpay for a retrospective increase, the legacy import for the parallel run, and the PR8–PR10 reports over them.
 - [ ] Committed runs are corrected by visible runs and compared with the legacy payroll (`PayrollAdjustmentTests.Committed_runs_are_corrected_by_visible_runs_and_compared_with_the_legacy_payroll`)
 
-**Payroll Analysis** — Covers two payroll controls: the journal analyses pay cost by the employee's department and cost centre (matched to the GL dimensions by code or name), and nobody may calculate, approve or reverse a run that includes their own employee record.
+**Payroll Analysis** - Covers two payroll controls: the journal analyses pay cost by the employee's department and cost centre (matched to the GL dimensions by code or name), and nobody may calculate, approve or reverse a run that includes their own employee record.
 - [ ] Pay cost is analysed and own pay is blocked (`PayrollAnalysisTests.Pay_cost_is_analysed_and_own_pay_is_blocked`)
 
-**Payroll Approval** — Covers maker-checker payroll: with approval required a direct run is refused; a calculation is approved by someone else (and by a second, different approver when net pay moves past the threshold), shows the exception report, and is committed only while it still matches what was approved; PR7 shows who calculated, approved and committed.
+**Payroll Approval** - Covers maker-checker payroll: with approval required a direct run is refused; a calculation is approved by someone else (and by a second, different approver when net pay moves past the threshold), shows the exception report, and is committed only while it still matches what was approved; PR7 shows who calculated, approved and committed.
 - [ ] Payroll is calculated approved and committed (`PayrollApprovalTests.Payroll_is_calculated_approved_and_committed`)
 
-**Payroll Control Reports** — Covers the payroll control listings (brief §14 O PR22, PR42, PR53, PR63, PR66): a clerk changes their own bank details and then runs the payroll that pays them (two SoD violations); a leaver still holds a laptop, owes a loan and has leave; job timesheets cover part of an employee's pay; the next month is accrued.
+**Payroll Control Reports** - Covers the payroll control listings (brief §14 O PR22, PR42, PR53, PR63, PR66): a clerk changes their own bank details and then runs the payroll that pays them (two SoD violations); a leaver still holds a laptop, owes a loan and has leave; job timesheets cover part of an employee's pay; the next month is accrued.
 - [ ] Payroll control listings flag the exceptions (`PayrollControlReportsTests.Payroll_control_listings_flag_the_exceptions`)
 
-**Payroll Currency Split** — Covers the multi-currency tax split (PR35): earnings paid in a second currency are converted at the pay date's rate, and the tax is apportioned from the base table by share — or computed on the currency's own table once one is in force.
+**Payroll Currency Split** - Covers the multi-currency tax split (PR35): earnings paid in a second currency are converted at the pay date's rate, and the tax is apportioned from the base table by share - or computed on the currency's own table once one is in force.
 - [ ] Tax is split across the currencies earnings are paid in (`PayrollCurrencySplitTests.Tax_is_split_across_the_currencies_earnings_are_paid_in`)
 
 **Payroll Deductions Report**
 - [ ] Deductions report aggregates by element across payslips (`PayrollDeductionsReportTests.Deductions_report_aggregates_by_element_across_payslips`)
 
-**Payroll Encryption** — Covers payroll encryption at rest: the cipher (random nonces, tamper and unknown-key refusal, plaintext from before passing through, key rotation), salary / bank / national ID stored as ciphertext and read back in clear, the audit log never holding them in clear, and the maintenance service finding and encrypting rows written before encryption.
+**Payroll Encryption** - Covers payroll encryption at rest: the cipher (random nonces, tamper and unknown-key refusal, plaintext from before passing through, key rotation), salary / bank / national ID stored as ciphertext and read back in clear, the audit log never holding them in clear, and the maintenance service finding and encrypting rows written before encryption.
 - [ ] The cipher protects rotates and refuses tampering (`PayrollEncryptionTests.The_cipher_protects_rotates_and_refuses_tampering`)
 - [ ] Payroll fields are ciphertext in the database and never in the audit log (`PayrollEncryptionTests.Payroll_fields_are_ciphertext_in_the_database_and_never_in_the_audit_log`)
 
-**Payroll Extras** — Covers split pay, benefits in kind, terminal benefits, labour mix and reprints (brief §14 O PR14, PR34, PR52, PR54, PR62, PR69).
+**Payroll Extras** - Covers split pay, benefits in kind, terminal benefits, labour mix and reprints (brief §14 O PR14, PR34, PR52, PR54, PR62, PR69).
 - [ ] Payroll extras are reported (`PayrollExtrasTests.Payroll_extras_are_reported`)
 
-**Payroll Period Guard** — Covers the payroll period guard: a period is paid once (a second run is refused and posts nothing), a blank period is refused, and the next period runs normally.
+**Payroll Period Guard** - Covers the payroll period guard: a period is paid once (a second run is refused and posts nothing), a blank period is refused, and the next period runs normally.
 - [ ] A payroll period cannot be paid twice (`PayrollPeriodGuardTests.A_payroll_period_cannot_be_paid_twice`)
 
-**Payroll Recovery** — Covers recoveries through payroll: staff purchases charged to an employee's staff account at the till and rent on the employee's council tenancy are deducted from pay (formula variables STAFFPURCHASES and HOUSINGRENT), the rent is receipted to the tenancy account, a reversal puts both balances back, and PR23 / PR24 reconcile them.
+**Payroll Recovery** - Covers recoveries through payroll: staff purchases charged to an employee's staff account at the till and rent on the employee's council tenancy are deducted from pay (formula variables STAFFPURCHASES and HOUSINGRENT), the rent is receipted to the tenancy account, a reversal puts both balances back, and PR23 / PR24 reconcile them.
 - [ ] Staff purchases and housing rent are recovered through payroll (`PayrollRecoveryTests.Staff_purchases_and_housing_rent_are_recovered_through_payroll`)
 
-**Payroll Remittance** — Covers third-party payments: a committed run raises AP invoices for the tax authority, the pension scheme (employee and employer parts together) and a garnishee creditor, clearing the payroll liabilities into AP; once only per run; on demand when the company does not raise them automatically; and PR73 lists them.
+**Payroll Remittance** - Covers third-party payments: a committed run raises AP invoices for the tax authority, the pension scheme (employee and employer parts together) and a garnishee creditor, clearing the payroll liabilities into AP; once only per run; on demand when the company does not raise them automatically; and PR73 lists them.
 - [ ] Runs raise supplier invoices for their third parties (`PayrollRemittanceTests.Runs_raise_supplier_invoices_for_their_third_parties`)
 
-**Payroll Reports** — Covers the PR-coded payroll reports (brief §14 O): a January run (basic 2,000, pension 5%, PAYE 180); the element summary, net pay control, tax reconciliation, GL reconciliation and YTD register agree with it; every PR report renders.
+**Payroll Reports** - Covers the PR-coded payroll reports (brief §14 O): a January run (basic 2,000, pension 5%, PAYE 180); the element summary, net pay control, tax reconciliation, GL reconciliation and YTD register agree with it; every PR report renders.
 - [ ] Payroll reports agree with the run (`PayrollReportsTests.Payroll_reports_agree_with_the_run`)
 
-**Payroll Second Net** — Covers the second net over payroll (brief §6): an employee taken on through the application is captured, and a salary raised by hand in the database is captured as a change from outside the application with the old and new values.
+**Payroll Second Net** - Covers the second net over payroll (brief §6): an employee taken on through the application is captured, and a salary raised by hand in the database is captured as a change from outside the application with the old and new values.
 - [ ] Payroll tables record changes made outside the application (`PayrollSecondNetTests.Payroll_tables_record_changes_made_outside_the_application`)
 
-**Payroll Settlement** — Covers the Pay and Close stages: a committed run with one employee paid by bank transfer and one in cash is paid from the bank and the cash account, clearing the net pay control, then closed; a run cannot close before it is paid, be paid twice, or close twice.
+**Payroll Settlement** - Covers the Pay and Close stages: a committed run with one employee paid by bank transfer and one in cash is paid from the bank and the cash account, clearing the net pay control, then closed; a run cannot close before it is paid, be paid twice, or close twice.
 - [ ] A committed run is paid then closed (`PayrollSettlementTests.A_committed_run_is_paid_then_closed`)
 - [ ] Earnings paid in another currency are paid from its account (`PayrollSettlementTests.Earnings_paid_in_another_currency_are_paid_from_its_account`)
 
-**Payroll Setup** — Covers payroll set-up without code: engaging and updating employees (unique numbers, a contract needs its end date), the standard pay elements, a tax table checked band by band, assigning elements, a payroll run using them all, and bank-detail changes that only a second person can approve.
+**Payroll Setup** - Covers payroll set-up without code: engaging and updating employees (unique numbers, a contract needs its end date), the standard pay elements, a tax table checked band by band, assigning elements, a payroll run using them all, and bank-detail changes that only a second person can approve.
 - [ ] Payroll is set up and runs (`PayrollSetupTests.Payroll_is_set_up_and_runs`)
 
 **Payroll**
 - [ ] Formula driven run pays net and posts balanced journal (`PayrollTests.Formula_driven_run_pays_net_and_posts_balanced_journal`)
 
-**Payroll Variable** — Covers variable input: keyed and imported variables (units for a rate-per-unit element, an amount for a once-off element the employee does not normally have), the import preview and its errors, the run using only the period's variables, and PR72.
+**Payroll Variable** - Covers variable input: keyed and imported variables (units for a rate-per-unit element, an amount for a once-off element the employee does not normally have), the import preview and its errors, the run using only the period's variables, and PR72.
 - [ ] Variables are keyed or imported and paid in their period (`PayrollVariableTests.Variables_are_keyed_or_imported_and_paid_in_their_period`)
 
-**Payroll Walled Garden** — Covers the payroll walled garden in the audit trail: changes to employees are left out of what an auditor without the payroll audit right sees (other changes still show), and are shown to a payroll auditor and to the system.
+**Payroll Walled Garden** - Covers the payroll walled garden in the audit trail: changes to employees are left out of what an auditor without the payroll audit right sees (other changes still show), and are shown to a payroll auditor and to the system.
 - [ ] Payroll changes are kept from auditors without the payroll audit right (`PayrollWalledGardenTests.Payroll_changes_are_kept_from_auditors_without_the_payroll_audit_right`)
 
-**Payroll Ytd Opening** — Covers payroll year-to-date openings: the previous payroll's taxable pay and tax for the year are imported (checked line by line first) and cumulative tax in the first run on this payroll counts them.
+**Payroll Ytd Opening** - Covers payroll year-to-date openings: the previous payroll's taxable pay and tax for the year are imported (checked line by line first) and cumulative tax in the first run on this payroll counts them.
 - [ ] Cumulative tax counts the previous payrolls year to date (`PayrollYtdOpeningTests.Cumulative_tax_counts_the_previous_payrolls_year_to_date`)
 
-**Payslip Distribution** — Covers e-mailed payslips: each employee of a run is queued a PDF protected by the company's password rule; employees without an address or without the detail the rule needs are listed instead; with no rule the PDF is open.
+**Payslip Distribution** - Covers e-mailed payslips: each employee of a run is queued a PDF protected by the company's password rule; employees without an address or without the detail the rule needs are listed instead; with no rule the PDF is open.
 - [ ] Run payslips are emailed as protected pdfs (`PayslipDistributionTests.Run_payslips_are_emailed_as_protected_pdfs`)
 
 **Payslip**
@@ -1204,7 +1204,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Pending Tender**
 - [ ] Pending tender sits in uncleared effects then clears to bank (`PendingTenderTests.Pending_tender_sits_in_uncleared_effects_then_clears_to_bank`)
 
-**Performance** — The performance pack (brief §15 non-functional targets): item lookup under 100 ms on 100,000 SKUs, a 100,000-row report rendered within 5 s, and a payroll of 1,000 employees calculated in under 60 s, and a billing run of 50,000 municipal accounts proposed and posted within 15 minutes (ONE4ALL_PERF_BILLING sets a smaller count to try it). Heavy, so it runs only when ONE4ALL_PERF=1; it cleans up the items it creates.
+**Performance** - The performance pack (brief §15 non-functional targets): item lookup under 100 ms on 100,000 SKUs, a 100,000-row report rendered within 5 s, and a payroll of 1,000 employees calculated in under 60 s, and a billing run of 50,000 municipal accounts proposed and posted within 15 minutes (ONE4ALL_PERF_BILLING sets a smaller count to try it). Heavy, so it runs only when ONE4ALL_PERF=1; it cleans up the items it creates.
 - [ ] Item lookup on 100k skus is under 100 ms (`PerformanceTests.Item_lookup_on_100k_skus_is_under_100_ms`)
 - [ ] A 100k row report has its first page within 5 seconds (`PerformanceTests.A_100k_row_report_has_its_first_page_within_5_seconds`)
 - [ ] A payroll of 1000 employees is calculated within a minute (`PerformanceTests.A_payroll_of_1000_employees_is_calculated_within_a_minute`)
@@ -1213,46 +1213,46 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Payslip pdfs for 1000 employees are produced within 5 minutes (`PerformanceTests.Payslip_pdfs_for_1000_employees_are_produced_within_5_minutes`)
 - [ ] Fifty concurrent users post and read without errors (`PerformanceTests.Fifty_concurrent_users_post_and_read_without_errors`)
 
-**Period Close Checklist** — Covers the period-close checklist: a clean company passes everything; unreconciled statement lines, goods received but not invoiced and an approval in progress are counted (with the GRNI value), items after the period end are ignored, and clearing them restores readiness.
+**Period Close Checklist** - Covers the period-close checklist: a clean company passes everything; unreconciled statement lines, goods received but not invoiced and an approval in progress are counted (with the GRNI value), items after the period end are ignored, and clearing them restores readiness.
 - [ ] Checklist counts outstanding items as at the period end (`PeriodCloseChecklistTests.Checklist_counts_outstanding_items_as_at_the_period_end`)
 
-**Period Permanent Close** — Covers closing a period permanently while a deferred journal of that module is dated in it: refused (the journal could never be released), though a plain close — which can be reopened — and another module's permanent close are allowed; once the journal is released the permanent close goes through.
+**Period Permanent Close** - Covers closing a period permanently while a deferred journal of that module is dated in it: refused (the journal could never be released), though a plain close - which can be reopened - and another module's permanent close are allowed; once the journal is released the permanent close goes through.
 - [ ] Permanent close waits for the periods deferred journals (`PeriodPermanentCloseTests.Permanent_close_waits_for_the_periods_deferred_journals`)
 
 **Period Status Report**
 - [ ] Period status lists periods with ledger open state (`PeriodStatusReportTests.Period_status_lists_periods_with_ledger_open_state`)
 
-**Petty Cash** — Covers the petty-cash imprest system: establish a float, disburse an expense, then reimburse the float back to its set amount (only the shortfall is drawn from the bank).
+**Petty Cash** - Covers the petty-cash imprest system: establish a float, disburse an expense, then reimburse the float back to its set amount (only the shortfall is drawn from the bank).
 - [ ] Imprest float is established spent and reimbursed (`PettyCashTests.Imprest_float_is_established_spent_and_reimbursed`)
 - [ ] Fund is counted reconciled and claims input tax (`PettyCashTests.Fund_is_counted_reconciled_and_claims_input_tax`)
 
-**Pick List** — Covers the pick list: only undespatched quantity is listed, on-hand is the picking warehouse's (not company-wide), shortages are flagged, and cancelled / unknown orders are refused.
+**Pick List** - Covers the pick list: only undespatched quantity is listed, on-hand is the picking warehouse's (not company-wide), shortages are flagged, and cancelled / unknown orders are refused.
 - [ ] Pick list lists outstanding lines against the picking warehouse (`PickListTests.Pick_list_lists_outstanding_lines_against_the_picking_warehouse`)
 
 **Pipeline Forecast**
 - [ ] Forecast sums open opportunities by stage with weighting (`PipelineForecastTests.Forecast_sums_open_opportunities_by_stage_with_weighting`)
 
-**Pos Account And Currency** — Covers the till's on-account sales and foreign-currency tenders: a sale charged to a customer raises an invoice on their account (posted to the receivables control), a second one past the credit limit and one for a customer on hold are refused, voiding it credits and settles the account; the currencies the till takes come with today's rate, and a sale paid in euros balances in base.
+**Pos Account And Currency** - Covers the till's on-account sales and foreign-currency tenders: a sale charged to a customer raises an invoice on their account (posted to the receivables control), a second one past the credit limit and one for a customer on hold are refused, voiding it credits and settles the account; the currencies the till takes come with today's rate, and a sale paid in euros balances in base.
 - [ ] Accounts and currencies at the till (`PosAccountAndCurrencyTests.Accounts_and_currencies_at_the_till`)
 
-**Pos Cash Up** — Covers the POS cash-up close: the counted cash is reconciled against the expected drawer (float + cash received − change), an over/short variance posts a balanced journal, an exact count posts none, and the session closes with a Z-read either way.
+**Pos Cash Up** - Covers the POS cash-up close: the counted cash is reconciled against the expected drawer (float + cash received − change), an over/short variance posts a balanced journal, an exact count posts none, and the session closes with a Z-read either way.
 - [ ] Cash up posts the over short variance and closes the till (`PosCashUpTests.Cash_up_posts_the_over_short_variance_and_closes_the_till`)
 
-**Pos Catalogue** — Covers the till's tiles from the item master: an explicitly priced item, an item priced by the default list's cost-plus rule, and the items left off (unpriced, inactive, no revenue account); and a sale of a tile's item issuing stock and posting its cost.
+**Pos Catalogue** - Covers the till's tiles from the item master: an explicitly priced item, an item priced by the default list's cost-plus rule, and the items left off (unpriced, inactive, no revenue account); and a sale of a tile's item issuing stock and posting its cost.
 - [ ] Tiles come from the item master and move stock (`PosCatalogueTests.Tiles_come_from_the_item_master_and_move_stock`)
 
-**Pos Change Currency** — Covers change in a configured change currency: the till quotes the change at the day's rate rounded to the currency's smallest note or coin, the sale posts with the rounding difference to the rounding account, and change in any other currency is refused.
+**Pos Change Currency** - Covers change in a configured change currency: the till quotes the change at the day's rate rounded to the currency's smallest note or coin, the sale posts with the rounding difference to the rounding account, and change in any other currency is refused.
 - [ ] Change is given in the change currency rounded to its smallest unit (`PosChangeCurrencyTests.Change_is_given_in_the_change_currency_rounded_to_its_smallest_unit`)
 
-**Pos Deposit** — Covers deposit items at the till: a crate deposit sold with the drinks posts to the deposits-held liability and issues no stock; a deposit with tax, or posted to a revenue account, is refused; fuel is stock-tracked.
+**Pos Deposit** - Covers deposit items at the till: a crate deposit sold with the drinks posts to the deposits-held liability and issues no stock; a deposit with tax, or posted to a revenue account, is refused; fuel is stock-tracked.
 - [ ] Deposits are held as liabilities (`PosDepositTests.Deposits_are_held_as_liabilities`)
 
-**Pos Device** — Covers the peripherals without hardware: the provider builds what the settings ask for (nothing, simulators, network devices), a network printer receives the exact ESC/POS bytes and the drawer kick goes through it, a network scale is asked for and reports the weight, an unreachable printer says so instead of throwing, and the simulated card terminal approves within its limit.
+**Pos Device** - Covers the peripherals without hardware: the provider builds what the settings ask for (nothing, simulators, network devices), a network printer receives the exact ESC/POS bytes and the drawer kick goes through it, a network scale is asked for and reports the weight, an unreachable printer says so instead of throwing, and the simulated card terminal approves within its limit.
 - [ ] The provider builds simulators or nothing (`PosDeviceTests.The_provider_builds_simulators_or_nothing`)
 - [ ] A network printer gets the bytes and a scale answers (`PosDeviceTests.A_network_printer_gets_the_bytes_and_a_scale_answers`)
 - [ ] An unreachable printer reports rather than throws (`PosDeviceTests.An_unreachable_printer_reports_rather_than_throws`)
 
-**Pos Events** — Covers the till event log and refunds (brief §14 F): a partial refund posts revenue, tax and cash back and restocks at the original cost; over-refunds and unauthorised refunds are refused; voids, discounts, overrides, no-sales, parking, loyalty, reprints and fiscal submissions are recorded and read back by POS106–111, 115, 116 and 121.
+**Pos Events** - Covers the till event log and refunds (brief §14 F): a partial refund posts revenue, tax and cash back and restocks at the original cost; over-refunds and unauthorised refunds are refused; voids, discounts, overrides, no-sales, parking, loyalty, reprints and fiscal submissions are recorded and read back by POS106–111, 115, 116 and 121.
 - [ ] Till events and refunds are recorded and reported (`PosEventsTests.Till_events_and_refunds_are_recorded_and_reported`)
 
 **Pos Favourites By Cashier**
@@ -1264,10 +1264,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Pos Job Report Render**
 - [ ] Pos and job costing reports render live figures (`PosJobReportRenderTests.Pos_and_job_costing_reports_render_live_figures`)
 
-**Pos Line Extras** — Till extras from the twelfth audit: a serial-tracked item needs its serial number, lines carry a note and gift wrap, and a cash-up variance over the till's limit needs another user's sign-off.
+**Pos Line Extras** - Till extras from the twelfth audit: a serial-tracked item needs its serial number, lines carry a note and gift wrap, and a cash-up variance over the till's limit needs another user's sign-off.
 - [ ] Serial numbers notes and gift wrap are taken and the cash up is signed off (`PosLineExtrasTests.Serial_numbers_notes_and_gift_wrap_are_taken_and_the_cash_up_is_signed_off`)
 
-**Pos Offline Sync** — End-to-end offline POS sync: a sale captured while offline is enqueued in the database outbox and, when the sync service drains it, posts through the normal POS path. Replaying the same sale number is idempotent (no second journal), and an operation with no handler is dead-lettered.
+**Pos Offline Sync** - End-to-end offline POS sync: a sale captured while offline is enqueued in the database outbox and, when the sync service drains it, posts through the normal POS path. Replaying the same sale number is idempotent (no second journal), and an operation with no handler is dead-lettered.
 - [ ] Captured sale syncs once and replay is idempotent (`PosOfflineSyncTests.Captured_sale_syncs_once_and_replay_is_idempotent`)
 - [ ] A till opened offline syncs before its sales (`PosOfflineSyncTests.A_till_opened_offline_syncs_before_its_sales`)
 - [ ] A void a refund and the cash up captured offline replay after their sales (`PosOfflineSyncTests.A_void_a_refund_and_the_cash_up_captured_offline_replay_after_their_sales`)
@@ -1278,19 +1278,19 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Pos**
 - [ ] Complete sale posts revenue tax cogs and reads the till (`PosTests.Complete_sale_posts_revenue_tax_cogs_and_reads_the_till`)
 
-**Pos Tip** — Covers tips at the till: a sale of 23 with a tip of 2 is tendered 30 with 5 change; the tip is credited to the tips account (not revenue), kept on the sale and shown on the X-read; a tip without an account and tenders that do not cover the tip are refused.
+**Pos Tip** - Covers tips at the till: a sale of 23 with a tip of 2 is tendered 30 with 5 change; the tip is credited to the tips account (not revenue), kept on the sale and shown on the X-read; a tip without an account and tenders that do not cover the tip are refused.
 - [ ] A tip is paid with the sale and owed to staff (`PosTipTests.A_tip_is_paid_with_the_sale_and_owed_to_staff`)
 
 **Pos Void Sale**
 - [ ] Voiding a sale refunds the tender unwinds revenue and returns stock (`PosVoidSaleTests.Voiding_a_sale_refunds_the_tender_unwinds_revenue_and_returns_stock`)
 
-**Pos Voucher And Split Bill** — Covers paying at the till from a gift card (part voucher, part cash; the card charged only when the sale posts; refused when the card cannot cover it, is blocked, is in another currency or would give change; given back when the sale is voided) and splitting a bill between payers (by items and evenly, each part its own sale, all or none).
+**Pos Voucher And Split Bill** - Covers paying at the till from a gift card (part voucher, part cash; the card charged only when the sale posts; refused when the card cannot cover it, is blocked, is in another currency or would give change; given back when the sale is voided) and splitting a bill between payers (by items and evenly, each part its own sale, all or none).
 - [ ] Vouchers pay at the till and bills split (`PosVoucherAndSplitBillTests.Vouchers_pay_at_the_till_and_bills_split`)
 
-**Posted Journal Immutability** — Covers the database guard on posted journals: editing an amount or account on a posted line, deleting a posted line or journal, or rewriting a posted journal's narrative or date is refused by trigger — while a deferred journal can still be released and a posted one can still be reversed.
+**Posted Journal Immutability** - Covers the database guard on posted journals: editing an amount or account on a posted line, deleting a posted line or journal, or rewriting a posted journal's narrative or date is refused by trigger - while a deferred journal can still be released and a posted one can still be reversed.
 - [ ] Posted journals cannot be edited or deleted in the database (`PostedJournalImmutabilityTests.Posted_journals_cannot_be_edited_or_deleted_in_the_database`)
 
-**Posting Dimension** — Covers the posting engine's dimension check (brief §3.2: accounts "permitted for the company/cost centre/department"): a line may only name a cost centre or department the company has set up and still uses; a blank one is fine.
+**Posting Dimension** - Covers the posting engine's dimension check (brief §3.2: accounts "permitted for the company/cost centre/department"): a line may only name a cost centre or department the company has set up and still uses; a blank one is fine.
 - [ ] Lines name only the companys active cost centres and departments (`PostingDimensionTests.Lines_name_only_the_companys_active_cost_centres_and_departments`)
 
 **Posting Engine**
@@ -1305,58 +1305,58 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Prep Station**
 - [ ] A fired order is split into one ticket per station (`PrepStationTests.A_fired_order_is_split_into_one_ticket_per_station`)
 
-**Prepaid Vending** — Covers prepaid vending: electricity at 0.25 a unit for an account 100 in arrears; a 50 purchase at a 20% arrears rule takes 10 off arrears and buys 160 units; a 500 purchase at 25% clears the remaining 90 and buys 1,640 units; with no arrears 20 buys 80 units; a stand without electricity and a zero amount are refused; each sale has its own token; the bank holds 570, electricity sales 470 and the account is clear.
+**Prepaid Vending** - Covers prepaid vending: electricity at 0.25 a unit for an account 100 in arrears; a 50 purchase at a 20% arrears rule takes 10 off arrears and buys 160 units; a 500 purchase at 25% clears the remaining 90 and buys 1,640 units; with no arrears 20 buys 80 units; a stand without electricity and a zero amount are refused; each sale has its own token; the bank holds 570, electricity sales 470 and the account is clear.
 - [ ] Prepaid sales pay down arrears and issue tokens (`PrepaidVendingTests.Prepaid_sales_pay_down_arrears_and_issue_tokens`)
 
-**Price List Maintenance** — Covers bulk price-list maintenance: a percentage increase rounded to a price point across every break, an increase limited to chosen items, and copying a list at a discount to a new list that a customer can then be priced from.
+**Price List Maintenance** - Covers bulk price-list maintenance: a percentage increase rounded to a price point across every break, an increase limited to chosen items, and copying a list at a discount to a new list that a customer can then be priced from.
 - [ ] Prices adjust in bulk and lists copy at a discount (`PriceListMaintenanceTests.Prices_adjust_in_bulk_and_lists_copy_at_a_discount`)
 
-**Price List** — Covers price lists: quantity breaks resolve to the highest applicable break, a customer's own list wins over the default and the default fills gaps, currency is enforced on assignment, and only one list is the default.
+**Price List** - Covers price lists: quantity breaks resolve to the highest applicable break, a customer's own list wins over the default and the default fills gaps, currency is enforced on assignment, and only one list is the default.
 - [ ] Prices resolve by quantity break from customer list then default (`PriceListTests.Prices_resolve_by_quantity_break_from_customer_list_then_default`)
 
-**Pro Rata Billing** — Covers pro-rata billing in the fixed-charge run: a 30 refuse charge bills in full for a stand served all April, 20 for one connected on 11 April and 15 for one whose service ended on 15 April; a stand that ended in March and one connected in May are not billed; in May the ended stand drops out and the new stand bills in full.
+**Pro Rata Billing** - Covers pro-rata billing in the fixed-charge run: a 30 refuse charge bills in full for a stand served all April, 20 for one connected on 11 April and 15 for one whose service ended on 15 April; a stand that ended in March and one connected in May are not billed; in May the ended stand drops out and the new stand bills in full.
 - [ ] Part months are billed pro rata (`ProRataBillingTests.Part_months_are_billed_pro_rata`)
 
-**Procurement Atomicity** — Covers procurement steps as single units of work: a goods receipt whose second line is unknown receives nothing; an invoice match whose second line is outside price tolerance marks no line invoiced; a supplier return refused by a closed period leaves stock untouched — each even after a save in the same scope, with check data clean.
+**Procurement Atomicity** - Covers procurement steps as single units of work: a goods receipt whose second line is unknown receives nothing; an invoice match whose second line is outside price tolerance marks no line invoiced; a supplier return refused by a closed period leaves stock untouched - each even after a save in the same scope, with check data clean.
 - [ ] Receipts matches and returns stand or fall together (`ProcurementAtomicityTests.Receipts_matches_and_returns_stand_or_fall_together`)
 
-**Procurement Reports** — Covers the PO-numbered procurement reports (brief §14 G): two orders for the same item at rising prices, the first received into quarantine and partly rejected; the reports list, measure and compare them; every PO report renders.
+**Procurement Reports** - Covers the PO-numbered procurement reports (brief §14 G): two orders for the same item at rising prices, the first received into quarantine and partly rejected; the reports list, measure and compare them; every PO report renders.
 - [ ] Procurement reports reflect orders receipts and inspections (`ProcurementReportsTests.Procurement_reports_reflect_orders_receipts_and_inspections`)
 
 **Procurement**
 - [ ] Po grn three way match accrues grni and clears to ap (`ProcurementTests.Po_grn_three_way_match_accrues_grni_and_clears_to_ap`)
 
-**Promise To Pay** — Covers the promise-to-pay diary: two overdue customers each promise 500 by 15 May. While the promises are open neither is chased by dunning. One pays 500 on 10 May and the review marks that promise kept; the other pays nothing, so a review on 16 May marks it broken and dunning chases them again. A second open promise for a customer is refused.
+**Promise To Pay** - Covers the promise-to-pay diary: two overdue customers each promise 500 by 15 May. While the promises are open neither is chased by dunning. One pays 500 on 10 May and the review marks that promise kept; the other pays nothing, so a review on 16 May marks it broken and dunning chases them again. A second open promise for a customer is refused.
 - [ ] Promises hold dunning and are reviewed against receipts (`PromiseToPayTests.Promises_hold_dunning_and_are_reviewed_against_receipts`)
 
-**Promo Campaign** — Covers promotion campaigns: a March campaign of single-use codes giving 10% off a spend of 50 or more, capped at two redemptions; a quote does not use the code; a code is refused below the minimum spend, outside March, a second time, and once the campaign has been redeemed twice; unknown and duplicate codes are refused; the analysis reports codes issued and used, spend and discount.
+**Promo Campaign** - Covers promotion campaigns: a March campaign of single-use codes giving 10% off a spend of 50 or more, capped at two redemptions; a quote does not use the code; a code is refused below the minimum spend, outside March, a second time, and once the campaign has been redeemed twice; unknown and duplicate codes are refused; the analysis reports codes issued and used, spend and discount.
 - [ ] Codes are checked redeemed and analysed (`PromoCampaignTests.Codes_are_checked_redeemed_and_analysed`)
 
-**Promo Eligibility** — Covers promotion eligibility: a 10%-off campaign for STAFF customers on BAKERY items with a minimum spend of 20 refuses other customer types, needs the basket, counts only the bakery lines for the minimum and the discount, and refuses a basket with no bakery lines.
+**Promo Eligibility** - Covers promotion eligibility: a 10%-off campaign for STAFF customers on BAKERY items with a minimum spend of 20 refuses other customer types, needs the basket, counts only the bakery lines for the minimum and the discount, and refuses a basket with no bakery lines.
 - [ ] Campaigns limited to customer types and categories discount only what qualifies (`PromoEligibilityTests.Campaigns_limited_to_customer_types_and_categories_discount_only_what_qualifies`)
 
 **Promotion Eligibility**
 - [ ] A promotion for customer types applies only to them (`PromotionEligibilityTests.A_promotion_for_customer_types_applies_only_to_them`)
 
-**Promotion** — Covers POS promotions end to end: configured promotions run by happy-hour window, membership and coupon; a basket is priced with each line's discount; the sale posts revenue gross and the discount to the promotion's account, and a refund reverses both shares.
+**Promotion** - Covers POS promotions end to end: configured promotions run by happy-hour window, membership and coupon; a basket is priced with each line's discount; the sale posts revenue gross and the discount to the promotion's account, and a refund reverses both shares.
 - [ ] Promotions price the basket and post their discount (`PromotionTests.Promotions_price_the_basket_and_post_their_discount`)
 
-**Property Enquiry** — Covers the enquiry desk: a stand with a registered owner, metered water read at 120 and a refuse service ended in March; 100 billed in February and 50 in late March with 30 received leave a balance of 120, of which 70 is overdue; the latest transactions come newest first; the indigent subsidy, payment arrangement, open disconnection order and a hawker permit all show; there is no valid clearance.
+**Property Enquiry** - Covers the enquiry desk: a stand with a registered owner, metered water read at 120 and a refuse service ended in March; 100 billed in February and 50 in late March with 30 received leave a balance of 120, of which 70 is overdue; the latest transactions come newest first; the indigent subsidy, payment arrangement, open disconnection order and a hawker permit all show; there is no valid clearance.
 - [ ] The enquiry desk shows the whole property (`PropertyEnquiryTests.The_enquiry_desk_shows_the_whole_property`)
 
 **Property Party**
 - [ ] Tenants occupiers and agents are kept and copied on bills (`PropertyPartyTests.Tenants_occupiers_and_agents_are_kept_and_copied_on_bills`)
 
-**Property Transfer** — Covers the owner register and transfers: a stand's sole owner is registered (a second registration is refused); a transfer needs a clearance certificate for the stand, valid on the date and not used before, and buyers whose shares make 100% with one ratepayer; joint buyers at 60 / 40 take over from the transfer date, the seller's ownership ends the day before and the 60% buyer becomes the ratepayer.
+**Property Transfer** - Covers the owner register and transfers: a stand's sole owner is registered (a second registration is refused); a transfer needs a clearance certificate for the stand, valid on the date and not used before, and buyers whose shares make 100% with one ratepayer; joint buyers at 60 / 40 take over from the transfer date, the seller's ownership ends the day before and the 60% buyer becomes the ratepayer.
 - [ ] Transfers need a valid clearance and move the ratepayer (`PropertyTransferTests.Transfers_need_a_valid_clearance_and_move_the_ratepayer`)
 
-**Purchase Order Amendment** — Covers purchase order amendments: an order for 10 at 5 with 4 received cannot go below 4; raising it to 12 (20% more than the 10% threshold) makes version 2 and holds it, so nothing more can be received until someone other than the amender re-approves it; the history keeps version 1; a fully invoiced order is closed to amendment; a 5% increase on another order needs no re-approval.
+**Purchase Order Amendment** - Covers purchase order amendments: an order for 10 at 5 with 4 received cannot go below 4; raising it to 12 (20% more than the 10% threshold) makes version 2 and holds it, so nothing more can be received until someone other than the amender re-approves it; the history keeps version 1; a fully invoiced order is closed to amendment; a 5% increase on another order needs no re-approval.
 - [ ] Amendments keep history and large increases need reapproval (`PurchaseOrderAmendmentTests.Amendments_keep_history_and_large_increases_need_reapproval`)
 
 **Purchase Order Document**
 - [ ] Purchase order renders with supplier items and total (`PurchaseOrderDocumentTests.Purchase_order_renders_with_supplier_items_and_total`)
 
-**Purchase Order Workflow** — Covers purchase orders under the approval workflow and scheduled escalation: with a purchase-order workflow defined, a new order waits for approval (no goods can be received); approval releases it; rejection cancels it; the escalation runs as a scheduled task.
+**Purchase Order Workflow** - Covers purchase orders under the approval workflow and scheduled escalation: with a purchase-order workflow defined, a new order waits for approval (no goods can be received); approval releases it; rejection cancels it; the escalation runs as a scheduled task.
 - [ ] Orders wait for their workflow and escalation is scheduled (`PurchaseOrderWorkflowTests.Orders_wait_for_their_workflow_and_escalation_is_scheduled`)
 
 **Purchase Requisition Report**
@@ -1365,10 +1365,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Purchase Requisition**
 - [ ] Approved requisition converts into a purchase order (`PurchaseRequisitionTests.Approved_requisition_converts_into_a_purchase_order`)
 
-**Qualification Rules Db** — Covers the configurable qualification rules at registration: a category income ceiling, and a rates clearance refused while the applicant owes an overdue charge and granted once it is paid off. The rules round-trip.
+**Qualification Rules Db** - Covers the configurable qualification rules at registration: a category income ceiling, and a rates clearance refused while the applicant owes an overdue charge and granted once it is paid off. The rules round-trip.
 - [ ] Registration applies the configured rules (`QualificationRulesDbTests.Registration_applies_the_configured_rules`)
 
-**Quality Inspection** — Covers quality inspection holds: 10 widgets at 5 received into quarantine are not available to sell; inspection passes 8 into the main store and rejects 2, returned to the supplier for a 10 credit; inspecting more than remains is refused, as is inspecting goods never held; the supplier scorecard counts the 2 returned.
+**Quality Inspection** - Covers quality inspection holds: 10 widgets at 5 received into quarantine are not available to sell; inspection passes 8 into the main store and rejects 2, returned to the supplier for a 10 credit; inspecting more than remains is refused, as is inspecting goods never held; the supplier scorecard counts the 2 returned.
 - [ ] Held goods are released or returned on inspection (`QualityInspectionTests.Held_goods_are_released_or_returned_on_inspection`)
 
 **Quotation Report**
@@ -1377,10 +1377,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Quotation**
 - [ ] Accepted quotation converts into a sales order (`QuotationTests.Accepted_quotation_converts_into_a_sales_order`)
 
-**Rate Override** — Covers rate-override control: with it on, a rate keyed on a document needs the exchange-rate override permission and is recorded against the table's rate; documents at the table's rate need nothing; with it off, keyed rates pass as before.
+**Rate Override** - Covers rate-override control: with it on, a rate keyed on a document needs the exchange-rate override permission and is recorded against the table's rate; documents at the table's rate need nothing; with it off, keyed rates pass as before.
 - [ ] Keyed rates need the override permission and are recorded (`RateOverrideTests.Keyed_rates_need_the_override_permission_and_are_recorded`)
 
-**Reading Route** — Covers reading routes and imports: a route of two meters in walking order for a reader (a duplicate code, a meter already routed and an unknown meter are refused); the route sheet lists them in order with the stand and last reading; an imported file captures a good reading, records a negative and a tampered one as rejected, and reports an unknown meter and an unreadable date by line.
+**Reading Route** - Covers reading routes and imports: a route of two meters in walking order for a reader (a duplicate code, a meter already routed and an unknown meter are refused); the route sheet lists them in order with the stand and last reading; an imported file captures a good reading, records a negative and a tampered one as rejected, and reports an unknown meter and an unreadable date by line.
 - [ ] Routes give sheets and imported readings are captured line by line (`ReadingRouteTests.Routes_give_sheets_and_imported_readings_are_captured_line_by_line`)
 
 **Receipt Allocation**
@@ -1405,10 +1405,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Receipting**
 - [ ] Receipt credits debtor control not income and cashup posts variance (`ReceiptingTests.Receipt_credits_debtor_control_not_income_and_cashup_posts_variance`)
 
-**Receivables Reports** — Covers the AR-numbered receivables reports (brief §14 B): two customers invoiced, one paying on account; the reports age, list, rank and measure them; every AR report renders.
+**Receivables Reports** - Covers the AR-numbered receivables reports (brief §14 B): two customers invoiced, one paying on account; the reports age, list, rank and measure them; every AR report renders.
 - [ ] Receivables reports reflect the ledger (`ReceivablesReportsTests.Receivables_reports_reflect_the_ledger`)
 
-**Record History** — Covers "who touched this record": created by, last changed by, everyone involved and every entry for a record, the database trigger's view of its row with a change made outside the application flagged; and the audit trail exported as CSV, Excel and PDF, each export itself logged.
+**Record History** - Covers "who touched this record": created by, last changed by, everyone involved and every entry for a record, the database trigger's view of its row with a change made outside the application flagged; and the audit trail exported as CSV, Excel and PDF, each export itself logged.
 - [ ] A records history and audit exports (`RecordHistoryTests.A_records_history_and_audit_exports`)
 
 **Recurring Invoice Report**
@@ -1420,7 +1420,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Recurring Journal Report**
 - [ ] Recurring journal register lists templates (`RecurringJournalReportTests.Recurring_journal_register_lists_templates`)
 
-**Recurring Journal Rerun** — Covers the recurring-journal guard: a month's run repeated posts nothing more, a single template cannot be posted again for the same or an earlier month, and a run that fails part-way can be re-run after the cause is fixed, posting only the templates that did not post.
+**Recurring Journal Rerun** - Covers the recurring-journal guard: a month's run repeated posts nothing more, a single template cannot be posted again for the same or an earlier month, and a run that fails part-way can be re-run after the cause is fixed, posting only the templates that did not post.
 - [ ] Rerunning a month never posts a template twice (`RecurringJournalRerunTests.Rerunning_a_month_never_posts_a_template_twice`)
 
 **Recurring Journal**
@@ -1435,7 +1435,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Recurring Sales Invoice**
 - [ ] Billing run generates and catches up monthly invoices (`RecurringSalesInvoiceTests.Billing_run_generates_and_catches_up_monthly_invoices`)
 
-**Recurring Schedule** — Recurring journals on a schedule (brief §3.1): quarterly from a start month for a number of times, auto-reversed on the first of the next month, in a foreign currency; and a journal import whose rows carry a currency and a rate.
+**Recurring Schedule** - Recurring journals on a schedule (brief §3.1): quarterly from a start month for a number of times, auto-reversed on the first of the next month, in a foreign currency; and a journal import whose rows carry a currency and a rate.
 - [ ] Quarterly accrual posts on its months reverses next month and stops after its count (`RecurringScheduleTests.Quarterly_accrual_posts_on_its_months_reverses_next_month_and_stops_after_its_count`)
 - [ ] Imported journals carry a currency and a keyed rate (`RecurringScheduleTests.Imported_journals_carry_a_currency_and_a_keyed_rate`)
 
@@ -1450,7 +1450,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Register Details**
 - [ ] Items stands and meters carry their details (`RegisterDetailsTests.Items_stands_and_meters_carry_their_details`)
 
-**Register History Import** — Covers migrating the registers that carry history or price structures: a stand's ownership chain, waiting-list applicants with their legacy numbers, municipal tariffs with stepped blocks, and price lists — previewed first, written only when clean, and never loaded twice.
+**Register History Import** - Covers migrating the registers that carry history or price structures: a stand's ownership chain, waiting-list applicants with their legacy numbers, municipal tariffs with stepped blocks, and price lists - previewed first, written only when clean, and never loaded twice.
 - [ ] Ownership history applicants tariffs and price lists migrate from their files (`RegisterHistoryImportTests.Ownership_history_applicants_tariffs_and_price_lists_migrate_from_their_files`)
 
 **Registers Report Render**
@@ -1459,41 +1459,41 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Remittance Advice**
 - [ ] Remittance lists the invoices a payment settled (`RemittanceAdviceTests.Remittance_lists_the_invoices_a_payment_settled`)
 
-**Rent Review** — Covers rent reviews: flats at 300 and a house at 500, both let; a 10% review of flats from 1 June raises the flat to 330 (the house stays 500) and gives its tenancy a change from June; a review not from the first of a month and a repeat for June are refused; May billed after the review still bills 300 and June 330; a vacant flat registered later is let at the reviewed rent.
+**Rent Review** - Covers rent reviews: flats at 300 and a house at 500, both let; a 10% review of flats from 1 June raises the flat to 330 (the house stays 500) and gives its tenancy a change from June; a review not from the first of a month and a repeat for June are refused; May billed after the review still bills 300 and June 330; a vacant flat registered later is let at the reviewed rent.
 - [ ] Reviews raise rents from their date only (`RentReviewTests.Reviews_raise_rents_from_their_date_only`)
 
-**Rent Tariff** — Covers rent tariffs: a general flat rate and a cheaper rate for low-income households in one suburb; applying them from June moves both flats' asking rent and the low-income tenancy's rent, leaves the house (no tariff) alone, and a rerun changes nothing.
+**Rent Tariff** - Covers rent tariffs: a general flat rate and a cheaper rate for low-income households in one suburb; applying them from June moves both flats' asking rent and the low-income tenancy's rent, leaves the house (no tariff) alone, and a rerun changes nothing.
 - [ ] Tariffs set rents by unit type suburb and income (`RentTariffTests.Tariffs_set_rents_by_unit_type_suburb_and_income`)
 
-**Rental Housing** — Covers council rentals: a flat at 300 a month is let from 16 March with a 400 deposit held as a liability (it cannot be let twice); the March run bills 154.84 pro rata and a repeat bills nothing; April bills 300 and the tenant pays 300; ending the tenancy on 15 May bills 145.16 final rent, applies 300 of the deposit to the arrears and refunds 100; the voids report shows the flat void 16 days (157.81 lost) behind a house void since January (992.88). Rental income is 600, the deposit liability nets to zero and the tenant's account is clear.
+**Rental Housing** - Covers council rentals: a flat at 300 a month is let from 16 March with a 400 deposit held as a liability (it cannot be let twice); the March run bills 154.84 pro rata and a repeat bills nothing; April bills 300 and the tenant pays 300; ending the tenancy on 15 May bills 145.16 final rent, applies 300 of the deposit to the arrears and refunds 100; the voids report shows the flat void 16 days (157.81 lost) behind a house void since January (992.88). Rental income is 600, the deposit liability nets to zero and the tenant's account is clear.
 - [ ] Tenancies are billed and ended with the deposit settled (`RentalHousingTests.Tenancies_are_billed_and_ended_with_the_deposit_settled`)
 
-**Rental Maintenance** — Covers rental maintenance: a burst geyser (wear and tear, 450) and a broken window caused by the tenant (120, recharged) on a let flat; a leak reported while another flat was empty cannot be recharged; a repair cannot be completed twice; an inspection graded 2 with a follow-up, then closed; the history shows the costs, recharge, grade and open items. Repairs expense 570, recharge income 120.
+**Rental Maintenance** - Covers rental maintenance: a burst geyser (wear and tear, 450) and a broken window caused by the tenant (120, recharged) on a let flat; a leak reported while another flat was empty cannot be recharged; a repair cannot be completed twice; an inspection graded 2 with a follow-up, then closed; the history shows the costs, recharge, grade and open items. Repairs expense 570, recharge income 120.
 - [ ] Repairs are costed and recharged and inspections followed up (`RentalMaintenanceTests.Repairs_are_costed_and_recharged_and_inspections_followed_up`)
 
 **Rental Voids And Planned Maintenance**
 - [ ] Voids carry their reason and planned work recurs (`RentalVoidsAndPlannedMaintenanceTests.Voids_carry_their_reason_and_planned_work_recurs`)
 
-**Replenishment Forecast** — Covers min/max replenishment and the moving-average forecast: at or below the minimum an item is ordered up to its maximum, and with a forecast window the reorder point rises to the average daily issues (inside the window, reversed issues left out) times the lead time.
+**Replenishment Forecast** - Covers min/max replenishment and the moving-average forecast: at or below the minimum an item is ordered up to its maximum, and with a forecast window the reorder point rises to the average daily issues (inside the window, reversed issues left out) times the lead time.
 - [ ] Min max orders up to the maximum and the forecast raises the reorder point (`ReplenishmentForecastTests.Min_max_orders_up_to_the_maximum_and_the_forecast_raises_the_reorder_point`)
 
-**Replenishment** — Covers replenishment: suggestions net open purchase orders against on-hand stock, carry the last purchase price and supplier, and a purchase order raised from them prices lines at that last price.
+**Replenishment** - Covers replenishment: suggestions net open purchase orders against on-hand stock, carry the last purchase price and supplier, and a purchase order raised from them prices lines at that last price.
 - [ ] Suggestions net on order stock and raise a po at last price (`ReplenishmentTests.Suggestions_net_on_order_stock_and_raise_a_po_at_last_price`)
 
-**Report Burst** — Covers bursting: the aged debtors report split by customer, each part a PDF of that customer's rows only, emailed to the customer's statement contact (or the customer's own email) and the customer with no address listed; and a subscription that bursts on every run, logging each part's delivery.
+**Report Burst** - Covers bursting: the aged debtors report split by customer, each part a PDF of that customer's rows only, emailed to the customer's statement contact (or the customer's own email) and the customer with no address listed; and a subscription that bursts on every run, logging each part's delivery.
 - [ ] A report is burst to each customer (`ReportBurstTests.A_report_is_burst_to_each_customer`)
 
-**Report Common Parameters** — The common parameters on sales, purchasing, cash book and tax listings (brief §9): a reporting currency translated at a named rate basis shown in the header, and a branch, cost centre or department narrowing the postings read.
+**Report Common Parameters** - The common parameters on sales, purchasing, cash book and tax listings (brief §9): a reporting currency translated at a named rate basis shown in the header, and a branch, cost centre or department narrowing the postings read.
 - [ ] Listings in the four modules declare the common parameters (`ReportCommonParametersTests.Listings_in_the_four_modules_declare_the_common_parameters`)
 - [ ] Cash book listing translates to the reporting currency and narrows to a branch (`ReportCommonParametersTests.Cash_book_listing_translates_to_the_reporting_currency_and_narrows_to_a_branch`)
 
-**Report Folder Delivery** — Covers report delivery to a folder: a subscription may save each run under the delivery root (stamped with the run, logged) instead of emailing it, and a folder outside the root is refused.
+**Report Folder Delivery** - Covers report delivery to a folder: a subscription may save each run under the delivery root (stamped with the run, logged) instead of emailing it, and a folder outside the root is refused.
 - [ ] Subscriptions save runs to a folder under the root (`ReportFolderDeliveryTests.Subscriptions_save_runs_to_a_folder_under_the_root`)
 
-**Report Parameter Lookup** — Covers report parameters with lists (brief §13.1): a list-of-values query runs for the company only, a cascading list waits for its parent and then filters by it, a query that does not keep to the company is refused, and a multi-select parameter reaches the report's query as an array.
+**Report Parameter Lookup** - Covers report parameters with lists (brief §13.1): a list-of-values query runs for the company only, a cascading list waits for its parent and then filters by it, a query that does not keep to the company is refused, and a multi-select parameter reaches the report's query as an array.
 - [ ] Lists cascade keep to the company and multi select reaches the query (`ReportParameterLookupTests.Lists_cascade_keep_to_the_company_and_multi_select_reaches_the_query`)
 
-**Report Printer Delivery** — Covers report delivery to a printer: a subscription with only a printer is accepted, each run prints the rendered report on that printer and logs it; a printer on a burst subscription is refused; a printer failure is logged and fails the run.
+**Report Printer Delivery** - Covers report delivery to a printer: a subscription with only a printer is accepted, each run prints the rendered report on that printer and logs it; a printer on a burst subscription is refused; a printer failure is logged and fails the run.
 - [ ] Subscriptions print on their printer and log it (`ReportPrinterDeliveryTests.Subscriptions_print_on_their_printer_and_log_it`)
 
 **Report Rendering**
@@ -1503,34 +1503,34 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Report Runner**
 - [ ] Runner renders gl ar and receipting reports against live data (`ReportRunnerTests.Runner_renders_gl_ar_and_receipting_reports_against_live_data`)
 
-**Report Security** — Covers report security through the audited runner: a payroll report needs the payroll reports right on top of the general one, and a user scoped to a department sees only that department's rows while an unscoped colleague sees them all.
+**Report Security** - Covers report security through the audited runner: a payroll report needs the payroll reports right on top of the general one, and a user scoped to a department sees only that department's rows while an unscoped colleague sees them all.
 - [ ] Reports respect module rights and scopes (`ReportSecurityTests.Reports_respect_module_rights_and_scopes`)
 
-**Report Subscription** — Covers scheduled report delivery: a trial balance subscription with a relative date is rendered at each run with the date resolved, attached to one email per recipient and logged; the despatch hands the attachment to the gateway; bad tokens, unknown reports and recipients without an address are refused; and the scheduled task runs the active subscriptions.
+**Report Subscription** - Covers scheduled report delivery: a trial balance subscription with a relative date is rendered at each run with the date resolved, attached to one email per recipient and logged; the despatch hands the attachment to the gateway; bad tokens, unknown reports and recipients without an address are refused; and the scheduled task runs the active subscriptions.
 - [ ] Subscribed reports are rendered attached emailed and logged (`ReportSubscriptionTests.Subscribed_reports_are_rendered_attached_emailed_and_logged`)
 
-**Report Versioning** — Covers report definition versioning: a system report is copied to a company version (once); saves create new versions and keep the old; an unchanged or invalid save is refused; versions are diffed by path; a rollback restores an old version as the newest; and the system report itself is never touched.
+**Report Versioning** - Covers report definition versioning: a system report is copied to a company version (once); saves create new versions and keep the old; an unchanged or invalid save is refused; versions are diffed by path; a rollback restores an old version as the newest; and the system report itself is never touched.
 - [ ] Company reports keep every version and can roll back (`ReportVersioningTests.Company_reports_keep_every_version_and_can_roll_back`)
 
-**Report Viewer Layout** — Covers the viewer's layout format through the audited runner: the journal daybook comes back laid out with each journal number linked to its journal, and printing it twice records a print and a numbered reprint.
+**Report Viewer Layout** - Covers the viewer's layout format through the audited runner: the journal daybook comes back laid out with each journal number linked to its journal, and printing it twice records a print and a numbered reprint.
 - [ ] The daybook lays out with links and prints are counted (`ReportViewerLayoutTests.The_daybook_lays_out_with_links_and_prints_are_counted`)
 
-**Reporting Currency** — Covers the reporting currency kept on every posting: base postings at the day's base→reporting rate, foreign postings through base, each journal balancing in the reporting currency, a reversal repeating the original amounts whatever the later rate, the period balances and the GL2R trial balance carrying them, and a posting refused when there is no rate.
+**Reporting Currency** - Covers the reporting currency kept on every posting: base postings at the day's base→reporting rate, foreign postings through base, each journal balancing in the reporting currency, a reversal repeating the original amounts whatever the later rate, the period balances and the GL2R trial balance carrying them, and a posting refused when there is no rate.
 - [ ] Every posting keeps the reporting currency (`ReportingCurrencyTests.Every_posting_keeps_the_reporting_currency`)
 
-**Reporting Snapshot** — Covers the reporting snapshots and quick search: aged debt, stock value and sales by day read from materialised views that stay as they were until refreshed (stamped with the refresh), the scheduled refresh task, and the trigram search finding a misspelt name.
+**Reporting Snapshot** - Covers the reporting snapshots and quick search: aged debt, stock value and sales by day read from materialised views that stay as they were until refreshed (stamped with the refresh), the scheduled refresh task, and the trigram search finding a misspelt name.
 - [ ] Snapshots hold until refreshed and search forgives typos (`ReportingSnapshotTests.Snapshots_hold_until_refreshed_and_search_forgives_typos`)
 
-**Reporting Tree** — Covers reporting hierarchies: a statutory tree started from the chart maps every account once and rolls posted amounts up by type and category (credit balances shown positive where the heading says); a management tree with its own headings and ranges, its mapping gaps and overlaps found, cycles refused; and the statement report laid out by a tree.
+**Reporting Tree** - Covers reporting hierarchies: a statutory tree started from the chart maps every account once and rolls posted amounts up by type and category (credit balances shown positive where the heading says); a management tree with its own headings and ranges, its mapping gaps and overlaps found, cycles refused; and the statement report laid out by a tree.
 - [ ] Trees lay out the statements independently of account codes (`ReportingTreeTests.Trees_lay_out_the_statements_independently_of_account_codes`)
 
-**Repossession** — Covers repossession under the §4.10.9 ruling: a stand costing 25,000 sold on instalments for 13,000 (1,000 down) with two instalments' interest raised (230.54) defaults. Self-approval is refused; repossession at a net realisable value of 20,000 derecognises the 12,230.54 receivable, returns the stand to inventory at 20,000 (the lower of cost and NRV) and to the available pool, records the repossession on the ownership chain, closes the agreement and takes a 7,769.46 gain to the repossession account; the register reports it; a second repossession is refused.
+**Repossession** - Covers repossession under the §4.10.9 ruling: a stand costing 25,000 sold on instalments for 13,000 (1,000 down) with two instalments' interest raised (230.54) defaults. Self-approval is refused; repossession at a net realisable value of 20,000 derecognises the 12,230.54 receivable, returns the stand to inventory at 20,000 (the lower of cost and NRV) and to the available pool, records the repossession on the ownership chain, closes the agreement and takes a 7,769.46 gain to the repossession account; the register reports it; a second repossession is refused.
 - [ ] A defaulted stand returns to inventory at the lower of cost and nrv (`RepossessionTests.A_defaulted_stand_returns_to_inventory_at_the_lower_of_cost_and_nrv`)
 
 **Reprint Log**
 - [ ] Reprints are numbered and logged on rc16 (`ReprintLogTests.Reprints_are_numbered_and_logged_on_rc16`)
 
-**Requisition Details** — Covers requisition details: a requisition for the OPS department is checked against OPS's own budget (200), not the company's (10,000), so 300 is blocked while the same 300 without a department passes; an OPS requisition within budget keeps its required-by date and justification, and its purchase order carries the date, department and cost centre and commits OPS's budget.
+**Requisition Details** - Covers requisition details: a requisition for the OPS department is checked against OPS's own budget (200), not the company's (10,000), so 300 is blocked while the same 300 without a department passes; an OPS requisition within budget keeps its required-by date and justification, and its purchase order carries the date, department and cost centre and commits OPS's budget.
 - [ ] Department requisitions are checked against the department budget and carry to the order (`RequisitionDetailsTests.Department_requisitions_are_checked_against_the_department_budget_and_carry_to_the_order`)
 
 **Restaurant Auto Availability**
@@ -1542,7 +1542,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Restaurant Availability Kot Report**
 - [ ] Menu availability gates ordering and kot report lists open tickets (`RestaurantAvailabilityKotReportTests.Menu_availability_gates_ordering_and_kot_report_lists_open_tickets`)
 
-**Restaurant Bill Atomicity** — Covers a restaurant bill as one unit of work: when the cost-of-sales issue is refused (the inventory period is closed) after the revenue has been posted, nothing remains — no journal, no billed quantity, no stock movement — even after a save in the same scope; once the period reopens the same order bills normally.
+**Restaurant Bill Atomicity** - Covers a restaurant bill as one unit of work: when the cost-of-sales issue is refused (the inventory period is closed) after the revenue has been posted, nothing remains - no journal, no billed quantity, no stock movement - even after a save in the same scope; once the period reopens the same order bills normally.
 - [ ] A bill whose cost of sales fails leaves nothing behind (`RestaurantBillAtomicityTests.A_bill_whose_cost_of_sales_fails_leaves_nothing_behind`)
 
 **Restaurant Bill Reversal**
@@ -1633,37 +1633,37 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Restaurant Wastage**
 - [ ] Wastage writes stock off to the wastage account not cost of sales (`RestaurantWastageTests.Wastage_writes_stock_off_to_the_wastage_account_not_cost_of_sales`)
 
-**Retail Reports** — Covers the POS-numbered retail reports (brief §14 F): one cash sale with change and a short cash-up; the daily summary, cash-up variance, product mix and tender analysis read it back; every POS report renders.
+**Retail Reports** - Covers the POS-numbered retail reports (brief §14 F): one cash sale with change and a short cash-up; the daily summary, cash-up variance, product mix and tender analysis read it back; every POS report renders.
 - [ ] Retail reports reflect sales and cash ups (`RetailReportsTests.Retail_reports_reflect_sales_and_cash_ups`)
 
 **Retention Release**
 - [ ] Releasing retention moves it onto the debtor (`RetentionReleaseTests.Releasing_retention_moves_it_onto_the_debtor`)
 
-**Revenue Recognition** — Covers percentage-of-completion revenue recognition: an under-billed contract books a contract asset, a later run after more certification unwinds it and books a liability, and an unchanged position posts nothing — with the ledger balancing throughout.
+**Revenue Recognition** - Covers percentage-of-completion revenue recognition: an under-billed contract books a contract asset, a later run after more certification unwinds it and books a liability, and an unchanged position posts nothing - with the ledger balancing throughout.
 - [ ] Poc runs book the movement between earned and certified revenue (`RevenueRecognitionTests.Poc_runs_book_the_movement_between_earned_and_certified_revenue`)
 
-**Reviewed Billing Run** — Covers the reviewed billing run for Ward 1 refuse at 30 a month: stands billed 30 last month, never billed, already billed this month, last billed 10 (a large change) and on a zero tariff are proposed without posting; the exception report lists the last three; the already-billed and zero lines are left out and cannot be put back; a second proposal for the month is refused; the large-change bill is left out by the reviewer; the proposer cannot approve; another user approves and two bills of 30 post; a posted run cannot be cancelled; a cancelled May run can be proposed again.
+**Reviewed Billing Run** - Covers the reviewed billing run for Ward 1 refuse at 30 a month: stands billed 30 last month, never billed, already billed this month, last billed 10 (a large change) and on a zero tariff are proposed without posting; the exception report lists the last three; the already-billed and zero lines are left out and cannot be put back; a second proposal for the month is refused; the large-change bill is left out by the reviewer; the proposer cannot approve; another user approves and two bills of 30 post; a posted run cannot be cancelled; a cancelled May run can be proposed again.
 - [ ] Bills are proposed reviewed and posted on approval (`ReviewedBillingRunTests.Bills_are_proposed_reviewed_and_posted_on_approval`)
 
-**Rfq Document** — Covers the request-for-quotation document: it prints the items, quantities and closing date, and emails to the order contact of each invited supplier that has one, naming the supplier with nobody to email.
+**Rfq Document** - Covers the request-for-quotation document: it prints the items, quantities and closing date, and emails to the order contact of each invited supplier that has one, naming the supplier with nobody to email.
 - [ ] The request prints and emails to the invited suppliers (`RfqDocumentTests.The_request_prints_and_emails_to_the_invited_suppliers`)
 
-**Rfq** — Covers requests for quotation: three suppliers are invited to quote for 10 desks and 20 chairs; one quotes cheapest but slowest, one quickest, and one never quotes; an uninvited supplier and a late quote are refused; the comparison ranks the quickest first on 70/30 weighting; awarding the cheaper second-ranked quote needs a reason, and raises a purchase order at its prices with a required-by date from its lead time.
+**Rfq** - Covers requests for quotation: three suppliers are invited to quote for 10 desks and 20 chairs; one quotes cheapest but slowest, one quickest, and one never quotes; an uninvited supplier and a late quote are refused; the comparison ranks the quickest first on 70/30 weighting; awarding the cheaper second-ranked quote needs a reason, and raises a purchase order at its prices with a required-by date from its lead time.
 - [ ] Quotes are compared and the award becomes a purchase order (`RfqTests.Quotes_are_compared_and_the_award_becomes_a_purchase_order`)
 
 **Role Bulk Change**
 - [ ] Roles are compared and changed in bulk (`RoleBulkChangeTests.Roles_are_compared_and_changed_in_bulk`)
 
-**Rollback Safe Posting** — Covers posting again in a scope whose earlier posting was rolled back by the caller's transaction: the engine reads the journal sequence and period balances afresh, so the next journal reuses the rolled-back number (no gap), the period balances hold only committed movements, and nothing fails on a stale concurrency token.
+**Rollback Safe Posting** - Covers posting again in a scope whose earlier posting was rolled back by the caller's transaction: the engine reads the journal sequence and period balances afresh, so the next journal reuses the rolled-back number (no gap), the period balances hold only committed movements, and nothing fails on a stale concurrency token.
 - [ ] A rolled back posting leaves no trace for the next one (`RollbackSafePostingTests.A_rolled_back_posting_leaves_no_trace_for_the_next_one`)
 
-**Route Billing Run** — Covers billing runs limited to a meter-reading route or to a billing cycle, and emailing a posted run's bills: only the route's stands are billed, a cycle run picks up only the stands on that cycle's tariffs, and each ratepayer billed with an email address is sent their bill.
+**Route Billing Run** - Covers billing runs limited to a meter-reading route or to a billing cycle, and emailing a posted run's bills: only the route's stands are billed, a cycle run picks up only the stands on that cycle's tariffs, and each ratepayer billed with an email address is sent their bill.
 - [ ] Runs follow a route or a cycle and their bills are emailed (`RouteBillingRunTests.Runs_follow_a_route_or_a_cycle_and_their_bills_are_emailed`)
 
-**Row Scope Filter** — Covers the scope-rule row filters (brief §5.1): a user scoped to a warehouse and a department reads only that warehouse's stock and that department's (or untagged) employees once the row scope is applied; codes match whatever their case; an unrestricted user filters nothing.
+**Row Scope Filter** - Covers the scope-rule row filters (brief §5.1): a user scoped to a warehouse and a department reads only that warehouse's stock and that department's (or untagged) employees once the row scope is applied; codes match whatever their case; an unrestricted user filters nothing.
 - [ ] Reads keep to the users warehouses and departments (`RowScopeFilterTests.Reads_keep_to_the_users_warehouses_and_departments`)
 
-**Salary Scale** — Covers salary scales (brief §4.15.1): the annual increment moves staff one notch up to the scale's salary, stopping at the top and not twice in a year; an acting appointment pays the acted grade's scale less the employee's basic; and once a company keeps a post register, staff can only be engaged or moved into a vacant approved post.
+**Salary Scale** - Covers salary scales (brief §4.15.1): the annual increment moves staff one notch up to the scale's salary, stopping at the top and not twice in a year; an acting appointment pays the acted grade's scale less the employee's basic; and once a company keeps a post register, staff can only be engaged or moved into a vacant approved post.
 - [ ] Increments move staff up the scale and acting pays the difference (`SalaryScaleTests.Increments_move_staff_up_the_scale_and_acting_pays_the_difference`)
 - [ ] A post register blocks engaging into a missing or filled post (`SalaryScaleTests.A_post_register_blocks_engaging_into_a_missing_or_filled_post`)
 - [ ] The latest scale in force sets the salary and the top notch (`SalaryScaleTests.The_latest_scale_in_force_sets_the_salary_and_the_top_notch`)
@@ -1671,25 +1671,25 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Sales Back Order Report**
 - [ ] Back orders report shows undespatched quantity (`SalesBackOrderReportTests.Back_orders_report_shows_undespatched_quantity`)
 
-**Sales Commission** — Covers sales commission: a rep paid 5% on invoiced revenue earns 50 on a 1,000 + 150 VAT invoice (tax left out); a rep paid 2% on collections earns 6 on a 300 receipt but nothing on a write-off; an unassigned customer earns nobody anything. The March accrual books 56, a rerun books nothing, and a late 200 invoice adds 10 on the next run.
+**Sales Commission** - Covers sales commission: a rep paid 5% on invoiced revenue earns 50 on a 1,000 + 150 VAT invoice (tax left out); a rep paid 2% on collections earns 6 on a 300 receipt but nothing on a write-off; an unassigned customer earns nobody anything. The March accrual books 56, a rerun books nothing, and a late 200 invoice adds 10 on the next run.
 - [ ] Commission is earned by basis and accrued once (`SalesCommissionTests.Commission_is_earned_by_basis_and_accrued_once`)
 
-**Sales Discount Control** — Covers back-office discount control: with a 10% limit and a price list at 100, an order at 95 passes; at 80 it is refused without authority, refused when the raiser authorises it, accepted with a manager who may override discounts; with a SalesDiscount workflow it is held (no despatch) until approved.
+**Sales Discount Control** - Covers back-office discount control: with a 10% limit and a price list at 100, an order at 95 passes; at 80 it is refused without authority, refused when the raiser authorises it, accepted with a manager who may override discounts; with a SalesDiscount workflow it is held (no despatch) until approved.
 - [ ] Discounts beyond the limit need authority or approval (`SalesDiscountControlTests.Discounts_beyond_the_limit_need_authority_or_approval`)
 
-**Sales Order Amendment** — Covers sales order amendments with history: a change makes a new version and keeps the old one with its reason, quantities cannot go below what has been despatched, and a cancelled order cannot be amended.
+**Sales Order Amendment** - Covers sales order amendments with history: a change makes a new version and keeps the old one with its reason, quantities cannot go below what has been despatched, and a cancelled order cannot be amended.
 - [ ] Amendments version the order and protect what has been despatched (`SalesOrderAmendmentTests.Amendments_version_the_order_and_protect_what_has_been_despatched`)
 
-**Sales Order Atomicity** — Covers sales-order despatch and invoicing as single units of work: an invoice credits each line's own revenue account; an invoice refused because the customer is on hold leaves the order untouched; over-despatch is refused; and a despatch whose second line cannot be issued issues nothing at all.
+**Sales Order Atomicity** - Covers sales-order despatch and invoicing as single units of work: an invoice credits each line's own revenue account; an invoice refused because the customer is on hold leaves the order untouched; over-despatch is refused; and a despatch whose second line cannot be issued issues nothing at all.
 - [ ] Despatch and invoice stand or fall together (`SalesOrderAtomicityTests.Despatch_and_invoice_stand_or_fall_together`)
 
-**Sales Order Credit Limit** — Covers credit control when an order is taken (brief §4.5): the balance, the orders not yet invoiced and the new order against the limit — refused under a blocking policy, taken and logged under a warning policy.
+**Sales Order Credit Limit** - Covers credit control when an order is taken (brief §4.5): the balance, the orders not yet invoiced and the new order against the limit - refused under a blocking policy, taken and logged under a warning policy.
 - [ ] An order over the credit limit is refused or logged by policy (`SalesOrderCreditLimitTests.An_order_over_the_credit_limit_is_refused_or_logged_by_policy`)
 
 **Sales Order Despatch Return**
 - [ ] Returning despatched goods before invoicing restores stock and reverses cost of sales (`SalesOrderDespatchReturnTests.Returning_despatched_goods_before_invoicing_restores_stock_and_reverses_cost_of_sales`)
 
-**Sales Order Pricing** — Covers price-list pricing of sales orders: an unpriced line takes the customer's price-list price for its quantity, a keyed price still wins, an unpriced item is refused, and a list in the wrong currency is refused.
+**Sales Order Pricing** - Covers price-list pricing of sales orders: an unpriced line takes the customer's price-list price for its quantity, a keyed price still wins, an unpriced item is refused, and a list in the wrong currency is refused.
 - [ ] Unpriced order lines take the price list price for their quantity (`SalesOrderPricingTests.Unpriced_order_lines_take_the_price_list_price_for_their_quantity`)
 
 **Sales Order**
@@ -1698,22 +1698,22 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Sample Data**
 - [ ] Sample data fills a new company and loads only once (`SampleDataTests.Sample_data_fills_a_new_company_and_loads_only_once`)
 
-**Scheduler** — Covers scheduled jobs: only registered tasks and complete schedules are accepted; due jobs run and are rescheduled; a task that throws is recorded as failed, its half-done work discarded, and the other jobs still run; a disabled job does not run; a job can be run on demand; and the built-in despatch task runs through the scheduler.
+**Scheduler** - Covers scheduled jobs: only registered tasks and complete schedules are accepted; due jobs run and are rescheduled; a task that throws is recorded as failed, its half-done work discarded, and the other jobs still run; a disabled job does not run; a job can be run on demand; and the built-in despatch task runs through the scheduler.
 - [ ] Due jobs run on schedule and failures are contained (`SchedulerTests.Due_jobs_run_on_schedule_and_failures_are_contained`)
 
-**Scheme Budget** — Covers scheme budgets (brief §14 H84): professional fees capitalised over three unsold stands (cents on the last), one stand sold, then overheads spread over the two left; the stands account carries it all; and budget vs actual shows land, fees and overheads against their budgets.
+**Scheme Budget** - Covers scheme budgets (brief §14 H84): professional fees capitalised over three unsold stands (cents on the last), one stand sold, then overheads spread over the two left; the stands account carries it all; and budget vs actual shows land, fees and overheads against their budgets.
 - [ ] Scheme costs are capitalised to unsold stands and compared with budget (`SchemeBudgetTests.Scheme_costs_are_capitalised_to_unsold_stands_and_compared_with_budget`)
 
-**Scheme Progress** — Covers scheme delivery progress (brief §14 H9, H12, H13): a layout pegged then partly lodged with the Surveyor-General, stages never going back; servicing certificates for all five services with progress never going backwards; a parcel valued below cost and a stand without a price, read back as survey status, servicing status and the IAS 2 NRV test.
+**Scheme Progress** - Covers scheme delivery progress (brief §14 H9, H12, H13): a layout pegged then partly lodged with the Surveyor-General, stages never going back; servicing certificates for all five services with progress never going backwards; a parcel valued below cost and a stand without a price, read back as survey status, servicing status and the IAS 2 NRV test.
 - [ ] Survey servicing and valuations drive the progress reports (`SchemeProgressTests.Survey_servicing_and_valuations_drive_the_progress_reports`)
 
-**School Fee Control** — Covers the school fee controls: a bursary reduces fees only once someone else with the approval right approves it, a staff member's child takes the staff discount only while the parent is employed, and a do-not-disclose student's name is withheld from readers without the restricted right.
+**School Fee Control** - Covers the school fee controls: a bursary reduces fees only once someone else with the approval right approves it, a staff member's child takes the staff discount only while the parent is employed, and a do-not-disclose student's name is withheld from readers without the restricted right.
 - [ ] Bursaries are approved staff children discounted and restricted students withheld (`SchoolFeeControlTests.Bursaries_are_approved_staff_children_discounted_and_restricted_students_withheld`)
 
-**School Options Pro Rata** — Covers optional fee items and pro-rata billing: a student taking lunches is billed them (to their own revenue account, undiscounted); a joiner half-way through a pro-rata term pays half; a leaver is credited the unused part of the term invoice; with deferred fees the credit comes out of deferred income and the recognition schedule ends on the leaving date.
+**School Options Pro Rata** - Covers optional fee items and pro-rata billing: a student taking lunches is billed them (to their own revenue account, undiscounted); a joiner half-way through a pro-rata term pays half; a leaver is credited the unused part of the term invoice; with deferred fees the credit comes out of deferred income and the recognition schedule ends on the leaving date.
 - [ ] Optional items and pro rata joiners and leavers are billed fairly (`SchoolOptionsProRataTests.Optional_items_and_pro_rata_joiners_and_leavers_are_billed_fairly`)
 
-**School Services** — Covers school sponsors, transport and boarding (brief §14 J 179, 181, 183, 184): a sponsored student's fees go to the sponsor's account; a boarder who rides the bus gets separate transport and boarding invoices; the deferred fee schedule, sponsor statement, route utilisation and hostel occupancy read them back.
+**School Services** - Covers school sponsors, transport and boarding (brief §14 J 179, 181, 183, 184): a sponsored student's fees go to the sponsor's account; a boarder who rides the bus gets separate transport and boarding invoices; the deferred fee schedule, sponsor statement, route utilisation and hostel occupancy read them back.
 - [ ] Sponsors transport and boarding are billed and reported (`SchoolServicesTests.Sponsors_transport_and_boarding_are_billed_and_reported`)
 
 **School Setup**
@@ -1725,43 +1725,43 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Scorecard Price Variance**
 - [ ] The scorecard shows what a supplier charged above the order (`ScorecardPriceVarianceTests.The_scorecard_shows_what_a_supplier_charged_above_the_order`)
 
-**Seasonal Tariff** — Covers seasonal billing: water at 1 a unit, 1.5 in the October–March dry season, bills 50 m³ at 75 in January and at 50 in June through the single-service bill.
+**Seasonal Tariff** - Covers seasonal billing: water at 1 a unit, 1.5 in the October–March dry season, bills 50 m³ at 75 in January and at 50 in June through the single-service bill.
 - [ ] Consumption is billed at the seasonal rate (`SeasonalTariffTests.Consumption_is_billed_at_the_seasonal_rate`)
 
-**Second Net Coverage** — Covers the widened second net (brief §6): journal headers and the chart are captured, journal lines only when changed or inserted from outside the application (the application's own postings are not doubled), and the dimension and permission tables are watched too.
+**Second Net Coverage** - Covers the widened second net (brief §6): journal headers and the chart are captured, journal lines only when changed or inserted from outside the application (the application's own postings are not doubled), and the dimension and permission tables are watched too.
 - [ ] Ledger and permission tables are watched without doubling postings (`SecondNetCoverageTests.Ledger_and_permission_tables_are_watched_without_doubling_postings`)
 
-**Sectional Title** — Covers sectional title: a building is registered as units with quotas from their floor areas (once per stand); units are transferred individually; the body corporate levy is split by quota and invoiced to the owners once per period, the share of an unowned unit reported unbilled; and a caveat on the stand stops unit transfers.
+**Sectional Title** - Covers sectional title: a building is registered as units with quotas from their floor areas (once per stand); units are transferred individually; the body corporate levy is split by quota and invoiced to the owners once per period, the share of an unowned unit reported unbilled; and a caveat on the stand stops unit transfers.
 - [ ] Units carry quotas transfer individually and share the levy (`SectionalTitleTests.Units_carry_quotas_transfer_individually_and_share_the_levy`)
 
 **Serial Device**
 - [ ] Serial devices are built and a missing port does not stop the sale (`SerialDeviceTests.Serial_devices_are_built_and_a_missing_port_does_not_stop_the_sale`)
 
-**Service Atomicity** — Covers two of the services now run as single units of work: registering an asset into a closed period leaves no asset in the register (it would otherwise depreciate with no cost in the GL), and gift-card breakage refused by a closed period leaves the card's balance intact — each even after a save in the same scope.
+**Service Atomicity** - Covers two of the services now run as single units of work: registering an asset into a closed period leaves no asset in the register (it would otherwise depreciate with no cost in the GL), and gift-card breakage refused by a closed period leaves the card's balance intact - each even after a save in the same scope.
 - [ ] Refused postings leave no asset and no breakage (`ServiceAtomicityTests.Refused_postings_leave_no_asset_and_no_breakage`)
 
-**Service Deposit** — Covers service deposits held as a liability: a 150 water deposit is taken (Dr bank / Cr consumer deposits) and a second for the same service is refused; one stand's deposit is refunded (bank and liability back to zero); another's is applied to the account, leaving a credit that clears a 150 final bill. The consumer-deposits liability nets to zero; the refunded deposit leaves the bank flat while the applied one stays as cash matched by the final bill.
+**Service Deposit** - Covers service deposits held as a liability: a 150 water deposit is taken (Dr bank / Cr consumer deposits) and a second for the same service is refused; one stand's deposit is refunded (bank and liability back to zero); another's is applied to the account, leaving a credit that clears a 150 final bill. The consumer-deposits liability nets to zero; the refunded deposit leaves the bank flat while the applied one stays as cash matched by the final bill.
 - [ ] Deposits are held then refunded or applied to the account (`ServiceDepositTests.Deposits_are_held_then_refunded_or_applied_to_the_account`)
 
-**Service Desk** — Covers the municipal service desk: fault categories with targets; a critical burst pipe logged against a property with a public reference and shortened SLA; assignment notifying the officer in-app; resolution within target; a refuse complaint responded to late and left unresolved; the public status; close, reopen and the history; and the SLA board as at different moments (at risk, breached, average time to resolve).
+**Service Desk** - Covers the municipal service desk: fault categories with targets; a critical burst pipe logged against a property with a public reference and shortened SLA; assignment notifying the officer in-app; resolution within target; a refuse complaint responded to late and left unresolved; the public status; close, reopen and the history; and the SLA board as at different moments (at risk, breached, average time to resolve).
 - [ ] Faults are logged assigned resolved and measured against their sla (`ServiceDeskTests.Faults_are_logged_assigned_resolved_and_measured_against_their_sla`)
 
-**Service Order** — Covers disconnection and reconnection: with a 200 threshold, a stand 300 in arrears is a candidate while one owing 100 is not; a disconnection order is raised (a second one is refused) and carried out, cutting the water; reconnection is refused while the arrears stand; once paid, a reconnection order is raised and carried out, restoring the water and invoicing a 50 fee.
+**Service Order** - Covers disconnection and reconnection: with a 200 threshold, a stand 300 in arrears is a candidate while one owing 100 is not; a disconnection order is raised (a second one is refused) and carried out, cutting the water; reconnection is refused while the arrears stand; once paid, a reconnection order is raised and carried out, restoring the water and invoicing a 50 fee.
 - [ ] Arrears lead to disconnection and payment to reconnection (`ServiceOrderTests.Arrears_lead_to_disconnection_and_payment_to_reconnection`)
 
-**Servicing Cost** — Covers servicing cost per stand: a servicing contract linked to a scheme has its actual cost capitalised into the scheme's unsold stands by area, and a second contract by frontage once frontages are recorded; each run moves only the cost added since the last; a sold stand takes none; and the cost per stand shows land and servicing.
+**Servicing Cost** - Covers servicing cost per stand: a servicing contract linked to a scheme has its actual cost capitalised into the scheme's unsold stands by area, and a second contract by frontage once frontages are recorded; each run moves only the cost added since the last; a sold stand takes none; and the cost per stand shows land and servicing.
 - [ ] Servicing cost is apportioned to unsold stands once (`ServicingCostTests.Servicing_cost_is_apportioned_to_unsold_stands_once`)
 
-**Settlement Discount Tax** — Covers settlement discount suggestions and their tax: a customer with 2% for payment within 10 days is offered 23.00 on an invoice of 1,000 + 150 tax paid on day 5 and nothing on day 15; settling with the output tax account moves the 3.00 tax share of the discount off output tax; a supplier's 575 invoice (75 input tax) paid with a 23 discount moves 3.00 off input tax.
+**Settlement Discount Tax** - Covers settlement discount suggestions and their tax: a customer with 2% for payment within 10 days is offered 23.00 on an invoice of 1,000 + 150 tax paid on day 5 and nothing on day 15; settling with the output tax account moves the 3.00 tax share of the discount off output tax; a supplier's 575 invoice (75 input tax) paid with a 23 discount moves 3.00 off input tax.
 - [ ] The discount is suggested within the window and its tax share comes off tax (`SettlementDiscountTaxTests.The_discount_is_suggested_within_the_window_and_its_tax_share_comes_off_tax`)
 
 **Settlement Discount**
 - [ ] Settling with an early payment discount clears the invoice (`SettlementDiscountTests.Settling_with_an_early_payment_discount_clears_the_invoice`)
 
-**Shift Roster** — Covers shift rosters: a rotating pattern generates the roster from its anchor, a day changed by hand survives regeneration, lateness is measured against the rostered start (across midnight, within the grace), and night-shift allowances are paid only for rostered shifts worked.
+**Shift Roster** - Covers shift rosters: a rotating pattern generates the roster from its anchor, a day changed by hand survives regeneration, lateness is measured against the rostered start (across midnight, within the grace), and night-shift allowances are paid only for rostered shifts worked.
 - [ ] Patterns generate the roster and drive lateness and allowances (`ShiftRosterTests.Patterns_generate_the_roster_and_drive_lateness_and_allowances`)
 
-**Sibling Discount** — Covers sibling discounts: the family's children in admission order take the rule for their place (second 10%, third and later 20%), after any bursary; an only child pays in full.
+**Sibling Discount** - Covers sibling discounts: the family's children in admission order take the rule for their place (second 10%, third and later 20%), after any bursary; an only child pays in full.
 - [ ] Younger siblings are billed at the family discount (`SiblingDiscountTests.Younger_siblings_are_billed_at_the_family_discount`)
 
 **Sla Escalation**
@@ -1773,53 +1773,53 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Sod Violation Report**
 - [ ] Blocked self verify is logged on rc22 (`SodViolationReportTests.Blocked_self_verify_is_logged_on_rc22`)
 
-**Soft Closed Period** — Covers soft close (brief §3.4: "soft close… allow adjustments with permission, then hard close"): a closed period refuses ordinary postings but takes an adjustment from a user granted GeneralLedger.PeriodAdjustment; a permanently closed period takes nothing, whoever posts.
+**Soft Closed Period** - Covers soft close (brief §3.4: "soft close… allow adjustments with permission, then hard close"): a closed period refuses ordinary postings but takes an adjustment from a user granted GeneralLedger.PeriodAdjustment; a permanently closed period takes nothing, whoever posts.
 - [ ] A closed period takes only permitted adjustments and a hard closed one nothing (`SoftClosedPeriodTests.A_closed_period_takes_only_permitted_adjustments_and_a_hard_closed_one_nothing`)
 
 **Source Document**
 - [ ] A journal leads to the document it came from (`SourceDocumentTests.A_journal_leads_to_the_document_it_came_from`)
 
-**Spatial Register** — Covers the GIS hook: stand and parcel boundaries are recorded as validated WKT with centroid and area; a stand whose mapped area departs from its surveyed size beyond the tolerance is reported; and layers come out as GeoJSON through the map provider, filtered by scheme.
+**Spatial Register** - Covers the GIS hook: stand and parcel boundaries are recorded as validated WKT with centroid and area; a stand whose mapped area departs from its surveyed size beyond the tolerance is reported; and layers come out as GeoJSON through the map provider, filtered by scheme.
 - [ ] Boundaries are mapped checked against the survey and exported (`SpatialRegisterTests.Boundaries_are_mapped_checked_against_the_survey_and_exported`)
 
-**Specific Cost And Usage Variance** — Covers specific identification and usage variance: a serial-costed item's issue costs the units that actually leave (named, or the earliest batches), and a standard-costed assembly posts components used beyond standard to the usage variance account, its price variance apart.
+**Specific Cost And Usage Variance** - Covers specific identification and usage variance: a serial-costed item's issue costs the units that actually leave (named, or the earliest batches), and a standard-costed assembly posts components used beyond standard to the usage variance account, its price variance apart.
 - [ ] Specific units carry their own cost (`SpecificCostAndUsageVarianceTests.Specific_units_carry_their_own_cost`)
 - [ ] A standard costed assembly separates usage from price variance (`SpecificCostAndUsageVarianceTests.A_standard_costed_assembly_separates_usage_from_price_variance`)
 
-**Split Currency Tax** — Covers split-currency tax in the pay run: earnings paid in a currency with its own tax table are taxed on it at the pay date's rate, the rest bears its share of the base table's tax on the whole.
+**Split Currency Tax** - Covers split-currency tax in the pay run: earnings paid in a currency with its own tax table are taxed on it at the pay date's rate, the rest bears its share of the base table's tax on the whole.
 - [ ] Each currency is taxed on its own table (`SplitCurrencyTaxTests.Each_currency_is_taxed_on_its_own_table`)
 
-**Sql Report Source** — Covers user-authored report data sources: the statement checks (one SELECT filtered by company, no protected schemas or file functions, views and functions only from rpt), and running them for real — company rows only, report parameters bound, a reporting view read, and a data-changing CTE that slips past the text checks still stopped by the read-only transaction.
+**Sql Report Source** - Covers user-authored report data sources: the statement checks (one SELECT filtered by company, no protected schemas or file functions, views and functions only from rpt), and running them for real - company rows only, report parameters bound, a reporting view read, and a data-changing CTE that slips past the text checks still stopped by the read-only transaction.
 - [ ] Sql sources are checked (`SqlReportSourceTests.Sql_sources_are_checked`)
 - [ ] Queries run read only for the company (`SqlReportSourceTests.Queries_run_read_only_for_the_company`)
 - [ ] Fields are discovered without reading rows (`SqlReportSourceTests.Fields_are_discovered_without_reading_rows`)
 
-**Stand Allocation** — Covers stand allocation: three applicants and two available stands in a scheme. A seniority run pairs the two longest-waiting; a second run cannot take the same stands while the first is live; the proposer cannot approve; approval issues certificates and offers and marks the stands allocated; one offer is accepted, the other declined, returning its stand; a seeded ballot over the rest verifies from its stored seed and inputs and reproduces exactly after cancellation; a lapsed offer returns its stand; the database refuses a second live allocation of a stand.
+**Stand Allocation** - Covers stand allocation: three applicants and two available stands in a scheme. A seniority run pairs the two longest-waiting; a second run cannot take the same stands while the first is live; the proposer cannot approve; approval issues certificates and offers and marks the stands allocated; one offer is accepted, the other declined, returning its stand; a seeded ballot over the rest verifies from its stored seed and inputs and reproduces exactly after cancellation; a lapsed offer returns its stand; the database refuses a second live allocation of a stand.
 - [ ] Stands are allocated under control and ballots reverify (`StandAllocationTests.Stands_are_allocated_under_control_and_ballots_reverify`)
 
-**Stand And Budget Import** — Covers migrating the housing stand register and a budget: stands come in on their parcels (a parcel not yet registered is made from its stands), sold statuses are refused, and a budget file becomes a budget for the year of the date — previewed first, written only when clean.
+**Stand And Budget Import** - Covers migrating the housing stand register and a budget: stands come in on their parcels (a parcel not yet registered is made from its stands), sold statuses are refused, and a budget file becomes a budget for the year of the date - previewed first, written only when clean.
 - [ ] Stands and a budget migrate from their files (`StandAndBudgetImportTests.Stands_and_a_budget_migrate_from_their_files`)
 
-**Stand Block** — Covers caveats and blocks: only an officer with the caveat permission can block or lift; a blocked stand is left out of an allocation run, refused for a cooperative, a sale, a transfer and a lease, and a run approved after one of its stands is blocked is refused; the officer who placed a block cannot lift it; lifted, the stand is free again and the block stays on the stand's history.
+**Stand Block** - Covers caveats and blocks: only an officer with the caveat permission can block or lift; a blocked stand is left out of an allocation run, refused for a cooperative, a sale, a transfer and a lease, and a run approved after one of its stands is blocked is refused; the officer who placed a block cannot lift it; lifted, the stand is free again and the block stays on the stand's history.
 - [ ] Blocked stands cannot be allocated sold leased or transferred (`StandBlockTests.Blocked_stands_cannot_be_allocated_sold_leased_or_transferred`)
 
-**Stand Lease** — Covers a stand lease straight-lined under IFRS 16: three years from January 2026 at 12,000 a year escalating 10% a year (39,720 in all). January bills 1,000 rent and recognises 1,103.33 income, accruing 103.33 (a repeat bills nothing); after the first year the accrued income stands at 1,239.96; billing every month to the end recognises the full 39,720 as income, invoices exactly that rent, and leaves the accrued income account at nothing. An overlapping lease of the same stand and a lease not starting on the first are refused.
+**Stand Lease** - Covers a stand lease straight-lined under IFRS 16: three years from January 2026 at 12,000 a year escalating 10% a year (39,720 in all). January bills 1,000 rent and recognises 1,103.33 income, accruing 103.33 (a repeat bills nothing); after the first year the accrued income stands at 1,239.96; billing every month to the end recognises the full 39,720 as income, invoices exactly that rent, and leaves the accrued income account at nothing. An overlapping lease of the same stand and a lease not starting on the first are refused.
 - [ ] Lease income is straight lined and the accrual unwinds (`StandLeaseTests.Lease_income_is_straight_lined_and_the_accrual_unwinds`)
 
-**Stand Lifecycle** — Covers the stand state machine, consolidation, re-subdivision and spouse checks: jumps and document-only moves are refused and every move needs its authority; a withheld stand cannot be sold or moved on and is released back to where it was; free stands consolidate (sizes and costs added, the old ones retired at nil cost) and a stand re-subdivides by area, lineage walking back to the parcel; a household whose spouse is already listed or owns a stand is refused, and an applicant whose spouse comes to hold a stand is left out of an allocation run.
+**Stand Lifecycle** - Covers the stand state machine, consolidation, re-subdivision and spouse checks: jumps and document-only moves are refused and every move needs its authority; a withheld stand cannot be sold or moved on and is released back to where it was; free stands consolidate (sizes and costs added, the old ones retired at nil cost) and a stand re-subdivides by area, lineage walking back to the parcel; a household whose spouse is already listed or owns a stand is refused, and an applicant whose spouse comes to hold a stand is left out of an allocation run.
 - [ ] Stands follow the lifecycle and households get one stand (`StandLifecycleTests.Stands_follow_the_lifecycle_and_households_get_one_stand`)
 
-**Stand Pricing** — Covers stand pricing: rules are proposed and approved by different officers with the pricing permission; only approved rules price stands; a size-band rule beats the scheme rule; a stand's price builds up from its capitalised cost; the price in force on the offer date is frozen on the allocation; and a later price change does not touch it.
+**Stand Pricing** - Covers stand pricing: rules are proposed and approved by different officers with the pricing permission; only approved rules price stands; a size-band rule beats the scheme rule; a stand's price builds up from its capitalised cost; the price in force on the offer date is frozen on the allocation; and a later price change does not touch it.
 - [ ] Prices are approved built up and frozen at the offer date (`StandPricingTests.Prices_are_approved_built_up_and_frozen_at_the_offer_date`)
 
-**Standard Costing** — Covers standard costing: with a standard of 10, receipts of 10 at 12 and 5 at 9 go into stock at 150, the 15 of difference to price variance; an issue of 6 costs 60; moving the standard to 11 revalues the 9 on hand by 9; the next issue costs 11. A standard item without a standard cannot be received.
+**Standard Costing** - Covers standard costing: with a standard of 10, receipts of 10 at 12 and 5 at 9 go into stock at 150, the 15 of difference to price variance; an issue of 6 costs 60; moving the standard to 11 revalues the 9 on hand by 9; the next issue costs 11. A standard item without a standard cannot be received.
 - [ ] Standard items are valued at standard with variances aside (`StandardCostingTests.Standard_items_are_valued_at_standard_with_variances_aside`)
 
-**Standing Order** — Covers standing orders (GL and supplier, month-end dates, never run twice), direct debits collecting what is owed up to a cap, and gift card stock ranges activated at sale.
+**Standing Order** - Covers standing orders (GL and supplier, month-end dates, never run twice), direct debits collecting what is owed up to a cap, and gift card stock ranges activated at sale.
 - [ ] Standing orders pay and direct debits collect on schedule (`StandingOrderTests.Standing_orders_pay_and_direct_debits_collect_on_schedule`)
 - [ ] Gift card stock is activated at sale (`StandingOrderTests.Gift_card_stock_is_activated_at_sale`)
 
-**Statement Despatch** — Covers bulk statements by email: customers owing at least the minimum with an email address get their statement merged into the template and queued in one batch; those without email, below the minimum or paid up are left out and counted; a missing template is refused; and the monthly scheduled task queues last month's statements.
+**Statement Despatch** - Covers bulk statements by email: customers owing at least the minimum with an email address get their statement merged into the template and queued in one batch; those without email, below the minimum or paid up are left out and counted; a missing template is refused; and the monthly scheduled task queues last month's statements.
 - [ ] Statements are emailed to customers who owe (`StatementDespatchTests.Statements_are_emailed_to_customers_who_owe`)
 
 **Statement Document**
@@ -1828,134 +1828,134 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Statement Render**
 - [ ] Customer statement renders open items and balance (`StatementRenderTests.Customer_statement_renders_open_items_and_balance`)
 
-**Statement Reports** — Covers the statement reports: AR42 dunning letters, AR46 commission statement, AP51 supplier statement (opening, running and closing balance, ageing), AP56 cash requirement by week, M144 ratepayer statement and SC173 student fee statement (fees by term, allocated payment).
+**Statement Reports** - Covers the statement reports: AR42 dunning letters, AR46 commission statement, AP51 supplier statement (opening, running and closing balance, ageing), AP56 cash requirement by week, M144 ratepayer statement and SC173 student fee statement (fees by term, allocated payment).
 - [ ] Statements letters and forecasts render (`StatementReportsTests.Statements_letters_and_forecasts_render`)
 
 **Stock Ageing Report**
 - [ ] Stock ageing buckets on hand value by age since last movement (`StockAgeingReportTests.Stock_ageing_buckets_on_hand_value_by_age_since_last_movement`)
 
-**Stock Availability** — Covers stock availability: free stock nets open sales-order commitments, available-to-promise adds inbound purchase orders, and the back-order book allocates on-hand oldest-first so a later order shows its shortfall.
+**Stock Availability** - Covers stock availability: free stock nets open sales-order commitments, available-to-promise adds inbound purchase orders, and the back-order book allocates on-hand oldest-first so a later order shows its shortfall.
 - [ ] Availability nets order commitments and back orders allocate oldest first (`StockAvailabilityTests.Availability_nets_order_commitments_and_back_orders_allocate_oldest_first`)
 
-**Stock Posting Atomicity** — Covers stock postings refused by a closed inventory period: an issue and a stocktake shortage are refused without touching the stock balance, so a later save in the same scope persists nothing and check data stays clean; once the period is reopened the issue goes through.
+**Stock Posting Atomicity** - Covers stock postings refused by a closed inventory period: an issue and a stocktake shortage are refused without touching the stock balance, so a later save in the same scope persists nothing and check data stays clean; once the period is reopened the issue goes through.
 - [ ] A refused stock posting leaves the balance untouched (`StockPostingAtomicityTests.A_refused_stock_posting_leaves_the_balance_untouched`)
 
-**Stock Provision** — Covers stock provisions end to end: at 31 August a widget that will sell below cost is written down to NRV (19), a gadget unsold since January is slow-moving (25) and recent stock needs nothing; posting books 44, a repeat posts nothing, and once the gadget has sold the September run releases its 25.
+**Stock Provision** - Covers stock provisions end to end: at 31 August a widget that will sell below cost is written down to NRV (19), a gadget unsold since January is slow-moving (25) and recent stock needs nothing; posting books 44, a repeat posts nothing, and once the gadget has sold the September run releases its 25.
 - [ ] Provisions are booked adjusted and released (`StockProvisionTests.Provisions_are_booked_adjusted_and_released`)
 
-**Stock Reservation** — Covers hard stock reservations for sales orders: orders reserve free stock first come first served, reserved stock is refused to any other issue, the reserving order despatches it, and cancelling an order releases what it held.
+**Stock Reservation** - Covers hard stock reservations for sales orders: orders reserve free stock first come first served, reserved stock is refused to any other issue, the reserving order despatches it, and cancelling an order releases what it held.
 - [ ] Reserved stock is held for its order until despatched or released (`StockReservationTests.Reserved_stock_is_held_for_its_order_until_despatched_or_released`)
 
-**Stock Transfer** — Covers two-step transfers and consignment stock (brief §14 E 91, 101): dispatch into a transit location, a short receipt written off under the TRANSIT reason, the guards on each step, goods in transit at a date, and stock held at a customer's site.
+**Stock Transfer** - Covers two-step transfers and consignment stock (brief §14 E 91, 101): dispatch into a transit location, a short receipt written off under the TRANSIT reason, the guards on each step, goods in transit at a date, and stock held at a customer's site.
 - [ ] Transfers travel through transit and consignment stock is reported (`StockTransferTests.Transfers_travel_through_transit_and_consignment_stock_is_reported`)
 
-**Stocktake** — End-to-end stocktake: freeze a warehouse's on-hand, capture counts, post the variances at moving-average cost (a shortage and a surplus), and confirm the stock and the ledger agree and the books balance.
+**Stocktake** - End-to-end stocktake: freeze a warehouse's on-hand, capture counts, post the variances at moving-average cost (a shortage and a surplus), and confirm the stock and the ledger agree and the books balance.
 - [ ] A stocktake posts variances and reconciles stock (`StocktakeTests.A_stocktake_posts_variances_and_reconciles_stock`)
 
-**Store Requisition** — Covers store requisitions: the canteen asks for 10 cups at 2 each; the requester cannot approve, and nothing issues before approval; 6 are issued (12 charged to the canteen's supplies account in its cost centre), over-issuing is refused, and the last 4 complete it; reversing an issue credits the canteen, not cost of sales.
+**Store Requisition** - Covers store requisitions: the canteen asks for 10 cups at 2 each; the requester cannot approve, and nothing issues before approval; 6 are issued (12 charged to the canteen's supplies account in its cost centre), over-issuing is refused, and the last 4 complete it; reversing an issue credits the canteen, not cost of sales.
 - [ ] Requisitions are approved then issued to the department (`StoreRequisitionTests.Requisitions_are_approved_then_issued_to_the_department`)
 
-**Student Wallet** — Covers student wallets (brief §14 J 185): a top-up, spends up to the daily limit and the balance, a withdrawn student refused, and the tuck-shop report rolling the wallet forward.
+**Student Wallet** - Covers student wallets (brief §14 J 185): a top-up, spends up to the daily limit and the balance, a withdrawn student refused, and the tuck-shop report rolling the wallet forward.
 - [ ] Wallets are topped up spent within limits and reported (`StudentWalletTests.Wallets_are_topped_up_spent_within_limits_and_reported`)
 
-**Sub Report Runner** — Covers sub-reports through the report runner: a company report lists the sales reps and, inside each row, runs the AR46 commission statement for that rep only (the link carries the rep's code, the period comes from the parent's parameters); its rich-text heading is filled from the row.
+**Sub Report Runner** - Covers sub-reports through the report runner: a company report lists the sales reps and, inside each row, runs the AR46 commission statement for that rep only (the link carries the rep's code, the period comes from the parent's parameters); its rich-text heading is filled from the row.
 - [ ] A report runs a linked sub report per row (`SubReportRunnerTests.A_report_runs_a_linked_sub_report_per_row`)
 
-**Subcontract Advance** — Covers subcontract advances and withholding: the advance is carried as an asset and recovered as a share of each certificate until cleared, withholding tax is deducted from each certificate's gross and certified for the return, and the supplier is invoiced the rest.
+**Subcontract Advance** - Covers subcontract advances and withholding: the advance is carried as an asset and recovered as a share of each certificate until cleared, withholding tax is deducted from each certificate's gross and certified for the return, and the supplier is invoiced the rest.
 - [ ] Certificates recover the advance and withhold tax (`SubcontractAdvanceTests.Certificates_recover_the_advance_and_withhold_tax`)
 
-**Subcontract** — Covers subcontracts and plant (brief §14 K 192, 194): certificates invoice the supplier ledger net of retention and hold the retention, refuse backwards or over-value work, and release no more than is held; plant hours charge jobs at the hire rate; JC192 and JC194 read them back.
+**Subcontract** - Covers subcontracts and plant (brief §14 K 192, 194): certificates invoice the supplier ledger net of retention and hold the retention, refuse backwards or over-value work, and release no more than is held; plant hours charge jobs at the hire rate; JC192 and JC194 read them back.
 - [ ] Subcontracts post through payables with retention and plant is recovered (`SubcontractTests.Subcontracts_post_through_payables_with_retention_and_plant_is_recovered`)
 
-**Supplier Advance** — Advances to suppliers (brief §4.4): paid into an advances account ahead of the invoice, applied to the invoice when it arrives (a purchase-ledger payment item allocated to it) and refunded when the order falls through.
+**Supplier Advance** - Advances to suppliers (brief §4.4): paid into an advances account ahead of the invoice, applied to the invoice when it arrives (a purchase-ledger payment item allocated to it) and refunded when the order falls through.
 - [ ] Advance is paid applied to the invoice and the rest refunded (`SupplierAdvanceTests.Advance_is_paid_applied_to_the_invoice_and_the_rest_refunded`)
 
-**Supplier Bank Change** — Covers dual authorisation of supplier bank details: a requested change leaves the details as they are and holds the supplier out of the payment run; the requester cannot approve it and a second request is refused; once a different user approves, the details change and the next run pays to the new account. A rejected change leaves them alone.
+**Supplier Bank Change** - Covers dual authorisation of supplier bank details: a requested change leaves the details as they are and holds the supplier out of the payment run; the requester cannot approve it and a second request is refused; once a different user approves, the details change and the next run pays to the new account. A rejected change leaves them alone.
 - [ ] Bank details change only with a second users approval (`SupplierBankChangeTests.Bank_details_change_only_with_a_second_users_approval`)
 
-**Supplier Blacklist** — Covers the supplier blacklist: once blacklisted, a supplier cannot be given an order, named on a requisition or invited to quote, but its existing invoice is still paid; an order for an unknown supplier is refused; after reinstatement an order goes through.
+**Supplier Blacklist** - Covers the supplier blacklist: once blacklisted, a supplier cannot be given an order, named on a requisition or invited to quote, but its existing invoice is still paid; an order for an unknown supplier is refused; after reinstatement an order goes through.
 - [ ] Blacklisted suppliers get no new business but are still paid (`SupplierBlacklistTests.Blacklisted_suppliers_get_no_new_business_but_are_still_paid`)
 
-**Supplier Certificate Enforcement** — Covers certificates on the supplier side: an exempt purchase needs the supplier's exemption certificate and a certified supply carries no tax; a supplier's tax clearance certificate (not only its clearance date) frees its payments from withholding, until revoked; and the company's default withholding code is deducted from payments to uncleared suppliers that name none — single payments and payment runs alike.
+**Supplier Certificate Enforcement** - Covers certificates on the supplier side: an exempt purchase needs the supplier's exemption certificate and a certified supply carries no tax; a supplier's tax clearance certificate (not only its clearance date) frees its payments from withholding, until revoked; and the company's default withholding code is deducted from payments to uncleared suppliers that name none - single payments and payment runs alike.
 - [ ] Supplier certificates are enforced (`SupplierCertificateEnforcementTests.Supplier_certificates_are_enforced`)
 
-**Supplier Rebate** — Covers supplier rebate accrual: on a 1% / 2%-from-1,000 agreement, 600 bought by February accrues 6; another 500 in March crosses the tier, so the rebate on all 1,100 is 22 and March books 16; a rerun books nothing; a 200 credit note takes spend back under the tier, so the rebate falls to 9 and 13 is reversed; another supplier's purchases count for nothing.
+**Supplier Rebate** - Covers supplier rebate accrual: on a 1% / 2%-from-1,000 agreement, 600 bought by February accrues 6; another 500 in March crosses the tier, so the rebate on all 1,100 is 22 and March books 16; a rerun books nothing; a 200 credit note takes spend back under the tier, so the rebate falls to 9 and 13 is reversed; another supplier's purchases count for nothing.
 - [ ] Rebates accrue on purchases and follow the tiers (`SupplierRebateTests.Rebates_accrue_on_purchases_and_follow_the_tiers`)
 
-**Supplier Scorecard** — Covers the supplier scorecard: one supplier delivers one order early and one late (50% on time), has 2 of its 20 units returned (90% quality) and invoices 300; another delivers its only order on time with nothing returned; an order with no required-by date is not judged for timeliness.
+**Supplier Scorecard** - Covers the supplier scorecard: one supplier delivers one order early and one late (50% on time), has 2 of its 20 units returned (90% quality) and invoices 300; another delivers its only order on time with nothing returned; an order with no required-by date is not judged for timeliness.
 - [ ] Suppliers are scored on timeliness quality and spend (`SupplierScorecardTests.Suppliers_are_scored_on_timeliness_quality_and_spend`)
 
 **Supplier Settlement Discount**
 - [ ] Paying early with a discount clears the supplier invoice (`SupplierSettlementDiscountTests.Paying_early_with_a_discount_clears_the_supplier_invoice`)
 
-**Supplier Statement Reconciliation** — Covers reconciling a supplier statement against real AP postings: invoices pair by number, an unapplied payment pairs by amount, a fully settled invoice drops out of both sides, and the balance identity holds.
+**Supplier Statement Reconciliation** - Covers reconciling a supplier statement against real AP postings: invoices pair by number, an unapplied payment pairs by amount, a fully settled invoice drops out of both sides, and the balance identity holds.
 - [ ] Supplier statement reconciles to the purchase ledger (`SupplierStatementReconciliationTests.Supplier_statement_reconciles_to_the_purchase_ledger`)
 
 **Supplier Statement**
 - [ ] Supplier statement lists outstanding payables and the balance (`SupplierStatementTests.Supplier_statement_lists_outstanding_payables_and_the_balance`)
 
-**Tab Transfer** — Covers moving lines between bar tabs and merging tabs (brief §4.1): part of a line moves with its share of the tax and stays fired; a merge moves everything unbilled, cancels the emptied tab and frees its table; only open tabs and unbilled quantities move.
+**Tab Transfer** - Covers moving lines between bar tabs and merging tabs (brief §4.1): part of a line moves with its share of the tax and stays fired; a merge moves everything unbilled, cancels the emptied tab and frees its table; only open tabs and unbilled quantities move.
 - [ ] Lines move between tabs and tabs merge (`TabTransferTests.Lines_move_between_tabs_and_tabs_merge`)
 
-**Tariff Billing Cycle** — Covers tariff billing cycles: an annual July rates charge is raised once by the first run in the year (later monthly runs skip it), and a stand connected part-way through the year pays its share; a quarterly charge billed in two instalments raises half in each of the first two months of the quarter through the reviewed billing run and nothing in the third.
+**Tariff Billing Cycle** - Covers tariff billing cycles: an annual July rates charge is raised once by the first run in the year (later monthly runs skip it), and a stand connected part-way through the year pays its share; a quarterly charge billed in two instalments raises half in each of the first two months of the quarter through the reviewed billing run and nothing in the third.
 - [ ] Annual and instalment charges are billed once per period (`TariffBillingCycleTests.Annual_and_instalment_charges_are_billed_once_per_period`)
 
-**Tariff Catalogue** — Covers the tariff catalogue: domestic (council-wide and a Ward 3 version) and commercial water tariffs are offered; a Ward 3 domestic consumer resolves to the Ward 3 tariff, a Ward 9 domestic consumer to the council-wide one, a commercial consumer to the commercial tariff, and an industrial consumer has none.
+**Tariff Catalogue** - Covers the tariff catalogue: domestic (council-wide and a Ward 3 version) and commercial water tariffs are offered; a Ward 3 domestic consumer resolves to the Ward 3 tariff, a Ward 9 domestic consumer to the council-wide one, a commercial consumer to the commercial tariff, and an industrial consumer has none.
 - [ ] Tariffs resolve by category and ward (`TariffCatalogueTests.Tariffs_resolve_by_category_and_ward`)
 
-**Tariff Service** — Covers creating and versioning tariffs (brief §4.9): a new code needs its essentials, a later date adds a version that carries over what is not given (blocks and seasons too), the catalogue resolves the version in force on a date, a withdrawn version steps aside, and an approved tariff change becomes a new version from the day it is applied instead of overwriting the version that raised earlier bills.
+**Tariff Service** - Covers creating and versioning tariffs (brief §4.9): a new code needs its essentials, a later date adds a version that carries over what is not given (blocks and seasons too), the catalogue resolves the version in force on a date, a withdrawn version steps aside, and an approved tariff change becomes a new version from the day it is applied instead of overwriting the version that raised earlier bills.
 - [ ] Tariffs are versioned not overwritten (`TariffServiceTests.Tariffs_are_versioned_not_overwritten`)
 
-**Tariff Version** — Covers effective-dated tariff versions: a stand linked to the January version of a refuse tariff (10 a month) bills 10 in June and 12 in July once the July version takes effect, without relinking; a version that is switched off is passed over; prepaid units sell at the version in force (200 then 100 units for 50).
+**Tariff Version** - Covers effective-dated tariff versions: a stand linked to the January version of a refuse tariff (10 a month) bills 10 in June and 12 in July once the July version takes effect, without relinking; a version that is switched off is passed over; prepaid units sell at the version in force (200 then 100 units for 50).
 - [ ] Bills use the tariff version in force on the bill date (`TariffVersionTests.Bills_use_the_tariff_version_in_force_on_the_bill_date`)
 
 **Tax And Fx**
 - [ ] Tax uses the effective dated rate (`TaxAndFxTests.Tax_uses_the_effective_dated_rate`)
 - [ ] Fx revaluation posts unrealised gain and auto reverses (`TaxAndFxTests.Fx_revaluation_posts_unrealised_gain_and_auto_reverses`)
 
-**Tax Compliance** — Covers tax compliance: exemption certificates stop tax being charged and are required for exempt invoicing, with expiry warnings; and the VAT return on each basis — invoice date (the ledger), tax point (an invoice delivered last period moved there), and cash accounting (invoice VAT due only as it is paid, part payments releasing their share).
+**Tax Compliance** - Covers tax compliance: exemption certificates stop tax being charged and are required for exempt invoicing, with expiry warnings; and the VAT return on each basis - invoice date (the ledger), tax point (an invoice delivered last period moved there), and cash accounting (invoice VAT due only as it is paid, part payments releasing their share).
 - [ ] Certificates and returns on each basis (`TaxComplianceTests.Certificates_and_returns_on_each_basis`)
 
-**Tax Credit Payroll** — Covers tax credits in a payroll run: an elderly credit from 65 for everyone, a medical-aid credit of half the contributions for those given it, and credits that never take the tax below nil.
+**Tax Credit Payroll** - Covers tax credits in a payroll run: an elderly credit from 65 for everyone, a medical-aid credit of half the contributions for those given it, and credits that never take the tax below nil.
 - [ ] Credits reduce the tax deducted in a run (`TaxCreditPayrollTests.Credits_reduce_the_tax_deducted_in_a_run`)
 
-**Tax Defaults** — Default tax codes (brief §3.5) on suppliers, customers and accounts fill in the tax on invoices entered without one; a category's costing method applies to items created in it; GL26 shows the FX revaluation before and after per trader.
+**Tax Defaults** - Default tax codes (brief §3.5) on suppliers, customers and accounts fill in the tax on invoices entered without one; a category's costing method applies to items created in it; GL26 shows the FX revaluation before and after per trader.
 - [ ] Invoices without tax take the trader or account default code (`TaxDefaultsTests.Invoices_without_tax_take_the_trader_or_account_default_code`)
 - [ ] Category costing applies to new items and GL26 shows revaluation by trader (`TaxDefaultsTests.Category_costing_applies_to_new_items_and_GL26_shows_revaluation_by_trader`)
 
-**Tax Table Basis** — Covers PAYE from the effective-dated tax table: per period, cumulative year-to-date (bands times the period number less tax already deducted), annual payments spread (annualised and apportioned), and a clear refusal when no table is in force.
+**Tax Table Basis** - Covers PAYE from the effective-dated tax table: per period, cumulative year-to-date (bands times the period number less tax already deducted), annual payments spread (annualised and apportioned), and a clear refusal when no table is in force.
 - [ ] Tax is calculated from the table per period cumulatively and with bonuses spread (`TaxTableBasisTests.Tax_is_calculated_from_the_table_per_period_cumulatively_and_with_bonuses_spread`)
 
-**Tenancy Occupancy** — Covers occupants and lodger permits: household members are listed within the unit's occupancy limit, a lodger needs a permit that leaves the tenant a room, the permit's fee is billed with the rent while it is in force, and the household and permits end with the tenancy.
+**Tenancy Occupancy** - Covers occupants and lodger permits: household members are listed within the unit's occupancy limit, a lodger needs a permit that leaves the tenant a room, the permit's fee is billed with the rent while it is in force, and the household and permits end with the tenancy.
 - [ ] Occupants and lodgers are permitted limited and billed (`TenancyOccupancyTests.Occupants_and_lodgers_are_permitted_limited_and_billed`)
 
 **Tenure Control Account**
 - [ ] Instalment debtors post to their own control (`TenureControlAccountTests.Instalment_debtors_post_to_their_own_control`)
 
-**Termination** — Covers termination and final pay: a retrenchment pays the last month pro rata, notice, leave, gratuity and severance, taxes ordinary pay on the PAYE table and terminal benefits at the terminal rate, recovers the loan, posts one balanced journal, terminates the employee (the next run leaves them out) and opens a clearance checklist and certificate of service; a resignation carries leave only, and loans beyond the pay stay owed.
+**Termination** - Covers termination and final pay: a retrenchment pays the last month pro rata, notice, leave, gratuity and severance, taxes ordinary pay on the PAYE table and terminal benefits at the terminal rate, recovers the loan, posts one balanced journal, terminates the employee (the next run leaves them out) and opens a clearance checklist and certificate of service; a resignation carries leave only, and loans beyond the pay stay owed.
 - [ ] Leavers are paid off and cleared (`TerminationTests.Leavers_are_paid_off_and_cleared`)
 
-**Till Cash** — Covers till cash: cash sales rounded to the smallest coin with the difference posted, and pickups, supervised paid-outs and float top-ups posted and counted in the cash expected at cash-up.
+**Till Cash** - Covers till cash: cash sales rounded to the smallest coin with the difference posted, and pickups, supervised paid-outs and float top-ups posted and counted in the cash expected at cash-up.
 - [ ] Cash is rounded and drawer movements reach the cash up (`TillCashTests.Cash_is_rounded_and_drawer_movements_reach_the_cash_up`)
 
-**Till Catalogue And Policy** — Covers the till's server search, favourites and category drill-down, the refund window, exchange-rate policy by document type or ledger, and the machine and snapshot hash kept on each approval.
+**Till Catalogue And Policy** - Covers the till's server search, favourites and category drill-down, the refund window, exchange-rate policy by document type or ledger, and the machine and snapshot hash kept on each approval.
 - [ ] The till finds by alias shows favourites and drills into categories (`TillCatalogueAndPolicyTests.The_till_finds_by_alias_shows_favourites_and_drills_into_categories`)
 - [ ] Old sales need a supervisor to refund (`TillCatalogueAndPolicyTests.Old_sales_need_a_supervisor_to_refund`)
 - [ ] A rate policy sets the rate type and approvals keep machine and hash (`TillCatalogueAndPolicyTests.A_rate_policy_sets_the_rate_type_and_approvals_keep_machine_and_hash`)
 
-**Till Exchange** — Covers refunds from the drawer and exchanges: a cash refund paid from an open session lowers the cash the drawer should hold; an exchange takes goods back towards new ones so only the difference moves (paid in, or given back); returning more than was sold refuses the whole exchange, leaving no new sale; refunds cannot be keyed as till cash movements by hand.
+**Till Exchange** - Covers refunds from the drawer and exchanges: a cash refund paid from an open session lowers the cash the drawer should hold; an exchange takes goods back towards new ones so only the difference moves (paid in, or given back); returning more than was sold refuses the whole exchange, leaving no new sale; refunds cannot be keyed as till cash movements by hand.
 - [ ] Refunds and exchanges keep the drawer right (`TillExchangeTests.Refunds_and_exchanges_keep_the_drawer_right`)
 
-**Title Deed** — Covers the title deed pipeline: title needs a holder who has paid in full; it is applied for once; the application moves stage by stage with its particulars (conveyancer, the registry's query, deed number, who signed for it) and cannot skip a stage; a blocked stand stops it; and the pipeline report ages each open application at its stage as at any date, dropping deeds once handed over.
+**Title Deed** - Covers the title deed pipeline: title needs a holder who has paid in full; it is applied for once; the application moves stage by stage with its particulars (conveyancer, the registry's query, deed number, who signed for it) and cannot skip a stage; a blocked stand stops it; and the pipeline report ages each open application at its stage as at any date, dropping deeds once handed over.
 - [ ] Title deeds move through the pipeline and are aged at every stage (`TitleDeedTests.Title_deeds_move_through_the_pipeline_and_are_aged_at_every_stage`)
 
-**Trader Analysis Code** — Covers the transaction analysis codes on customer and supplier accounts (brief §4.5): they come in with the take-on file, upper-cased, and the registers list them.
+**Trader Analysis Code** - Covers the transaction analysis codes on customer and supplier accounts (brief §4.5): they come in with the take-on file, upper-cased, and the registers list them.
 - [ ] Analysis codes are imported and listed (`TraderAnalysisCodeTests.Analysis_codes_are_imported_and_listed`)
 
-**Trader Directory** — Covers customer and supplier addresses and contacts: the default postal address prints on the invoice, statement, reminder letter, purchase order and remittance advice; a new default replaces the old one; documents are emailed to the contacts who receive them (else the primary contact, else the customer's own email), with the document attached; a trader with nobody to send to is refused.
+**Trader Directory** - Covers customer and supplier addresses and contacts: the default postal address prints on the invoice, statement, reminder letter, purchase order and remittance advice; a new default replaces the old one; documents are emailed to the contacts who receive them (else the primary contact, else the customer's own email), with the document attached; a trader with nobody to send to is refused.
 - [ ] Addresses print and documents go to the right people (`TraderDirectoryTests.Addresses_print_and_documents_go_to_the_right_people`)
 
-**Trader Rate Type** — Covers per-trader rate types: a customer on a contract (fixed) rate converts its euro invoices and receipts at that rate; before the contract rate exists it falls back to the daily rate; a supplier with no rate type converts at the daily rate; a rate keyed on the document still wins.
+**Trader Rate Type** - Covers per-trader rate types: a customer on a contract (fixed) rate converts its euro invoices and receipts at that rate; before the contract rate exists it falls back to the daily rate; a supplier with no rate type converts at the daily rate; a rate keyed on the document still wins.
 - [ ] Traders convert at their own rate type with the daily rate as fallback (`TraderRateTypeTests.Traders_convert_at_their_own_rate_type_with_the_daily_rate_as_fallback`)
 
 **Trader Register Report**
@@ -1964,10 +1964,10 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Trading Contra**
 - [ ] Contra offsets a debtor invoice against a creditor invoice for the same partner (`TradingContraTests.Contra_offsets_a_debtor_invoice_against_a_creditor_invoice_for_the_same_partner`)
 
-**Trading Document Type** — Covers the document type recorded on trading journals: each kind of sales and purchase document now names itself (it used to record an account code such as "4000" or "1100"), which is what the account enquiry and audit trail show.
+**Trading Document Type** - Covers the document type recorded on trading journals: each kind of sales and purchase document now names itself (it used to record an account code such as "4000" or "1100"), which is what the account enquiry and audit trail show.
 - [ ] Trading journals carry their document type (`TradingDocumentTypeTests.Trading_journals_carry_their_document_type`)
 
-**Trading Revaluation** — Covers period-end revaluation of foreign-currency receivables and payables: EUR items booked at 1.10 are retranslated at the 1.20 closing rate (only what is still outstanding), the unrealised gain on AR and loss on AP are posted and reversed the next day, a repeat run posts nothing, a date without a closing rate is refused, and the control reconciliation shows the revaluation as the reconciling item while it is booked.
+**Trading Revaluation** - Covers period-end revaluation of foreign-currency receivables and payables: EUR items booked at 1.10 are retranslated at the 1.20 closing rate (only what is still outstanding), the unrealised gain on AR and loss on AP are posted and reversed the next day, a repeat run posts nothing, a date without a closing rate is refused, and the control reconciliation shows the revaluation as the reconciling item while it is booked.
 - [ ] Foreign balances are revalued at the closing rate and reversed next day (`TradingRevaluationTests.Foreign_balances_are_revalued_at_the_closing_rate_and_reversed_next_day`)
 
 **Trading**
@@ -1975,16 +1975,16 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Ar allocation across rates realises fx gain (`TradingTests.Ar_allocation_across_rates_realises_fx_gain`)
 - [ ] Ap invoice and payment post and age (`TradingTests.Ap_invoice_and_payment_post_and_age`)
 
-**Transfer Application** — Covers change-of-ownership applications: one open application per stand; the sale checklist (live municipal clearance and housing account, identity, spousal consent, originals, fees, tax); only permitted officers verify, and live items cannot be ticked by hand; fees must be receipted on the ledger; submission waits for every item, including clearing the transferor's arrears and a current clearance certificate; two different approvers, neither of whom verified it; the live checks run again at completion; and completion updates the stand's ownership chain and the municipal owner register together. A change of name has its own, shorter checklist and can be rejected.
+**Transfer Application** - Covers change-of-ownership applications: one open application per stand; the sale checklist (live municipal clearance and housing account, identity, spousal consent, originals, fees, tax); only permitted officers verify, and live items cannot be ticked by hand; fees must be receipted on the ledger; submission waits for every item, including clearing the transferor's arrears and a current clearance certificate; two different approvers, neither of whom verified it; the live checks run again at completion; and completion updates the stand's ownership chain and the municipal owner register together. A change of name has its own, shorter checklist and can be rejected.
 - [ ] A cession is verified approved twice and completed across both registers (`TransferApplicationTests.A_cession_is_verified_approved_twice_and_completed_across_both_registers`)
 
-**Transfer Settlement** — Covers the pro-rata settlement on a property transfer: the month's refuse charge and the year's rates billed to the seller are shared by the days each party owns the stand; the buyer's share is credited to the seller and invoiced to the buyer, once.
+**Transfer Settlement** - Covers the pro-rata settlement on a property transfer: the month's refuse charge and the year's rates billed to the seller are shared by the days each party owns the stand; the buyer's share is credited to the seller and invoiced to the buyer, once.
 - [ ] A transfer settles the periods charges by the days each party owns the stand (`TransferSettlementTests.A_transfer_settles_the_periods_charges_by_the_days_each_party_owns_the_stand`)
 
-**Translated Consolidation** — Covers consolidation across base currencies (IAS 21 current-rate method): a USD parent and a EUR subsidiary are presented in USD — the subsidiary's bank at the 1.20 closing rate, its capital and sales at the 1.10 rate of their posting dates — with the 150 difference as the translation reserve; presented in EUR the parent is translated through the inverse rates; and a date with no closing rate is refused.
+**Translated Consolidation** - Covers consolidation across base currencies (IAS 21 current-rate method): a USD parent and a EUR subsidiary are presented in USD - the subsidiary's bank at the 1.20 closing rate, its capital and sales at the 1.10 rate of their posting dates - with the 150 difference as the translation reserve; presented in EUR the parent is translated through the inverse rates; and a date with no closing rate is refused.
 - [ ] A foreign subsidiary is translated with a translation reserve (`TranslatedConsolidationTests.A_foreign_subsidiary_is_translated_with_a_translation_reserve`)
 
-**Treasury Transfer** — Covers bank transfers: 500 between two USD accounts is a single journal; 1,100 USD sent that arrives as 980 EUR at the 1.10 daily rate is worth 1,078, so 22 is a realised exchange loss and the clearing account is left at nil; transfers to the same account, of nothing, or across currencies without what arrived, are refused and post nothing.
+**Treasury Transfer** - Covers bank transfers: 500 between two USD accounts is a single journal; 1,100 USD sent that arrives as 980 EUR at the 1.10 daily rate is worth 1,078, so 22 is a realised exchange loss and the clearing account is left at nil; transfers to the same account, of nothing, or across currencies without what arrived, are refused and post nothing.
 - [ ] Transfers move money and realise exchange differences (`TreasuryTransferTests.Transfers_move_money_and_realise_exchange_differences`)
 
 **Trial Balance By Type Report**
@@ -2003,13 +2003,13 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Unallocate restores both items and marks the allocation reversed (`UnallocationTests.Unallocate_restores_both_items_and_marks_the_allocation_reversed`)
 - [ ] Unallocate reverses realised fx (`UnallocationTests.Unallocate_reverses_realised_fx`)
 
-**Units Of Production** — Covers units-of-production depreciation: the asset needs its expected total units; each month is charged on that month's usage readings (nothing when idle), never below residual; readings for a month already charged are refused.
+**Units Of Production** - Covers units-of-production depreciation: the asset needs its expected total units; each month is charged on that month's usage readings (nothing when idle), never below residual; readings for a month already charged are refused.
 - [ ] Assets are depreciated on the units they produce (`UnitsOfProductionTests.Assets_are_depreciated_on_the_units_they_produce`)
 
 **Update Service**
 - [ ] A signed release on the share is offered and checked (`UpdateServiceTests.A_signed_release_on_the_share_is_offered_and_checked`)
 
-**User Admin** — Covers user administration: policy-checked passwords, a reset that forces a change and lifts a lockout, roles copied from others, scoped role assignments, groups, and segregation-of-duties warnings when one user gains both sides of a conflict.
+**User Admin** - Covers user administration: policy-checked passwords, a reset that forces a change and lifts a lockout, roles copied from others, scoped role assignments, groups, and segregation-of-duties warnings when one user gains both sides of a conflict.
 - [ ] Users roles and groups are administered (`UserAdminTests.Users_roles_and_groups_are_administered`)
 
 **User Permission Override**
@@ -2018,16 +2018,16 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **User Report Version**
 - [ ] A users own version comes first for that user only (`UserReportVersionTests.A_users_own_version_comes_first_for_that_user_only`)
 
-**Valuation Roll** — Covers the valuation roll: rates at 0.1 cents in the dollar bill a 100,000 stand 100 a month; a supplementary value of 160,000 from February back-bills February and March (120) and April bills 160; an objection upheld at 130,000 replaces the supplementary value from February and credits three months (90), and May bills 130; a general roll for 2027 sets next year's values; the objections register shows the decision.
+**Valuation Roll** - Covers the valuation roll: rates at 0.1 cents in the dollar bill a 100,000 stand 100 a month; a supplementary value of 160,000 from February back-bills February and March (120) and April bills 160; an objection upheld at 130,000 replaces the supplementary value from February and credits three months (90), and May bills 130; a general roll for 2027 sets next year's values; the objections register shows the decision.
 - [ ] Supplementary values and objections adjust rates already billed (`ValuationRollTests.Supplementary_values_and_objections_adjust_rates_already_billed`)
 
-**Variance Commentary** — Covers variance commentary: with 1,000 budgeted for stationery and 500 for travel in March, spending 1,300 and 520 makes only stationery material at 10%; it is owed an explanation until one is given, and a revised explanation replaces the first.
+**Variance Commentary** - Covers variance commentary: with 1,000 budgeted for stationery and 500 for travel in March, spending 1,300 and 520 makes only stationery material at 10%; it is owed an explanation until one is given, and a revised explanation replaces the first.
 - [ ] Material variances are listed with their explanations (`VarianceCommentaryTests.Material_variances_are_listed_with_their_explanations`)
 
-**Variance Decomposition** — Covers the variance decomposition (B35): budget lines carry the volume and, for foreign-currency lines, the planned rate; actual volumes are recorded; the year-to-date variance splits into volume, price and FX components that add up to the total.
+**Variance Decomposition** - Covers the variance decomposition (B35): budget lines carry the volume and, for foreign-currency lines, the planned rate; actual volumes are recorded; the year-to-date variance splits into volume, price and FX components that add up to the total.
 - [ ] Variance splits into volume price and fx (`VarianceDecompositionTests.Variance_splits_into_volume_price_and_fx`)
 
-**Vat Relief Write Off** — Covers bad-debt write-off with VAT relief: an invoice of 1,000 + 150 VAT is part-paid 460, leaving 690; relief is refused until the debt has been overdue 180 days; then 90 of output VAT is reclaimed and only 600 goes to bad debt, the invoice is settled, and output VAT falls to the 60 actually collected.
+**Vat Relief Write Off** - Covers bad-debt write-off with VAT relief: an invoice of 1,000 + 150 VAT is part-paid 460, leaving 690; relief is refused until the debt has been overdue 180 days; then 90 of output VAT is reclaimed and only 600 goes to bad debt, the invoice is settled, and output VAT falls to the 60 actually collected.
 - [ ] Writing off with relief reclaims the vat share of the debt (`VatReliefWriteOffTests.Writing_off_with_relief_reclaims_the_vat_share_of_the_debt`)
 
 **Vat Return By Code Report**
@@ -2036,19 +2036,19 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Vat Return Report**
 - [ ] Vat return nets output tax against input tax (`VatReturnReportTests.Vat_return_nets_output_tax_against_input_tax`)
 
-**Vat Return Settlement** — Covers posting (settling) a VAT return: the output and input control accounts are cleared for the period and the net is posted to a VAT payable account; re-running a settled period is a no-op.
+**Vat Return Settlement** - Covers posting (settling) a VAT return: the output and input control accounts are cleared for the period and the net is posted to a VAT payable account; re-running a settled period is a no-op.
 - [ ] Settling clears the vat control accounts and posts the net payable (`VatReturnSettlementTests.Settling_clears_the_vat_control_accounts_and_posts_the_net_payable`)
 
-**Vehicle Load** — Covers vehicle loads: a 500 kg van with three drops a day takes a 250 kg delivery and a 150 kg one put in front of it as stop 1; a third of 125 kg would overload it and is refused; on a bigger truck the stops limit is enforced; the van's load lists its drops in run order.
+**Vehicle Load** - Covers vehicle loads: a 500 kg van with three drops a day takes a 250 kg delivery and a 150 kg one put in front of it as stop 1; a third of 125 kg would overload it and is refused; on a bigger truck the stops limit is enforced; the van's load lists its drops in run order.
 - [ ] Deliveries are planned on vehicles within their capacity in stop order (`VehicleLoadTests.Deliveries_are_planned_on_vehicles_within_their_capacity_in_stop_order`)
 
-**Vertical Import** — Covers the module register importers: a file with a bad line writes nothing and reports the line; fixed assets come in with cost and depreciation to date (posted against suspense, the next depreciation run charging only the following month); employees, then their loan balances; properties with their services; students under their guardians; a second import skips what is already there; the registers agree with their accounts.
+**Vertical Import** - Covers the module register importers: a file with a bad line writes nothing and reports the line; fixed assets come in with cost and depreciation to date (posted against suspense, the next depreciation run charging only the following month); employees, then their loan balances; properties with their services; students under their guardians; a second import skips what is already there; the registers agree with their accounts.
 - [ ] Module registers import validated and reconcile to their accounts (`VerticalImportTests.Module_registers_import_validated_and_reconcile_to_their_accounts`)
 
 **Vertical Report Render**
 - [ ] Vertical reports render live figures (`VerticalReportRenderTests.Vertical_reports_render_live_figures`)
 
-**Virement Band** — Covers virement bands and dimensions: budget moves between cost centres and to another department's budget; an approver needs the authorisation level of the amount's band, one more between budgets.
+**Virement Band** - Covers virement bands and dimensions: budget moves between cost centres and to another department's budget; an approver needs the authorisation level of the amount's band, one more between budgets.
 - [ ] Virements follow delegated bands across cost centres and departments (`VirementBandTests.Virements_follow_delegated_bands_across_cost_centres_and_departments`)
 
 **Voucher Check And Workflow**
@@ -2057,59 +2057,59 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Voucher**
 - [ ] Gift card issue redeem and breakage (`VoucherTests.Gift_card_issue_redeem_and_breakage`)
 
-**Waiting List Control** — Covers waiting-list integrity: a registration-date change waits for a second officer (the requester cannot approve, a second request is refused while one is pending) and only then moves seniority; a rejected change moves nothing. On an annual cycle with 30 days' grace, the renewal run suspends an applicant who has not confirmed, removes one long overdue, and leaves one who confirmed; a suspended applicant who confirms is reinstated; the notice history records each step.
+**Waiting List Control** - Covers waiting-list integrity: a registration-date change waits for a second officer (the requester cannot approve, a second request is refused while one is pending) and only then moves seniority; a rejected change moves nothing. On an annual cycle with 30 days' grace, the renewal run suspends an applicant who has not confirmed, removes one long overdue, and leaves one who confirmed; a suspended applicant who confirms is reinstated; the notice history records each step.
 - [ ] Date changes need two officers and renewals suspend then remove (`WaitingListControlTests.Date_changes_need_two_officers_and_renewals_suspend_then_remove`)
 
-**Waiting List** — Covers the housing waiting list: with a five-year residency rule, an older registrant and a newer but needier one register (the newer one homeless with dependants); a duplicate ID, a newcomer and an applicant who already owns a municipal property are refused; ranking by seniority puts the older first and by score the needier first; the enquiry by ID gives the position and the score explanation.
+**Waiting List** - Covers the housing waiting list: with a five-year residency rule, an older registrant and a newer but needier one register (the newer one homeless with dependants); a duplicate ID, a newcomer and an applicant who already owns a municipal property are refused; ranking by seniority puts the older first and by score the needier first; the enquiry by ID gives the position and the score explanation.
 - [ ] Applicants register after checks and rank by seniority or score (`WaitingListTests.Applicants_register_after_checks_and_rank_by_seniority_or_score`)
 
-**Water Balance** — Covers the water balance and meter exceptions (brief §14 I 157–158): bulk water into a zone against what its meters billed, and meters that are unread, estimated or flagged as tampered.
+**Water Balance** - Covers the water balance and meter exceptions (brief §14 I 157–158): bulk water into a zone against what its meters billed, and meters that are unread, estimated or flagged as tampered.
 - [ ] Water losses and meter exceptions are reported (`WaterBalanceTests.Water_losses_and_meter_exceptions_are_reported`)
 
-**Webhook** — Covers webhooks end to end: posting an invoice queues a signed delivery for its subscriber in the same unit of work; a refused delivery is retried after the back-off and then delivered; a stopped subscription receives nothing more.
+**Webhook** - Covers webhooks end to end: posting an invoice queues a signed delivery for its subscriber in the same unit of work; a refused delivery is retried after the back-off and then delivered; a stopped subscription receives nothing more.
 - [ ] Invoices are published signed and retried (`WebhookTests.Invoices_are_published_signed_and_retried`)
 
-**Weighbridge Invoice** — Covers billing weighbridge loads: a customer's completed outbound tickets are invoiced at a price per tonne plus their haulage, with tax on top; each ticket is marked with the invoice, a load still on the bridge is left out, and nothing is billed twice.
+**Weighbridge Invoice** - Covers billing weighbridge loads: a customer's completed outbound tickets are invoiced at a price per tonne plus their haulage, with tax on top; each ticket is marked with the invoice, a load still on the bridge is left out, and nothing is billed twice.
 - [ ] Completed loads are invoiced once with haulage and tax (`WeighbridgeInvoiceTests.Completed_loads_are_invoiced_once_with_haulage_and_tax`)
 
-**Weighbridge** — Covers weighbridge operations (brief §14 L): outbound loads on stored tare and on a manual weight (refused without a second person), an overload, haulage by zone with a minimum, stock issued from the stockpile, an open inbound ticket that cannot complete with no net load, a concrete batch delivered over the bridge; WB198–205 read them back.
+**Weighbridge** - Covers weighbridge operations (brief §14 L): outbound loads on stored tare and on a manual weight (refused without a second person), an overload, haulage by zone with a minimum, stock issued from the stockpile, an open inbound ticket that cannot complete with no net load, a concrete batch delivered over the bridge; WB198–205 read them back.
 - [ ] Weighbridge tickets drive stock haulage and reports (`WeighbridgeTests.Weighbridge_tickets_drive_stock_haulage_and_reports`)
 
-**Weighbridge Ticket Document** — Covers weighbridge loads against sales orders and the printed ticket: a load names the customer's open order for the product (another customer's order, or one without the product, is refused); the ticket prints the vehicle, order, gross, tare and net with signature lines.
+**Weighbridge Ticket Document** - Covers weighbridge loads against sales orders and the printed ticket: a load names the customer's open order for the product (another customer's order, or one without the product, is refused); the ticket prints the vehicle, order, gross, tare and net with signature lines.
 - [ ] Loads go against orders and print a ticket (`WeighbridgeTicketDocumentTests.Loads_go_against_orders_and_print_a_ticket`)
 
-**Whats App** — Covers WhatsApp: the Cloud API request (text, or a template carrying the text) with the bearer token; a queued message despatched through it keeps the provider id; signed webhook deliveries apply delivered / read / failed receipts (in any order) and record a customer's reply once, matched by number; unsigned or wrongly signed deliveries and a wrong verify token are refused.
+**Whats App** - Covers WhatsApp: the Cloud API request (text, or a template carrying the text) with the bearer token; a queued message despatched through it keeps the provider id; signed webhook deliveries apply delivered / read / failed receipts (in any order) and record a customer's reply once, matched by number; unsigned or wrongly signed deliveries and a wrong verify token are refused.
 - [ ] The request is text or a template (`WhatsAppTests.The_request_is_text_or_a_template`)
 - [ ] Messages go out and receipts and replies come back (`WhatsAppTests.Messages_go_out_and_receipts_and_replies_come_back`)
 
-**Withholding Tax** — Covers withholding tax on supplier payments (brief §3.5): paying 1,000 to a supplier without tax clearance withholds 30% — the invoice is settled in full, the bank pays 700 and 300 is owed as WHT; a cleared supplier is paid in full; the period's return lists the certificate, remitting pays the 300 over (and a second remittance finds nothing), and the certificate text shows gross, withheld and net.
+**Withholding Tax** - Covers withholding tax on supplier payments (brief §3.5): paying 1,000 to a supplier without tax clearance withholds 30% - the invoice is settled in full, the bank pays 700 and 300 is owed as WHT; a cleared supplier is paid in full; the period's return lists the certificate, remitting pays the 300 over (and a second remittance finds nothing), and the certificate text shows gross, withheld and net.
 - [ ] Payments to uncleared suppliers withhold tax that is then remitted (`WithholdingTaxTests.Payments_to_uncleared_suppliers_withhold_tax_that_is_then_remitted`)
 
-**Wmi Machine Id Provider** — Exercises the real <see cref="WmiMachineIdProvider"/> on the host running the suite. WMI values are hardware-specific, so the assertions cover only invariants that hold on any machine: it never throws, it yields distinctive components, those components are stable across calls, and they hash into a parseable fingerprint. On Windows it must enrich beyond the portable baseline.
+**Wmi Machine Id Provider** - Exercises the real <see cref="WmiMachineIdProvider"/> on the host running the suite. WMI values are hardware-specific, so the assertions cover only invariants that hold on any machine: it never throws, it yields distinctive components, those components are stable across calls, and they hash into a parseable fingerprint. On Windows it must enrich beyond the portable baseline.
 - [ ] Get Components never throws and always includes the machine baseline (`WmiMachineIdProviderTests.GetComponents_never_throws_and_always_includes_the_machine_baseline`)
 - [ ] Get Components is stable across calls (`WmiMachineIdProviderTests.GetComponents_is_stable_across_calls`)
 - [ ] Components hash into a parseable fingerprint (`WmiMachineIdProviderTests.Components_hash_into_a_parseable_fingerprint`)
 - [ ] On windows the provider enriches beyond the portable baseline (`WmiMachineIdProviderTests.On_windows_the_provider_enriches_beyond_the_portable_baseline`)
 
-**Workflow Attribute Routing** — Covers approval rules by document attributes (brief §4.3 "rules by value band, currency, department, cost centre, item category, project, requester"): a requisition carries its currency, supplier, main item category and requester to the workflow, and only the stages whose conditions hold apply.
+**Workflow Attribute Routing** - Covers approval rules by document attributes (brief §4.3 "rules by value band, currency, department, cost centre, item category, project, requester"): a requisition carries its currency, supplier, main item category and requester to the workflow, and only the stages whose conditions hold apply.
 - [ ] Stage conditions see the documents attributes (`WorkflowAttributeRoutingTests.Stage_conditions_see_the_documents_attributes`)
 
-**Workflow Definition** — Covers defining a workflow (brief §7) through the service: stages with quorum, value band, condition, named approvers, a role and escalation; a new definition replaces the active one for its document type; documents then route through it; and what is refused.
+**Workflow Definition** - Covers defining a workflow (brief §7) through the service: stages with quorum, value band, condition, named approvers, a role and escalation; a new definition replaces the active one for its document type; documents then route through it; and what is refused.
 - [ ] A workflow is defined and routes documents (`WorkflowDefinitionTests.A_workflow_is_defined_and_routes_documents`)
 
-**Workflow Delegation** — Covers delegation, ad hoc approvers and escalation: a delegate sees and approves on the away approver's behalf (once for both), an approver added by hand can act, and an overdue stage escalates to its escalation user exactly once.
+**Workflow Delegation** - Covers delegation, ad hoc approvers and escalation: a delegate sees and approves on the away approver's behalf (once for both), an approver added by hand can act, and an overdue stage escalates to its escalation user exactly once.
 - [ ] Delegates added approvers and escalation can act (`WorkflowDelegationTests.Delegates_added_approvers_and_escalation_can_act`)
 
-**Workflow Document** — Covers the approval workflow driving documents: a company's requisition workflow (two stages, the second only for larger amounts) governs the requisition — direct approval is refused, approvers are notified stage by stage, the last approval approves the requisition and the requester is told; a journal workflow posts the journal on approval and rejects it on rejection; and when the document cannot follow a decision (the preparer approving their own journal), the decision is not recorded.
+**Workflow Document** - Covers the approval workflow driving documents: a company's requisition workflow (two stages, the second only for larger amounts) governs the requisition - direct approval is refused, approvers are notified stage by stage, the last approval approves the requisition and the requester is told; a journal workflow posts the journal on approval and rejects it on rejection; and when the document cannot follow a decision (the preparer approving their own journal), the decision is not recorded.
 - [ ] Workflows govern requisitions and journals (`WorkflowDocumentTests.Workflows_govern_requisitions_and_journals`)
 
-**Workflow Routing** — Covers approval workflows for payment runs, billing runs, credit notes and write-offs: each starts its workflow when the company defines one and cannot then be approved directly; approval through the workflow pays the run, posts the credit note or writes the debt off; rejection cancels the run, leaves the ledger untouched or withdraws the request; a billing run approved through its workflow is authorised and posts through the resumable posting.
+**Workflow Routing** - Covers approval workflows for payment runs, billing runs, credit notes and write-offs: each starts its workflow when the company defines one and cannot then be approved directly; approval through the workflow pays the run, posts the credit note or writes the debt off; rejection cancels the run, leaves the ledger untouched or withdraws the request; a billing run approved through its workflow is authorised and posts through the resumable posting.
 - [ ] Runs credit notes and write offs are approved through their workflows (`WorkflowRoutingTests.Runs_credit_notes_and_write_offs_are_approved_through_their_workflows`)
 
-**Workflow Rules** — Covers workflow rules: a stage that applies only when its condition holds, approval by the requester's manager and by a role's holders, a snapshot of the document at each decision, and bulk approval acting item by item.
+**Workflow Rules** - Covers workflow rules: a stage that applies only when its condition holds, approval by the requester's manager and by a role's holders, a snapshot of the document at each decision, and bulk approval acting item by item.
 - [ ] Conditions dynamic approvers snapshots and bulk approval (`WorkflowRulesTests.Conditions_dynamic_approvers_snapshots_and_bulk_approval`)
 
-**Working Capital** — End-to-end working-capital metrics: DSO and DPO computed from a real AR invoice and AP invoice.
+**Working Capital** - End-to-end working-capital metrics: DSO and DPO computed from a real AR invoice and AP invoice.
 - [ ] Dso and dpo are computed from receivables and payables (`WorkingCapitalTests.Dso_and_dpo_are_computed_from_receivables_and_payables`)
 
 **Workstation Printer**
@@ -2118,13 +2118,13 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Xlsx Render**
 - [ ] Report runner renders a report to a valid xlsx workbook (`XlsxRenderTests.Report_runner_renders_a_report_to_a_valid_xlsx_workbook`)
 
-**Year End Calendar** — Covers a July–June year with an adjustment period: adjustments reach the 13th period only when asked; the year-end closes into it and opens the next July–June year (not a calendar year) with its own adjustment period; the year-end can be reversed — the profit comes back — and run again, until it is hard-locked, after which every period is permanently closed.
+**Year End Calendar** - Covers a July–June year with an adjustment period: adjustments reach the 13th period only when asked; the year-end closes into it and opens the next July–June year (not a calendar year) with its own adjustment period; the year-end can be reversed - the profit comes back - and run again, until it is hard-locked, after which every period is permanently closed.
 - [ ] A july june year closes reverses and locks (`YearEndCalendarTests.A_july_june_year_closes_reverses_and_locks`)
 
 **Year End**
 - [ ] Year end rolls profit to retained earnings and opens next year (`YearEndTests.Year_end_rolls_profit_to_retained_earnings_and_opens_next_year`)
 
-**Year End Unposted** — Covers the year-end guard: a deferred journal dated in the year blocks the close (it would be left out of the closing profit and could never be released into the permanently closed periods); once released, the year closes and its profit includes the journal.
+**Year End Unposted** - Covers the year-end guard: a deferred journal dated in the year blocks the close (it would be left out of the closing profit and could never be released into the permanently closed periods); once released, the year closes and its profit includes the journal.
 - [ ] A deferred journal blocks year end until released (`YearEndUnpostedTests.A_deferred_journal_blocks_year_end_until_released`)
 
 ## One4All.IntegrationTests (10 scenarios)
@@ -2631,7 +2631,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 
 ### Licensing
 
-**Licence Desk** — Covers the vendor licence desk: terms, edition templates and per-module dates, renew / upgrade / reissue (from a request code) as replacements in the customer's history, revocation published as a signed list that the validator honours, bulk issue with a bad row, the expiry dashboard, the certificate, and the issue log's hash chain catching an edit.
+**Licence Desk** - Covers the vendor licence desk: terms, edition templates and per-module dates, renew / upgrade / reissue (from a request code) as replacements in the customer's history, revocation published as a signed list that the validator honours, bulk issue with a bad row, the expiry dashboard, the certificate, and the issue log's hash chain catching an edit.
 - [ ] Terms end on the right day (`LicenceDeskTests.Terms_end_on_the_right_day`)
 - [ ] Bad terms are refused (`LicenceDeskTests.Bad_terms_are_refused`)
 - [ ] A customer licence is issued renewed upgraded reissued and revoked (`LicenceDeskTests.A_customer_licence_is_issued_renewed_upgraded_reissued_and_revoked`)
@@ -2659,7 +2659,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Protected private key round trips and rejects wrong passphrase (`LicensingTests.Protected_private_key_round_trips_and_rejects_wrong_passphrase`)
 - [ ] Clock rollback is detected (`LicensingTests.Clock_rollback_is_detected`)
 
-**Machine Id Binding** — Covers the seam a machine-id provider plugs into: the raw components it gathers are hashed into a <see cref="MachineFingerprint"/> and validated against a machine-bound licence. Uses a fake provider so the assertions are deterministic on any platform (the real WMI provider is exercised separately).
+**Machine Id Binding** - Covers the seam a machine-id provider plugs into: the raw components it gathers are hashed into a <see cref="MachineFingerprint"/> and validated against a machine-bound licence. Uses a fake provider so the assertions are deterministic on any platform (the real WMI provider is exercised separately).
 - [ ] Fingerprint from the bound machine validates (`MachineIdBindingTests.Fingerprint_from_the_bound_machine_validates`)
 - [ ] Fingerprint survives one component changing (`MachineIdBindingTests.Fingerprint_survives_one_component_changing`)
 - [ ] Fingerprint from a different machine is rejected (`MachineIdBindingTests.Fingerprint_from_a_different_machine_is_rejected`)
@@ -2817,7 +2817,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] A connectivity error wrapped in an outer exception is detected (`OfflineDetectionTests.A_connectivity_error_wrapped_in_an_outer_exception_is_detected`)
 - [ ] A domain or unrelated exception is not a connectivity error (`OfflineDetectionTests.A_domain_or_unrelated_exception_is_not_a_connectivity_error`)
 
-**Offline Sync Service** — Covers the offline sync engine with in-memory fakes: successful replay, immediate dead-lettering when no handler is registered, retry-then-dead-letter on repeated failure, isolation of a throwing handler, capture-order processing, and the outbox's enqueue-once idempotency.
+**Offline Sync Service** - Covers the offline sync engine with in-memory fakes: successful replay, immediate dead-lettering when no handler is registered, retry-then-dead-letter on repeated failure, isolation of a throwing handler, capture-order processing, and the outbox's enqueue-once idempotency.
 - [ ] Successful replay marks the operation synced (`OfflineSyncServiceTests.Successful_replay_marks_the_operation_synced`)
 - [ ] An operation with no handler is dead lettered immediately (`OfflineSyncServiceTests.An_operation_with_no_handler_is_dead_lettered_immediately`)
 - [ ] A failing operation is retried then dead lettered at the attempt ceiling (`OfflineSyncServiceTests.A_failing_operation_is_retried_then_dead_lettered_at_the_attempt_ceiling`)
@@ -2977,12 +2977,12 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] An amount is right aligned against its label (`PosReceiptFormatterTests.An_amount_is_right_aligned_against_its_label`)
 - [ ] Change is omitted when zero (`PosReceiptFormatterTests.Change_is_omitted_when_zero`)
 
-**Pos Ticket Adjustment** — Covers the till's adjustments: line and whole-sale discounts (a percentage follows the quantity; above the cashier's limit a supervisor is needed), price overrides (always supervised), discounts carried to the sale as a discount line on their own account, and a parked ticket loading back with its prices, discounts and quantities.
+**Pos Ticket Adjustment** - Covers the till's adjustments: line and whole-sale discounts (a percentage follows the quantity; above the cashier's limit a supervisor is needed), price overrides (always supervised), discounts carried to the sale as a discount line on their own account, and a parked ticket loading back with its prices, discounts and quantities.
 - [ ] Discounts follow the quantity and need a supervisor past the limit (`PosTicketAdjustmentTests.Discounts_follow_the_quantity_and_need_a_supervisor_past_the_limit`)
 - [ ] Price overrides are supervised and discounts post to their account (`PosTicketAdjustmentTests.Price_overrides_are_supervised_and_discounts_post_to_their_account`)
 - [ ] A parked ticket comes back as it was (`PosTicketAdjustmentTests.A_parked_ticket_comes_back_as_it_was`)
 
-**Pos Ticket** — Covers the touch-terminal cart/tender engine: line and ticket maths, tendering with change, and building a balanced <see cref="CompleteSaleRequest"/> whose net tender equals the gross total (the invariant the POS service enforces).
+**Pos Ticket** - Covers the touch-terminal cart/tender engine: line and ticket maths, tendering with change, and building a balanced <see cref="CompleteSaleRequest"/> whose net tender equals the gross total (the invariant the POS service enforces).
 - [ ] Line maths add tax on top of net (`PosTicketTests.Line_maths_add_tax_on_top_of_net`)
 - [ ] Adding the same sellable increments quantity (`PosTicketTests.Adding_the_same_sellable_increments_quantity`)
 - [ ] Balance and change track tenders (`PosTicketTests.Balance_and_change_track_tenders`)
@@ -3022,7 +3022,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] A bill splits sixty forty by percentage or by amount (`SplitBillByShareTests.A_bill_splits_sixty_forty_by_percentage_or_by_amount`)
 - [ ] Odd amounts still share out every line in full (`SplitBillByShareTests.Odd_amounts_still_share_out_every_line_in_full`)
 
-**Split Bill** — Covers splitting a basket: by items (whole lines and part quantities, with net, tax and discount following the quantity and the last share taking the rounding), evenly, and the splits that are refused.
+**Split Bill** - Covers splitting a basket: by items (whole lines and part quantities, with net, tax and discount following the quantity and the last share taking the rounding), evenly, and the splits that are refused.
 - [ ] Items split with amounts following quantity (`SplitBillTests.Items_split_with_amounts_following_quantity`)
 - [ ] An even split adds back exactly (`SplitBillTests.An_even_split_adds_back_exactly`)
 - [ ] Bad splits are refused (`SplitBillTests.Bad_splits_are_refused`)
@@ -3035,7 +3035,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Parts of the same tender and reference merge and the total is their sum (`TenderSplitTests.Parts_of_the_same_tender_and_reference_merge_and_the_total_is_their_sum`)
 - [ ] A split needs parts each above zero and a reference on all but cash (`TenderSplitTests.A_split_needs_parts_each_above_zero_and_a_reference_on_all_but_cash`)
 
-**Ticket Promotion** — Covers promotions on the till ticket: only lines without a manual discount or price override go into the promotion basket; the engine's discounts land on those lines (net and tax follow) and post as the promotion's discount with its account and code; a manual discount later clears the line's promotion.
+**Ticket Promotion** - Covers promotions on the till ticket: only lines without a manual discount or price override go into the promotion basket; the engine's discounts land on those lines (net and tax follow) and post as the promotion's discount with its account and code; a manual discount later clears the line's promotion.
 - [ ] Promotion discounts price eligible lines and post with their account (`TicketPromotionTests.Promotion_discounts_price_eligible_lines_and_post_with_their_account`)
 
 **Till Function Keys**
@@ -3067,7 +3067,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 
 ### Reporting
 
-**Band Flow And Grouping** — Covers the band and group behaviour the designer offers (brief §13.1): suppress-when on a band, groups sorted by value (numbers and dates as such) and descending, a group header's aggregates over its own group, First / Last and grand totals, page breaks before and after, group headers kept with their first row and repeated on the pages their group continues on, Legal paper, page numbers from expressions, and the Case / FiscalPeriod / DateDiffIn functions.
+**Band Flow And Grouping** - Covers the band and group behaviour the designer offers (brief §13.1): suppress-when on a band, groups sorted by value (numbers and dates as such) and descending, a group header's aggregates over its own group, First / Last and grand totals, page breaks before and after, group headers kept with their first row and repeated on the pages their group continues on, Legal paper, page numbers from expressions, and the Case / FiscalPeriod / DateDiffIn functions.
 - [ ] A band is suppressed when its expression holds (`BandFlowAndGroupingTests.A_band_is_suppressed_when_its_expression_holds`)
 - [ ] Groups sort by value and direction and headers total their own group (`BandFlowAndGroupingTests.Groups_sort_by_value_and_direction_and_headers_total_their_own_group`)
 - [ ] Dates group in date order (`BandFlowAndGroupingTests.Dates_group_in_date_order`)
@@ -3076,14 +3076,14 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Case fiscal period and date differences in units (`BandFlowAndGroupingTests.Case_fiscal_period_and_date_differences_in_units`)
 - [ ] The designer sets band flow options with undo (`BandFlowAndGroupingTests.The_designer_sets_band_flow_options_with_undo`)
 
-**Barcode And Chart Type** — Covers the added barcode symbologies (Code 39 with its start/stop asterisks; EAN-13 with its check digit and parity) and the drawn chart types (column, stacked column, line, area, pie, donut) — checked pixel by pixel in the PNG they produce, with legends and category labels.
+**Barcode And Chart Type** - Covers the added barcode symbologies (Code 39 with its start/stop asterisks; EAN-13 with its check digit and parity) and the drawn chart types (column, stacked column, line, area, pie, donut) - checked pixel by pixel in the PNG they produce, with legends and category labels.
 - [ ] Code39 frames the value with asterisks (`BarcodeAndChartTypeTests.Code39_frames_the_value_with_asterisks`)
 - [ ] Ean13 checks its digit and encodes the parity (`BarcodeAndChartTypeTests.Ean13_checks_its_digit_and_encodes_the_parity`)
 - [ ] Columns and stacks draw each series in its colour (`BarcodeAndChartTypeTests.Columns_and_stacks_draw_each_series_in_its_colour`)
 - [ ] Pies and donuts slice by category (`BarcodeAndChartTypeTests.Pies_and_donuts_slice_by_category`)
 - [ ] Lines and areas rise with the values (`BarcodeAndChartTypeTests.Lines_and_areas_rise_with_the_values`)
 
-**Barcode And Image** — Covers pictures in reports: Code 128 (set B, with its checksum) and QR codes drawn as PNG, and the engine placing a static picture, a picture field, the company logo and a barcode of a field — shown as images in HTML and PDF while exports keep the barcode's value.
+**Barcode And Image** - Covers pictures in reports: Code 128 (set B, with its checksum) and QR codes drawn as PNG, and the engine placing a static picture, a picture field, the company logo and a barcode of a field - shown as images in HTML and PDF while exports keep the barcode's value.
 - [ ] Code128 carries the start data checksum and stop (`BarcodeAndImageTests.Code128_carries_the_start_data_checksum_and_stop`)
 - [ ] Barcodes are pngs (`BarcodeAndImageTests.Barcodes_are_pngs`)
 - [ ] Images logos and barcodes render (`BarcodeAndImageTests.Images_logos_and_barcodes_render`)
@@ -3094,7 +3094,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Designer Page Setup**
 - [ ] Page setup changes in one undoable step and keeps elements on the page (`DesignerPageSetupTests.Page_setup_changes_in_one_undoable_step_and_keeps_elements_on_the_page`)
 
-**Element Text Option** — Covers the element text options (brief §13.1): text for a missing value, vertical alignment, padding, per-side borders, word-wrap, shrink-to-fit and rotation — carried from the definition to the rendered cell, kept by layout copies, and drawn by HTML and PDF.
+**Element Text Option** - Covers the element text options (brief §13.1): text for a missing value, vertical alignment, padding, per-side borders, word-wrap, shrink-to-fit and rotation - carried from the definition to the rendered cell, kept by layout copies, and drawn by HTML and PDF.
 - [ ] Options reach the rendered cell (`ElementTextOptionTests.Options_reach_the_rendered_cell`)
 - [ ] Shrink to fit lowers the font until the text fits (`ElementTextOptionTests.Shrink_to_fit_lowers_the_font_until_the_text_fits`)
 - [ ] Html and pdf draw the options (`ElementTextOptionTests.Html_and_pdf_draw_the_options`)
@@ -3114,11 +3114,11 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Changed added and removed values are reported with their paths (`JsonDiffTests.Changed_added_and_removed_values_are_reported_with_their_paths`)
 - [ ] A value turning null or changing type is a change (`JsonDiffTests.A_value_turning_null_or_changing_type_is_a_change`)
 
-**Layout Export** — Covers exporting a report as laid out (brief §13.3: XLSX "with real columns", plus CSV and DOCX): the column titles, group headers, detail lines and totals in order and in columns taken from where the text sits, figures as numbers and codes with leading zeros as text.
+**Layout Export** - Covers exporting a report as laid out (brief §13.3: XLSX "with real columns", plus CSV and DOCX): the column titles, group headers, detail lines and totals in order and in columns taken from where the text sits, figures as numbers and codes with leading zeros as text.
 - [ ] The grid follows the report layout (`LayoutExportTests.The_grid_follows_the_report_layout`)
 - [ ] Excel csv and word carry the grid (`LayoutExportTests.Excel_csv_and_word_carry_the_grid`)
 
-**Listing Column Round Trip** — Covers the report designer's core transformation: a listing definition can be decomposed into columns and rebuilt through <see cref="SystemReports.Listing"/> without loss — extract → edit → rebuild.
+**Listing Column Round Trip** - Covers the report designer's core transformation: a listing definition can be decomposed into columns and rebuilt through <see cref="SystemReports.Listing"/> without loss - extract → edit → rebuild.
 - [ ] Columns extracted from a system listing round trip back to the same layout (`ListingColumnRoundTripTests.Columns_extracted_from_a_system_listing_round_trip_back_to_the_same_layout`)
 - [ ] Reordering and editing columns is preserved through a rebuild (`ListingColumnRoundTripTests.Reordering_and_editing_columns_is_preserved_through_a_rebuild`)
 
@@ -3132,7 +3132,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Numbers read as they are written on a cheque (`NumberToWordsPortugueseTests.Numbers_read_as_they_are_written_on_a_cheque`)
 - [ ] Amounts take their units in the singular or plural (`NumberToWordsPortugueseTests.Amounts_take_their_units_in_the_singular_or_plural`)
 
-**Page Columns And Background** — Covers the page setup additions (brief §13.1): detail rows flowing across several columns (labels) a column's width apart, group bands still spanning the page and restarting the columns, and a background picture behind every page in HTML and PDF.
+**Page Columns And Background** - Covers the page setup additions (brief §13.1): detail rows flowing across several columns (labels) a column's width apart, group bands still spanning the page and restarting the columns, and a background picture behind every page in HTML and PDF.
 - [ ] Labels flow across the columns then down (`PageColumnsAndBackgroundTests.Labels_flow_across_the_columns_then_down`)
 - [ ] A group band spans the page and restarts the columns (`PageColumnsAndBackgroundTests.A_group_band_spans_the_page_and_restarts_the_columns`)
 - [ ] A background picture sits behind every page (`PageColumnsAndBackgroundTests.A_background_picture_sits_behind_every_page`)
@@ -3146,7 +3146,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Every report is well formed and round trips through the serializer (`ReceiptingReportsTests.Every_report_is_well_formed_and_round_trips_through_the_serializer`)
 - [ ] Listing reports expose a detail band of fields (`ReceiptingReportsTests.Listing_reports_expose_a_detail_band_of_fields`)
 
-**Report Access** — Covers report security: a module with its own reports right (payroll, budget) needs it, a report can name its own permission, a super administrator runs everything; and report rows are cut to the user's scope — rows of another department or with the department blank are left out, rows without a department column pass.
+**Report Access** - Covers report security: a module with its own reports right (payroll, budget) needs it, a report can name its own permission, a super administrator runs everything; and report rows are cut to the user's scope - rows of another department or with the department blank are left out, rows without a department column pass.
 - [ ] Module and report permissions are needed (`ReportAccessTests.Module_and_report_permissions_are_needed`)
 - [ ] Rows are cut to the scope (`ReportAccessTests.Rows_are_cut_to_the_scope`)
 
@@ -3155,7 +3155,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Modules are sections and empty cells show a dash (`ReportCatalogueDocumentTests.Modules_are_sections_and_empty_cells_show_a_dash`)
 - [ ] The committed catalogue matches the shipped reports (`ReportCatalogueDocumentTests.The_committed_catalogue_matches_the_shipped_reports`)
 
-**Report Design Session** — Covers the banded designer's model: elements added and moved on the snap grid and kept inside their band and the printable width, alignment, equal sizing and distribution, typed property edits with refusals, band heights, themes, duplicate and delete, every change undoable and redoable, and the expression preview against a sample row.
+**Report Design Session** - Covers the banded designer's model: elements added and moved on the snap grid and kept inside their band and the printable width, alignment, equal sizing and distribution, typed property edits with refusals, band heights, themes, duplicate and delete, every change undoable and redoable, and the expression preview against a sample row.
 - [ ] Elements snap and stay inside their band and page (`ReportDesignSessionTests.Elements_snap_and_stay_inside_their_band_and_page`)
 - [ ] Alignment sizing and distribution follow the first selected (`ReportDesignSessionTests.Alignment_sizing_and_distribution_follow_the_first_selected`)
 - [ ] Properties are typed and checked (`ReportDesignSessionTests.Properties_are_typed_and_checked`)
@@ -3166,7 +3166,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Dragging snaps to the edges and centres of the other elements (`ReportDesignSessionTests.Dragging_snaps_to_the_edges_and_centres_of_the_other_elements`)
 - [ ] Elements can be brought to the front or sent to the back (`ReportDesignSessionTests.Elements_can_be_brought_to_the_front_or_sent_to_the_back`)
 
-**Report Extras** — Covers the richer report content: median, standard deviation, percent of total (row and group), rank and running total; tick boxes and signature blocks; bar charts drawn as cells; and cross-tabs pivoting rows into generated columns.
+**Report Extras** - Covers the richer report content: median, standard deviation, percent of total (row and group), rank and running total; tick boxes and signature blocks; bar charts drawn as cells; and cross-tabs pivoting rows into generated columns.
 - [ ] Statistics are right (`ReportExtrasTests.Statistics_are_right`)
 - [ ] Row level aggregates use the current row (`ReportExtrasTests.Row_level_aggregates_use_the_current_row`)
 - [ ] A group footer percent is the group against the report (`ReportExtrasTests.A_group_footer_percent_is_the_group_against_the_report`)
@@ -3181,13 +3181,13 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 **Report Head**
 - [ ] A long report shows its first bands without the totals (`ReportHeadTests.A_long_report_shows_its_first_bands_without_the_totals`)
 
-**Report House Style** — Covers the report house style: standard fonts and sizes take the theme's, titles and column-heading strips take its colours, lines its accent, a footer line is added to every page and the logo is placed when the layout does not place it; a cell's own font and colour are left alone; no theme changes nothing; the JSON round-trips and bad colours are named.
+**Report House Style** - Covers the report house style: standard fonts and sizes take the theme's, titles and column-heading strips take its colours, lines its accent, a footer line is added to every page and the logo is placed when the layout does not place it; a cell's own font and colour are left alone; no theme changes nothing; the JSON round-trips and bad colours are named.
 - [ ] The theme restyles standard text titles headings lines footer and logo (`ReportHouseStyleTests.The_theme_restyles_standard_text_titles_headings_lines_footer_and_logo`)
 - [ ] Without a theme or with an empty one nothing changes (`ReportHouseStyleTests.Without_a_theme_or_with_an_empty_one_nothing_changes`)
 - [ ] The logo is not placed twice when the layout places it (`ReportHouseStyleTests.The_logo_is_not_placed_twice_when_the_layout_places_it`)
 - [ ] Json round trips and bad colours are named (`ReportHouseStyleTests.Json_round_trips_and_bad_colours_are_named`)
 
-**Report Layout** — Covers the viewer's layout: pages filled to the printable height with the page header and footer on each and "[Page] of [Pages]" numbered, landscape and receipt-roll paper, drill-through targets inferred from field names (or set explicitly) carrying each row's key, search across pages, and the layout surviving its JSON trip to the desktop.
+**Report Layout** - Covers the viewer's layout: pages filled to the printable height with the page header and footer on each and "[Page] of [Pages]" numbered, landscape and receipt-roll paper, drill-through targets inferred from field names (or set explicitly) carrying each row's key, search across pages, and the layout surviving its JSON trip to the desktop.
 - [ ] Bands flow onto pages with headers footers and numbers (`ReportLayoutTests.Bands_flow_onto_pages_with_headers_footers_and_numbers`)
 - [ ] Paper turns for landscape and rolls grow with the receipt (`ReportLayoutTests.Paper_turns_for_landscape_and_rolls_grow_with_the_receipt`)
 - [ ] Values drill through to their source (`ReportLayoutTests.Values_drill_through_to_their_source`)
@@ -3223,7 +3223,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Plain text render lays out lines (`ReportingTests.Plain_text_render_lays_out_lines`)
 - [ ] Grouped report emits group headers and footers (`ReportingTests.Grouped_report_emits_group_headers_and_footers`)
 
-**Sub Report And Rich Text** — Covers rich text (markup into runs, placeholders filled but never read as markup, HTML and PDF output) and sub-reports (parameters linked from the parent row, the child laid into the element and the band grown, a missing child noted, nesting capped, links edited in the designer and kept through serialisation).
+**Sub Report And Rich Text** - Covers rich text (markup into runs, placeholders filled but never read as markup, HTML and PDF output) and sub-reports (parameters linked from the parent row, the child laid into the element and the band grown, a missing child noted, nesting capped, links edited in the designer and kept through serialisation).
 - [ ] Markup becomes runs (`SubReportAndRichTextTests.Markup_becomes_runs`)
 - [ ] Rich text renders with emphasis (`SubReportAndRichTextTests.Rich_text_renders_with_emphasis`)
 - [ ] A sub report runs per row with linked parameters and grows the band (`SubReportAndRichTextTests.A_sub_report_runs_per_row_with_linked_parameters_and_grows_the_band`)
@@ -3299,7 +3299,7 @@ Every automated scenario, as a checklist by area: tick a scenario when it passes
 - [ ] Rights decide what is hidden (`FieldSensitivityTests.Rights_decide_what_is_hidden`)
 - [ ] Hidden fields are stripped at any depth (`FieldSensitivityTests.Hidden_fields_are_stripped_at_any_depth`)
 
-**Module Registry** — Covers the module registry: the built-in modules describe every permission module and are consistent; navigation shows only licensed modules the user holds permissions in; operation groups, API areas and tasks resolve to their modules; a plug-in joins the registry and is checked like the rest.
+**Module Registry** - Covers the module registry: the built-in modules describe every permission module and are consistent; navigation shows only licensed modules the user holds permissions in; operation groups, API areas and tasks resolve to their modules; a plug-in joins the registry and is checked like the rest.
 - [ ] The built in modules are consistent (`ModuleRegistryTests.The_built_in_modules_are_consistent`)
 - [ ] Navigation follows licence and permission (`ModuleRegistryTests.Navigation_follows_licence_and_permission`)
 - [ ] A plug in module registers itself (`ModuleRegistryTests.A_plug_in_module_registers_itself`)

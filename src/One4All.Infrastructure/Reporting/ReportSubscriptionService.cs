@@ -242,7 +242,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
 
         string summary = string.Join(", ", parameters.OrderBy(p => p.Key, StringComparer.Ordinal).Select(p => $"{p.Key} = {Format(p.Value)}"));
         Result<long> batch = await _messages.QueueDirectAsync(subscription.CompanyId, $"Report {subscription.Code} {runAt:yyyy-MM-dd}", MessageChannel.Email, subscription.Recipients,
-            $"{subscription.ReportCode} — {runAt:d MMMM yyyy}", $"Please find the {subscription.ReportCode} report attached ({summary}).",
+            $"{subscription.ReportCode} - {runAt:d MMMM yyyy}", $"Please find the {subscription.ReportCode} report attached ({summary}).",
             new MessageAttachment(document.FileName, document.ContentType, document.Content), ct).ConfigureAwait(false);
         foreach (string recipient in subscription.Recipients)
         {

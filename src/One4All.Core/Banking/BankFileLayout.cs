@@ -4,7 +4,7 @@ namespace One4All.Core.Banking;
 
 /// <summary>
 /// A bank's payment-file layout (<c>cb.bank_file_layout</c>, brief §4.15.7): header, detail and trailer templates the EFT files for
-/// payroll and supplier payment runs are rendered from — the format is configuration, not code.
+/// payroll and supplier payment runs are rendered from - the format is configuration, not code.
 /// </summary>
 public sealed class BankFileLayout : Entity, ICompanyScoped
 {

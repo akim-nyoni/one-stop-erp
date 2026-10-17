@@ -1495,7 +1495,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <summary>
-    /// The journal document type of a trading document — what the account enquiry, the audit trail and journal
+    /// The journal document type of a trading document - what the account enquiry, the audit trail and journal
     /// listings show for it. (These journals used to carry an account code here.)
     /// </summary>
     /// <param name="ledger">The sub-ledger.</param>

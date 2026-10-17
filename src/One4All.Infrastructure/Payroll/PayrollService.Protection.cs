@@ -29,7 +29,7 @@ public sealed partial class PayrollService
     }
 
     // Builds the payslip with arrears brought forward; when net pay would fall below the company's minimum take-home, the suspendable
-    // deductions are cut — highest suspension priority first — until it does not (or nothing suspendable is left).
+    // deductions are cut - highest suspension priority first - until it does not (or nothing suspendable is left).
     private (Result<Payslip> Slip, IReadOnlyList<DeductionOutcome> Outcomes, decimal Floor) BuildProtected(Company company, Employee employee, IReadOnlyDictionary<long, PayElement> elements,
         string periodLabel, DateOnly payDate, IReadOnlyDictionary<string, object?> recoveries, IReadOnlyDictionary<string, decimal> arrears, string documentNumber = "",
         IReadOnlyDictionary<string, PayrollVariable>? variables = null)

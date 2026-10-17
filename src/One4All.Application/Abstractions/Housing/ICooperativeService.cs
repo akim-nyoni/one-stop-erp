@@ -36,7 +36,7 @@ public sealed record CooperativeStatement(string Cooperative, DateOnly From, Dat
     IReadOnlyList<MemberContributions> Contributions);
 
 /// <summary>
-/// Cooperative allocations (brief §4.10.5: allocation to a cooperative, which sub-allocates to members — track both
+/// Cooperative allocations (brief §4.10.5: allocation to a cooperative, which sub-allocates to members - track both
 /// levels): register cooperatives and members, allocate available stands to a cooperative, sub-allocate each to an
 /// active member (one stand each), and show the two-level register.
 /// </summary>

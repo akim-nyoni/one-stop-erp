@@ -53,7 +53,7 @@ public sealed partial class PayrollService
     public const string LoanInterestLinePrefix = "LOANINT-";
 
     // Each employee's balances to recover as at the date: staff tenders less staff-purchase deductions already made, and the tenancy
-    // account's balance (never below zero — a tenant in credit has nothing to deduct).
+    // account's balance (never below zero - a tenant in credit has nothing to deduct).
     private async Task<Dictionary<long, Dictionary<string, object?>>> RecoveryVariablesAsync(long companyId, IReadOnlyCollection<Employee> employees, IReadOnlyDictionary<long, PayElement> elements,
         DateOnly asAt, CancellationToken ct)
     {
@@ -182,8 +182,8 @@ public sealed partial class PayrollService
         return tenancyByEmployee.Where(kv => customerByTenancy.ContainsKey(kv.Value)).ToDictionary(kv => kv.Key, kv => customerByTenancy[kv.Value]);
     }
 
-    // Rent deducted from pay is receipted to the tenancy's account (Dr the deduction's clearing account, Cr AR); a negative amount —
-    // a reversal or a refund — reverses the receipt.
+    // Rent deducted from pay is receipted to the tenancy's account (Dr the deduction's clearing account, Cr AR); a negative amount -
+    // a reversal or a refund - reverses the receipt.
     private async Task<Result> SettleHousingRentAsync(Company company, IReadOnlyList<Payslip> slips, IReadOnlyDictionary<long, PayElement> elements, string documentNumber, DateOnly date,
         CancellationToken ct)
     {

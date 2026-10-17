@@ -41,7 +41,7 @@ public class PermissionResolutionTests
         PermissionOverride[] overrides =
         [
             new(Code, OperationFlags.Post, IsGrant: true),   // try to grant Post
-            new(Code, OperationFlags.Post, IsGrant: false),  // deny Post — must win
+            new(Code, OperationFlags.Post, IsGrant: false),  // deny Post - must win
         ];
 
         EffectivePermissions result = PermissionResolution.Resolve(grants, overrides);

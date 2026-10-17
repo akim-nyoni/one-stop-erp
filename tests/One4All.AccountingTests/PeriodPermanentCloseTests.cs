@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers closing a period permanently while a deferred journal of that module is dated in it: refused (the journal
-/// could never be released), though a plain close — which can be reopened — and another module's permanent close are
+/// could never be released), though a plain close - which can be reopened - and another module's permanent close are
 /// allowed; once the journal is released the permanent close goes through.
 /// </summary>
 [Collection(AccountingCollection.Name)]

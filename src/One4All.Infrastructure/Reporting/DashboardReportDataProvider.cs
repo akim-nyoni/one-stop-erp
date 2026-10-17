@@ -84,7 +84,7 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
         List<(string, string)> measures =
         [
             ($"Revenue {asAt.Year} to date", Money(revenue)), ("Expenses to date", Money(expenses)), ("Net profit to date", Money(revenue - expenses)),
-            ("Gross margin", revenue == 0m ? "—" : Percent(revenue - cos, revenue)), ("Cash & bank", Money(cash)), ("Debtors", Money(debtors)), ("Creditors", Money(creditors)),
+            ("Gross margin", revenue == 0m ? "-" : Percent(revenue - cos, revenue)), ("Cash & bank", Money(cash)), ("Debtors", Money(debtors)), ("Creditors", Money(creditors)),
             ("Stock", Money(stock)), ("Working capital (cash + debtors + stock − creditors)", Money(cash + debtors + stock - creditors)),
         ];
         if (metrics.IsSuccess)
@@ -122,7 +122,7 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
         return
         [
             Line("Sales (invoices + POS, net)", Sales), Line("Receipts", Receipts), Line("Supplier payments", Payments),
-            Row(("Measure", "Cash & bank at close"), ("Today", Money(cash)), ("LastWeek", Money(await CashAsync(companyId, lastWeek, ct).ConfigureAwait(false))), ("MonthToDate", "—")),
+            Row(("Measure", "Cash & bank at close"), ("Today", Money(cash)), ("LastWeek", Money(await CashAsync(companyId, lastWeek, ct).ConfigureAwait(false))), ("MonthToDate", "-")),
         ];
     }
 
@@ -137,7 +137,7 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
         IReadOnlyDictionary<string, object?> Kpi(string name, decimal? current, decimal? prior, bool higherIsBetter, string format)
         {
             string trend = current is null || prior is null || current == prior ? "→" : (current > prior) == higherIsBetter ? "▲ better" : "▼ worse";
-            return Row(("Kpi", name), ("ThisMonth", current?.ToString(format, CultureInfo.InvariantCulture) ?? "—"), ("LastMonth", prior?.ToString(format, CultureInfo.InvariantCulture) ?? "—"), ("Trend", trend));
+            return Row(("Kpi", name), ("ThisMonth", current?.ToString(format, CultureInfo.InvariantCulture) ?? "-"), ("LastMonth", prior?.ToString(format, CultureInfo.InvariantCulture) ?? "-"), ("Trend", trend));
         }
 
         return
@@ -184,7 +184,7 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
             var current = monthly.GetValueOrDefault((month.Year, month.Month));
             var prior = monthly.GetValueOrDefault((month.Year - 1, month.Month));
             rows.Add(Row(("Month", month.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Revenue", Money(current.Revenue)), ("Expenses", Money(current.Expenses)), ("LastYear", Money(prior.Revenue)),
-                ("YearOnYear", prior.Revenue == 0m ? "—" : ((current.Revenue - prior.Revenue) * 100m / prior.Revenue).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
+                ("YearOnYear", prior.Revenue == 0m ? "-" : ((current.Revenue - prior.Revenue) * 100m / prior.Revenue).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Profit", current.Revenue - current.Expenses)));
         }
 
@@ -240,19 +240,19 @@ public sealed class DashboardReportDataProvider : IReportDataProvider
         return
         [
             Row(("Measure", $"Billed {asAt.Year} to date"), ("Value", Money(billed))), Row(("Measure", "Collected from ratepayers to date"), ("Value", Money(collected))),
-            Row(("Measure", "Collection rate"), ("Value", billed == 0m ? "—" : Percent(collected, billed))), Row(("Measure", "Ratepayer debtors"), ("Value", Money(debtors))),
+            Row(("Measure", "Collection rate"), ("Value", billed == 0m ? "-" : Percent(collected, billed))), Row(("Measure", "Ratepayer debtors"), ("Value", Money(debtors))),
             Row(("Measure", "of which over 90 days"), ("Value", Money(over90))), Row(("Measure", "Valuation roll total"), ("Value", Money(roll))),
             Row(("Measure", "Indigent households"), ("Value", indigent.ToString(CultureInfo.InvariantCulture))), Row(("Measure", "Disconnection orders open"), ("Value", disconnections.ToString(CultureInfo.InvariantCulture))),
             Row(("Measure", "Open fault tickets"), ("Value", faults.ToString(CultureInfo.InvariantCulture))), Row(("Measure", "Licences expiring within 30 days"), ("Value", licences.ToString(CultureInfo.InvariantCulture))),
             Row(("Measure", $"Water bought in bulk {asAt.Year} to date (units)"), ("Value", Money(bulkSupplied))), Row(("Measure", "Water metered to consumers to date (units)"), ("Value", Money(metered))),
-            Row(("Measure", "Water losses (units)"), ("Value", Money(lost))), Row(("Measure", "Water losses as a share of supply"), ("Value", bulkSupplied == 0m ? "—" : Percent(lost, bulkSupplied))),
+            Row(("Measure", "Water losses (units)"), ("Value", Money(lost))), Row(("Measure", "Water losses as a share of supply"), ("Value", bulkSupplied == 0m ? "-" : Percent(lost, bulkSupplied))),
             .. trend,
         ];
     }
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 
-    private static string Percent(decimal part, decimal total) => total == 0m ? "—" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    private static string Percent(decimal part, decimal total) => total == 0m ? "-" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
 

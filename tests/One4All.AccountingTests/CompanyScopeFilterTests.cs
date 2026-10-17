@@ -10,8 +10,8 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Covers the DbContext's company query filter (brief §2): a context scoped to one company cannot read another company's rows — by
-/// code, by id, or when deleted rows are included — while an unscoped context sees every company, and the intercompany and consolidation
+/// Covers the DbContext's company query filter (brief §2): a context scoped to one company cannot read another company's rows - by
+/// code, by id, or when deleted rows are included - while an unscoped context sees every company, and the intercompany and consolidation
 /// services, which work across companies by design, still do so from a scoped request.
 /// </summary>
 [Collection(AccountingCollection.Name)]

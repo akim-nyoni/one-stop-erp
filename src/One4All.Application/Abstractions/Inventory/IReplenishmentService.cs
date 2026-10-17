@@ -37,8 +37,8 @@ public sealed record ReplenishmentPolicy(decimal ReorderLevel, decimal ReorderQu
 public readonly record struct ReplenishmentLine(long ItemId, decimal Quantity, decimal? UnitPrice = null);
 
 /// <summary>
-/// Stock replenishment (brief §4.2/§4.3): suggests what to reorder — netting open purchase orders against
-/// stock on hand so goods already on their way are not ordered twice — and raises a purchase order from the
+/// Stock replenishment (brief §4.2/§4.3): suggests what to reorder - netting open purchase orders against
+/// stock on hand so goods already on their way are not ordered twice - and raises a purchase order from the
 /// chosen suggestions at each item's last purchase price.
 /// </summary>
 public interface IReplenishmentService

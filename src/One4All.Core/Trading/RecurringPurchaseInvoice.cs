@@ -5,7 +5,7 @@ namespace One4All.Core.Trading;
 
 /// <summary>
 /// A recurring purchase-invoice template (<c>ap.recurring_invoice</c>): standing instructions to raise a
-/// periodic AP invoice from a supplier (rent, subscriptions, service contracts). It holds no ledger balance —
+/// periodic AP invoice from a supplier (rent, subscriptions, service contracts). It holds no ledger balance -
 /// a billing run reads the due templates and posts real supplier invoices, then advances the next run.
 /// </summary>
 public sealed class RecurringPurchaseInvoice : AuditableEntity, ICompanyScoped

@@ -5,7 +5,7 @@ using One4All.Desktop.ViewModels;
 namespace One4All.Desktop;
 
 /// <summary>
-/// The operations form — an action's boxes, its result and its list — shown in a tab of the main window or in a window of its own.
+/// The operations form - an action's boxes, its result and its list - shown in a tab of the main window or in a window of its own.
 /// All behaviour lives in <see cref="OperationsViewModel"/>.
 /// </summary>
 public partial class OperationsView : UserControl

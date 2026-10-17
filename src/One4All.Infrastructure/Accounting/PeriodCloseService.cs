@@ -15,7 +15,7 @@ namespace One4All.Infrastructure.Accounting;
 
 /// <summary>
 /// The period-close checklist: counts, as at a period end, everything a controller should clear before
-/// closing — unposted journals, unsynced offline operations, unreconciled statement lines, open
+/// closing - unposted journals, unsynced offline operations, unreconciled statement lines, open
 /// stocktakes, goods received not invoiced, approvals in progress and foreign-currency balances not yet revalued.
 /// Reads only.
 /// </summary>

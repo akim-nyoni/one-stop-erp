@@ -108,7 +108,7 @@ public sealed partial class SupplierReconciliationViewModel : ObservableObject
             Suppliers.Clear();
             foreach (var s in await db.Suppliers.Where(s => s.CompanyId == _companyId).OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync(ct).ConfigureAwait(true))
             {
-                Suppliers.Add(new SupplierChoiceVm(s.Id, $"{s.Code} — {s.Name}"));
+                Suppliers.Add(new SupplierChoiceVm(s.Id, $"{s.Code} - {s.Name}"));
             }
 
             StatusMessage = "Choose a supplier, paste their statement (document, date, amount per line) and press Reconcile.";
@@ -163,7 +163,7 @@ public sealed partial class SupplierReconciliationViewModel : ObservableObject
         SupplierStatementParseResult parsed = SupplierStatementText.Parse(StatementText, DateFormat, HasHeader, TabSeparated ? '\t' : ',');
         if (!parsed.IsClean)
         {
-            StatusMessage = $"{parsed.Errors.Count} statement line(s) could not be read — "
+            StatusMessage = $"{parsed.Errors.Count} statement line(s) could not be read - "
                 + string.Join("; ", parsed.Errors.Take(3).Select(e => e.LineNumber > 0 ? $"line {e.LineNumber}: {e.Reason}" : e.Reason));
             return;
         }

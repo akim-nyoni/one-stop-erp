@@ -34,7 +34,7 @@ public static class PermissionResolution
             map[ov.PermissionCode] = Get(map, ov.PermissionCode) | ov.Operations;
         }
 
-        // 3. Apply deny overrides (remove) LAST — deny wins over any grant.
+        // 3. Apply deny overrides (remove) LAST - deny wins over any grant.
         foreach (PermissionOverride ov in overrides.Where(o => !o.IsGrant))
         {
             map[ov.PermissionCode] = Get(map, ov.PermissionCode) & ~ov.Operations;

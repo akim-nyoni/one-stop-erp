@@ -16,7 +16,7 @@ public sealed record ExpectedLossCalculation(decimal ContractValue, decimal Budg
 
 /// <summary>
 /// Onerous-contract provisioning (IAS 37 / IFRS 15): when the forecast cost to complete exceeds the
-/// contract value the whole expected loss is provided immediately — not spread over the remaining work —
+/// contract value the whole expected loss is provided immediately - not spread over the remaining work -
 /// and released again if the forecast improves. Pure and unit-tested.
 /// </summary>
 public static class ExpectedLoss

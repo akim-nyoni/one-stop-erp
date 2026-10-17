@@ -52,7 +52,7 @@ public sealed class CreditControlService : ICreditControlService
             decimal balance = mine.Sum(i => i.Sign == LedgerSign.Debit ? i.OutstandingBase : -i.OutstandingBase);
 
             // Overdue: debit items whose due date is earlier than the cutoff (strictly beyond the tolerance), less the
-            // customer's unallocated receipts and credit notes applied oldest first — money already received does not
+            // customer's unallocated receipts and credit notes applied oldest first - money already received does not
             // put an account on stop.
             var overdue = mine.Where(i => i.Sign == LedgerSign.Debit && i.DueDate < overdueCutoff).ToList();
             decimal credits = mine.Where(i => i.Sign == LedgerSign.Credit).Sum(i => i.OutstandingBase);

@@ -17,7 +17,7 @@ public sealed class MasterDataChangeService : IMasterDataChangeService
     /// <summary>The workflow document type the changes go through.</summary>
     public const string DocumentType = "MasterDataChange";
 
-    // The fields each record allows changing this way — public settable properties only.
+    // The fields each record allows changing this way - public settable properties only.
     private static readonly Dictionary<MasterDataTarget, string[]> Allowed = new()
     {
         [MasterDataTarget.Tariff] = ["FixedCharge", "PerUnitRate", "RatePerValuationCents", "RatePerSquareMetre", "MinimumCharge", "IsActive"],

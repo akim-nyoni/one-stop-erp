@@ -7,7 +7,7 @@ namespace One4All.Application.Documents;
 /// <summary>
 /// Writes fixed-width text (payslips, statements) as a PDF in Courier, optionally password-protected with the PDF Standard Security
 /// Handler, revision 4: AES-128 (AESV2) for every stream, the key derived from the user password as ISO 32000-1 §7.6.3 requires
-/// (algorithms 1, 2, 3 and 5 — which mandate MD5 and RC4 for the key and password values). Readers ask for the user password to open
+/// (algorithms 1, 2, 3 and 5 - which mandate MD5 and RC4 for the key and password values). Readers ask for the user password to open
 /// the file; the owner password is random, so the permissions cannot be lifted.
 /// </summary>
 public static class PdfTextDocument

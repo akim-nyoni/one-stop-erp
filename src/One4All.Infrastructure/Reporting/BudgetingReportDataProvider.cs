@@ -201,7 +201,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
                 decimal before = previous.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount), after = current.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount);
                 rows.Add(Row(("Budget", group.Key.Label + (group.Key.Department is null ? string.Empty : $" ({group.Key.Department})")), ("Versions", $"v{previous.VersionNumber} → v{current.VersionNumber}"),
                     ("Account", account), ("Name", names.GetValueOrDefault(account, "?")), ("Previous", Money(before)), ("Current", Money(after)),
-                    ("Percent", before == 0m ? "—" : ((after - before) * 100m / before).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Change", after - before)));
+                    ("Percent", before == 0m ? "-" : ((after - before) * 100m / before).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Change", after - before)));
             }
         }
 
@@ -258,10 +258,10 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         return [.. (await _db.ChangeLog.AsNoTracking().Where(l => (l.CompanyId == c.CompanyId || l.CompanyId == null) && entities.Contains(l.EntityType) && l.OccurredOnUtc >= start && l.OccurredOnUtc <= end)
                 .OrderBy(l => l.Id).Take(10000).ToListAsync(ct).ConfigureAwait(false))
             .Select(l => showEntity
-                ? Row(("When", l.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", l.UserName), ("Entity", l.EntityType), ("Id", l.EntityId ?? "—"), ("Action", l.Action.ToString()),
-                    ("Changed", l.ChangedFields.Count == 0 ? "—" : string.Join(", ", l.ChangedFields)))
-                : Row(("When", l.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", l.UserName), ("Id", l.EntityId ?? "—"), ("Action", l.Action.ToString()),
-                    ("Changed", l.ChangedFields.Count == 0 ? "—" : string.Join(", ", l.ChangedFields))))];
+                ? Row(("When", l.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", l.UserName), ("Entity", l.EntityType), ("Id", l.EntityId ?? "-"), ("Action", l.Action.ToString()),
+                    ("Changed", l.ChangedFields.Count == 0 ? "-" : string.Join(", ", l.ChangedFields)))
+                : Row(("When", l.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("User", l.UserName), ("Id", l.EntityId ?? "-"), ("Action", l.Action.ToString()),
+                    ("Changed", l.ChangedFields.Count == 0 ? "-" : string.Join(", ", l.ChangedFields))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VirementsAsync(Context c, CancellationToken ct)
@@ -271,7 +271,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         return [.. (await _db.Set<BudgetVirement>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId && budgetIds.Contains(v.BudgetId)).OrderBy(v => v.CreatedOnUtc).ToListAsync(ct).ConfigureAwait(false))
             .Select(v => Row(("Requested", v.CreatedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("From", v.FromAccountCode), ("To", v.ToAccountCode), ("Period", v.Period),
                 ("Justification", v.Justification), ("Status", v.Status.ToString()), ("RequestedBy", users.GetValueOrDefault(v.RequestedByUserId, $"user {v.RequestedByUserId}")),
-                ("ReviewedBy", v.ReviewedByUserId is long r ? users.GetValueOrDefault(r, $"user {r}") : "—"), ("Amount", v.Amount)))];
+                ("ReviewedBy", v.ReviewedByUserId is long r ? users.GetValueOrDefault(r, $"user {r}") : "-"), ("Amount", v.Amount)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VoteBookAsync(Context c, CancellationToken ct)
@@ -294,7 +294,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CommitmentsAsync(Context c, CancellationToken ct)
         => [.. (await _db.BudgetCommitments.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.FiscalYearId == c.Year.Id).OrderBy(x => x.Period).ThenBy(x => x.Reference).ToListAsync(ct).ConfigureAwait(false))
-            .Select(x => Row(("Reference", x.Reference), ("Account", x.AccountCode), ("Department", x.Department ?? "—"), ("Period", x.Period), ("Type", x.Type.ToString()),
+            .Select(x => Row(("Reference", x.Reference), ("Account", x.AccountCode), ("Department", x.Department ?? "-"), ("Period", x.Period), ("Type", x.Type.ToString()),
                 ("Status", x.CarriedFromId is null ? x.Status.ToString() : $"{x.Status} (carried forward)"), ("Amount", x.Amount)))];
 
     // The open value of an order is what is still to be received at the order price.
@@ -323,7 +323,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             .OrderByDescending(x => x.Amount).Select(x => Row(("Account", x.Account), ("Name", accounts[x.Account].Name), ("Postings", x.Postings), ("Actual", x.Amount)))];
     }
 
-    private static string Rag(decimal? used) => used switch { null => "—", < 90m => "Green", <= 100m => "Amber", _ => "Red" };
+    private static string Rag(decimal? used) => used switch { null => "-", < 90m => "Green", <= 100m => "Amber", _ => "Red" };
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> UtilisationAsync(Context c, bool exceptionsOnly, CancellationToken ct)
     {
@@ -334,9 +334,9 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             .Where(x => !exceptionsOnly || Rag(x.Used) is "Amber" or "Red")
             .OrderBy(x => exceptionsOnly ? -(x.Used ?? 0m) : 0m).ThenBy(x => x.Account, StringComparer.Ordinal);
         return [.. rows.Select(x => exceptionsOnly
-            ? Row(("Account", x.Account), ("Name", names.GetValueOrDefault(x.Account, "?")), ("Budget", Money(x.Budget)), ("Used", x.Used is decimal u ? u.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—"),
+            ? Row(("Account", x.Account), ("Name", names.GetValueOrDefault(x.Account, "?")), ("Budget", Money(x.Budget)), ("Used", x.Used is decimal u ? u.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "-"),
                 ("Rag", Rag(x.Used)), ("Over", Math.Max(0m, x.Actual - x.Budget)))
-            : Row(("Account", x.Account), ("Name", names.GetValueOrDefault(x.Account, "?")), ("Budget", Money(x.Budget)), ("Used", x.Used is decimal v ? v.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—"),
+            : Row(("Account", x.Account), ("Name", names.GetValueOrDefault(x.Account, "?")), ("Budget", Money(x.Budget)), ("Used", x.Used is decimal v ? v.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "-"),
                 ("Rag", Rag(x.Used)), ("Actual", x.Actual)))];
     }
 
@@ -390,9 +390,9 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         {
             decimal a = actual.GetValueOrDefault(b.Key);
             decimal? percent = b.Value == 0m ? null : (a - b.Value) * 100m / b.Value;
-            string accuracy = percent is not decimal p ? "—" : Math.Abs(p) <= 5m ? "Excellent" : Math.Abs(p) <= 10m ? "Good" : Math.Abs(p) <= 20m ? "Fair" : "Poor";
+            string accuracy = percent is not decimal p ? "-" : Math.Abs(p) <= 5m ? "Excellent" : Math.Abs(p) <= 10m ? "Good" : Math.Abs(p) <= 20m ? "Fair" : "Poor";
             return Row(("Account", b.Key), ("Name", names.GetValueOrDefault(b.Key, "?")), ("Budget", Money(b.Value)), ("Actual", Money(a)),
-                ("Percent", percent is decimal q ? q.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%" : "—"), ("Accuracy", accuracy), ("Variance", a - b.Value));
+                ("Percent", percent is decimal q ? q.ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%" : "-"), ("Accuracy", accuracy), ("Variance", a - b.Value));
         })];
     }
 
@@ -417,9 +417,9 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             };
             DateTimeOffset? changed = draft is null ? null : (draft.ModifiedOnUtc ?? draft.CreatedOnUtc);
             bool done = status is "Submitted" or "Approved";
-            return Row(("Department", d), ("Status", status), ("Version", draft?.VersionNumber.ToString(CultureInfo.InvariantCulture) ?? "—"),
-                ("Updated", changed?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"), ("Deadline", deadline?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"),
-                ("Days", deadline is DateOnly due && !done ? (due.DayNumber - c.AsAt.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"), ("Requested", draft?.Lines.Sum(l => l.Amount) ?? 0m));
+            return Row(("Department", d), ("Status", status), ("Version", draft?.VersionNumber.ToString(CultureInfo.InvariantCulture) ?? "-"),
+                ("Updated", changed?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-"), ("Deadline", deadline?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-"),
+                ("Days", deadline is DateOnly due && !done ? (due.DayNumber - c.AsAt.DayNumber).ToString(CultureInfo.InvariantCulture) : "-"), ("Requested", draft?.Lines.Sum(l => l.Amount) ?? 0m));
         })];
     }
 
@@ -458,7 +458,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReconciliationAsync(Context c, CancellationToken ct)
         => [.. (await _control.VoteBookAsync(c.CompanyId, c.Year.Id, 12, ct).ConfigureAwait(false)).OrderBy(v => v.AccountCode, StringComparer.Ordinal)
-            .Select(v => Row(("Account", v.AccountCode), ("Name", v.Name), ("Original", Money(v.Original)), ("Supplementary", Money(v.Supplementary)), ("Virements", Money(v.Virements)), ("Rephasing", "—"),
+            .Select(v => Row(("Account", v.AccountCode), ("Name", v.Name), ("Original", Money(v.Original)), ("Supplementary", Money(v.Supplementary)), ("Virements", Money(v.Virements)), ("Rephasing", "-"),
                 ("Current", v.Appropriation)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SupplementaryAsync(Context c, CancellationToken ct)
@@ -480,7 +480,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         List<BudgetCommitment> closed = await _db.BudgetCommitments.AsNoTracking()
             .Where(x => x.CompanyId == c.CompanyId && x.FiscalYearId == c.Year.Id && (x.Status == CommitmentStatus.Lapsed || x.Status == CommitmentStatus.CarriedForward)).OrderBy(x => x.Reference).ToListAsync(ct).ConfigureAwait(false);
         return [.. closed.Select(x => Row(("Reference", x.Reference), ("Account", x.AccountCode), ("Department", x.Department ?? "All"), ("Period", x.Period), ("Outcome", x.Status == CommitmentStatus.Lapsed ? "Lapsed" : "Carried forward"),
-            ("ApprovedBy", x.YearEndApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "—"), ("Amount", x.Amount)))];
+            ("ApprovedBy", x.YearEndApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "-"), ("Amount", x.Amount)))];
     }
 
     // The forecast for the remaining periods comes from the latest reforecast round when there is one, else from the budget itself.
@@ -547,7 +547,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             decimal actual = p.Costs.Where(x => x.Date <= c.AsAt).Sum(x => x.Amount);
             decimal committed = commitments.Where(x => x.AccountCode == p.CwipAccountCode && x.Reference.StartsWith(p.Code, StringComparison.OrdinalIgnoreCase)).Sum(x => x.Amount);
             return Row(("Project", p.Code), ("Name", p.Name), ("Status", p.CapitalisedOn is DateOnly on && on <= c.AsAt ? "Capitalised" : "In progress"), ("Budget", Money(p.Budget)), ("Actual", Money(actual)),
-                ("Committed", Money(committed)), ("Spent", p.Budget == 0m ? "—" : (actual * 100m / p.Budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("ToComplete", Math.Max(0m, p.Budget - actual - committed)));
+                ("Committed", Money(committed)), ("Spent", p.Budget == 0m ? "-" : (actual * 100m / p.Budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("ToComplete", Math.Max(0m, p.Budget - actual - committed)));
         })];
     }
 
@@ -614,7 +614,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BasisAsync(Context c, CancellationToken ct)
         => [.. (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).OrderBy(b => b.Label, StringComparer.Ordinal).ThenBy(b => b.VersionNumber)
             .SelectMany(b => b.Lines.GroupBy(l => (l.AccountCode, l.Basis, l.DriverCode)).OrderBy(g => g.Key.AccountCode, StringComparer.Ordinal)
-                .Select(g => Row(("Budget", $"{b.Label} v{b.VersionNumber}"), ("Department", b.Department ?? "All"), ("Account", g.Key.AccountCode), ("Basis", g.Key.Basis.ToString()), ("Driver", g.Key.DriverCode ?? "—"),
+                .Select(g => Row(("Budget", $"{b.Label} v{b.VersionNumber}"), ("Department", b.Department ?? "All"), ("Account", g.Key.AccountCode), ("Basis", g.Key.Basis.ToString()), ("Driver", g.Key.DriverCode ?? "-"),
                     ("Amount", g.Sum(l => l.Amount)))))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> StaffAsync(Context c, string staffAccount, decimal vacancyPercent, CancellationToken ct)
@@ -644,7 +644,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
                 {
                     decimal amount = g.Sum(l => l.Amount), volume = drivers.GetValueOrDefault(g.Key.DriverCode!)?.Value ?? 0m;
                     return Row(("Budget", $"{b.Label} v{b.VersionNumber}"), ("Account", g.Key.AccountCode), ("Name", names.GetValueOrDefault(g.Key.AccountCode, "?")), ("Driver", g.Key.DriverCode),
-                        ("Volume", volume.ToString("0.####", CultureInfo.InvariantCulture)), ("Rate", volume == 0m ? "—" : Money(amount / volume)), ("Amount", amount));
+                        ("Volume", volume.ToString("0.####", CultureInfo.InvariantCulture)), ("Rate", volume == 0m ? "-" : Money(amount / volume)), ("Amount", amount));
                 }))];
     }
 
@@ -659,7 +659,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         {
             decimal actual = ActualFor(actuals, b.Key), committed = commitments.Where(x => x.AccountCode == b.Key.Account && x.Department == h.Department).Sum(x => x.Amount);
             return Row(("Holder", h.BudgetHolder), ("Department", h.Department), ("Account", b.Key.Account), ("Budget", Money(b.Value)), ("Actual", Money(actual)), ("Committed", Money(committed)),
-                ("Used", b.Value == 0m ? "—" : ((actual + committed) * 100m / b.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Available", b.Value - actual - committed));
+                ("Used", b.Value == 0m ? "-" : ((actual + committed) * 100m / b.Value).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Available", b.Value - actual - committed));
         }))];
     }
 
@@ -677,7 +677,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
                     decimal amount = month.Sum(l => l.Amount);
                     running += amount;
                     rows.Add(Row(("Budget", $"{b.Label} v{b.VersionNumber}"), ("Account", vote.Key), ("Period", month.Key), ("Month", c.Year.StartDate.AddMonths(month.Key - 1).ToString("yyyy-MM", CultureInfo.InvariantCulture)),
-                        ("Cumulative", Money(running)), ("Share", total == 0m ? "—" : (running * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Amount", amount)));
+                        ("Cumulative", Money(running)), ("Share", total == 0m ? "-" : (running * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Amount", amount)));
                 }
             }
         }
@@ -696,18 +696,18 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         {
             if (json is null)
             {
-                return "—";
+                return "-";
             }
 
             using System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(json);
-            return doc.RootElement.TryGetProperty("Status", out System.Text.Json.JsonElement v) ? (v.ValueKind == System.Text.Json.JsonValueKind.Number ? ((BudgetStatus)v.GetInt32()).ToString() : v.ToString()) : "—";
+            return doc.RootElement.TryGetProperty("Status", out System.Text.Json.JsonElement v) ? (v.ValueKind == System.Text.Json.JsonValueKind.Number ? ((BudgetStatus)v.GetInt32()).ToString() : v.ToString()) : "-";
         }
 
         Dictionary<string, DateTimeOffset> last = [];
         List<IReadOnlyDictionary<string, object?>> rows = [];
         foreach (Core.Audit.ChangeLogEntry change in changes)
         {
-            string days = last.TryGetValue(change.EntityId!, out DateTimeOffset previous) ? ((int)(change.OccurredOnUtc - previous).TotalDays).ToString(CultureInfo.InvariantCulture) : "—";
+            string days = last.TryGetValue(change.EntityId!, out DateTimeOffset previous) ? ((int)(change.OccurredOnUtc - previous).TotalDays).ToString(CultureInfo.InvariantCulture) : "-";
             last[change.EntityId!] = change.OccurredOnUtc;
             rows.Add(Row(("When", change.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Budget", labels[change.EntityId!]), ("Status", Status(change.NewValues)), ("User", change.UserName), ("Days", days)));
         }
@@ -758,7 +758,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         {
             decimal budget = g.Sum(l => l.Amount), spent = actuals.Where(a => a.Key.Account == g.Key).Sum(a => a.Value.Amount);
             return Row(("Account", g.Key), ("Name", names.GetValueOrDefault(g.Key, "?")), ("Budget", Money(budget)), ("Spent", Money(spent)),
-                ("Used", budget == 0m ? "—" : (spent * 100m / budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Unspent", Math.Max(0m, budget - spent)));
+                ("Used", budget == 0m ? "-" : (spent * 100m / budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Unspent", Math.Max(0m, budget - spent)));
         })];
     }
 
@@ -787,7 +787,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         List<BudgetControlEvent> events = await _db.Set<BudgetControlEvent>().AsNoTracking()
             .Where(e => e.CompanyId == c.CompanyId && e.PostingDate >= c.Year.StartDate && e.PostingDate <= c.Year.EndDate).OrderBy(e => e.CreatedOnUtc).ToListAsync(ct).ConfigureAwait(false);
         return [.. events.Select(e => Row(("When", e.CreatedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Outcome", e.Outcome.ToString()), ("Date", e.PostingDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
-            ("Account", e.AccountCode), ("Department", string.IsNullOrEmpty(e.Department) ? "—" : e.Department), ("Document", e.Document ?? "—"), ("User", User(e.CreatedByUserId)), ("AuthorisedBy", e.AuthorisedByUserId is null ? "—" : User(e.AuthorisedByUserId)),
+            ("Account", e.AccountCode), ("Department", string.IsNullOrEmpty(e.Department) ? "-" : e.Department), ("Document", e.Document ?? "-"), ("User", User(e.CreatedByUserId)), ("AuthorisedBy", e.AuthorisedByUserId is null ? "-" : User(e.AuthorisedByUserId)),
             ("Reason", e.Reason ?? string.Empty), ("Amount", Math.Round(e.Amount, 2))))];
     }
 
@@ -811,17 +811,17 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         foreach (Budget b in (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).OrderBy(b => b.Label, StringComparer.Ordinal).ThenBy(b => b.Department, StringComparer.Ordinal)
                      .ThenBy(b => b.VersionNumber))
         {
-            string verified = "—";
+            string verified = "-";
             if (b.SealHash is not null)
             {
                 var check = await _control.VerifySealAsync(c.CompanyId, b.Id, ct).ConfigureAwait(false);
                 verified = check.IsSuccess && check.Value ? "Yes" : "BROKEN";
             }
 
-            string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+            string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "-";
             rows.Add(Row(("Budget", b.Label + (b.Department is null ? string.Empty : $" ({b.Department})")), ("Version", b.VersionNumber), ("Type", b.Type.ToString()), ("Status", b.Status.ToString()),
                 ("Author", User(b.CreatedByUserId == 0 ? null : b.CreatedByUserId)), ("Created", b.CreatedOnUtc.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Reason", b.Reason ?? string.Empty),
-                ("ApprovedBy", User(b.ApprovedByUserId)), ("Resolution", b.ResolutionReference ?? "—"), ("Seal", b.SealHash is null ? "not sealed" : b.SealHash[..Math.Min(16, b.SealHash.Length)] + "…"),
+                ("ApprovedBy", User(b.ApprovedByUserId)), ("Resolution", b.ResolutionReference ?? "-"), ("Seal", b.SealHash is null ? "not sealed" : b.SealHash[..Math.Min(16, b.SealHash.Length)] + "…"),
                 ("Verified", verified)));
         }
 
@@ -845,11 +845,11 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
         decimal Quarter(IEnumerable<BudgetLine> lines, int q) => lines.Where(l => (l.Period - 1) / 3 == q).Sum(l => l.Amount);
         List<IReadOnlyDictionary<string, object?>> rows =
         [
-            Row(("Account", "SEAL"), ("Name", $"{budget.Label} v{budget.VersionNumber} {c.Year.Code} — {(intact ? "seal verified, exactly as approved" : "SEAL BROKEN — lines differ from those approved")}"),
+            Row(("Account", "SEAL"), ("Name", $"{budget.Label} v{budget.VersionNumber} {c.Year.Code} - {(intact ? "seal verified, exactly as approved" : "SEAL BROKEN - lines differ from those approved")}"),
                 ("CostCentre", budget.SealHash![..Math.Min(16, budget.SealHash!.Length)] + "…"), ("Q1", string.Empty), ("Q2", string.Empty), ("Q3", string.Empty), ("Q4", string.Empty), ("Total", null)),
         ];
         rows.AddRange(budget.Lines.GroupBy(l => (l.AccountCode, CostCentre: l.CostCentre ?? string.Empty)).OrderBy(g => g.Key.AccountCode, StringComparer.Ordinal).ThenBy(g => g.Key.CostCentre, StringComparer.Ordinal)
-            .Select(g => Row(("Account", g.Key.AccountCode), ("Name", names.GetValueOrDefault(g.Key.AccountCode, "?")), ("CostCentre", g.Key.CostCentre.Length == 0 ? "—" : g.Key.CostCentre),
+            .Select(g => Row(("Account", g.Key.AccountCode), ("Name", names.GetValueOrDefault(g.Key.AccountCode, "?")), ("CostCentre", g.Key.CostCentre.Length == 0 ? "-" : g.Key.CostCentre),
                 ("Q1", Money(Quarter(g, 0))), ("Q2", Money(Quarter(g, 1))), ("Q3", Money(Quarter(g, 2))), ("Q4", Money(Quarter(g, 3))), ("Total", g.Sum(l => l.Amount)))));
         rows.Add(Row(("Account", "TOTAL"), ("Name", string.Empty), ("CostCentre", string.Empty), ("Q1", Money(Quarter(budget.Lines, 0))), ("Q2", Money(Quarter(budget.Lines, 1))),
             ("Q3", Money(Quarter(budget.Lines, 2))), ("Q4", Money(Quarter(budget.Lines, 3))), ("Total", budget.Lines.Sum(l => l.Amount))));
@@ -889,7 +889,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
                 decimal budget = g.Sum(x => x.Budget), actual = g.Sum(x => x.Actual), committed = g.Sum(x => x.Committed);
                 return Row(("Level", g.Key), ("Name", level.Equals("Account", StringComparison.OrdinalIgnoreCase) || level.Length == 0 ? names.GetValueOrDefault(g.Key, "?") : basis),
                     ("Budget", Money(budget)), ("Actual", Money(actual)), ("Committed", Money(committed)), ("Available", Money(budget - actual - committed)),
-                    ("Used", budget == 0m ? "—" : ((actual + committed) * 100m / budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Postings", g.Sum(x => x.Postings)));
+                    ("Used", budget == 0m ? "-" : ((actual + committed) * 100m / budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Postings", g.Sum(x => x.Postings)));
             })];
     }
 
@@ -912,7 +912,7 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             .GroupBy(a => a.DebitItemId).Select(g => new { g.Key, Paid = g.Sum(a => a.DebitBase) }).ToDictionaryAsync(x => x.Key, x => x.Paid, ct).ConfigureAwait(false);
         Dictionary<string, decimal> collected = invoices.Where(i => income.Contains(i.AccountCode) && i.OriginalBase != 0m).GroupBy(i => i.AccountCode)
             .ToDictionary(g => g.Key, g => Math.Round(g.Sum(i => i.BaseCredit * Math.Min(1m, paid.GetValueOrDefault(i.Id) / i.OriginalBase)), 2, MidpointRounding.AwayFromZero));
-        static string Pct(decimal part, decimal whole) => whole == 0m ? "—" : (part * 100m / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        static string Pct(decimal part, decimal whole) => whole == 0m ? "-" : (part * 100m / whole).ToString("0.0", CultureInfo.InvariantCulture) + "%";
         return [.. budget.Keys.Union(billed.Keys).Where(k => budget.GetValueOrDefault(k) != 0m || billed.GetValueOrDefault(k) != 0m).Order(StringComparer.Ordinal).Select(account =>
         {
             decimal b = budget.GetValueOrDefault(account), actual = billed.GetValueOrDefault(account), cash = collected.GetValueOrDefault(account);

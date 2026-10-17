@@ -59,7 +59,7 @@ public sealed class CreditControlTests
             // Overdue: due 2026-03-03, well past tolerance at the review date.
             (await ar.PostInvoiceAsync(Invoice(companyId, overdueId, "CC-D1", new DateOnly(2026, 2, 1), 250m))).IsSuccess.Should().BeTrue();
 
-            // Good: within limit and due 2026-05-31 — not overdue at the review date.
+            // Good: within limit and due 2026-05-31 - not overdue at the review date.
             (await ar.PostInvoiceAsync(Invoice(companyId, goodId, "CC-G1", new DateOnly(2026, 5, 1), 1200m))).IsSuccess.Should().BeTrue();
             await db.SaveChangesAsync();
         }

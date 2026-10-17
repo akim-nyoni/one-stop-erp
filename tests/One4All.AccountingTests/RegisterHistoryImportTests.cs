@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers migrating the registers that carry history or price structures: a stand's ownership chain, waiting-list applicants with their legacy numbers,
-/// municipal tariffs with stepped blocks, and price lists — previewed first, written only when clean, and never loaded twice.
+/// municipal tariffs with stepped blocks, and price lists - previewed first, written only when clean, and never loaded twice.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class RegisterHistoryImportTests

@@ -16,7 +16,7 @@ public enum PendingCreditNoteStatus
 }
 
 /// <summary>
-/// A customer credit note held for approval (<c>ar.pending_credit_note</c>, brief §7): what will post once its workflow approves it — nothing
+/// A customer credit note held for approval (<c>ar.pending_credit_note</c>, brief §7): what will post once its workflow approves it - nothing
 /// reaches the ledger before then.
 /// </summary>
 public sealed class PendingCreditNote : AuditableEntity, ICompanyScoped

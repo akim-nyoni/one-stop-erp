@@ -65,7 +65,7 @@ public interface ITerminationService
     Task<Result<IReadOnlyList<ClearanceItem>>> ClearanceAsync(long companyId, string employeeNumber, CancellationToken ct = default);
 
     /// <summary>
-    /// Releases the net final pay to the leaver (Dr the net pay account it was accrued to, Cr the bank) — only once every clearance item is cleared (brief §4.15.8).
+    /// Releases the net final pay to the leaver (Dr the net pay account it was accrued to, Cr the bank) - only once every clearance item is cleared (brief §4.15.8).
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="employeeNumber">The leaver.</param>
@@ -75,6 +75,6 @@ public interface ITerminationService
     /// <returns>The payment journal (null when nothing was due), or why it is held.</returns>
     Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default);
 
-    /// <summary>The certificate of service (dates, position and reason — not pay).</summary>
+    /// <summary>The certificate of service (dates, position and reason - not pay).</summary>
     Task<Result<string>> CertificateOfServiceAsync(long companyId, string employeeNumber, CancellationToken ct = default);
 }

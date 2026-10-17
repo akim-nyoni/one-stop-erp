@@ -3,8 +3,8 @@ using One4All.Core.Housing;
 namespace One4All.Application.Housing;
 
 /// <summary>
-/// Decides the next default notice on an instalment agreement (brief §4.10.5): the stage the arrears' age calls for — reminder from the first unpaid instalment,
-/// demand after 30 days, breach after 60, cancellation after 90 — never skipping a stage, each after the previous one has been served, and the cancellation
+/// Decides the next default notice on an instalment agreement (brief §4.10.5): the stage the arrears' age calls for - reminder from the first unpaid instalment,
+/// demand after 30 days, breach after 60, cancellation after 90 - never skipping a stage, each after the previous one has been served, and the cancellation
 /// notice only once the breach notice has stood for 30 days. Pure.
 /// </summary>
 public static class InstalmentDefault

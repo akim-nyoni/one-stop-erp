@@ -4,13 +4,13 @@ using One4All.Core.Housing;
 namespace One4All.Application.Abstractions.Housing;
 
 /// <summary>
-/// Rental units held to earn rentals, accounted for as investment property (IAS 40, cost or fair value model) or PPE (IAS 16) — out of the
+/// Rental units held to earn rentals, accounted for as investment property (IAS 40, cost or fair value model) or PPE (IAS 16) - out of the
 /// stand inventory pool (brief §4.10.9).
 /// </summary>
 public interface IRentalPropertyAccountingService
 {
     /// <summary>
-    /// Designates a unit's treatment and brings it into the asset account at its carrying amount (Dr asset, Cr the contra account — the
+    /// Designates a unit's treatment and brings it into the asset account at its carrying amount (Dr asset, Cr the contra account - the
     /// account it is transferred from, or opening equity). A unit is designated once.
     /// </summary>
     /// <returns>The journal number (empty when the amount is nil).</returns>

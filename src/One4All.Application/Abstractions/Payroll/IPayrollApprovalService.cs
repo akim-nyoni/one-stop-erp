@@ -43,9 +43,9 @@ public sealed record PayrollDraftResult(long DraftId, PayrollDraftStatus Status,
     bool RequiresSecondApproval, IReadOnlyList<string> Exceptions);
 
 /// <summary>
-/// Maker-checker payroll (brief §4.15.6): calculate (re-runnable any number of times — each calculation replaces the last), approve
+/// Maker-checker payroll (brief §4.15.6): calculate (re-runnable any number of times - each calculation replaces the last), approve
 /// by someone other than whoever calculated (and a second, different approver when net pay moves more than the company's threshold
-/// from the group's last run), then commit — which recalculates and refuses if anything changed since approval.
+/// from the group's last run), then commit - which recalculates and refuses if anything changed since approval.
 /// </summary>
 public interface IPayrollApprovalService
 {

@@ -5,7 +5,7 @@ namespace One4All.Core.Housing;
 /// <summary>
 /// A stand repossessed from a defaulting instalment buyer (<c>hse.repossession</c>, brief §4.10.5 and the §4.10.9
 /// ruling): the receivable derecognised, the stand re-recognised in inventory at the lower of its previous carrying
-/// amount and net realisable value, and the difference taken to profit or loss — a sensitive number kept here so it is
+/// amount and net realisable value, and the difference taken to profit or loss - a sensitive number kept here so it is
 /// separately reportable. Requested and approved by different people.
 /// </summary>
 public sealed class Repossession : AuditableEntity, ICompanyScoped

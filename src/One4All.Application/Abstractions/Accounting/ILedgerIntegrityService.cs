@@ -76,7 +76,7 @@ public readonly record struct PeriodBalanceRebuildResult(int Corrected, int Crea
 
 /// <summary>
 /// "Check data" for a company: verifies that the ledgers agree with themselves. The posted journal lines are the
-/// record; everything else checked here — cached GL period balances, stock balances, open-item outstanding amounts —
+/// record; everything else checked here - cached GL period balances, stock balances, open-item outstanding amounts -
 /// is derived from records and must match them. Also reports unbalanced posted journals and gaps in journal numbering.
 /// </summary>
 public interface ILedgerIntegrityService
@@ -88,7 +88,7 @@ public interface ILedgerIntegrityService
     Task<Result<LedgerIntegrityReport>> CheckAsync(long companyId, CancellationToken ct = default);
 
     /// <summary>
-    /// Rebuilds the company's cached GL period balances from its posted journal lines — the one repair that is always
+    /// Rebuilds the company's cached GL period balances from its posted journal lines - the one repair that is always
     /// safe, because the balances are purely derived. Stock and open-item differences are reported, not repaired: they
     /// need investigating.
     /// </summary>

@@ -39,7 +39,7 @@ public sealed class SourceDocumentService : ISourceDocumentService
             var trader = customer
                 ? await _db.Customers.AsNoTracking().Where(c => c.Id == item.TraderId).Select(c => new { c.Code, c.Name }).FirstOrDefaultAsync(ct).ConfigureAwait(false)
                 : await _db.Suppliers.AsNoTracking().Where(s => s.Id == item.TraderId).Select(s => new { s.Code, s.Name }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-            blocks.Add($"{(customer ? "Customer" : "Supplier")} {item.ItemType.ToString().ToLowerInvariant()} {item.DocumentNumber} — {trader?.Code} {trader?.Name}" + Environment.NewLine
+            blocks.Add($"{(customer ? "Customer" : "Supplier")} {item.ItemType.ToString().ToLowerInvariant()} {item.DocumentNumber} - {trader?.Code} {trader?.Name}" + Environment.NewLine
                 + $"  dated {D(item.DocumentDate)}, due {D(item.DueDate)}; {item.Currency.Value} {M(item.OriginalTransaction)}, {M(item.OutstandingTransaction)} still open"
                 + (string.IsNullOrWhiteSpace(item.Narrative) ? string.Empty : $"; {item.Narrative}"));
         }
@@ -86,7 +86,7 @@ public sealed class SourceDocumentService : ISourceDocumentService
 
         return blocks.Count > 0
             ? string.Join(Environment.NewLine, blocks)
-            : $"No originating document is held for {journal.SourceModule} {journal.DocumentType} {number}".TrimEnd() + " — the journal is its own source.";
+            : $"No originating document is held for {journal.SourceModule} {journal.DocumentType} {number}".TrimEnd() + " - the journal is its own source.";
     }
 
     private static string D(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

@@ -84,7 +84,7 @@ public sealed class LayoutPlan : AuditableEntity, ICompanyScoped
     /// <summary>The newest version.</summary>
     public LayoutPlanVersion Latest => _versions.MaxBy(v => v.Version)!;
 
-    /// <summary>The newest approved version — the plan in force — if any.</summary>
+    /// <summary>The newest approved version - the plan in force - if any.</summary>
     public LayoutPlanVersion? InForce => _versions.Where(v => v.ApprovedOn is not null).MaxBy(v => v.Version);
 
     /// <summary>Adds a version.</summary>

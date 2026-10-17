@@ -204,7 +204,7 @@ public sealed class DespatchMessagesTask : IScheduledTask
     }
 }
 
-/// <summary>Built-in task: the waiting list's yearly renewals — applicants who have not renewed are suspended, and removed after the grace period.</summary>
+/// <summary>Built-in task: the waiting list's yearly renewals - applicants who have not renewed are suspended, and removed after the grace period.</summary>
 public sealed class WaitingListRenewalsTask : IScheduledTask
 {
     private readonly Application.Abstractions.Housing.IWaitingListControlService _waitingList;
@@ -247,7 +247,7 @@ public sealed class MonthlyDepreciationTask : IScheduledTask
 }
 
 /// <summary>
-/// Built-in task: true the IAS 19 leave provision up at the end of the month just ended — the leave staff are owed, at each one's daily rate,
+/// Built-in task: true the IAS 19 leave provision up at the end of the month just ended - the leave staff are owed, at each one's daily rate,
 /// against accounts 6600 (leave expense) and 2460 (leave provision).
 /// </summary>
 public sealed class LeaveProvisionTask : IScheduledTask
@@ -465,7 +465,8 @@ public sealed class LapseOffersTask : IScheduledTask
     /// <inheritdoc />
     public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
     {
-        IReadOnlyList<string> lapsed = await _allocations.LapseExpiredAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), ct).ConfigureAwait(false);
-        return lapsed.Count == 0 ? "No offers lapsed." : $"{lapsed.Count} offers lapsed: {string.Join(", ", lapsed)}.";
+        // Brief §4.10.4: expired offers go to an exceptions queue for an officer to lapse or extend with a reason; the job reports the queue rather than deciding.
+        IReadOnlyList<ExpiredOffer> expired = await _allocations.ExpiredOffersAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), ct).ConfigureAwait(false);
+        return expired.Count == 0 ? "No expired offers." : $"{expired.Count} expired offer(s) await an officer's decision (lapse or extend): {string.Join(", ", expired.Select(e => e.CertificateNumber))}.";
     }
 }

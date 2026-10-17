@@ -15,7 +15,7 @@ public enum TipAllocationStatus
 /// <summary>
 /// A staff member's share of the pooled tips (<c>res.tip_allocation</c>). Tips accumulate in the
 /// tips-payable liability at billing; distributing the pool assigns who within that liability is owed what
-/// (no GL — the liability already exists). Paying an allocation clears its share to the bank.
+/// (no GL - the liability already exists). Paying an allocation clears its share to the bank.
 /// </summary>
 public sealed class TipAllocation : AuditableEntity, ICompanyScoped
 {

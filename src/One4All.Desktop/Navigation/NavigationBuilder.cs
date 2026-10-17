@@ -83,8 +83,8 @@ public sealed record NavGroup(string Title, IReadOnlyList<NavEntry> Entries)
 }
 
 /// <summary>
-/// One kind of work in a module — Maintenance (setting up), Transactions (day-to-day), Enquiries (looking up) or Utilities (period end and
-/// housekeeping) — with the module's screens of that kind, still in their groups.
+/// One kind of work in a module - Maintenance (setting up), Transactions (day-to-day), Enquiries (looking up) or Utilities (period end and
+/// housekeeping) - with the module's screens of that kind, still in their groups.
 /// </summary>
 public sealed class NavCategory
 {

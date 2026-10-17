@@ -5,7 +5,7 @@ namespace One4All.Core.Housing;
 /// <summary>
 /// A sectional title scheme (<c>hse.sectional_scheme</c>, brief §4.10.6 sectional title / flats): a building on a stand
 /// divided into units, the rest common property; each unit carries a participation quota that apportions the body
-/// corporate's levies, and units — not the stand — are what is owned and transferred.
+/// corporate's levies, and units - not the stand - are what is owned and transferred.
 /// </summary>
 public sealed class SectionalScheme : AuditableEntity, ICompanyScoped
 {

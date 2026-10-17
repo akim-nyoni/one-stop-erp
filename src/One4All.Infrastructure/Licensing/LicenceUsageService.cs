@@ -26,9 +26,13 @@ public sealed class LicenceUsageService : ILicenceUsageService
         List<LicenceUsage> usage = [];
         async Task Add(string key, string? module, IQueryable<object> rows)
         {
-            int? limit = module is null ? _licence.GetLimit(key) : _licence.Current.GetModuleLimit(module, key) ?? _licence.GetLimit(key);
-            usage.Add(new LicenceUsage(key, module, await rows.CountAsync(ct).ConfigureAwait(false), limit));
+            usage.Add(new LicenceUsage(key, module, await rows.CountAsync(ct).ConfigureAwait(false), Limit(key, module)));
         }
+
+        int? Limit(string key, string? module) => module is null ? _licence.GetLimit(key)
+            : _licence.Current.GetModuleLimit(module, key)
+                ?? (key.StartsWith(module + "_", StringComparison.OrdinalIgnoreCase) ? _licence.Current.GetModuleLimit(module, key[(module.Length + 1)..]) : null)
+                ?? _licence.GetLimit(key);
 
         await Add("companies", null, _db.Companies.IgnoreQueryFilters([One4AllDbContext.CompanyFilter])).ConfigureAwait(false);
         await Add("warehouses", null, _db.Warehouses.IgnoreQueryFilters([One4AllDbContext.CompanyFilter])).ConfigureAwait(false);
@@ -38,6 +42,9 @@ public sealed class LicenceUsageService : ILicenceUsageService
         await Add("waiting_list", LicenceModules.Housing, _db.HousingApplicants.IgnoreQueryFilters([One4AllDbContext.CompanyFilter])).ConfigureAwait(false);
         await Add("students", LicenceModules.School, _db.Students.IgnoreQueryFilters([One4AllDbContext.CompanyFilter])).ConfigureAwait(false);
         await Add("employees", LicenceModules.Payroll, _db.Employees.IgnoreQueryFilters([One4AllDbContext.CompanyFilter])).ConfigureAwait(false);
+        // "payrolls" (PAY): the companies running a payroll, i.e. with employees on the books.
+        int payrolls = await _db.Employees.IgnoreQueryFilters([One4AllDbContext.CompanyFilter]).Where(e => e.Status != Core.Payroll.EmployeeStatus.Terminated).Select(e => e.CompanyId).Distinct().CountAsync(ct).ConfigureAwait(false);
+        usage.Add(new LicenceUsage("payrolls", LicenceModules.Payroll, payrolls, Limit("payrolls", LicenceModules.Payroll)));
         return usage;
     }
 }

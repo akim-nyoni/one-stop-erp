@@ -26,7 +26,7 @@ public sealed record PosTenderEnvelope(TenderType TenderType, string Currency, d
 /// A self-describing, serializable snapshot of a POS sale captured while the terminal was offline. It uses
 /// only primitives and enums (currency as a code string) so it round-trips cleanly through JSON, and it
 /// rebuilds the exact <see cref="CompleteSaleRequest"/> the online path would have posted. The
-/// <see cref="SaleNumber"/> — generated on the terminal — is the natural idempotency key: replaying the
+/// <see cref="SaleNumber"/> - generated on the terminal - is the natural idempotency key: replaying the
 /// same sale number must not post twice.
 /// </summary>
 /// <param name="CompanyId">The company.</param>

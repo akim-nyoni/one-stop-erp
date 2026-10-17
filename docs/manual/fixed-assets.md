@@ -38,7 +38,7 @@ The list beside the form shows: Fixed asset register.
 
 ### Asset classes and impairment
 
-Classes hold the defaults an asset registered in them takes (method, life, residual %, rate and accounts). An impairment test (IAS 36) books a recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers — never above what it would have been unimpaired.
+Classes hold the defaults an asset registered in them takes (method, life, residual %, rate and accounts). An impairment test (IAS 36) books a recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers - never above what it would have been unimpaired.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -234,7 +234,7 @@ The list beside the form shows: Capital projects.
 
 | Code | Report | What it shows |
 | --- | --- | --- |
-| FA-DISP | Asset Disposals | Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal — newest first. |
+| FA-DISP | Asset Disposals | Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal - newest first. |
 | FA-FCST | Depreciation Forecast | Projected monthly depreciation across active assets and the aggregate closing net book value. |
 | FA-MAINT | Asset Maintenance Log | Maintenance and service events logged against assets, newest first, with the informational cost. |
 | FA-REG | Fixed Asset Register | Assets with cost, accumulated depreciation and net book value. |

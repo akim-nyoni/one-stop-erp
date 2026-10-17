@@ -1,7 +1,7 @@
 <Window x:Class="One4All.Desktop.ReportViewerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="One4All — Report Viewer" Height="720" Width="1160"
+        Title="One4All - Report Viewer" Height="720" Width="1160"
         WindowStartupLocation="CenterOwner" Background="White">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />

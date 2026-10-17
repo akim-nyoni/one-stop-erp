@@ -110,4 +110,4 @@ The list beside the form shows: Replies not yet handled.
 
 | Code | Report | What it shows |
 | --- | --- | --- |
-| CRM-PIPE | Sales Pipeline | Open opportunities by stage — estimated value, win probability and the probability-weighted value. |
+| CRM-PIPE | Sales Pipeline | Open opportunities by stage - estimated value, win probability and the probability-weighted value. |

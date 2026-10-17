@@ -8,7 +8,7 @@ public readonly record struct LeaseYear(int Year, decimal AnnualRent);
 /// <summary>
 /// Lease rent arithmetic (brief §4.10.5 long leases with rent reviews; §4.10.9: rental income is straight-lined over the
 /// lease term where escalations are fixed, IFRS 16 lessor operating lease): the contractual rent each year with fixed
-/// escalation at each review, the monthly contractual rent, and the straight-line monthly income — the last month taking
+/// escalation at each review, the monthly contractual rent, and the straight-line monthly income - the last month taking
 /// the rounding so the income over the term equals the rent exactly. Pure and unit-tested.
 /// </summary>
 public static class LeaseSchedule

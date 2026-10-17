@@ -4,8 +4,8 @@ namespace One4All.Core.Receipting;
 
 /// <summary>
 /// A logged allocation of money out of the suspense control to a payer account (brief §RCP-16 RC30,
-/// <c>rcp.suspense_allocation</c>). Allocating from suspense is a permissioned, audited act with a reason —
-/// because it is also a fraud route — so it is recorded for the suspense-allocation report.
+/// <c>rcp.suspense_allocation</c>). Allocating from suspense is a permissioned, audited act with a reason -
+/// because it is also a fraud route - so it is recorded for the suspense-allocation report.
 /// </summary>
 public sealed class SuspenseAllocation : AuditableEntity, ICompanyScoped
 {

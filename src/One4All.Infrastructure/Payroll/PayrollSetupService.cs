@@ -444,7 +444,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
         if (code.Length == 0 || string.IsNullOrWhiteSpace(credit.Name) || credit.MinimumAge is < 0
             || (credit.Basis == TaxCreditBasis.Fixed ? credit.Amount <= 0m : credit.Percent is <= 0m or > 100m || element is null))
         {
-            return Result.Failure(Error.Validation("Pay.TaxCredit", "A tax credit needs a code, a name and a positive monthly amount — or a percentage up to 100 of a pay element."));
+            return Result.Failure(Error.Validation("Pay.TaxCredit", "A tax credit needs a code, a name and a positive monthly amount - or a percentage up to 100 of a pay element."));
         }
 
         if (element is not null && !await _db.PayElements.AnyAsync(e => e.CompanyId == companyId && e.Code == element, ct).ConfigureAwait(false))

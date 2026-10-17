@@ -109,7 +109,7 @@ public sealed partial class ApprovalsViewModel : ObservableObject
             SelectedItem = null;
             StatusMessage = Items.Count == 0
                 ? "Nothing is waiting for your approval."
-                : $"{Items.Count} item(s) awaiting you — refreshed {DateTime.Now:HH:mm:ss}.";
+                : $"{Items.Count} item(s) awaiting you - refreshed {DateTime.Now:HH:mm:ss}.";
         }
         catch (Exception ex)
         {
@@ -156,7 +156,7 @@ public sealed partial class ApprovalsViewModel : ObservableObject
             }
 
             Comment = string.Empty;
-            StatusMessage = $"{item.Document}: {Describe(action)} — workflow is now {result.Value}.";
+            StatusMessage = $"{item.Document}: {Describe(action)} - workflow is now {result.Value}.";
         }
         catch (Exception ex)
         {

@@ -109,7 +109,7 @@ public sealed class BillingRunService : IBillingRunService
             }
 
             string stands = string.Join(", ", lines.Where(l => l.RatepayerCustomerId == ratepayer).Select(l => $"{l.StandNumber} ({l.InvoiceNumber})"));
-            pages.Add($"BILL — run {run.RunNumber}, {run.BillDate:d MMMM yyyy} — stand(s) {stands}{Environment.NewLine}{statement.Value}");
+            pages.Add($"BILL - run {run.RunNumber}, {run.BillDate:d MMMM yyyy} - stand(s) {stands}{Environment.NewLine}{statement.Value}");
         }
 
         return new PrintedBills(pages.Count, string.Join(Environment.NewLine + "\f", pages));
@@ -344,7 +344,7 @@ public sealed class BillingRunService : IBillingRunService
     }
 
     /// <summary>
-    /// Authorises a proposed run (also the end of its workflow): the checks, then the run marked Posting — its bills then post through
+    /// Authorises a proposed run (also the end of its workflow): the checks, then the run marked Posting - its bills then post through
     /// <see cref="ResumeAsync"/> in resumable chunks.
     /// </summary>
     internal Task<Result<BillingRun>> AuthoriseAsync(long companyId, string runNumber, long userId, CancellationToken ct)

@@ -71,7 +71,7 @@ public sealed class DeferredSchoolFeesTests
         {
             IDeferredIncomeService deferred = scope.ServiceProvider.GetRequiredService<IDeferredIncomeService>();
 
-            // January: 31 of 90 days — 344.44 + 258.33.
+            // January: 31 of 90 days - 344.44 + 258.33.
             DeferredIncomeRunResult january = (await deferred.RecogniseAsync(companyId, new DateOnly(2026, 1, 31))).Value;
             january.Recognised.Should().Be(602.77m);
             january.JournalNumber.Should().NotBeNull();

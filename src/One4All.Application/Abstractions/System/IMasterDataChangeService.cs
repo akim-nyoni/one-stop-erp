@@ -17,7 +17,7 @@ public sealed record MasterDataChangeRow(string Reference, MasterDataTarget Targ
 
 /// <summary>
 /// Changes to tariffs and master records put through approval (brief §7): a change waits for the company's <c>MasterDataChange</c> workflow when one is
-/// defined and is applied only on approval; without one it is applied at once — either way with the value before and after on record.
+/// defined and is applied only on approval; without one it is applied at once - either way with the value before and after on record.
 /// </summary>
 public interface IMasterDataChangeService
 {

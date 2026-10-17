@@ -14,7 +14,7 @@ public sealed record CostElement(AcquisitionCostComponent Component, decimal Amo
 
 /// <summary>
 /// Whether a land acquisition may complete (brief §4.10.1): every due-diligence item signed off as acceptable, a
-/// valuation obtained wherever value changes hands, and a purchase price recorded for a purchase — and the cost build-up,
+/// valuation obtained wherever value changes hands, and a purchase price recorded for a purchase - and the cost build-up,
 /// element by element, to the total parcel cost. Pure and unit-tested.
 /// </summary>
 public static class AcquisitionReadiness

@@ -110,8 +110,8 @@ public sealed record PricedLine(long ItemId, decimal Quantity, decimal Gross, de
 public sealed record BasketPricing(IReadOnlyList<PricedLine> Lines, IReadOnlyList<(string Code, string Name, decimal Saving)> Applied);
 
 /// <summary>
-/// The POS promotions engine (brief §4.1): promotions configured as data — mix and match, buy X get Y, lowest price free, percent off a
-/// category, meal deals — run by date, happy-hour window, branch, membership and coupon, applied by priority with compounding, and a
+/// The POS promotions engine (brief §4.1): promotions configured as data - mix and match, buy X get Y, lowest price free, percent off a
+/// category, meal deals - run by date, happy-hour window, branch, membership and coupon, applied by priority with compounding, and a
 /// basket priced with each line's discount and the account it posts to (the sale posts gross revenue and the discount separately).
 /// </summary>
 public interface IPromotionService

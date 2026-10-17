@@ -42,7 +42,7 @@ public sealed class RestaurantAvailabilityKotReportTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
-            // 86 the soup — it can no longer be ordered.
+            // 86 the soup - it can no longer be ordered.
             (await res.SetMenuAvailabilityAsync(companyId, soupId, false)).IsSuccess.Should().BeTrue();
             var blocked = await res.AddItemAsync(companyId, orderId, soupId, 1m);
             blocked.IsFailure.Should().BeTrue();

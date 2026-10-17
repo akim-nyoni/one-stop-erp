@@ -10,7 +10,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the ledger guards in the database itself: a journal line cannot carry a negative amount or be a debit and a credit at once, and a
-/// journal cannot become posted while its lines do not balance in base currency — even when written straight to the database.
+/// journal cannot become posted while its lines do not balance in base currency - even when written straight to the database.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class LedgerDatabaseGuardTests

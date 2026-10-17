@@ -82,7 +82,7 @@ public sealed class ReceiptAllocationTests
             var open = await rcp.OpenSessionAsync(companyId, stationId, Cashier, new DateOnly(2026, 4, 1), [new FloatDeclaration(Scenario.Usd, 0m)]);
             long sessionId = open.Value;
 
-            // User-directs 150 specifically to the FEB charge — refused without the reason, then taken with it.
+            // User-directs 150 specifically to the FEB charge - refused without the reason, then taken with it.
             ReceiptRequest Directed(string? reason) => new()
             {
                 CompanyId = companyId, SessionId = sessionId, PayerKind = PayerKind.ArCustomer, PayerAccountId = customerId,

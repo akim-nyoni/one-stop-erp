@@ -10,7 +10,7 @@ namespace One4All.Infrastructure.FixedAssets;
 
 /// <summary>
 /// Fixed Assets (brief §4.14). Registers and capitalises assets, runs monthly depreciation posting to the
-/// GL, and disposes assets recognising the profit or loss — all through the central posting engine.
+/// GL, and disposes assets recognising the profit or loss - all through the central posting engine.
 /// </summary>
 public sealed class FixedAssetService : IFixedAssetService
 {
@@ -408,8 +408,8 @@ public sealed class FixedAssetService : IFixedAssetService
             return Error.NotFound("Fa.CompanyNotFound", $"Company {companyId} not found.");
         }
 
-        // Depreciation is charged up to the disposal (brief §4.14): every month from the last one charged to the disposal month — that month by
-        // the asset's convention — goes into the disposal journal before the asset is cleared, so the gain or loss is on the carrying amount at the date.
+        // Depreciation is charged up to the disposal (brief §4.14): every month from the last one charged to the disposal month - that month by
+        // the asset's convention - goes into the disposal journal before the asset is cleared, so the gain or loss is on the carrying amount at the date.
         decimal caughtUp = 0m;
         if (asset.Status == FixedAssetStatus.Active && asset.Method != DepreciationMethod.UnitsOfProduction)
         {

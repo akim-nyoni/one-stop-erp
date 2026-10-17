@@ -1,4 +1,4 @@
-# BUILD PROMPT — "Meridian ERP" (Sage 200–style Desktop ERP, C# / .NET / PostgreSQL)
+# BUILD PROMPT - "Meridian ERP" (Sage 200–style Desktop ERP, C# / .NET / PostgreSQL)
 
 > Paste this whole file into Claude Code as the project brief. Keep it at the repo root as `docs/BRIEF.md` and treat it as the contract for the build.
 
@@ -7,14 +7,14 @@
 ## 0. HOW YOU (CLAUDE CODE) MUST WORK ON THIS
 
 You are acting simultaneously as:
-- **Senior Software Architect** — you own the layering, module boundaries, contracts and non-functional requirements.
-- **Senior C#/.NET Engineer** — you write production-grade, testable code. No pseudo-code, no `// TODO: implement later` in delivered increments.
-- **Chartered Accountant (IFRS)** — you own correctness of double-entry, control accounts, period control, FX treatment (IAS 21), inventory valuation (IAS 2), revenue recognition (IFRS 15), and the statutory reports. **An ERP that produces a trial balance that does not balance is a failed build.**
+- **Senior Software Architect** - you own the layering, module boundaries, contracts and non-functional requirements.
+- **Senior C#/.NET Engineer** - you write production-grade, testable code. No pseudo-code, no `// TODO: implement later` in delivered increments.
+- **Chartered Accountant (IFRS)** - you own correctness of double-entry, control accounts, period control, FX treatment (IAS 21), inventory valuation (IAS 2), revenue recognition (IFRS 15), and the statutory reports. **An ERP that produces a trial balance that does not balance is a failed build.**
 
 ### Working rules
 1. **Do not build everything at once.** Follow the phased plan in §16. Finish a phase, make it compile, make its tests pass, demo it, then move on.
 2. **Before each phase**, restate your plan (files you will create, tables, contracts) in a short checklist, then execute.
-3. **Ask me** when a business rule is genuinely ambiguous. Do not silently invent accounting policy. Everything else — make the call and document it in `docs/decisions/ADR-xxx.md`.
+3. **Ask me** when a business rule is genuinely ambiguous. Do not silently invent accounting policy. Everything else - make the call and document it in `docs/decisions/ADR-xxx.md`.
 4. **Every schema change is a migration.** Never edit an applied migration.
 5. **Every posting path needs a test** that asserts Dr = Cr and that the sub-ledger reconciles to its control account.
 6. Keep a running `docs/PROGRESS.md` with what's done, what's stubbed, what's next.
@@ -40,13 +40,13 @@ A **Windows desktop ERP** that a single codebase can deploy to:
 | Housing & land development | Land bank, subdivision into stands, waiting lists, allocation/ballot, instalment sales, cession & change of ownership, title deeds, council rental stock |
 | Everything else | Generic trading, services, wholesale, distribution |
 
-**Two modules cut across every vertical above and are not optional extras:** departmental **budgeting with permanent version history** (§4.18) and **payroll** (§4.15). A council, a school, a construction firm and a supermarket chain all budget by department and all pay people — and in all four the budget and the payroll are the numbers that get audited hardest.
+**Two modules cut across every vertical above and are not optional extras:** departmental **budgeting with permanent version history** (§4.18) and **payroll** (§4.15). A council, a school, a construction firm and a supermarket chain all budget by department and all pay people - and in all four the budget and the payroll are the numbers that get audited hardest.
 
 **Currency reality:** multi-currency is a *first-class* requirement, not an add-on. Assume a market where a business trades daily in two or more hard/soft currencies simultaneously (e.g. USD + local currency), prices can be held in one currency and tendered in another, and rates move daily or intraday.
 
 ---
 
-## 2. ARCHITECTURE — FOLLOW SAGE 200 STRUCTURE
+## 2. ARCHITECTURE - FOLLOW SAGE 200 STRUCTURE
 
 ### 2.1 Sage 200 concepts we deliberately mirror
 - **Accounting System Manager (ASM)** equivalent: a central `SystemManager` module owning companies, users, periods, currencies, exchange rates, number sequences, VAT/tax codes, document layouts, and **deferred vs live posting**.
@@ -62,7 +62,7 @@ A **Windows desktop ERP** that a single codebase can deploy to:
 ### 2.2 Technical stack (use exactly this unless you raise an ADR)
 - **.NET 8 LTS**, C# 12, nullable enabled, warnings-as-errors on Core/Application.
 - **UI: WPF** + MVVM via `CommunityToolkit.Mvvm`, DI via `Microsoft.Extensions.Hosting`. Theming with a custom design system (touch-first for POS, dense-grid for back office). Use `Syncfusion`/`DevExpress`-free approach: build on `WPF` + open-source grid alternatives, or plain WPF `DataGrid` with virtualization. **Ship a POS that is usable on a 1024×768 touch screen with no mouse.**
-  - *Architect's note:* structure the UI so a future **Avalonia** port is possible — keep zero business logic in code-behind; ViewModels must have no WPF references beyond `ICommand`.
+  - *Architect's note:* structure the UI so a future **Avalonia** port is possible - keep zero business logic in code-behind; ViewModels must have no WPF references beyond `ICommand`.
 - **Application server: ASP.NET Core 8 Web API** ("Meridian.Server"). The desktop client talks to the server; the server is the **only** thing that touches PostgreSQL.
   - Provide an **Embedded Mode**: for single-PC installs, the WPF app hosts the API in-process (`WebApplication` on localhost) so the same code path runs. No second code path, ever.
 - **Data: PostgreSQL 16**, `Npgsql`. **EF Core 8** for the write model and master data; **Dapper** for reporting/high-volume reads and set-based posting queries.
@@ -120,7 +120,7 @@ Meridian.sln
 
 ---
 
-## 3. THE ACCOUNTING CORE (CHARTERED ACCOUNTANT SECTION — GET THIS RIGHT FIRST)
+## 3. THE ACCOUNTING CORE (CHARTERED ACCOUNTANT SECTION - GET THIS RIGHT FIRST)
 
 Build this before any UI. Every other module is a client of it.
 
@@ -129,7 +129,7 @@ Build this before any UI. Every other module is a client of it.
 - Account attributes: name, type (`Asset|Liability|Equity|Income|Expense`), report category (for financial-statement mapping), `IsControlAccount`, `ControlAccountType` (AR/AP/Stock/VAT Input/VAT Output/Bank/Retained Earnings/FX Gain/FX Loss/Suspense/WIP/Retention/…), allow-manual-journal flag, currency restriction, active, budget-enabled.
 - **Control accounts are locked from manual journals.** Enforce in code AND with a DB trigger.
 - Support a **reporting hierarchy** (tree) independent of the account code, so financial statements are configurable, plus **alternate hierarchies** (statutory, management, consolidation).
-- Ship seed charts of accounts per vertical: `docs/coa/retail.csv`, `hospitality.csv`, `municipal.csv`, `housing.csv`, `school.csv`, `construction.csv` — each with its budget/vote structure and payroll expense analysis already mapped.
+- Ship seed charts of accounts per vertical: `docs/coa/retail.csv`, `hospitality.csv`, `municipal.csv`, `housing.csv`, `school.csv`, `construction.csv` - each with its budget/vote structure and payroll expense analysis already mapped.
 
 ### 3.2 The posting engine (single, central, non-bypassable)
 ```csharp
@@ -148,17 +148,17 @@ Rules enforced inside one DB transaction:
 7. Emits domain events for sub-ledger updates, and updates period balances (`gl_period_balance`) in the same transaction.
 8. **Deferred posting option** (Sage 200 behaviour): transactions can be queued and posted in a controlled batch run, with a "pending postings" report and an approval step.
 
-### 3.3 Multi-currency — full IAS 21 treatment
+### 3.3 Multi-currency - full IAS 21 treatment
 - **Base (functional) currency** per company; optional **second reporting currency** (dual-currency reporting) maintained on every posting.
 - Currency master: code (ISO 4217), symbol, decimals, rounding rule, denomination list (for cash tenders), active.
 - **Exchange rate tables** with rate *types*: `Spot`, `Daily`, `PeriodAverage`, `ClosingRate`, `Budget`, `Fixed/Contract`. Effective-dated with full history. Support **direct and indirect quotation**, and **triangulation** through base.
 - Rate selection policy per: trader account, document type, module. A document can override the rate (permission-controlled, audited).
 - **Transactional FX:** invoice at transaction-date rate; on settlement compute **realised** FX gain/loss to the configured accounts.
 - **Period-end revaluation:** retranslate open monetary items (AR, AP, foreign bank accounts) at the closing rate → **unrealised** FX gain/loss journal, auto-reversing next period (configurable). Full revaluation report showing before/after and the difference per account/trader.
-- **Non-monetary items** (stock, fixed assets, prepayments) are held at historic rate — the engine must not revalue them.
+- **Non-monetary items** (stock, fixed assets, prepayments) are held at historic rate - the engine must not revalue them.
 - **POS multi-currency tendering:** price list in currency A, customer pays partly in B and C, change given in a configured "change currency", with rounding to available denominations and a **rounding difference** account. Every tender line stores its own currency, rate and base value.
 - **Cash book per currency**: a bank/cash account is denominated in one currency; its GL control shows base equivalent.
-- Optional **IAS 29 hyperinflation restatement** module: CPI index table, restatement factors, monetary gain/loss, restated primary statements alongside historical cost. *(Build as an optional module — it's a real requirement in some markets.)*
+- Optional **IAS 29 hyperinflation restatement** module: CPI index table, restatement factors, monetary gain/loss, restated primary statements alongside historical cost. *(Build as an optional module - it's a real requirement in some markets.)*
 
 ### 3.4 Periods and year-end
 - Fiscal year with N periods (12/13/4-4-5 configurable), each period per-module status: `Future | Open | Closed | Permanently Closed`.
@@ -170,7 +170,7 @@ Rules enforced inside one DB transaction:
 - Item-level and account-level default tax codes; customer/supplier tax status overrides (exempt certificates, with expiry and warning).
 - **Withholding tax** on supplier payments (rate by supplier tax-clearance status), with WHT certificate printing and a WHT remittance return.
 - Tax point rules (invoice date vs delivery vs payment/cash accounting).
-- **Fiscalisation hook:** an `IFiscalDeviceProvider` abstraction so a country-specific fiscal device / e-invoicing API (e.g. a revenue authority's fiscal data management system) can be plugged in — fiscal day open/close, receipt signing, QR/verification code on the receipt, Z-report submission, offline queue with retry. Ship a `NullFiscalProvider` and one reference implementation skeleton.
+- **Fiscalisation hook:** an `IFiscalDeviceProvider` abstraction so a country-specific fiscal device / e-invoicing API (e.g. a revenue authority's fiscal data management system) can be plugged in - fiscal day open/close, receipt signing, QR/verification code on the receipt, Z-report submission, offline queue with retry. Ship a `NullFiscalProvider` and one reference implementation skeleton.
 
 ### 3.6 Inventory valuation (IAS 2)
 - Costing methods per item **or** per item group: `FIFO`, `WeightedAverage` (moving), `Standard` (with purchase price variance + usage variance to separate accounts), `SpecificIdentification` (serial/batch).
@@ -182,7 +182,7 @@ Rules enforced inside one DB transaction:
 
 ### 3.7 Revenue recognition (IFRS 15)
 - Point-in-time for POS/retail/trade.
-- **Over-time for construction/jobs**: input method (cost-to-cost) — compute % complete, recognise revenue and cost, post **WIP / accrued income / deferred income** and **retention** correctly. Contract asset vs contract liability presentation.
+- **Over-time for construction/jobs**: input method (cost-to-cost) - compute % complete, recognise revenue and cost, post **WIP / accrued income / deferred income** and **retention** correctly. Contract asset vs contract liability presentation.
 - Deferred income schedules for schools (fees billed in advance, recognised over the term) and municipalities (annual licences).
 
 ---
@@ -191,7 +191,7 @@ Rules enforced inside one DB transaction:
 
 For each module: master data, transactions, workflows, permissions, reports, and integration points.
 
-### 4.1 Point of Sale (POS) — flagship module
+### 4.1 Point of Sale (POS) - flagship module
 
 **Shell**
 - Separate **full-screen / kiosk** window, keyboard-first with large touch targets. Configurable layout per terminal profile (supermarket / bar / butchery / weighbridge kiosk).
@@ -199,12 +199,12 @@ For each module: master data, transactions, workflows, permissions, reports, and
 - Panels: transaction grid (left), product browse (centre), function keys + **numberpad** (right), totals bar (bottom), customer/currency bar (top).
 
 **Product finding (assume NO barcode scanner is available, but fully support one if present)**
-- **Live incremental search** as you type: matches on code, name, short name, alias/synonym, PLU, supplier code, and description — debounced, indexed (`pg_trgm` GIN indexes + `unaccent`), returns in <100 ms on 100k SKUs.
+- **Live incremental search** as you type: matches on code, name, short name, alias/synonym, PLU, supplier code, and description - debounced, indexed (`pg_trgm` GIN indexes + `unaccent`), returns in <100 ms on 100k SKUs.
 - **Category / department / sub-category tiles**, multi-level drill-down, back button, breadcrumb.
 - **Favourites / hot-key grid** per terminal and per cashier: colour-coded, drag-to-arrange, pages of tiles.
 - Filters: department, category, brand, supplier, price band, in-stock only, promo only, recently sold.
-- **PLU codes** (short numeric) typed on the numberpad — classic supermarket/greengrocer flow.
-- **Scanner optional**: HID keyboard-wedge capture, plus **embedded price/weight barcodes** (EAN-13 with price or weight in the payload) for butchery/deli — configurable parsing template.
+- **PLU codes** (short numeric) typed on the numberpad - classic supermarket/greengrocer flow.
+- **Scanner optional**: HID keyboard-wedge capture, plus **embedded price/weight barcodes** (EAN-13 with price or weight in the payload) for butchery/deli - configurable parsing template.
 - **Scale integration**: read live weight from a connected scale (RS-232/USB/TCP), tare, hold, manual weight entry with permission + audit.
 
 **Numberpad behaviour**
@@ -270,22 +270,22 @@ Each closed sale posts: Dr Cash/Bank/AR/Voucher-liability per tender line, Cr Re
 - **Goods Received Note**: receipt against PO (full/partial/over-receipt tolerance), quality inspection hold, reject/return-to-supplier, batch/serial capture, landed cost entry, GRN → accrual posting (Dr Stock / Cr GRNI).
 - **Invoice matching (3-way)**: PO ↔ GRN ↔ supplier invoice, with tolerance rules on price and quantity; mismatches routed to a query/dispute queue; matched invoices post Dr GRNI / Cr AP.
 - Supplier returns, debit notes, rebates, settlement discount.
-- **Supplier master**: categories, tax clearance status & expiry, bank details (with change-approval workflow — a classic fraud vector, so make bank-detail changes a dual-authorisation event), contracts, performance scorecard (on-time %, quality %, price variance), blacklist.
+- **Supplier master**: categories, tax clearance status & expiry, bank details (with change-approval workflow - a classic fraud vector, so make bank-detail changes a dual-authorisation event), contracts, performance scorecard (on-time %, quality %, price variance), blacklist.
 
 ### 4.4 General Ledger / Nominal Ledger
 - Manual journals: single, recurring (schedules with auto-generate), reversing, accrual/prepayment templates, template journals, import from CSV/Excel, multi-currency journals, inter-company journals (with due-to/due-from).
 - Journal approval workflow (maker-checker) above a threshold.
-- Budgets: **see §4.18 — budgeting is a full module, not a GL feature.** The GL's only obligations are to expose actuals by the full dimension set for comparison and to refuse to post against a vote with no appropriation when fund control is enabled.
+- Budgets: **see §4.18 - budgeting is a full module, not a GL feature.** The GL's only obligations are to expose actuals by the full dimension set for comparison and to refuse to post against a vote with no appropriation when fund control is enabled.
 - Allocations/apportionments: overhead recharge rules (fixed %, headcount, floor area, usage driver) run as a period-end routine.
-- Consolidation: multi-company consolidation with intercompany elimination, currency translation of subsidiaries (IAS 21 — closing rate for BS, average for P&L, CTA to equity reserve).
+- Consolidation: multi-company consolidation with intercompany elimination, currency translation of subsidiaries (IAS 21 - closing rate for BS, average for P&L, CTA to equity reserve).
 - Nominal transaction enquiry with unlimited drill-down: TB → account → transaction → source document → originating POS receipt/PO/invoice.
 
 ### 4.5 Accounts Receivable (Sales Ledger)
 - Customer master: account ref, type (`Retail|Trade|Student|PropertyOwner|Tenant|Debtor`), currency, credit limit & credit-limit check policy, payment terms, settlement discount, ageing basis (by invoice date or due date), statement type (open item / balance forward), delivery addresses, contacts, price list, sales agent, tax status, on-hold, dunning group.
 - Documents: invoice, credit note, debit note, receipt, payment on account, refund, journal, write-off, interest charge, contra with AP.
 - **Allocation/matching** screen: auto-match by reference/amount, manual, part allocation, unallocate (permission + audit), settlement discount handling, FX realised gain/loss on allocation.
-- **Credit control workbench**: aged debt with drill-down, promise-to-pay diary, dunning levels with configurable letters/SMS/email, hold/release, credit limit approval workflow, bad-debt provision (expected credit loss matrix under IFRS 9 — provision % by ageing bucket) and write-off with VAT relief.
-- **Statements** (see §14 — critical requirement): open-item and balance-forward, per currency and in base, with ageing summary, printable and emailable in bulk, with remittance slip.
+- **Credit control workbench**: aged debt with drill-down, promise-to-pay diary, dunning levels with configurable letters/SMS/email, hold/release, credit limit approval workflow, bad-debt provision (expected credit loss matrix under IFRS 9 - provision % by ageing bucket) and write-off with VAT relief.
+- **Statements** (see §14 - critical requirement): open-item and balance-forward, per currency and in base, with ageing summary, printable and emailable in bulk, with remittance slip.
 - Direct debit / recurring billing schedules; deposits and advance payments; instalment/lay-bye plans with schedules and forfeiture rules.
 - Sales agents/reps: assignment, commission rules (by margin, value, collection-based), commission statements and accruals.
 
@@ -293,7 +293,7 @@ Each closed sale posts: Dr Cash/Bank/AR/Voucher-liability per tender line, Cr Re
 - Supplier invoices (matched and non-PO), credit notes, expense claims, recurring invoices, prepayments/advances to suppliers.
 - **Payment run**: select by due date/supplier/currency/priority, proposed payment list, approval, part-payment, payment method (EFT file generation in bank-specific formats, cheque printing with numbering, cash, mobile money), remittance advice generation and emailing, and the resulting GL posting including WHT deduction and FX.
 - Supplier statement reconciliation tool: import/key the supplier's statement, auto-match against our ledger, produce a **reconciliation report** listing items on their statement not on ours and vice versa.
-- Aged creditors, cash requirement forecast, unmatched GRNI report (a classic audit finding — make it first-class).
+- Aged creditors, cash requirement forecast, unmatched GRNI report (a classic audit finding - make it first-class).
 
 ### 4.7 Cash Book / Treasury
 - Bank accounts per currency, cash accounts, petty cash (imprest system with top-ups and reconciliation), mobile-money wallets.
@@ -302,7 +302,7 @@ Each closed sale posts: Dr Cash/Bank/AR/Voucher-liability per tender line, Cr Re
 - Cash flow forecast: from AR due dates, AP due dates, recurring items, payroll, and manual forecast lines.
 
 ### 4.8 Voucher Management
-A deliberately broad module — covers several distinct voucher concepts; implement all:
+A deliberately broad module - covers several distinct voucher concepts; implement all:
 1. **Gift cards / gift vouchers**: issue (sold at POS → **liability**, not revenue), serial/barcode ranges, activation, balance enquiry, partial redemption, top-up, expiry with breakage recognition, reissue/replace, lost/stolen block, full transaction history, liability report by age.
 2. **Discount/promo vouchers & coupons**: single-use or multi-use codes, campaigns, validity windows, eligibility rules (customer group, item category, minimum spend), redemption caps, redemption analysis.
 3. **Payment vouchers (accounting)**: the classic Payment Voucher / Receipt Voucher / Journal Voucher / Petty Cash Voucher documents with their own numbering, approval workflow, supporting-document attachment, and printed voucher layout with signature blocks (prepared by / checked by / approved by / received by). **Municipal and school clients will insist on this.**
@@ -322,16 +322,16 @@ A deliberately broad module — covers several distinct voucher concepts; implem
 - **Interest/penalty on arrears**: configurable rate, compounding rule, grace period, exemption flags; posted as a separate transaction type.
 - **Debt management**: arrears ageing, payment plans/arrangements with instalment schedules and default tracking, disconnection/reconnection workflow with orders and fees, legal handover, summons register, write-off approval workflow, **indigent/social-tariff register** with means-test review dates and subsidy postings.
 - **Prepaid** integration hooks (vending token purchase, credit-off-arrears % rule).
-- **Consumer/citizen enquiry desk**: single screen showing property, services, meters, readings, bills, payments, arrears, arrangements, complaints/tickets, and correspondence — with instant statement print.
+- **Consumer/citizen enquiry desk**: single screen showing property, services, meters, readings, bills, payments, arrears, arrangements, complaints/tickets, and correspondence - with instant statement print.
 - **Clearance certificates / rates clearance** for property transfer with pro-rata computation.
-- Licensing & permits sub-module: business licences, liquor licences, shop licences, building plan approvals, hawker permits — with renewal cycles, inspection records, fees and penalties.
+- Licensing & permits sub-module: business licences, liquor licences, shop licences, building plan approvals, hawker permits - with renewal cycles, inspection records, fees and penalties.
 - Cemetery, market stalls, hall hire, and other council revenue streams as configurable "service types" reusing the same billing engine.
 
 ### 4.10 Housing, Land & Estates Management
 
 > **Write this module as a Housing Officer would specify it, not as a developer would guess it.** The department's daily reality is: a finite land bank, a waiting list far longer than the stands available, applicants who will try to be on the list three times under three spellings of their name, agreements signed years ago whose instalments were never chased, stands sold twice by someone who shouldn't have had the access, transfers that must not proceed until rates are cleared, and a filing room full of paper agreements whose chain of ownership is the only proof a family owns their home. **The module's primary job is to make the chain of ownership of every stand complete, provable and tamper-evident from acquisition to title deed.** Everything else is secondary to that.
 
-This module works hand-in-glove with §4.9 (Municipality) — Housing *creates* the property record that Municipality then bills — but it must be separately licensable, because private developers, housing cooperatives and estate agencies will buy it without the rates module.
+This module works hand-in-glove with §4.9 (Municipality) - Housing *creates* the property record that Municipality then bills - but it must be separately licensable, because private developers, housing cooperatives and estate agencies will buy it without the rates module.
 
 #### 4.10.1 Land bank & acquisition
 - **Parcel register** (the parent land, before subdivision): parcel reference, description, locality/ward, GPS polygon or boundary coordinates, area (ha and m²), current land use/zoning, tenure (freehold / state land / leasehold / communal / customary / trust), existing improvements, current occupation status (vacant / occupied / informally settled / under dispute), and photographs.
@@ -339,48 +339,48 @@ This module works hand-in-glove with §4.9 (Municipality) — Housing *creates* 
 - **Due diligence checklist** with mandatory sign-off before acquisition can be marked complete: title search result, encumbrances and bonds, caveats, servitudes and way-leaves, boundary disputes, outstanding rates on the parcel, environmental impact assessment status, heritage/archaeological clearance, flood-plain or geotechnical constraints, wetland status, existing occupants/compensation liability.
 - **Acquisition cost build-up**: purchase price + survey + legal/conveyancing + valuation + compensation to occupants + stamp duty/transfer fees + interest on acquisition loans (if capitalisable) → **total parcel cost**.
 - Compulsory acquisition sub-process: notice served, objections register, compensation assessment, compensation offers and payments, disputes/arbitration, possession date.
-- Land disposal in the other direction: sale of surplus council land, land exchange, lease of land to third parties — same controls, reverse direction.
+- Land disposal in the other direction: sale of surplus council land, land exchange, lease of land to third parties - same controls, reverse direction.
 
 #### 4.10.2 Planning, survey, subdivision & servicing
 - **Layout plan register**: layout number, planner, date submitted, approval authority, approval date, approved density (low/medium/high), number of stands by use (residential / commercial / industrial / institutional / open space / roads / schools / clinics), amendments and re-approvals with version history.
-- **Subdivision engine**: split a parent parcel into child **stands/erven** (and support consolidation of stands back into one, and re-subdivision of a stand). Each child stand inherits lineage — you must be able to walk from any stand back to the parcel it came from and the acquisition that created it.
-- **Stand register** — the core master record: stand/erf number, scheme/project, ward/suburb/zone, street address, size (m²), intended use and zoning, density category, survey status, **surveyor-general diagram number**, pegging date and surveyor, coordinates, service availability flags (water / sewer / road / electricity / storm water), servicing phase, status (see state machine below), selling price, valuation, reserved/blocked flags, photographs, and a free-form remarks history.
+- **Subdivision engine**: split a parent parcel into child **stands/erven** (and support consolidation of stands back into one, and re-subdivision of a stand). Each child stand inherits lineage - you must be able to walk from any stand back to the parcel it came from and the acquisition that created it.
+- **Stand register** - the core master record: stand/erf number, scheme/project, ward/suburb/zone, street address, size (m²), intended use and zoning, density category, survey status, **surveyor-general diagram number**, pegging date and surveyor, coordinates, service availability flags (water / sewer / road / electricity / storm water), servicing phase, status (see state machine below), selling price, valuation, reserved/blocked flags, photographs, and a free-form remarks history.
 - **Stand status state machine** (enforce transitions in code; no jumping states, every transition audited with user, date and authority):
   `Raw land → Planned → Surveyed → Under servicing → Serviced → Available → Reserved → Offered → Allocated → Under agreement → Fully paid → Title applied → Title registered → Title handed over`
   with side branches: `Withheld / Blocked (dispute or caveat)`, `Repossessed`, `Surrendered`, `Cancelled offer`, `Consolidated away`, `Re-subdivided`.
-- **Servicing projects**: link a servicing contract (from §4.12 Job Costing) to a scheme so actual servicing cost flows in — roads, water reticulation, sewer, storm water, electrification. Then **apportion servicing cost to stands** by area, by frontage, by equal share, or by zoning weighting, producing an auditable **cost per stand**.
-- **Selling price build-up** per stand: land cost + servicing cost + overhead/administration recovery + development levy + margin/cost-recovery factor = price, with the ability to set price by scheme, by stand size band, or per stand, with effective dating and approval workflow. Price changes are versioned — a beneficiary's price is frozen at offer date.
-- **Development/infrastructure levies**: endowment fee, intrinsic land value charge, infrastructure development levy, connection fees — configurable charge types applied at allocation or at transfer.
+- **Servicing projects**: link a servicing contract (from §4.12 Job Costing) to a scheme so actual servicing cost flows in - roads, water reticulation, sewer, storm water, electrification. Then **apportion servicing cost to stands** by area, by frontage, by equal share, or by zoning weighting, producing an auditable **cost per stand**.
+- **Selling price build-up** per stand: land cost + servicing cost + overhead/administration recovery + development levy + margin/cost-recovery factor = price, with the ability to set price by scheme, by stand size band, or per stand, with effective dating and approval workflow. Price changes are versioned - a beneficiary's price is frozen at offer date.
+- **Development/infrastructure levies**: endowment fee, intrinsic land value charge, infrastructure development levy, connection fees - configurable charge types applied at allocation or at transfer.
 
 #### 4.10.3 Waiting list & applicant management
 - **Application intake**: applicant + spouse/co-applicant, national ID (validated format, checked for duplicates), date of birth, gender, disability status, marital status and regime, dependants, physical and postal address, contacts, employer, income band, current tenure (lodger / tenant / homeless / staying with relatives), period of residence in the local authority area, and supporting documents (ID copy, proof of residence, payslip, affidavit) attached and flagged verified/unverified with the verifying officer's name.
 - **Qualification rules engine** (configurable, never hardcoded): minimum age, minimum period of residency, maximum income for a category, **must not already own property in the area** (auto-checked against the stand register, ownership history and the municipal property register by national ID), not previously allocated and forfeited, tax/rates clearance, first-time-buyer status.
-- **Registration**: unique waiting-list number and registration date (the date that determines seniority — protect it fiercely; any change to a registration date is a dual-authorisation, fully audited event). Registration fee receipting. Waiting list **category** (low/medium/high density, flats, rental, serviced/unserviced) and **quota groups** (e.g. civil servants, war veterans, persons with disabilities, youth, women, people on the list longest, cooperative members) with configurable quota percentages per scheme.
-- **Priority scoring**: points model — years on list, residency period, dependants, disability, age, current housing conditions, cooperative membership — weights configurable per council, with the score recomputed on a schedule and a full explanation of how each applicant's score was derived (an applicant *will* ask, and the officer must be able to print it).
-- **Periodic confirmation/renewal**: annual or biennial re-registration; non-responders flagged, then suspended, then removed after a grace period — all with notification history proving they were contacted.
+- **Registration**: unique waiting-list number and registration date (the date that determines seniority - protect it fiercely; any change to a registration date is a dual-authorisation, fully audited event). Registration fee receipting. Waiting list **category** (low/medium/high density, flats, rental, serviced/unserviced) and **quota groups** (e.g. civil servants, war veterans, persons with disabilities, youth, women, people on the list longest, cooperative members) with configurable quota percentages per scheme.
+- **Priority scoring**: points model - years on list, residency period, dependants, disability, age, current housing conditions, cooperative membership - weights configurable per council, with the score recomputed on a schedule and a full explanation of how each applicant's score was derived (an applicant *will* ask, and the officer must be able to print it).
+- **Periodic confirmation/renewal**: annual or biennial re-registration; non-responders flagged, then suspended, then removed after a grace period - all with notification history proving they were contacted.
 - **Duplicate and fraud detection**: fuzzy matching on name + ID + date of birth + phone across the waiting list, past allocations, current ownership and the deceased register; a dedicated **duplicate applicants queue** for an officer to merge or reject with reasons.
-- Applicant self-service: enquiry by waiting-list number or ID showing position, category, score and last update — exposed through the API for a web/USSD front-end later.
+- Applicant self-service: enquiry by waiting-list number or ID showing position, category, score and last update - exposed through the API for a web/USSD front-end later.
 
-#### 4.10.4 Allocation (the highest-fraud-risk process in the whole ERP — control it accordingly)
-- **Allocation run**: select a scheme and stand set, select waiting-list category and quota rules, and generate a **proposed allocation list** by seniority, by score, or by **ballot/draw** (with a seeded, reproducible, logged random draw — the seed and the input list hash are stored so the draw can be independently re-verified).
-- **Allocation committee**: the proposed list is a document that goes through the §7 approval workflow — committee members, meeting date, minute reference, approvals, rejections with reasons, substitutions (a substitution must state why the skipped applicant was skipped).
+#### 4.10.4 Allocation (the highest-fraud-risk process in the whole ERP - control it accordingly)
+- **Allocation run**: select a scheme and stand set, select waiting-list category and quota rules, and generate a **proposed allocation list** by seniority, by score, or by **ballot/draw** (with a seeded, reproducible, logged random draw - the seed and the input list hash are stored so the draw can be independently re-verified).
+- **Allocation committee**: the proposed list is a document that goes through the §7 approval workflow - committee members, meeting date, minute reference, approvals, rejections with reasons, substitutions (a substitution must state why the skipped applicant was skipped).
 - **Hard controls, enforced in the database, not just the UI:**
   - A stand may have **exactly one active allocation**. Unique partial index. A second allocation attempt is blocked and raises an exception report entry.
   - **One beneficiary, one stand** per scheme/council (configurable to N) checked on national ID, including against ownership history and the spouse's ID.
   - Allocation requires **dual authorisation** above the officer level; the allocating officer cannot be an approver.
   - Any change to an existing allocation (swap of stand, change of beneficiary, cancellation) is a separate approved document, never an in-place edit.
-- **Offer letter**: generated with price, charges, deposit required, payment terms, acceptance deadline, and the stand's exact description. Offers have a life — expired offers auto-lapse to an exceptions queue for the officer to lapse or extend (with reason).
+- **Offer letter**: generated with price, charges, deposit required, payment terms, acceptance deadline, and the stand's exact description. Offers have a life - expired offers auto-lapse to an exceptions queue for the officer to lapse or extend (with reason).
 - **Acceptance**: deposit receipted (feeds AR/Cash Book), acceptance signed, allocation confirmed, stand status moves on. **Non-acceptance/decline/forfeiture**: reason, forfeiture of deposit per policy, stand returns to available pool, applicant returns to or is removed from the list per rules.
 - **Appeals register**: unsuccessful applicants' appeals, grounds, hearing, outcome, and any resulting re-allocation.
 - Every allocation carries an immutable **allocation certificate number** and a printable allocation letter.
 
 #### 4.10.5 Tenure, agreements & instalment sales
 Support every tenure type a housing department actually issues:
-- **Outright cash sale** — pay in full, proceed to transfer.
-- **Sale on instalments / rent-to-buy / lease-with-option-to-purchase** — deposit, term (months/years), interest rate (flat, reducing balance, or zero), instalment amount, payment day, escalation, penalty interest on arrears, early settlement with rebate calculation.
-- **Council rental** (housing stock) — see 4.10.7.
+- **Outright cash sale** - pay in full, proceed to transfer.
+- **Sale on instalments / rent-to-buy / lease-with-option-to-purchase** - deposit, term (months/years), interest rate (flat, reducing balance, or zero), instalment amount, payment day, escalation, penalty interest on arrears, early settlement with rebate calculation.
+- **Council rental** (housing stock) - see 4.10.7.
 - **Lease of stands** (commercial/industrial/agricultural), including **long leases (e.g. 99-year)** with rent reviews.
-- **Lodger permits**, **site-and-service schemes**, **cooperative allocations** (allocation to a cooperative, which sub-allocates to members — track both levels).
+- **Lodger permits**, **site-and-service schemes**, **cooperative allocations** (allocation to a cooperative, which sub-allocates to members - track both levels).
 - **Agreement register**: agreement number, type, parties, stand, price, charges, terms, signature dates, witnesses, special conditions, and the generated agreement document itself stored against the record. Amendments create a new version; the superseded version is retained.
 - **Instalment schedule** generated on signature: full amortisation table (capital, interest, balance) printable for the beneficiary. Receipts allocate against the schedule (oldest-first or specified-instalment, per policy), producing an always-current arrears position.
 - **Development covenant**: "build within N years or the stand reverts". Track building plan submission and approval (link to §4.9 licences/permits), construction commencement and completion inspections, extensions granted (with fee), breaches, penalty levies, **notice of intention to repossess**, and the repossession workflow with committee approval, refund-less-deductions computation, and return of the stand to the available pool.
@@ -390,19 +390,19 @@ Support every tenure type a housing department actually issues:
 - **Transfer types**, each with its own required-document checklist and approval route:
   `Sale/assignment to a third party · Cession of rights (pre-title, the common case) · Inheritance / deceased estate · Donation or gift · Divorce or court order · Matrimonial addition or removal of spouse · Transfer to or from a company/trust · Change of name (marriage, deed poll) · Correction of a captured error · Surrender to council · Repossession by council · Substitution of a deceased joint holder`
 - **Mandatory pre-conditions before a transfer can be submitted** (configurable, but these are the defaults, and each one is a checklist item with an attachment and a verifying officer):
-  1. **Municipal clearance** — rates, water, refuse and all service accounts on the property paid in full or a cleared arrangement in place. Pull this live from §4.9; do not let an officer type "cleared".
-  2. **Housing account clear** — instalments up to date, or the balance settled, or formally assumed by the transferee with approval.
+  1. **Municipal clearance** - rates, water, refuse and all service accounts on the property paid in full or a cleared arrangement in place. Pull this live from §4.9; do not let an officer type "cleared".
+  2. **Housing account clear** - instalments up to date, or the balance settled, or formally assumed by the transferee with approval.
   3. Identity verification of transferor and transferee (ID, biometrics/photo, affidavit).
   4. **Spousal consent** where the marital regime requires it, or a court order.
   5. Original agreement / title produced or a sworn loss affidavit with police report.
   6. For deceased estates: death certificate, letters of administration / executor's appointment, distribution account, beneficiary identification.
-  7. Transfer/cession fee, administration fee and any endowment or transfer duty paid — receipted before submission.
+  7. Transfer/cession fee, administration fee and any endowment or transfer duty paid - receipted before submission.
   8. Where applicable, capital gains or transfer-duty withholding computed and remitted (link to §3.5 tax engine).
 - **Workflow**: application lodged → checklist verified by Housing Officer → valuation/consideration recorded → **dual approval** (Housing Officer + Director/Committee, value-banded via §7) → cession/transfer agreement generated and signed → registers updated atomically → new agreement or title issued → old holder's account closed and new holder's account opened in AR with any agreed balance carried over.
-- **Ownership history chain**: every stand carries an ordered, append-only list of holders — from, to, transfer type, effective date, consideration, approving authority, document references. **Never overwrite the current owner; always append and close the previous period.** The chain is part of the audit hash-chain (§6) so a tampered ownership record is detectable.
+- **Ownership history chain**: every stand carries an ordered, append-only list of holders - from, to, transfer type, effective date, consideration, approving authority, document references. **Never overwrite the current owner; always append and close the previous period.** The chain is part of the audit hash-chain (§6) so a tampered ownership record is detectable.
 - **Joint ownership**: multiple holders with shares (%), each with their own ID and consent requirements; transfer of one share only; survivorship rules.
 - **Caveats, disputes & blocks**: a stand or an account can be flagged `Blocked` with a reason (court interdict, family dispute, suspected fraud, double allocation under investigation, boundary dispute). A blocked stand cannot be allocated, transferred, or have title processed. Only a senior role can place or lift a block, and both actions are audited with a mandatory reason and supporting document.
-- **Title deed pipeline**: application to the deeds registry, conveyancer assigned, documents lodged, queries raised and resolved, deed number and registration date captured, deed received into council custody, **handover to the owner with signed receipt**, and deeds held but uncollected tracked and chased. Report on pipeline age at every stage — "deeds sitting with the conveyancer for 400 days" is exactly the number a housing director is asked for in a council meeting.
+- **Title deed pipeline**: application to the deeds registry, conveyancer assigned, documents lodged, queries raised and resolved, deed number and registration date captured, deed received into council custody, **handover to the owner with signed receipt**, and deeds held but uncollected tracked and chased. Report on pipeline age at every stage - "deeds sitting with the conveyancer for 400 days" is exactly the number a housing director is asked for in a council meeting.
 - **Sectional title / flats**: building → units → common property, unit participation quotas, body corporate levies, and transfer of a unit rather than a stand.
 
 #### 4.10.7 Council rental housing stock
@@ -417,27 +417,27 @@ Support every tenure type a housing department actually issues:
 - **Housing scheme/project** as the organising unit: scheme name, type (council-delivered, PPP/joint venture, cooperative, employer-assisted, rural/peri-urban), target beneficiaries, stand counts by category, budget, funding source (own revenue, loan, grant, developer contribution), start and completion dates, and delivery milestones.
 - **Developer/partner agreements**: developer builds and/or services; council contributes land; split of stands between council quota and developer quota; delivery obligations, penalties, and a reconciliation of stands handed over vs contracted.
 - **Housing cooperatives**: cooperative register, members, contributions, allocation to the cooperative and sub-allocation to members, and the cooperative's own account statement.
-- **Informal settlements / regularisation**: settlement register, enumeration exercises (household survey data), structures and occupants, eligibility for regularisation, upgrading plan, conversion of an enumerated household into a waiting-list registration or a direct allocation on regularisation — with the same anti-double-allocation checks.
+- **Informal settlements / regularisation**: settlement register, enumeration exercises (household survey data), structures and occupants, eligibility for regularisation, upgrading plan, conversion of an enumerated household into a waiting-list registration or a direct allocation on regularisation - with the same anti-double-allocation checks.
 - **Beneficiary subsidy/grant tracking** where a national or donor housing subsidy part-funds a beneficiary (IAS 20 treatment, see below).
 
-#### 4.10.9 Accounting treatment (Chartered Accountant's ruling — build it this way)
-- **Land held for sale or development is inventory under IAS 2, not PPE.** Parcel acquisition cost plus capitalisable servicing and development costs sit in a `Land & Housing Stock (WIP)` inventory account, transfer to `Stands Available for Sale` on completion of servicing, and release to **cost of sales on transfer of control** to the beneficiary — not on allocation, and not on offer.
-- **Land and buildings the council holds to earn rentals** = investment property (IAS 40) or PPE (IAS 16) depending on policy — keep them out of the inventory pool entirely and out of the "stands available" reports.
-- **Revenue recognition (IFRS 15)**: determine the point at which control of the stand passes (usually signature of the agreement of sale and giving of occupation, not final payment). Recognise the sale then, raise the full receivable, and treat the instalment arrangement as a **financing component** — discount the receivable where the term is long, and recognise interest income over the term rather than inflating sale revenue.
-- **Instalment debtors** go to a dedicated AR control account per tenure type, with **IFRS 9 expected credit loss** provisioning by arrears bucket and by scheme — housing debtors behave nothing like trade debtors and must be provided for separately.
+#### 4.10.9 Accounting treatment (Chartered Accountant's ruling - build it this way)
+- **Land held for sale or development is inventory under IAS 2, not PPE.** Parcel acquisition cost plus capitalisable servicing and development costs sit in a `Land & Housing Stock (WIP)` inventory account, transfer to `Stands Available for Sale` on completion of servicing, and release to **cost of sales on transfer of control** to the beneficiary - not on allocation, and not on offer.
+- **Land and buildings the council holds to earn rentals** = investment property (IAS 40) or PPE (IAS 16) depending on policy - keep them out of the inventory pool entirely and out of the "stands available" reports.
+- **Revenue recognition (IFRS 15)**: determine the point at which control of the stand passes (usually signature of the agreement of sale and giving of occupation, not final payment). Recognise the sale then, raise the full receivable, and treat the instalment arrangement as a **financing component** - discount the receivable where the term is long, and recognise interest income over the term rather than inflating sale revenue.
+- **Instalment debtors** go to a dedicated AR control account per tenure type, with **IFRS 9 expected credit loss** provisioning by arrears bucket and by scheme - housing debtors behave nothing like trade debtors and must be provided for separately.
 - **Deposits, rental deposits and part-payments on unaccepted offers are liabilities**, never revenue, until the triggering event. Forfeited deposits become other income on forfeiture approval.
 - **Rental income** is straight-lined over the lease term where escalations are fixed (IFRS 16 lessor, operating lease).
 - **Development/endowment levies and transfer fees** are revenue when the performance obligation is satisfied; connection fees may be deferred where they relate to a service still to be delivered.
 - **Government grants and housing subsidies** (IAS 20): recognise in line with the expenditure they compensate; deferred income where conditions are outstanding; disclose unfulfilled conditions.
 - **Compensation payable on compulsory acquisition** is a provision once the obligation is probable and measurable (IAS 37), not on payment.
-- **Repossessions**: derecognise the receivable, recognise the stand back into inventory at the lower of previous carrying amount and net realisable value, take the difference (net of forfeitures and occupation rental charged) to P&L, and disclose it — repossession gains are a sensitive number and must be separately reportable.
+- **Repossessions**: derecognise the receivable, recognise the stand back into inventory at the lower of previous carrying amount and net realisable value, take the difference (net of forfeitures and occupation rental charged) to P&L, and disclose it - repossession gains are a sensitive number and must be separately reportable.
 - Every one of the above posts through the §3.2 posting engine. No module-local journals.
 
 #### 4.10.10 Integration points
 - → **§4.9 Municipality**: on title registration or on allocation (configurable trigger), create or update the billable property, link owner as the ratepayer, start rates and service charges pro-rata from the effective date, and pull live clearance status for transfers.
 - → **§4.5 AR**: beneficiary, tenant and cooperative accounts, statements, ageing, dunning.
 - → **§4.12 Job Costing**: servicing and construction contracts feed actual cost per scheme and per stand.
-- → **§4.3 Procurement**: land acquisition, survey, conveyancing and servicing contracts procured through the normal requisition→PO→approval chain — land acquisition above a threshold should require the highest authorisation band in the system.
+- → **§4.3 Procurement**: land acquisition, survey, conveyancing and servicing contracts procured through the normal requisition→PO→approval chain - land acquisition above a threshold should require the highest authorisation band in the system.
 - → **§4.16 Service Desk**: tenant fault reports and applicant enquiries.
 - → **§6 Audit** and **§7 Workflow**: allocations, ownership changes, price changes, registration-date changes, block placement/lifting and repossessions are all approval-routed and hash-chained.
 - → **GIS hook**: store coordinates/polygons (PostGIS-ready columns) and expose an `IMapProvider` so stand maps, scheme layouts and ward overlays can be plotted later without a schema change.
@@ -459,7 +459,7 @@ with the standard operation flags plus `Authorise-Level-1..5`. **Segregation of 
 - Job/project/contract hierarchy: contract → phase → cost head/activity → transaction, with a full WBS.
 - **BOQ import** and budget by cost head; revised budgets with variation orders (VOs) tracked separately.
 - Costs captured from: purchase invoices, stock issues, timesheets/labour, plant & equipment usage (internal hire rates), subcontractor certificates, overhead allocation.
-- **Progress valuations / interim payment certificates**: measured work, materials on site, VOs, less previous certificates, less **retention** (with retention release schedule and defects liability period), less advances recovery — producing a certificate document and the corresponding AR posting.
+- **Progress valuations / interim payment certificates**: measured work, materials on site, VOs, less previous certificates, less **retention** (with retention release schedule and defects liability period), less advances recovery - producing a certificate document and the corresponding AR posting.
 - **Subcontractor ledger**: subcontract orders, work certified, retention held, WHT/contractor tax deduction, payment certificates.
 - WIP and revenue recognition (cost-to-cost %), contract asset/liability, provision for foreseeable losses.
 - Plant register with hire rates, utilisation, maintenance schedules, fuel and running-cost capture.
@@ -483,12 +483,12 @@ with the standard operation flags plus `Authorise-Level-1..5`. **Segregation of 
 - **Personal**: employee number (sequence per company), names as they appear on the national ID (this is what the bank and the tax authority match on), national ID/passport, date of birth, gender, marital status, nationality, work permit/visa with expiry alert, physical and postal address, contacts, next of kin and beneficiaries, photograph.
 - **Employment**: engagement date, contract type (permanent / fixed-term / contract / casual / seasonal / intern / consultant), contract start and end with expiry alerts, probation period and confirmation, notice period, grade and notch/step, job title and position, **department, cost centre, project/fund and branch** (this is what drives the payroll journal), reporting line, union membership, shift pattern, pay group and pay frequency.
 - **Statutory & scheme identifiers**: tax number, social security number, pension fund and member number, medical aid scheme, member number and dependants, workers' compensation class.
-- **Bank details**: account name, number, branch, bank, currency, and **split-pay instructions** (e.g. 60% to bank A, 40% to mobile money). **Any change to bank details is a dual-authorisation workflow event with a mandatory audit record and a "bank details changed this period" exception report** — this is the single most common payroll fraud.
+- **Bank details**: account name, number, branch, bank, currency, and **split-pay instructions** (e.g. 60% to bank A, 40% to mobile money). **Any change to bank details is a dual-authorisation workflow event with a mandatory audit record and a "bank details changed this period" exception report** - this is the single most common payroll fraud.
 - HR records: qualifications, training, appraisals, disciplinary and grievance records, warnings with expiry, medical records flagged restricted, assets issued (laptop, phone, tools, uniform, keys).
 - **Establishment / post management** (essential for councils and schools): approved post register, grading structure, salary scales with notches and annual increment rules, posts filled vs vacant, acting appointments, and a block on engaging an employee against a post that does not exist or is already filled.
 
-#### 4.15.2 Pay element engine (formula-driven — never hardcode a single allowance)
-- A **pay element** is a configured record, not code: code, name, type (`Earning | Deduction | EmployerContribution | Provision | Memo/Information`), calculation basis (fixed amount, % of basic, % of gross, % of a named element group, rate × units, formula expression, table lookup, balance-driven), calculation **sequence number** (order matters — a pension calculated on basic must run before a tax that is calculated after pension relief), and rounding rule.
+#### 4.15.2 Pay element engine (formula-driven - never hardcode a single allowance)
+- A **pay element** is a configured record, not code: code, name, type (`Earning | Deduction | EmployerContribution | Provision | Memo/Information`), calculation basis (fixed amount, % of basic, % of gross, % of a named element group, rate × units, formula expression, table lookup, balance-driven), calculation **sequence number** (order matters - a pension calculated on basic must run before a tax that is calculated after pension relief), and rounding rule.
 - Per element flags: **taxable / non-taxable**, **pensionable / non-pensionable**, subject to social security, subject to union dues, included in overtime base, included in leave-pay base, included in terminal-benefit base, pro-rated for part-period, arrears-able, currency, ceiling and floor, employer/employee split, and **GL account mapping by department/cost centre** (with a fallback default).
 - Reuse the §13.1 **expression engine** for element formulas so payroll formulas are written, tested and audited the same way report expressions are, with a "calculate against a sample employee" preview.
 - Standard elements to ship seeded: basic salary, housing allowance, transport allowance, acting allowance, responsibility allowance, shift and night allowance, standby and call-out, **overtime at configurable multipliers (1.5×, 2×, public holiday)**, commission (from the POS/sales agent module), bonus and 13th cheque, backpay, leave pay, leave encashment, gratuity, severance, notice pay; and on the deduction side: tax, pension, social security, medical aid, union dues, **staff loans and advances**, **garnishee and court orders** (with priority ordering and protected-earnings rules), funeral scheme, savings scheme, **staff purchases (posted from the POS staff-account tender)**, **council/employer housing rent (posted from §4.10.7)**, and salary overpayment recovery.
@@ -498,17 +498,17 @@ with the standard operation flags plus `Authorise-Level-1..5`. **Segregation of 
 - **Effective-dated tax tables**: bands, rates, thresholds, per frequency (monthly/weekly/annual), per currency, with full history so a prior-period recalculation uses the table that was in force then.
 - **Cumulative (year-to-date) PAYE** and non-cumulative options; mid-year joiners and leavers; tax-year straddling a fiscal year.
 - Tax credits and rebates (elderly, disabled, medical-aid contribution credit, dependant credits) as configurable, effective-dated records.
-- **Taxable benefits**: motor vehicle benefit (by engine capacity or cost bands), housing benefit, **loan benefit at a deemed interest rate**, school fees, medical, and any element flagged as a benefit — valued by rule, taxed, and shown on the payslip as a memo item.
+- **Taxable benefits**: motor vehicle benefit (by engine capacity or cost bands), housing benefit, **loan benefit at a deemed interest rate**, school fees, medical, and any element flagged as a benefit - valued by rule, taxed, and shown on the payslip as a memo item.
 - **Bonus/annual payment tax spreading** (annualise-and-apportion) rather than taxing a bonus at the marginal rate of one month.
-- **Multi-currency payroll taxation**: where an employee is paid partly in a hard currency and partly in local currency, compute the tax **per currency on the correctly apportioned tax-free threshold and bands**, produce separate statutory returns per currency, and show both on one payslip with the exchange rate used. Get this wrong and the client gets a tax assessment — treat it as a first-class requirement, not an edge case.
+- **Multi-currency payroll taxation**: where an employee is paid partly in a hard currency and partly in local currency, compute the tax **per currency on the correctly apportioned tax-free threshold and bands**, produce separate statutory returns per currency, and show both on one payslip with the exchange rate used. Get this wrong and the client gets a tax assessment - treat it as a first-class requirement, not an edge case.
 - Surcharges/levies computed on tax (e.g. a health or AIDS levy), employer levies (skills/manpower development, workers' compensation), and social security with earnings ceilings.
-- Statutory returns generated as data plus documents: monthly tax remittance return, annual employee tax certificates, social security schedule, pension schedule, workers' compensation return, skills levy return — each format-configurable through the report designer because these forms change.
+- Statutory returns generated as data plus documents: monthly tax remittance return, annual employee tax certificates, social security schedule, pension schedule, workers' compensation return, skills levy return - each format-configurable through the report designer because these forms change.
 
 #### 4.15.4 Leave & attendance
 - Leave types: annual, sick (with full-pay/half-pay tiers and rolling entitlement windows), maternity, paternity, compassionate, study, unpaid, special, and time-off-in-lieu.
 - Accrual rules per type and per grade: monthly accrual, on anniversary, pro-rata on engagement, service-band uplifts, **carry-forward caps and expiry**, maximum accumulation, and negative-balance policy.
 - Applications and approvals through the §7 workflow, with team calendars, coverage checks and cancellation.
-- **Leave liability provision (IAS 19 short-term benefits)**: value untaken leave at current rates each period and post the movement to the provision — auditors ask for this every year and clients almost never have it.
+- **Leave liability provision (IAS 19 short-term benefits)**: value untaken leave at current rates each period and post the movement to the provision - auditors ask for this every year and clients almost never have it.
 - Leave encashment and leave-pay advance (pay the leave in the month before it is taken, recover in the month it falls).
 - **Attendance/time**: clock devices or timesheet entry, shift rosters, absence and lateness capture, overtime request-and-approve before it can be paid, and **timesheet hours flowing into §4.12 job costing** so labour lands on the right job.
 
@@ -520,22 +520,22 @@ with the standard operation flags plus `Authorise-Level-1..5`. **Segregation of 
 #### 4.15.6 The payroll run
 A strict, resumable state machine:
 `Open period → Capture variables → Calculate → Validate → Review → Approve → Commit → Post to GL → Pay → Close`
-- **Variable input**: overtime, absences, once-off earnings and deductions, new engagements, terminations, salary changes — captured individually or imported from a validated Excel/CSV template with a preview-and-error screen.
+- **Variable input**: overtime, absences, once-off earnings and deductions, new engagements, terminations, salary changes - captured individually or imported from a validated Excel/CSV template with a preview-and-error screen.
 - **Calculate is re-runnable any number of times before commit.** Each calculation stores a full trace per employee per element ("basic 1,200.00 × 0.075 = 90.00 pension") so the officer can explain any figure to any employee without opening a spreadsheet.
-- **Pre-commit validation / exception report** — the payroll officer's safety net. Block or warn on: negative net pay, zero net pay, net pay varying more than N% from last period, employees with no bank details, **duplicate bank account numbers across employees**, duplicate national IDs, employees with no tax number, terminated employees still in the run, employees in the previous run missing from this one, negative leave balances, deductions suspended by net-pay protection, salary below the grade minimum or above the maximum, contract expired, and bank details changed since the last run.
+- **Pre-commit validation / exception report** - the payroll officer's safety net. Block or warn on: negative net pay, zero net pay, net pay varying more than N% from last period, employees with no bank details, **duplicate bank account numbers across employees**, duplicate national IDs, employees with no tax number, terminated employees still in the run, employees in the previous run missing from this one, negative leave balances, deductions suspended by net-pay protection, salary below the grade minimum or above the maximum, contract expired, and bank details changed since the last run.
 - **Approval**: maker-checker, with the approver seeing the totals and the exception report, not just a button. Above a configurable variance threshold, require a second approver.
-- **Commit** freezes the run: no edits, ever. Corrections are made by a **supplementary/adjustment run** or as backpay in the next period, both of which are visible and reportable. A commit can only be reversed by a formally approved **payroll reversal** that writes a reversing journal — never by deletion.
+- **Commit** freezes the run: no edits, ever. Corrections are made by a **supplementary/adjustment run** or as backpay in the next period, both of which are visible and reportable. A commit can only be reversed by a formally approved **payroll reversal** that writes a reversing journal - never by deletion.
 - **Parallel run mode**: run the new system alongside the legacy one for a month or two and produce a line-by-line comparison report. Insist on this for every payroll go-live.
 - Multiple payrolls per company (monthly staff, weekly wages, casuals), multiple pay groups, and the ability to run them independently and consolidate for reporting and statutory returns.
 
 #### 4.15.7 Payment and payslips
 - **Bank EFT files** in configurable per-bank layouts (define the format as a template, not as code), with a control total and a hash for the bank's verification; separate files per currency and per bank.
 - Mobile money payment files; cash payroll with a **denomination breakdown report** per pay point; cheque payments.
-- **Payslip**: designed in the report designer, printable, and emailable as a **password-protected PDF** (password rule configurable — national ID, date of birth, or employee-set). Shows: earnings, deductions, employer contributions, taxable benefits as memo, net pay by payment method and currency, leave balances, loan balances, year-to-date totals, and the tax computation summary.
+- **Payslip**: designed in the report designer, printable, and emailable as a **password-protected PDF** (password rule configurable - national ID, date of birth, or employee-set). Shows: earnings, deductions, employer contributions, taxable benefits as memo, net pay by payment method and currency, leave balances, loan balances, year-to-date totals, and the tax computation summary.
 - Employee self-service hooks in the API: payslip history, tax certificate, leave balance and application, personal-detail change request routed for HR approval.
 
 #### 4.15.8 Terminations
-- Termination types: resignation, dismissal, retrenchment, retirement, end of contract, death, abscondment — each with its own entitlement rules.
+- Termination types: resignation, dismissal, retrenchment, retirement, end of contract, death, abscondment - each with its own entitlement rules.
 - **Final pay computation**: pro-rata basic, notice pay or pay in lieu, **leave encashment**, pro-rata bonus, gratuity, severance per the statutory formula or contract, less loan balances, less unreturned assets, less any overpayment.
 - **Tax on terminal benefits** per the applicable concession rules, with the calculation shown.
 - **Clearance checklist** before the final payment is released: assets returned, staff account settled (from POS), loans settled or written off with approval, handover signed, housing vacated (link to §4.10.7 if the employer houses staff).
@@ -543,20 +543,20 @@ A strict, resumable state machine:
 
 #### 4.15.9 Accounting treatment (Chartered Accountant's ruling)
 - The payroll journal posts gross cost by **department / cost centre / project / fund**, not as one lump: Dr salary and allowance expense accounts, Dr employer contribution expense, Cr net pay control (a liability cleared by the bank payment), Cr each statutory and third-party liability account.
-- **Net pay control and each statutory liability account must reconcile to zero** after the payment run — ship the reconciliation report (PR-series) and make it part of the month-end checklist.
+- **Net pay control and each statutory liability account must reconcile to zero** after the payment run - ship the reconciliation report (PR-series) and make it part of the month-end checklist.
 - Accrue unpaid salaries at period end where the pay date falls after the cut-off.
-- **IAS 19**: leave provision and bonus provision as short-term benefits; gratuity and long-service awards as other long-term benefits with a discounted provision; defined contribution plans expensed as incurred; if any client runs a defined benefit plan, that is an actuarial input, not a calculation this system performs — capture and disclose it, do not compute it.
+- **IAS 19**: leave provision and bonus provision as short-term benefits; gratuity and long-service awards as other long-term benefits with a discounted provision; defined contribution plans expensed as incurred; if any client runs a defined benefit plan, that is an actuarial input, not a calculation this system performs - capture and disclose it, do not compute it.
 - Capitalise payroll cost into WIP where staff work on a construction contract or on self-constructed assets, via the timesheet link.
 - Multi-currency payroll follows §3.3: each currency's postings at that currency's rate, with the FX difference on settlement to the FX accounts.
 
-#### 4.15.10 Security — treat payroll as a walled garden
+#### 4.15.10 Security - treat payroll as a walled garden
 - Own schema (`pay`), own permission domain, and **salary, bank details and national ID encrypted at rest** (column-level encryption with keys held outside the database).
 - Row-level scoping so a branch HR officer sees only their branch, and **field-level restriction** so a line manager can approve leave without ever seeing pay.
 - **Hard SoD rules, pre-loaded as violations**: process payroll + approve payroll; maintain employee master + approve payroll; change bank details + approve payment run; **and an absolute block on any user calculating, approving or committing a run that includes their own employee record** (the run refuses to commit and names the conflict).
 - Payroll audit trail is separate and visible only to a payroll-audit role; payslip reprints, exports and report prints are all logged (a payroll export is a data-breach risk, so record every one).
 - Permissions to add to the §5 grid: `Payroll.Employee · Payroll.BankDetails · Payroll.PayElement · Payroll.TaxTable · Payroll.SalaryChange · Payroll.Variables · Payroll.Calculate · Payroll.Validate · Payroll.Approve · Payroll.Commit · Payroll.Reverse · Payroll.Payslip · Payroll.PayslipReprint · Payroll.BankFile · Payroll.StatutoryReturn · Payroll.Termination · Payroll.Loan · Payroll.Leave · Payroll.LeaveApprove · Payroll.Establishment · Payroll.ViewSalary · Payroll.Reports`
 
-*(Build the employee master, establishment and timesheets early — §4.12 job costing and §4.18 budgeting both depend on them even if the payroll calculation itself lands in a later phase.)*
+*(Build the employee master, establishment and timesheets early - §4.12 job costing and §4.18 budgeting both depend on them even if the payroll calculation itself lands in a later phase.)*
 
 ### 4.16 CRM & Service Desk (lightweight, recommended)
 - Leads, opportunities, activities, quotations link.
@@ -567,13 +567,13 @@ Companies, branches, users, roles, groups, permissions, periods, currencies, rat
 
 ### 4.18 Budgeting, Planning & Commitment Control
 
-> **Specified from the Finance Office.** A budget is not a column on a report — it is a document with an author, a version, an approval, a legal or board mandate, and a life after the year ends. Two rules govern this module and must never be compromised: **(1) every department prepares, owns and answers for its own numbers, and (2) no budget is ever overwritten or deleted.** Every version ever submitted, negotiated, cut, approved, revised or superseded is retained and remains fully reportable years later. When the auditor asks "what was originally approved for the Works Department in 2024, and who reduced the training line by 40% in the revision?", the system answers in one screen.
+> **Specified from the Finance Office.** A budget is not a column on a report - it is a document with an author, a version, an approval, a legal or board mandate, and a life after the year ends. Two rules govern this module and must never be compromised: **(1) every department prepares, owns and answers for its own numbers, and (2) no budget is ever overwritten or deleted.** Every version ever submitted, negotiated, cut, approved, revised or superseded is retained and remains fully reportable years later. When the auditor asks "what was originally approved for the Works Department in 2024, and who reduced the training line by 40% in the revision?", the system answers in one screen.
 
 #### 4.18.1 Budget structure
 - A **budget** is a header plus lines. Header: name, fiscal year (or multi-year span), **budget type/scenario**, **version number**, status, preparing entity (company/department), owner/budget holder, currency and budget exchange rate, basis notes, and approval references.
 - A **budget line** keys on the full posting dimension set so it compares directly to actuals with no mapping layer: `Account + Cost Centre + Department + Project/Job + Fund/Vote + Branch`, with an amount per period bucket for the whole year, plus quantity and rate where the line is driver-based.
 - **Budget types/scenarios**, all coexisting for the same year: `Original/Approved · Supplementary/Revised · Reforecast (Q1/Q2/Q3) · Draft/Submission · Base case · Best case · Worst case · Zero-based · Rolling forecast · Capital budget · Cash budget · Project budget · Establishment/staff budget`.
-- **Revenue budgets are first-class**, not an afterthought — councils budget rates, service charges, licence fees and housing sales; schools budget fee income; retail budgets sales by department and store. Every budget report must run on income as readily as on expenditure.
+- **Revenue budgets are first-class**, not an afterthought - councils budget rates, service charges, licence fees and housing sales; schools budget fee income; retail budgets sales by department and store. Every budget report must run on income as readily as on expenditure.
 - **Multi-year budgeting (MTEF-style)**: a three- or five-year expenditure and revenue framework where year 1 is the appropriated budget and years 2–n are indicative, with roll-forward each year.
 - Multi-currency: budget in a chosen currency at a **budget rate** held on the header, with base-currency equivalents maintained so consolidated reporting works; FX-driven variance separately identifiable from volume and price variance.
 
@@ -581,19 +581,19 @@ Companies, branches, users, roles, groups, permissions, periods, currencies, rat
 - **Every department is a preparation unit** with its own budget holder, its own workspace, its own submission, and its own deadline. Departments cannot see or edit each other's numbers unless granted; Finance sees everything.
 - **Organisation hierarchy** for consolidation: cost centre → department → division → directorate → company → group. A budget rolls up the tree automatically, and any level can be reported on, approved at, or locked independently.
 - **Top-down targets and bottom-up submissions together**: Finance issues a target/ceiling per department; departments prepare against it; the system shows the **gap between target and submission** at every level and will not let Finance forget an unreconciled gap.
-- **Preparation methods** selectable per line or per department: zero-based, incremental (prior year ± %), actuals-based (last year's actuals ± %, or annualised part-year actuals), driver-based (`volume × rate` — learners × fee, properties × tariff, tonnes × price, headcount × average cost), activity-based, and manual.
-- **Driver/assumption register**: inflation rate, exchange rate, salary increment %, headcount, enrolment, tonnage, connection growth — stored as named assumptions so a budget line references the assumption rather than a hardcoded number, and **changing one assumption re-computes every dependent line** with a before/after impact preview.
-- **Spreading profiles**: even, prior-year seasonality, manual per period, working-day weighted, S-curve (for capital projects), custom weighting sets — applied per line, re-applied on amount change.
-- **Establishment-driven staff budget**: build the payroll budget from §4.15's approved post register — posts × grade × notch × scale, plus increments, vacancy factor, and employer contributions — rather than typing a number. When the salary scale changes, the staff budget re-computes.
+- **Preparation methods** selectable per line or per department: zero-based, incremental (prior year ± %), actuals-based (last year's actuals ± %, or annualised part-year actuals), driver-based (`volume × rate` - learners × fee, properties × tariff, tonnes × price, headcount × average cost), activity-based, and manual.
+- **Driver/assumption register**: inflation rate, exchange rate, salary increment %, headcount, enrolment, tonnage, connection growth - stored as named assumptions so a budget line references the assumption rather than a hardcoded number, and **changing one assumption re-computes every dependent line** with a before/after impact preview.
+- **Spreading profiles**: even, prior-year seasonality, manual per period, working-day weighted, S-curve (for capital projects), custom weighting sets - applied per line, re-applied on amount change.
+- **Establishment-driven staff budget**: build the payroll budget from §4.15's approved post register - posts × grade × notch × scale, plus increments, vacancy factor, and employer contributions - rather than typing a number. When the salary scale changes, the staff budget re-computes.
 - **Capital budget**: project-linked, with phasing across years, funding source, commitment profile, and **year-end carry-forward of unspent approved capital** (approved as a separate act, not automatic).
 - Excel round-trip: export a locked template per department, import back with validation, difference preview and an error report. Departments will use Excel; make it a controlled path rather than a shadow process.
 
-#### 4.18.3 Versioning and retention — never lose a budget
+#### 4.18.3 Versioning and retention - never lose a budget
 - **Immutable versioning.** Editing an approved budget is impossible. Any change creates a **new version**, with the prior version retained in full, sealed, and permanently reportable. Versions are numbered and carry: created by, created date, reason for the version, source version it was copied from, and approval references.
 - **Status lifecycle**: `Draft → Submitted → Under review → Returned for amendment → Recommended → Approved → Active → Superseded → Archived → Locked`. Only one version per type may be `Active` at a time; superseding is an explicit, approved act.
 - **Approval snapshot**: on approval the full line set is hashed and sealed (joining the §6 audit hash chain), so an approved budget can be proved unaltered years later.
 - **Retention is permanent by default.** Budgets are never deleted by any user at any permission level; old fiscal years remain queryable, comparable and reportable without restore. Archiving moves storage, never availability. If a client demands purging, it is a vendor-key operation, logged, and never exposed in the UI.
-- **Cross-year comparison out of the box**: report any account/department across N prior years' budgets *and* actuals side by side — original vs revised vs actual for each year — which is exactly the table finance committees ask for.
+- **Cross-year comparison out of the box**: report any account/department across N prior years' budgets *and* actuals side by side - original vs revised vs actual for each year - which is exactly the table finance committees ask for.
 - **Version comparison**: any two versions, any two years, any two scenarios, line by line, showing movement and % change, with a **"what changed and who changed it"** drill-down. This is how a department proves its training line was cut in review rather than under-requested.
 - Full change log on every line (old value, new value, user, timestamp, reason) inside a version's draft life, and on the version itself thereafter.
 
@@ -607,16 +607,16 @@ Companies, branches, users, roles, groups, permissions, periods, currencies, rat
 #### 4.18.5 Commitment control and budget enforcement (where budgeting earns its keep)
 - **Available balance** on any line, live:
   `Available = Approved (original + supplementary ± virements) − Actuals − Commitments (open POs) − Requisitions in flight − Manual reservations`
-- Enforcement policy per department, per account category and per value band: `Allow · Warn · Require approval · Block`. Applied at **requisition submission, requisition approval, PO raising, and invoice posting** — checked at every gate, because a budget checked only at requisition is a budget that gets overrun at invoice.
+- Enforcement policy per department, per account category and per value band: `Allow · Warn · Require approval · Block`. Applied at **requisition submission, requisition approval, PO raising, and invoice posting** - checked at every gate, because a budget checked only at requisition is a budget that gets overrun at invoice.
 - **Reservations/earmarking** for known future spend that has no PO yet.
 - **Budget holder notifications** at configurable utilisation thresholds (e.g. 75%, 90%, 100%), plus a monthly budget-holder statement pushed by email.
-- **Vote book / fund accounting** for councils and grant-funded bodies: appropriation by vote, expenditure against vote, commitments against vote, unexpended balance, and the classic **vote book report** — plus a hard rule that expenditure cannot be posted against a vote with no appropriation.
+- **Vote book / fund accounting** for councils and grant-funded bodies: appropriation by vote, expenditure against vote, commitments against vote, unexpended balance, and the classic **vote book report** - plus a hard rule that expenditure cannot be posted against a vote with no appropriation.
 - Year-end: commitments outstanding at year end either lapse or carry forward (per policy, approved), and the carry-forward is itself an auditable document.
 
 #### 4.18.6 Monitoring, variance and forecasting
 - **Budget vs Actual vs Commitment vs Available**, at any level of the hierarchy, for any period, YTD or full year, with drill-down from the variance straight to the transactions that caused it.
 - Variance analysis with **decomposition** where drivers exist: split the total variance into volume, price/rate and FX components rather than reporting one unexplained number.
-- **Variance commentary**: budget holders record explanations against material variances (threshold by value and %), and the commentary prints with the management accounts — turning the month-end pack from a spreadsheet exercise into a record.
+- **Variance commentary**: budget holders record explanations against material variances (threshold by value and %), and the commentary prints with the management accounts - turning the month-end pack from a spreadsheet exercise into a record.
 - **Rolling forecast / reforecast**: take actuals to date + forecast for remaining periods = full-year forecast, versioned like any other budget, compared against the approved budget, with forecast-vs-forecast movement reporting.
 - **Cash budget**: convert the income and expenditure budget into expected receipts and payments using debtor/creditor collection and payment profiles, and compare to the §4.7 cash flow forecast.
 - Phasing re-profile: move approved budget between periods within the year (a timing change, not a value change) with its own approval and audit, kept distinct from virements.
@@ -643,7 +643,7 @@ User ──< UserPermissionOverride >  (explicit Grant or Deny; Deny always wins
   `View | Create | Edit | Delete | Print | Export | Post | Approve | Void/Reverse | Authorise-Level-1..5 | Override-Price | Override-Discount | Override-Credit-Limit | ViewCost | ViewMargin | Reprint | BackDate`
   Add flags where a module needs them; keep the grid generic.
 - **The permission UI is a grid**: rows = features (grouped in a tree by module), columns = operation checkboxes, with tri-state parent checkboxes, "select all in row/column", filter box, and a **compare/copy from another role** function.
-- **Scope rules** (row-level security): a role assignment is scoped to companies, branches, warehouses, tills, cost centres, departments, wards/zones, and job/projects. Enforced server-side in query filters — never only in the UI.
+- **Scope rules** (row-level security): a role assignment is scoped to companies, branches, warehouses, tills, cost centres, departments, wards/zones, and job/projects. Enforced server-side in query filters - never only in the UI.
 - **Field-level** sensitivity: mark fields (cost price, margin, salary, customer credit limit) as restricted; the API strips them for unauthorised users.
 - **Segregation of duties matrix**: define conflicting permission pairs (e.g. create supplier + approve payment run); the system warns at role-assignment time and produces an **SoD violation report** for auditors.
 - **Supervisor override at POS**: a permission-gated action prompts for a supervisor PIN and records an override audit record (who authorised what, for whom, on what transaction).
@@ -656,7 +656,7 @@ User ──< UserPermissionOverride >  (explicit Grant or Deny; Deny always wins
 
 ## 6. AUDIT TRAIL
 
-Two complementary layers — build both.
+Two complementary layers - build both.
 
 **A. Transaction audit trail (accounting):** every posted transaction keeps its source module, document type, document number, batch number, posting date, entry date, user, terminal, and an immutable link to the source record. Reversals reference the original. Nothing is ever updated in place.
 
@@ -710,15 +710,15 @@ One engine serving requisitions, POs, journals, credit notes, write-offs, paymen
 - **Module plug-in model**: each functional module registers itself (`IModuleDescriptor`: id, name, licence key, menu entries, permissions, migrations, report definitions, jobs). The shell builds navigation from licensed + permitted modules only.
 - REST API with OpenAPI/Swagger for third parties; webhook publisher for key events (sale completed, invoice posted, bill generated, payment received).
 - Import/export framework: CSV/Excel templates with validation preview and error report for every master data type and for opening balances.
-- **Opening balance wizard**: migrate from a legacy system — customers, suppliers, stock (qty + cost), open AR/AP items, GL trial balance, properties/meters/stands/ownership history/students/employees with YTD payroll balances/prior-year approved budgets — with a balancing suspense account and a reconciliation report before go-live.
+- **Opening balance wizard**: migrate from a legacy system - customers, suppliers, stock (qty + cost), open AR/AP items, GL trial balance, properties/meters/stands/ownership history/students/employees with YTD payroll balances/prior-year approved budgets - with a balancing suspense account and a reconciliation report before go-live.
 
 ---
 
-## 11. LICENSING TOOL (SEPARATE APPLICATION — VENDOR ONLY)
+## 11. LICENSING TOOL (SEPARATE APPLICATION - VENDOR ONLY)
 
 ### 11.1 Two deliverables
-1. **`Meridian.Licensing.Generator`** — a standalone WPF/console app that **you, the vendor, run**. It is never shipped to customers and never in the same installer. Holds the **private key**.
-2. **`Meridian.Licensing.Core`** — a small library referenced by the ERP that only **validates** licences using the embedded **public key**.
+1. **`Meridian.Licensing.Generator`** - a standalone WPF/console app that **you, the vendor, run**. It is never shipped to customers and never in the same installer. Holds the **private key**.
+2. **`Meridian.Licensing.Core`** - a small library referenced by the ERP that only **validates** licences using the embedded **public key**.
 
 ### 11.2 Cryptography
 - **Ed25519** (or RSA-2048 PSS if you prefer tooling familiarity) signatures over a canonical JSON payload. The licence file is `payload_base64url.signature_base64url` (a compact signed token).
@@ -773,7 +773,7 @@ One engine serving requisitions, POs, journals, credit notes, write-offs, paymen
   "notes": "…"
 }
 ```
-**Per-module expiry is mandatory** — a customer can have GL perpetual and POS on a 6-month subscription. Timeframes must be arbitrary: days, months, years, or a specific end date; trials in days from first activation.
+**Per-module expiry is mandatory** - a customer can have GL perpetual and POS on a 6-month subscription. Timeframes must be arbitrary: days, months, years, or a specific end date; trials in days from first activation.
 
 ### 11.4 Generator app features
 - Customer register (name, contact, sites), licence history per customer, reissue/renew/upgrade/downgrade, revoke.
@@ -782,13 +782,13 @@ One engine serving requisitions, POs, journals, credit notes, write-offs, paymen
 - Output: `.lic` file, copyable activation string, printable licence certificate PDF, and a QR code for short keys.
 - Bulk issue from CSV; expiry dashboard ("licences expiring in 30 days"); audit log of every licence issued (immutable, exportable).
 - Offline activation challenge/response flow for locked-down sites.
-- Optional online activation service (ASP.NET Core minimal API + Postgres) for self-service renewal — design the interfaces now, implement later.
+- Optional online activation service (ASP.NET Core minimal API + Postgres) for self-service renewal - design the interfaces now, implement later.
 
 ### 11.5 ERP-side enforcement
 - Validate at startup and every N minutes; cache the validated result in memory only.
 - **Fingerprint** derived from a stable composite (motherboard UUID + machine GUID + primary NIC MAC + volume serial), hashed; tolerate one component change (fuzzy match ≥3 of 4) to avoid false lockouts after a NIC change.
 - **Clock-rollback detection**: store a monotonic high-water-mark timestamp (encrypted, in DB and registry/file); if system time < high-water − tolerance, flag tamper and enter grace/read-only.
-- Module gating: `ILicenceService.IsModuleLicensed(code)` drives menu visibility, API authorisation filters, and job scheduling. A locked module is **hidden**, and its API endpoints return 403 — do not rely on UI hiding alone.
+- Module gating: `ILicenceService.IsModuleLicensed(code)` drives menu visibility, API authorisation filters, and job scheduling. A locked module is **hidden**, and its API endpoints return 403 - do not rely on UI hiding alone.
 - Limits enforced at the point of creation (companies, terminals, named users, concurrent sessions, properties, students) with clear messages ("Licence allows 4 POS terminals; 4 are registered. Deactivate one or contact your vendor.").
 - Expiry behaviour: warning banner from T−30 days, daily nag from T−7, grace period after expiry, then either hard stop or **read-only mode** (view + print only, no posting) per the licence flag. **Never destroy or lock the customer's data.**
 - Licence status screen: customer, edition, modules with expiry dates and colour-coded status, limits vs current usage, machine ID, and an "Install new licence" button.
@@ -800,7 +800,7 @@ Provide an **Industry Setup Wizard** at company creation: pick vertical(s) → s
 
 ---
 
-## 13. REPORT DESIGNER & REPORTING ENGINE (BUILD THIS PROPERLY — IT IS A HEADLINE REQUIREMENT)
+## 13. REPORT DESIGNER & REPORTING ENGINE (BUILD THIS PROPERLY - IT IS A HEADLINE REQUIREMENT)
 
 The user wants Crystal Reports–class flexibility with **every field editable**. Do not bolt on a closed third-party designer. **Build an in-house banded report designer and engine** in `Meridian.Reporting` + `Meridian.Reporting.Designer`.
 
@@ -810,32 +810,32 @@ The user wants Crystal Reports–class flexibility with **every field editable**
 - **Elements**: text label, data field, expression field, rich text, image (static, from DB bytea, or from URL/path), line, rectangle, shape, page break, barcode (Code128, Code39, EAN-13, QR, PDF417), chart (bar, stacked, line, pie, donut, area, combo), cross-tab/matrix (row groups, column groups, measures, totals), sub-report, checkbox, signature block, table/grid element with per-column formatting, and a map/gauge (nice-to-have).
 - **Every element property is editable in a property grid**: name, position (X/Y/W/H), anchoring/docking, font (family, size, bold/italic/underline, colour), alignment (h/v), padding, margins, border (per side, style, width, colour), background (solid/gradient), rotation, angle, z-order, visibility expression, format string (numeric, currency with currency-symbol binding, date, percentage, custom mask), null-value text, word-wrap, auto-shrink font to fit, hyperlink/drill-through target, tooltip, and **conditional formatting rules** (expression → style).
 - **Grouping & sorting**: multi-level, group on field or expression, sort ascending/descending/custom, group headers/footers with aggregates, "repeat group header on new page", top-N filtering.
-- **Aggregates**: `Sum, Avg, Count, DistinctCount, Min, Max, First, Last, Median, StdDev, RunningTotal, PercentOfTotal, RankOf` — scoped to detail/group/page/report, with reset rules.
-- **Expression engine**: use `DynamicExpresso` or Roslyn scripting with a **sandboxed, curated function library**: math, string (`Left/Right/Mid/Replace/Trim/Upper/Proper/Format`), date (`AddMonths/DateDiff/EndOfMonth/FiscalPeriod`), logical (`If/Case/IsNull/Coalesce`), aggregate references, `NumberToWords` (essential for cheques and vouchers — multi-currency and multi-language), currency conversion helper `ToBase(amount, currency, date)`, and page/report variables (`PageNumber`, `TotalPages`, `PrintDate`, `UserName`, `CompanyName`, `CompanyLogo`, `Parameters.X`). No file/network/reflection access.
+- **Aggregates**: `Sum, Avg, Count, DistinctCount, Min, Max, First, Last, Median, StdDev, RunningTotal, PercentOfTotal, RankOf` - scoped to detail/group/page/report, with reset rules.
+- **Expression engine**: use `DynamicExpresso` or Roslyn scripting with a **sandboxed, curated function library**: math, string (`Left/Right/Mid/Replace/Trim/Upper/Proper/Format`), date (`AddMonths/DateDiff/EndOfMonth/FiscalPeriod`), logical (`If/Case/IsNull/Coalesce`), aggregate references, `NumberToWords` (essential for cheques and vouchers - multi-currency and multi-language), currency conversion helper `ToBase(amount, currency, date)`, and page/report variables (`PageNumber`, `TotalPages`, `PrintDate`, `UserName`, `CompanyName`, `CompanyLogo`, `Parameters.X`). No file/network/reflection access.
 - **Page setup**: paper size (incl. custom and roll/receipt widths 58 mm/80 mm), orientation, margins, columns (multi-column labels), watermark, background image, duplex hints, printer tray selection per report.
 - **Localisation**: label translations per report, RTL support, and per-company terminology overrides ("Stand" vs "Erf" vs "Property").
 
 ### 13.2 Designer UX (WPF)
 - Drag-and-drop canvas with rulers, snap-to-grid, alignment guides, multi-select, group/ungroup, align/distribute toolbar, z-order controls, zoom, undo/redo stack, copy/paste across reports.
-- **Field explorer** panel (data source tree: tables, columns with types, parameters, aggregates, variables) — drag a field onto the canvas to bind it.
+- **Field explorer** panel (data source tree: tables, columns with types, parameters, aggregates, variables) - drag a field onto the canvas to bind it.
 - **Property grid** with search, grouped categories, and an expression editor dialog (with IntelliSense-style field/function completion and a live "evaluate against first row" preview).
 - **Live preview tab** with real data and parameter prompting; page navigation; export from preview.
 - Report templates/themes so a customer's house style (fonts, colours, logo, footer) applies across all reports in one click.
-- **Version history** for report definitions with diff and rollback; "system" reports are read-only but can be **copied to a user version** — never let a customer edit a system report in place (upgrades would clobber it). Resolution order at runtime: user version → company version → system version.
+- **Version history** for report definitions with diff and rollback; "system" reports are read-only but can be **copied to a user version** - never let a customer edit a system report in place (upgrades would clobber it). Resolution order at runtime: user version → company version → system version.
 - Import/export `.mrpt` files for sharing between sites.
 
 ### 13.3 Engine & output
 - Render pipeline: definition + parameters + data → layout → paginated document.
-- Renderers: **WPF FixedDocument** (on-screen preview + direct printing), **PDF** (QuestPDF/PdfSharpCore), **XLSX** (ClosedXML, with real columns not images), **CSV**, **HTML**, **DOCX** (optional), **plain-text/ESC-POS** (for receipt and dot-matrix printers — councils and schools still run dot-matrix).
+- Renderers: **WPF FixedDocument** (on-screen preview + direct printing), **PDF** (QuestPDF/PdfSharpCore), **XLSX** (ClosedXML, with real columns not images), **CSV**, **HTML**, **DOCX** (optional), **plain-text/ESC-POS** (for receipt and dot-matrix printers - councils and schools still run dot-matrix).
 - Viewer control with: page navigation, zoom, search-in-report, **drill-down/drill-through to source documents**, export button, email button, print with printer/tray/copies selection, and a "reprint" audit record.
 - **Scheduling**: run reports on a schedule (Hangfire), deliver by email/folder/printer, with a distribution list and a delivery log.
-- **Bursting**: split one report run by a key (customer / property owner / student / supplier / branch) into N documents, each emailed to the right recipient. **This is how bulk statements and bills are issued — it is required, not optional.**
+- **Bursting**: split one report run by a key (customer / property owner / student / supplier / branch) into N documents, each emailed to the right recipient. **This is how bulk statements and bills are issued - it is required, not optional.**
 - **Performance**: stream large result sets, cap in-memory rows, pre-aggregate in SQL, show progress with cancel, and cache parameter lookups.
 - **Security**: report-level permissions; data filtered by the running user's row-level scopes (a branch manager's report must not include other branches); watermark "CONFIDENTIAL/DRAFT" driven by expression; every print/export written to the audit log.
 
 ---
 
-## 14. THE REPORT CATALOGUE — SHIP ALL OF THESE
+## 14. THE REPORT CATALOGUE - SHIP ALL OF THESE
 
 Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module, purpose, parameters, columns, grouping, totals, and output formats. Implement them as seeded report definitions. **Common parameters** unless stated: Company, Branch/Site, Date or Period range, Currency (transaction / base / reporting), Cost Centre, Department, and "Include unposted Y/N".
 
@@ -843,14 +843,14 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 
 ### A. General Ledger / Financial
 1. Trial Balance (period, YTD, comparative prior year, by cost centre/department, detailed & summary)
-2. Trial Balance — Multi-currency (base and transaction currency columns)
+2. Trial Balance - Multi-currency (base and transaction currency columns)
 3. Nominal Activity / Account Ledger Detail (opening, movements, closing, with drill-down)
 4. Nominal Transaction Listing / Day Book (by date, batch, user, source module)
 5. Journal Listing & Journal Audit (posted, unposted/deferred, reversing, recurring)
-6. **Statement of Financial Position (Balance Sheet)** — current vs prior, with note references
-7. **Statement of Profit or Loss and Other Comprehensive Income** — by nature and by function
+6. **Statement of Financial Position (Balance Sheet)** - current vs prior, with note references
+7. **Statement of Profit or Loss and Other Comprehensive Income** - by nature and by function
 8. **Statement of Changes in Equity**
-9. **Statement of Cash Flows** — indirect and direct methods
+9. **Statement of Cash Flows** - indirect and direct methods
 10. Notes-to-the-accounts supporting schedules (per note, driven by account grouping)
 11. Management Accounts Pack (P&L by cost centre/department, with budget, variance, % variance, YTD and full-year forecast)
 12. Budget vs Actual vs Commitment (by account, cost centre, department, project)
@@ -869,11 +869,11 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 25. Hyperinflation Restatement Working Papers (optional module: index, factors, monetary gain/loss)
 
 ### A-B. Budgeting, Planning & Commitment Control
-*(`B` prefix — separately licensable as module `BUD`. Common parameters add: Fiscal Year(s), Budget Type/Scenario, Version, Preparing Department, Hierarchy Level, Fund/Vote.)*
+*(`B` prefix - separately licensable as module `BUD`. Common parameters add: Fiscal Year(s), Budget Type/Scenario, Version, Preparing Department, Hierarchy Level, Fund/Vote.)*
 
 **Preparation & submission**
 - B1. Budget Preparation Status Board (every department: not started / in progress / submitted / returned / recommended / approved, with deadline and days outstanding)
-- B2. **Departmental Budget Submission** (one department's full submission, by account and period, with narrative and assumptions) — the document the budget holder signs
+- B2. **Departmental Budget Submission** (one department's full submission, by account and period, with narrative and assumptions) - the document the budget holder signs
 - B3. Target vs Submission Gap Report (ceiling issued vs amount requested, by department and category, with the unreconciled gap highlighted)
 - B4. Consolidated Draft Budget by hierarchy level (cost centre → department → division → directorate → company)
 - B5. Assumption & Driver Register (inflation, exchange rate, increment %, headcount, enrolment, volumes) with the lines each assumption feeds
@@ -881,53 +881,53 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - B7. Budget Preparation Basis Report (which lines were zero-based, incremental, actuals-based or driver-based)
 - B8. Establishment-Driven Staff Budget (posts × grade × notch × scale + contributions + increments − vacancy factor, reconciled to the payroll budget line)
 - B9. Capital Budget Submission & Phasing (project, year, funding source, S-curve phasing)
-- B10. Revenue Budget Build-up (rates, service charges, fees, sales, stand sales — volume × rate, by source)
+- B10. Revenue Budget Build-up (rates, service charges, fees, sales, stand sales - volume × rate, by source)
 
 **Approval, versions and history**
 - B11. **Budget Version Register** (every version ever created: number, type, status, author, date, reason, approval reference, sealed hash)
-- B12. **Budget Version Comparison** (any two versions, any two years, any two scenarios — line by line, movement and %, with who-changed-what drill-down)
-- B13. **Original vs Recommended vs Approved** (what the department asked for, what Finance proposed, what was approved — the cuts trail)
+- B12. **Budget Version Comparison** (any two versions, any two years, any two scenarios - line by line, movement and %, with who-changed-what drill-down)
+- B13. **Original vs Recommended vs Approved** (what the department asked for, what Finance proposed, what was approved - the cuts trail)
 - B14. Budget Approval Audit (rounds, reviewers, returns, comments, committee minute references, turnaround days)
 - B15. **Multi-Year Budget Comparison** (this year and N prior years: original, revised and actual for each, side by side)
 - B16. **Archived Budget Retrieval Report** (produce any sealed prior-year budget in full, exactly as approved, with its integrity hash verified)
 - B17. Superseded Versions Report (what replaced what, when and on whose authority)
-- B18. Budget Line Change Log (old value, new value, user, timestamp, reason — within a draft version's life)
+- B18. Budget Line Change Log (old value, new value, user, timestamp, reason - within a draft version's life)
 
 **Appropriation, virements and control**
 - B19. **Approved Budget Register by Vote / Fund / Department** (the appropriation of record)
 - B20. **Virement Register** (all transfers: source, target, amount, justification, approver, date)
-- B21. **Budget Reconciliation: Original + Supplementary ± Virements ± Rephasing = Current Approved** (per line — the control report that proves the current budget is legitimate)
+- B21. **Budget Reconciliation: Original + Supplementary ± Virements ± Rephasing = Current Approved** (per line - the control report that proves the current budget is legitimate)
 - B22. Supplementary Appropriation Schedule (additions and reductions, separately approved and separately reported)
 - B23. Rephasing Report (value moved between periods within the year, distinct from virements)
-- B24. **Vote Book** (per vote: appropriation, expenditure to date, commitments, reservations, unexpended balance) — councils will live in this report
+- B24. **Vote Book** (per vote: appropriation, expenditure to date, commitments, reservations, unexpended balance) - councils will live in this report
 - B25. **Commitment / Encumbrance Register** (open POs and requisitions in flight against each budget line)
 - B26. Commitment Ledger Reconciliation to Open Purchase Orders (nightly exception report)
 - B27. Budget Block & Override Report (transactions blocked for insufficient budget; overrides granted, by whom, with the stated reason)
-- B28. Expenditure Against Unappropriated Vote (must be empty — any row is a governance incident)
+- B28. Expenditure Against Unappropriated Vote (must be empty - any row is a governance incident)
 - B29. Year-End Commitment Carry-Forward Schedule (lapsed vs carried, with approval reference)
 - B30. Unspent Capital Carry-Forward Schedule
 
 **Monitoring, variance and forecast**
-- B31. **Budget vs Actual vs Commitment vs Available** — at any hierarchy level, period, YTD or full year, with drill-down to transactions
-- B32. **Budget Holder Statement** (one manager's lines, spend, commitments, available balance, utilisation %) — emailed monthly
+- B31. **Budget vs Actual vs Commitment vs Available** - at any hierarchy level, period, YTD or full year, with drill-down to transactions
+- B32. **Budget Holder Statement** (one manager's lines, spend, commitments, available balance, utilisation %) - emailed monthly
 - B33. Budget Utilisation Report (% consumed by line and department, with a RAG status and projected full-year outturn)
 - B34. **Over-Budget & Approaching-Threshold Exceptions** (lines past 90% / 100%, ranked by value at risk)
 - B35. Variance Analysis with Decomposition (total variance split into volume, price/rate and FX components)
-- B36. **Variance Commentary Pack** (material variances with the budget holder's written explanation) — attaches to the management accounts
+- B36. **Variance Commentary Pack** (material variances with the budget holder's written explanation) - attaches to the management accounts
 - B37. Departmental Management Accounts (P&L by department: actual, budget, variance, YTD, prior year, full-year forecast)
 - B38. **Full-Year Forecast / Outturn Projection** (actuals to date + forecast remaining = projected outturn vs approved budget)
 - B39. Forecast vs Forecast Movement (what changed between reforecast rounds and why)
 - B40. Rolling Forecast Report (N periods forward, refreshed each close)
 - B41. Cash Budget vs Actual Cash Flow
 - B42. Capital Project Budget vs Actual vs Commitment (by project, with % complete and cost-to-complete)
-- B43. Revenue Budget Performance (billed and collected vs budgeted, by source — pairs with municipal collection efficiency)
-- B44. Budget Accuracy Review (prior years: budget vs actual variance by department — who forecasts well and who does not)
+- B43. Revenue Budget Performance (billed and collected vs budgeted, by source - pairs with municipal collection efficiency)
+- B44. Budget Accuracy Review (prior years: budget vs actual variance by department - who forecasts well and who does not)
 - B45. Budget Audit Trail Report (all changes to budgets, versions, virements, targets and enforcement policy, with before/after values)
 
 ### B. Accounts Receivable / Customers
-26. **Customer Statement — Open Item** (all outstanding documents, ageing summary box, remittance tear-off, multi-currency)
-27. **Customer Statement — Balance Forward** (opening balance, period transactions, closing balance)
-28. Customer Statement — Consolidated for group/parent accounts
+26. **Customer Statement - Open Item** (all outstanding documents, ageing summary box, remittance tear-off, multi-currency)
+27. **Customer Statement - Balance Forward** (opening balance, period transactions, closing balance)
+28. Customer Statement - Consolidated for group/parent accounts
 29. Aged Debtors Summary & Detail (30/60/90/120+, configurable buckets, by due date or invoice date, as at any historical date)
 30. Aged Debtors by Sales Agent / Branch / Customer Type / Currency
 31. Customer Ledger / Account Enquiry Print
@@ -941,7 +941,7 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 39. Allocations & Unallocated Receipts Report
 40. Payment Performance / Days Sales Outstanding (DSO) by customer and overall
 41. Promise-to-Pay Diary & Broken Promises
-42. Dunning / Reminder Letters — Levels 1..n (as document layouts)
+42. Dunning / Reminder Letters - Levels 1..n (as document layouts)
 43. Bad Debt Provision (IFRS 9 ECL matrix) & Write-off Listing
 44. Customer Deposits & Advance Payments Held
 45. Lay-bye / Instalment Plan Status & Arrears
@@ -960,7 +960,7 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 56. **Cash Requirement Forecast / Payment Due Report** (by week, by currency)
 57. Payment Run Proposal, Payment Run Listing, and **Remittance Advice** (per supplier)
 58. Payments Made Report (by method, currency, bank account, user)
-59. **GRNI (Goods Received Not Invoiced) Report** — aged, with drill to GRN
+59. **GRNI (Goods Received Not Invoiced) Report** - aged, with drill to GRN
 60. Invoice Matching Exceptions (price/qty variance, unmatched, held/disputed)
 61. Supplier Statement Reconciliation Working Paper
 62. Withholding Tax Deducted Report + WHT Certificates
@@ -992,8 +992,8 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 84. Stock Ageing by receipt date / batch expiry
 85. **Reorder / Replenishment Suggestion** (below reorder level, with suggested order qty and preferred supplier)
 86. Overstock / Excess Inventory
-87. Negative Stock Report (must be empty — exception monitoring)
-88. Batch / Lot Traceability — forward (batch → customers) and backward (sale → supplier)
+87. Negative Stock Report (must be empty - exception monitoring)
+88. Batch / Lot Traceability - forward (batch → customers) and backward (sale → supplier)
 89. Serial Number Register & History
 90. Expiry / Shelf-life Report (expiring in N days, expired)
 91. Stock Transfers In-Transit Report
@@ -1009,7 +1009,7 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 101. Consignment Stock Report
 
 ### F. POS / Retail Operations
-102. **Z-Read (End of Shift)** and **X-Read (Mid-shift)** — by till, cashier, shift, with tender breakdown per currency
+102. **Z-Read (End of Shift)** and **X-Read (Mid-shift)** - by till, cashier, shift, with tender breakdown per currency
 103. Daily Sales Summary (by department, category, hour, till, cashier, tender type)
 104. Cashier Performance (sales, items/hour, avg basket, voids, refunds, discounts, overrides, variances)
 105. **Till Variance / Cash-up Report** (expected vs counted per currency and denomination)
@@ -1057,7 +1057,7 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 143. Quotation Listing & Conversion Rate
 
 ### I. Municipality / Council
-144. **Consumer / Ratepayer Statement** (property, services, opening balance, charges, payments, interest, closing balance, ageing) — printable per account and **burst in bulk**
+144. **Consumer / Ratepayer Statement** (property, services, opening balance, charges, payments, interest, closing balance, ageing) - printable per account and **burst in bulk**
 145. **Rates & Services Bill / Invoice** (the monthly bill layout, with consumption graph, meter readings, tariff breakdown, messages)
 146. Billing Run Summary & Control Report (accounts billed, total by service, by ward, compared to prior period, exceptions)
 147. Billing Exceptions (no reading, estimated, zero consumption, abnormal high/low, unbilled services, inactive meters)
@@ -1091,7 +1091,7 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 *(Numbered with an `H` prefix so this section can be licensed, shipped and versioned independently of the municipal set. Common parameters add: Scheme/Project, Ward/Suburb, Stand Status, Tenure Type, Waiting List Category, Allocation Date range.)*
 
 **Land bank & acquisition**
-- H1. **Land Bank Register** (all parcels: reference, locality, area, tenure, zoning, occupation status, acquisition date, cost, current status) — the report the director asks for first
+- H1. **Land Bank Register** (all parcels: reference, locality, area, tenure, zoning, occupation status, acquisition date, cost, current status) - the report the director asks for first
 - H2. Land Acquisition Register (by method: purchase / donation / state grant / compulsory / swap, with council resolution reference and price)
 - H3. Land Acquisition Cost Build-up per parcel (price, survey, legal, valuation, compensation, duties → total and cost per m²)
 - H4. Acquisitions in Progress / Due Diligence Outstanding (which checklist items are blocking which parcel)
@@ -1105,49 +1105,49 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - H10. Layout Plans Register & Approval Status (submitted, approved, amended, rejected, with turnaround days)
 - H11. **Stand Creation / Subdivision Report** (parent parcel → stands created, by use and density, with lineage)
 - H12. Survey Status Report (pegged / diagram issued / awaiting surveyor-general, by scheme, with age at each stage)
-- H13. **Servicing Status by Scheme** (water, sewer, roads, electricity, storm water — % complete, stands serviced vs unserviced)
+- H13. **Servicing Status by Scheme** (water, sewer, roads, electricity, storm water - % complete, stands serviced vs unserviced)
 - H14. Servicing Cost Apportionment Schedule (actual servicing spend → cost per stand, showing the apportionment basis used)
 - H15. **Cost per Stand / Selling Price Build-up** (land + servicing + overhead + levy → price, with margin and cost-recovery %)
 - H16. Price List by Scheme & Stand Size Band, with price change history and approval references
-- H17. Stand Inventory Movement & Reconciliation (opening stands + created + repossessed − sold − consolidated = closing, in units and in value — must reconcile to the GL inventory control account)
+- H17. Stand Inventory Movement & Reconciliation (opening stands + created + repossessed − sold − consolidated = closing, in units and in value - must reconcile to the GL inventory control account)
 
 **Waiting list**
 - H18. **Waiting List Register** (by category, in seniority order, with registration number, date, score and position)
 - H19. Waiting List Summary by Category, Ward, Income Band, Gender, Age Band and Quota Group
 - H20. **Waiting List Age Analysis** (how long applicants have been waiting: <1yr, 1–3, 3–5, 5–10, 10+ years)
-- H21. Applicant Detail / Verification Sheet (single applicant, all captured data, documents held, score derivation) — printable for the applicant
+- H21. Applicant Detail / Verification Sheet (single applicant, all captured data, documents held, score derivation) - printable for the applicant
 - H22. **Priority Score Derivation Report** (how each applicant's points were computed, factor by factor)
 - H23. **Duplicate & Suspected Fraudulent Applicants** (fuzzy name/ID/DOB matches across list, allocations and property register)
 - H24. Applicants Already Owning Property (auto-disqualification candidates, cross-checked against stand register and rates roll)
-- H25. Registration Renewal Compliance (confirmed, not confirmed, suspended, removed — with proof-of-contact history)
-- H26. **Registration Date Change Audit** (every change to a seniority date, who, when, authorised by whom, reason) — a top-three fraud control
+- H25. Registration Renewal Compliance (confirmed, not confirmed, suspended, removed - with proof-of-contact history)
+- H26. **Registration Date Change Audit** (every change to a seniority date, who, when, authorised by whom, reason) - a top-three fraud control
 - H27. Registration Fee Collection Report
 - H28. New Registrations & Removals Movement (period-on-period)
-- H29. Demand vs Supply Report (applicants by category vs stands available by category — the housing gap)
+- H29. Demand vs Supply Report (applicants by category vs stands available by category - the housing gap)
 
 **Allocation**
 - H30. **Proposed Allocation List** (pre-approval working document: stand, applicant, seniority/score, quota group)
 - H31. **Allocation Register** (approved allocations: stand, beneficiary, date, price, committee minute reference, approving officers)
 - H32. Ballot / Draw Result Report (with the stored seed and input-list hash for independent re-verification)
 - H33. Allocations by Officer, by Scheme, by Month (workload and concentration analysis)
-- H34. **Skipped Applicant / Substitution Report** (who was passed over on each allocation, and the stated reason) — the appeal-defence report
+- H34. **Skipped Applicant / Substitution Report** (who was passed over on each allocation, and the stated reason) - the appeal-defence report
 - H35. Offers Outstanding / Expiring / Expired (with acceptance deadline countdown)
 - H36. Declined, Lapsed & Forfeited Offers (with deposit forfeiture amounts)
 - H37. Quota Compliance Report (actual allocations by quota group vs policy percentage, per scheme)
 - H38. Appeals Register & Outcomes
-- H39. **Double Allocation Exception Report** (must always be empty — any row is an incident)
+- H39. **Double Allocation Exception Report** (must always be empty - any row is an incident)
 - H40. Beneficiaries with More Than One Stand (across schemes, including spouse ID matching)
 - H41. Allocation-to-Agreement Conversion Report (allocated but no agreement signed, with age)
 
 **Agreements, instalments & beneficiary accounts**
 - H42. Agreement Register by tenure type, scheme and status (draft / signed / active / settled / cancelled)
-- H43. **Beneficiary Account Statement** (all charges, instalments, receipts, interest, penalties, balance, next due) — printable per beneficiary and **burstable in bulk**
-- H44. **Instalment Amortisation Schedule** (capital, interest, balance per instalment) — issued to the beneficiary at signature
+- H43. **Beneficiary Account Statement** (all charges, instalments, receipts, interest, penalties, balance, next due) - printable per beneficiary and **burstable in bulk**
+- H44. **Instalment Amortisation Schedule** (capital, interest, balance per instalment) - issued to the beneficiary at signature
 - H45. **Housing Debtors Age Analysis** (by scheme, tenure type, ward, officer; 30/60/90/120+; as at any historical date)
 - H46. Instalment Arrears & Default Report with last payment date and arrangement status
 - H47. Payment Arrangements Register (active, honoured, defaulted)
 - H48. Collections Report (by scheme, method, currency, day, officer) and Collection Efficiency %
-- H49. **Fully Paid / Ready for Transfer Report** (beneficiaries who have settled but have no title — the most actionable list in the department)
+- H49. **Fully Paid / Ready for Transfer Report** (beneficiaries who have settled but have no title - the most actionable list in the department)
 - H50. Early Settlement & Rebate Report
 - H51. Deposits Held Register (liability listing, by scheme and beneficiary)
 - H52. **Expected Credit Loss (IFRS 9) Provision Working** for housing debtors, by arrears bucket and scheme
@@ -1156,7 +1156,7 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - H55. Repossession Pipeline & Register (notice issued, committee approved, repossessed, re-allocated) with financial effect
 
 **Change of ownership, cession & title**
-- H56. **Ownership History / Chain of Title per Stand** (every holder, from–to dates, transfer type, consideration, authority, document references) — the single most important printout the department issues
+- H56. **Ownership History / Chain of Title per Stand** (every holder, from–to dates, transfer type, consideration, authority, document references) - the single most important printout the department issues
 - H57. **Change of Ownership Register** (all transfers in a period, by type: sale, cession, inheritance, donation, court order, name change, correction)
 - H58. Transfers in Progress / Pending Approval (with age at each stage and who is holding it up)
 - H59. **Transfers Blocked by Outstanding Rates or Housing Arrears** (with the amount required to clear)
@@ -1165,18 +1165,18 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - H62. Transfer, Cession & Administration Fee Collection Report
 - H63. Withholding / Transfer Duty Deducted and Remitted on Transfers
 - H64. **Title Deed Pipeline Report** (applied → lodged → queried → registered → received → handed over, with days at each stage and conveyancer)
-- H65. **Title Deeds Held but Uncollected** (aged, with owner contact details) — chase list
+- H65. **Title Deeds Held but Uncollected** (aged, with owner contact details) - chase list
 - H66. Deeds Register (deed numbers, registration dates, current custody)
 - H67. Conveyancer Performance (files allocated, registered, average days, queries raised)
 - H68. **Caveats, Blocks & Disputes Register** (placed by, reason, date, supporting document, lift authority, age)
-- H69. Stands with No Recorded Owner / Broken Ownership Chain (data-integrity exception — must be empty)
+- H69. Stands with No Recorded Owner / Broken Ownership Chain (data-integrity exception - must be empty)
 - H70. Sectional Title Unit Register & Participation Quotas
 
 **Council rental housing stock**
 - H71. **Rent Roll** (all units, tenant, rent, arrears, lease end) by suburb and unit type
 - H72. Housing Stock Register & Condition Report (units, type, rooms, condition grade, last inspection)
 - H73. **Occupancy & Voids Report** (occupied, void, days void, reason, rent lost to voids, re-let performance)
-- H74. Tenant Statement (charges, receipts, balance) — burstable
+- H74. Tenant Statement (charges, receipts, balance) - burstable
 - H75. **Rent Arrears Age Analysis** by suburb, unit type and officer
 - H76. Eviction Pipeline & Register (stage, dates, legal reference, outcome)
 - H77. Lease Expiry & Renewal Due Report
@@ -1193,16 +1193,16 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - H86. Housing Cooperative Register, Membership and Cooperative Account Statement
 - H87. Informal Settlement / Enumeration Register (settlements, structures, households, eligibility status)
 - H88. Regularisation Progress Report (enumerated → qualified → allocated → agreement → title)
-- H89. Housing Subsidy & Grant Utilisation (IAS 20 — received, applied, deferred, conditions outstanding)
+- H89. Housing Subsidy & Grant Utilisation (IAS 20 - received, applied, deferred, conditions outstanding)
 
 **Control, audit & executive**
-- H90. **Housing Audit Trail Report** (all changes to stands, allocations, prices, ownership, registration dates, caveats — before/after values, user, authority)
+- H90. **Housing Audit Trail Report** (all changes to stands, allocations, prices, ownership, registration dates, caveats - before/after values, user, authority)
 - H91. Allocation & Ownership Change Approval Audit (who approved what, value, turnaround, delegations used, dual-authorisation exceptions)
-- H92. **Segregation of Duties Violations — Housing** (allocation vs approval, clearance verification vs transfer approval, caveat place vs lift)
-- H93. Manual Override & Exception Report (price overrides, waived clearances, forced status transitions — each with the stated reason)
+- H92. **Segregation of Duties Violations - Housing** (allocation vs approval, clearance verification vs transfer approval, caveat place vs lift)
+- H93. Manual Override & Exception Report (price overrides, waived clearances, forced status transitions - each with the stated reason)
 - H94. Housing Revenue Summary (stand sales, instalment interest, rentals, levies, transfer fees, forfeitures) vs budget
 - H95. **Housing Executive Dashboard** (land bank hectares and stands available, waiting list size and ageing, allocations and titles issued YTD, debtors and collection efficiency, rental occupancy, deeds pipeline age)
-- H96. Housing Delivery / Statutory Return (units and stands delivered by density, tenure and beneficiary category — format-configurable for national reporting)
+- H96. Housing Delivery / Statutory Return (units and stands delivered by density, tenure and beneficiary category - format-configurable for national reporting)
 - H97. Ward Housing Pack (one ward: stands, allocations, beneficiaries, arrears, rental units, waiting list) for councillors
 
 ### J. Schools
@@ -1266,20 +1266,20 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 222. Statutory Deduction Schedules
 223. Tax Invoice / Fiscal Receipt compliance layouts
 224. Annual Financial Statements Pack (IFRS presentation, with comparatives and notes)
-225. Audit File Export (SAF-T style: GL, AR, AP, inventory, master data — configurable format)
+225. Audit File Export (SAF-T style: GL, AR, AP, inventory, master data - configurable format)
 
 ### O. Payroll & HR
-*(`PR` prefix — separately licensable as module `PAY`. **Every report in this section is permission-gated and every print/export is logged**, because a payroll report is a data-breach risk. Common parameters add: Payroll/Pay Group, Pay Period, Currency, Department/Cost Centre, Employee Status.)*
+*(`PR` prefix - separately licensable as module `PAY`. **Every report in this section is permission-gated and every print/export is logged**, because a payroll report is a data-breach risk. Common parameters add: Payroll/Pay Group, Pay Period, Currency, Department/Cost Centre, Employee Status.)*
 
 **The run itself**
-- PR1. **Payslip** (per employee, multi-currency, with earnings, deductions, employer contributions, taxable benefits as memo, YTD totals, leave and loan balances) — printable, bulk-burstable, emailable as a password-protected PDF
-- PR2. **Payroll Summary** (totals by earning, deduction, contribution and net pay, by pay group and department) — the one-page the officer checks before approving
+- PR1. **Payslip** (per employee, multi-currency, with earnings, deductions, employer contributions, taxable benefits as memo, YTD totals, leave and loan balances) - printable, bulk-burstable, emailable as a password-protected PDF
+- PR2. **Payroll Summary** (totals by earning, deduction, contribution and net pay, by pay group and department) - the one-page the officer checks before approving
 - PR3. **Payroll Journal** (the GL posting by account, department, cost centre, project and fund, with the double entry shown)
-- PR4. **Pre-Commit Validation / Exception Report** — negative net pay, zero net pay, net pay varying >N% from last period, missing bank details, **duplicate bank accounts across employees**, duplicate national IDs, missing tax numbers, terminated employees still in the run, employees missing since last run, negative leave, deductions suspended by net-pay protection, salary outside grade band, expired contracts, **bank details changed since the last run**
-- PR5. **Payroll Variance / Movement Report** (this period vs last, per employee and per element, with every difference explained — the report that catches the mistake before it reaches the bank)
-- PR6. **Per-Employee Calculation Trace** (every element, its formula, its inputs and its result) — how the officer answers "why is my tax higher this month" without opening a spreadsheet
+- PR4. **Pre-Commit Validation / Exception Report** - negative net pay, zero net pay, net pay varying >N% from last period, missing bank details, **duplicate bank accounts across employees**, duplicate national IDs, missing tax numbers, terminated employees still in the run, employees missing since last run, negative leave, deductions suspended by net-pay protection, salary outside grade band, expired contracts, **bank details changed since the last run**
+- PR5. **Payroll Variance / Movement Report** (this period vs last, per employee and per element, with every difference explained - the report that catches the mistake before it reaches the bank)
+- PR6. **Per-Employee Calculation Trace** (every element, its formula, its inputs and its result) - how the officer answers "why is my tax higher this month" without opening a spreadsheet
 - PR7. Payroll Run Control Report (run status, who calculated, who approved, who committed, timestamps, totals at each stage)
-- PR8. **Parallel Run Comparison** (new system vs legacy, line by line, per employee and per element) — mandatory at go-live
+- PR8. **Parallel Run Comparison** (new system vs legacy, line by line, per employee and per element) - mandatory at go-live
 - PR9. Adjustment / Supplementary Run Report and Payroll Reversal Register
 - PR10. Backpay & Retrospective Adjustment Report
 
@@ -1289,39 +1289,39 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - PR13. Mobile Money / Wallet Payment Schedule
 - PR14. Split-Pay Report (employees paid across multiple accounts or methods)
 - PR15. Unpaid / Held Salaries Report (with reason and release authority)
-- PR16. **Net Pay Control Account Reconciliation** (payroll net pay vs bank payments — must clear to zero)
+- PR16. **Net Pay Control Account Reconciliation** (payroll net pay vs bank payments - must clear to zero)
 
 **Earnings, deductions and third parties**
 - PR17. Earnings Analysis by element, department and period (with period-on-period trend)
 - PR18. Deductions Analysis by element, with employee counts and totals
-- PR19. **Third-Party Remittance Schedules** — tax authority, pension fund, medical aid, union, savings scheme, funeral scheme, garnishee creditors (each in the recipient's required format)
-- PR20. Third-Party Deduction vs Remittance Reconciliation (deducted, remitted, outstanding — per scheme, per period)
+- PR19. **Third-Party Remittance Schedules** - tax authority, pension fund, medical aid, union, savings scheme, funeral scheme, garnishee creditors (each in the recipient's required format)
+- PR20. Third-Party Deduction vs Remittance Reconciliation (deducted, remitted, outstanding - per scheme, per period)
 - PR21. **Garnishee & Court Order Register** (order reference, priority, amount, balance, protected-earnings effect)
 - PR22. **Loan & Advance Register and Balances** (issued, repaid, outstanding, suspended, deemed-benefit taxable value)
 - PR23. Staff Account / POS Staff Purchase Deductions Reconciliation
 - PR24. Employer Housing Rent Deduction Reconciliation (links to §4.10.7)
 - PR25. Overtime Analysis (hours and cost by department, employee and multiplier, vs approved overtime)
-- PR26. Allowance Analysis (acting, responsibility, shift, standby — with eligibility review)
+- PR26. Allowance Analysis (acting, responsibility, shift, standby - with eligibility review)
 
 **Tax and statutory**
-- PR27. **Monthly Tax (PAYE) Remittance Return** — format-configurable, per currency
+- PR27. **Monthly Tax (PAYE) Remittance Return** - format-configurable, per currency
 - PR28. **Annual Employee Tax Certificates** (per employee) and the consolidated annual reconciliation
 - PR29. **Tax Reconciliation** (tax per payroll vs tax per GL vs tax remitted, per period and YTD)
 - PR30. Social Security / National Insurance Schedule and Return
 - PR31. Pension Fund Contribution Schedule (employee, employer, per member number)
 - PR32. Medical Aid Schedule (member, dependants, employee and employer split)
 - PR33. Workers' Compensation Return and Skills/Manpower Levy Return
-- PR34. **Taxable Benefits Schedule** (motor vehicle, housing, loan, school fees — value, basis and tax effect per employee)
-- PR35. **Multi-Currency Tax Split Report** (earnings, bands applied, tax computed and remitted per currency) — the working paper for a split-currency payroll assessment
-- PR36. Tax Table in Force Report (bands, rates, credits, effective dates — proves which table a prior period used)
+- PR34. **Taxable Benefits Schedule** (motor vehicle, housing, loan, school fees - value, basis and tax effect per employee)
+- PR35. **Multi-Currency Tax Split Report** (earnings, bands applied, tax computed and remitted per currency) - the working paper for a split-currency payroll assessment
+- PR36. Tax Table in Force Report (bands, rates, credits, effective dates - proves which table a prior period used)
 
 **Leave and attendance**
 - PR37. **Leave Balances** (entitlement, taken, accrued, carried forward, expiring, current balance) by employee and department
-- PR38. **Leave Liability Provision (IAS 19)** — untaken leave valued at current rates, with the period movement and the journal
+- PR38. **Leave Liability Provision (IAS 19)** - untaken leave valued at current rates, with the period movement and the journal
 - PR39. Leave Taken Analysis by type, department and month; leave expiring within N days
 - PR40. Absence & Lateness Report; Sick Leave Pattern Analysis (with full-pay/half-pay tier status)
 - PR41. Leave Encashment Report
-- PR42. Timesheet Hours Summary and **Labour Cost Allocated to Jobs** (reconciled to the payroll journal — hours costed must equal hours paid)
+- PR42. Timesheet Hours Summary and **Labour Cost Allocated to Jobs** (reconciled to the payroll journal - hours costed must equal hours paid)
 - PR43. Attendance Exception Report (no clock-in, unapproved overtime, hours exceeding statutory maxima)
 
 **Employees, establishment and movements**
@@ -1331,9 +1331,9 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - PR47. **Establishment vs Actual** (approved posts, filled, vacant, over-establishment, by grade and department) with the vacancy cost saving
 - PR48. Salary Scale & Grade Distribution (employees per notch, compa-ratio, employees at scale maximum)
 - PR49. **Salary Change / Increment Audit** (every salary change: old, new, %, effective date, authorised by whom)
-- PR50. **Bank Detail Change Report** (every change, with the prior and new account and the approving officer) — the fraud control
+- PR50. **Bank Detail Change Report** (every change, with the prior and new account and the approving officer) - the fraud control
 - PR51. Contract Expiry, Probation Due and Work Permit Expiry (next 30/60/90 days)
-- PR52. **Termination & Final Settlement Report** (notice, leave encashment, gratuity, severance, recoveries, tax on terminal benefits — per employee, showing the computation)
+- PR52. **Termination & Final Settlement Report** (notice, leave encashment, gratuity, severance, recoveries, tax on terminal benefits - per employee, showing the computation)
 - PR53. Clearance Checklist Outstanding (leavers with assets, loans or staff accounts unsettled)
 - PR54. Gratuity & Long Service Provision Schedule (IAS 19 other long-term benefits, discounted)
 - PR55. Employee Documents Expiring / Missing (ID, contract, qualifications, medicals)
@@ -1349,11 +1349,11 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 - PR63. Payroll Accrual Schedule (unpaid salaries at period end)
 
 **Control and audit**
-- PR64. **Payroll GL Reconciliation** (payroll totals vs GL postings vs statutory liability balances — each liability account must clear)
-- PR65. **Payroll Audit Trail** (every change to employee master, salary, bank details, pay elements, tax tables and runs — before/after values, user, authority)
-- PR66. **Segregation of Duties Violations — Payroll** (process + approve, master maintenance + approve, bank change + payment approval, **and any user who processed a run containing their own record**)
+- PR64. **Payroll GL Reconciliation** (payroll totals vs GL postings vs statutory liability balances - each liability account must clear)
+- PR65. **Payroll Audit Trail** (every change to employee master, salary, bank details, pay elements, tax tables and runs - before/after values, user, authority)
+- PR66. **Segregation of Duties Violations - Payroll** (process + approve, master maintenance + approve, bank change + payment approval, **and any user who processed a run containing their own record**)
 - PR67. Payroll Access & Report Print/Export Log (who viewed or exported payroll data, when, and what)
-- PR68. Ghost Worker Detection Pack — duplicate national IDs, duplicate bank accounts, duplicate addresses, employees with no leave ever taken, employees never appraised, employees with no engagement documents, and employees whose bank account matches a supplier's
+- PR68. Ghost Worker Detection Pack - duplicate national IDs, duplicate bank accounts, duplicate addresses, employees with no leave ever taken, employees never appraised, employees with no engagement documents, and employees whose bank account matches a supplier's
 - PR69. Payslip Reprint Log
 - PR70. YTD Earnings & Deductions Register (per employee, all elements, for the tax year)
 
@@ -1373,11 +1373,11 @@ Create `docs/reports/CATALOGUE.md` listing each report with: code, name, module,
 247. Audit Trail Hash-Chain Verification Report
 248. Licence & Module Usage Report
 249. Login Session & Concurrency Report
-250. Report Print/Export Log (who printed what, when — data-leak control)
+250. Report Print/Export Log (who printed what, when - data-leak control)
 
 ### Q. Executive / BI Dashboards (on-screen, with print to PDF)
 251. Executive Dashboard: revenue, gross margin, cash position by currency, debtors, creditors, stock value, top movers, with period comparisons
-252. Daily Flash Report (yesterday's sales, collections, payments, cash balances) — emailable each morning
+252. Daily Flash Report (yesterday's sales, collections, payments, cash balances) - emailable each morning
 253. KPI Scorecard (configurable: DSO, DPO, stock turn, gross margin %, collection efficiency, till variance %)
 254. Branch / Store Comparison League Table
 255. Trend & Seasonality Analysis
@@ -1414,47 +1414,47 @@ Sales quotation, sales order, proforma invoice, tax invoice (A4 + thermal), cred
 
 ## 16. DELIVERY PLAN (build in this order)
 
-**Phase 0 — Foundations (no business features)**
+**Phase 0 - Foundations (no business features)**
 Solution skeleton, DI, config, logging, `Result<T>`, Money/Currency value objects, EF Core + Npgsql, migration runner, Testcontainers test harness, CI build, code style, ADR folder.
 
-**Phase 1 — System Manager + Security + Licensing**
+**Phase 1 - System Manager + Security + Licensing**
 Companies, branches, users, roles, groups, **permission grid**, scopes, audit trail (both layers), periods, currencies & rates, number sequences, `Meridian.Licensing.Core` + `Generator`, licence enforcement in the shell. Ship the WPF shell with navigation driven by licence + permissions.
 
-**Phase 2 — Accounting Core**
+**Phase 2 - Accounting Core**
 Chart of accounts, posting engine, journals, period control, year-end, tax engine, FX revaluation, control-account framework, **Trial Balance + Nominal Activity + Balance Sheet + P&L** as the first real reports. Accounting test suite green.
 
-**Phase 3 — Reporting Engine + Designer**
-Definition model, expression engine, engine + renderers (WPF preview, PDF, XLSX, CSV, ESC/POS), viewer control, designer UI, scheduling and **bursting**, report permissions, seeded system reports from Phase 2. *(Do this early — every later module ships its reports on this foundation.)*
+**Phase 3 - Reporting Engine + Designer**
+Definition model, expression engine, engine + renderers (WPF preview, PDF, XLSX, CSV, ESC/POS), viewer control, designer UI, scheduling and **bursting**, report permissions, seeded system reports from Phase 2. *(Do this early - every later module ships its reports on this foundation.)*
 
-**Phase 4 — AR + AP + Cash Book**
+**Phase 4 - AR + AP + Cash Book**
 Traders, documents, allocation, ageing, statements (open item + balance forward), payment runs, bank reconciliation, dunning, and their full report sets.
 
-**Phase 4B — Budgeting, Planning & Commitment Control**
-Budget structure on the full posting dimension set, departmental preparation workspaces with the org hierarchy, top-down targets vs bottom-up submissions, driver/assumption register, spreading profiles, **immutable versioning with permanent retention and sealed approval snapshots**, workflow through to board/council approval, supplementary budgets and virements with the reconciliation control report, and budget-vs-actual reporting. Commitment control is wired in during Phase 5 when procurement exists — build the available-balance service now and have Procurement call it at all four gates. Module code `BUD`.
+**Phase 4B - Budgeting, Planning & Commitment Control**
+Budget structure on the full posting dimension set, departmental preparation workspaces with the org hierarchy, top-down targets vs bottom-up submissions, driver/assumption register, spreading profiles, **immutable versioning with permanent retention and sealed approval snapshots**, workflow through to board/council approval, supplementary budgets and virements with the reconciliation control report, and budget-vs-actual reporting. Commitment control is wired in during Phase 5 when procurement exists - build the available-balance service now and have Procurement call it at all four gates. Module code `BUD`.
 
-**Phase 5 — Inventory + Procurement + Workflow engine**
+**Phase 5 - Inventory + Procurement + Workflow engine**
 Items, warehouses, costing, movements, stock take, batch/serial; requisition → RFQ → PO → GRN → 3-way match; the generic approval workflow; commitment accounting; report sets.
 
-**Phase 6 — POS**
+**Phase 6 - POS**
 Full-screen POS, search/filters/numberpad, discounts, refunds, void/recall, split bill, tabs/tables, multi-currency tendering, promotions, loyalty, vouchers, till sessions, X/Z reads, offline mode + sync, device layer, fiscal hook, POS report set.
 
-**Phase 7 — Voucher Management + SOP/Distribution**
+**Phase 7 - Voucher Management + SOP/Distribution**
 
-**Phase 8 — Municipality module** (properties, valuation roll, services, meters, tariffs, billing runs, arrears, debt management, clearance certificates, service tickets, full municipal report set)
+**Phase 8 - Municipality module** (properties, valuation roll, services, meters, tariffs, billing runs, arrears, debt management, clearance certificates, service tickets, full municipal report set)
 
-**Phase 8B — Housing, Land & Estates module**
-Land bank and acquisition, subdivision into stands with lineage, servicing cost apportionment and price build-up, waiting list with qualification rules and duplicate detection, allocation with ballot and dual authorisation, agreements and instalment schedules, **change of ownership / cession with the clearance gate and the append-only ownership chain**, title deed pipeline, council rental stock, and the full `H`-series report set. Separately licensable (module code `HSE`) — build it so it runs with or without the Municipality module, degrading the clearance check to a manual, audited attestation when `MUNI` is not licensed.
+**Phase 8B - Housing, Land & Estates module**
+Land bank and acquisition, subdivision into stands with lineage, servicing cost apportionment and price build-up, waiting list with qualification rules and duplicate detection, allocation with ballot and dual authorisation, agreements and instalment schedules, **change of ownership / cession with the clearance gate and the append-only ownership chain**, title deed pipeline, council rental stock, and the full `H`-series report set. Separately licensable (module code `HSE`) - build it so it runs with or without the Municipality module, degrading the clearance check to a manual, audited attestation when `MUNI` is not licensed.
 
-**Phase 9 — Schools module**
+**Phase 9 - Schools module**
 
-**Phase 10 — Construction / Job Costing + Weighbridge & bulk materials**
+**Phase 10 - Construction / Job Costing + Weighbridge & bulk materials**
 
-**Phase 11 — Fixed Assets + CRM/Service Desk**
+**Phase 11 - Fixed Assets + CRM/Service Desk**
 
-**Phase 11B — HR & Payroll**
+**Phase 11B - HR & Payroll**
 Employee master, establishment and salary scales, pay element engine with the expression evaluator, effective-dated tax tables and multi-currency tax split, leave with IAS 19 liability, loans and garnishees, the full run state machine with the pre-commit exception report and maker-checker, immutable committed runs, bank files and password-protected payslips, third-party remittances into AP, terminations and final settlements, the `PR`-series reports, and the walled-garden security model (own schema, encrypted columns, own audit visibility, self-payslip block). Module code `PAY`. **Insist on a parallel run (PR8) before any client goes live.** *(The employee master, establishment and timesheets must ship earlier, in Phase 5, because job costing and the establishment-driven staff budget depend on them.)*
 
-**Phase 12 — Hardening**
+**Phase 12 - Hardening**
 Performance tuning, opening-balance migration wizard, installer + auto-update, backup/restore, documentation, training data set, user manual per vertical, acceptance test pack.
 
 ---

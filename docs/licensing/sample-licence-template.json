@@ -21,5 +21,5 @@
   ],
   "features": ["MULTI_CURRENCY", "OFFLINE_POS", "API_ACCESS"],
   "support_expiry": "2027-01-14",
-  "notes": "Sample template — edit and sign with the Generator."
+  "notes": "Sample template - edit and sign with the Generator."
 }

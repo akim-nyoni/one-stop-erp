@@ -214,7 +214,7 @@ public sealed class DocumentLayoutSettings
 
 /// <summary>
 /// A business document as report rows: one row per line (one row when it has no lines), every row carrying the heading (title, company, party, the
-/// reference fields as Field1…Field6 with their labels), the totals, notes and signature lines — what a designed layout places on the page.
+/// reference fields as Field1…Field6 with their labels), the totals, notes and signature lines - what a designed layout places on the page.
 /// </summary>
 public static class BusinessDocumentRows
 {

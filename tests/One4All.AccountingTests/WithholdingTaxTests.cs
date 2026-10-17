@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers withholding tax on supplier payments (brief §3.5): paying 1,000 to a supplier without tax clearance withholds
-/// 30% — the invoice is settled in full, the bank pays 700 and 300 is owed as WHT; a cleared supplier is paid in full;
+/// 30% - the invoice is settled in full, the bank pays 700 and 300 is owed as WHT; a cleared supplier is paid in full;
 /// the period's return lists the certificate, remitting pays the 300 over (and a second remittance finds nothing), and
 /// the certificate text shows gross, withheld and net.
 /// </summary>

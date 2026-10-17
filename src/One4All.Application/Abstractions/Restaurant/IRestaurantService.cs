@@ -12,7 +12,7 @@ public readonly record struct RecipeIngredient(long IngredientItemId, decimal Qu
 /// <param name="Net">The net (tax-exclusive) total billed.</param>
 /// <param name="Tax">The tax total billed.</param>
 /// <param name="ServiceCharge">The service charge / gratuity (income to the house) added.</param>
-/// <param name="Tip">The tip (staff money — a liability, not income) added.</param>
+/// <param name="Tip">The tip (staff money - a liability, not income) added.</param>
 /// <param name="Discount">The discount allowed (a contra-revenue) deducted from the bill.</param>
 /// <param name="Gross">The gross total charged (net + tax + service charge + tip − discount).</param>
 /// <param name="CostOfSales">The cost of sales released by exploding the recipes.</param>
@@ -201,7 +201,7 @@ public interface IRestaurantService
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
     /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income) added to the bill.</param>
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
-    /// <param name="tipAmount">An optional tip (staff money — a liability) added to the bill.</param>
+    /// <param name="tipAmount">An optional tip (staff money - a liability) added to the bill.</param>
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from the bill.</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
@@ -222,7 +222,7 @@ public interface IRestaurantService
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
     /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income) added to this split.</param>
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
-    /// <param name="tipAmount">An optional tip (staff money — a liability) added to this split.</param>
+    /// <param name="tipAmount">An optional tip (staff money - a liability) added to this split.</param>
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from this split.</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
@@ -245,7 +245,7 @@ public interface IRestaurantService
 
     /// <summary>
     /// Distributes an amount from the pooled tips among staff by weight (tip pooling). Assigns who within the
-    /// tips-payable liability is owed what — no GL, since the liability already exists. The shares sum exactly
+    /// tips-payable liability is owed what - no GL, since the liability already exists. The shares sum exactly
     /// to the amount (rounding remainder on the last share).
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -276,7 +276,7 @@ public interface IRestaurantService
     Task<Result> AssignLineToSeatAsync(long companyId, long orderId, long lineId, int? seatNumber, CancellationToken ct = default);
 
     /// <summary>
-    /// Bills an open order settled across several tenders (split payment — e.g. part cash, part card): the
+    /// Bills an open order settled across several tenders (split payment - e.g. part cash, part card): the
     /// tenders must sum to the gross (net + tax + service charge + tip − discount). Posts revenue and recipe
     /// cost of sales and closes the order / frees the table, exactly like <see cref="BillOrderAsync"/>.
     /// </summary>
@@ -288,7 +288,7 @@ public interface IRestaurantService
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
     /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income).</param>
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
-    /// <param name="tipAmount">An optional tip (staff money — a liability).</param>
+    /// <param name="tipAmount">An optional tip (staff money - a liability).</param>
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue).</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
@@ -357,7 +357,7 @@ public interface IRestaurantService
     /// <param name="taxAccountCode">The output-tax account, when there is tax.</param>
     /// <param name="serviceChargeAmount">An optional service charge / gratuity (house income) added to this seat.</param>
     /// <param name="serviceChargeAccountCode">The service-charge income account (required when charging).</param>
-    /// <param name="tipAmount">An optional tip (staff money — a liability) added to this seat.</param>
+    /// <param name="tipAmount">An optional tip (staff money - a liability) added to this seat.</param>
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from this seat.</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
@@ -379,8 +379,8 @@ public interface IRestaurantService
     Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default);
 
     /// <summary>
-    /// Comps an order line (complimentary): the item is still made and served — so billing recognises its cost
-    /// of sales via the recipe — but the guest is charged nothing (no revenue). Requires a reason; the order
+    /// Comps an order line (complimentary): the item is still made and served - so billing recognises its cost
+    /// of sales via the recipe - but the guest is charged nothing (no revenue). Requires a reason; the order
     /// must be open and nothing on the line already billed.
     /// </summary>
     /// <param name="companyId">The company.</param>

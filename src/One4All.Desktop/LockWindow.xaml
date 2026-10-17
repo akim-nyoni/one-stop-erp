@@ -1,7 +1,7 @@
 <Window x:Class="One4All.Desktop.LockWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="One4All ERP — Locked" Height="400" Width="420"
+        Title="One4All ERP - Locked" Height="400" Width="420"
         WindowStartupLocation="CenterScreen" ResizeMode="NoResize" Topmost="True" ShowInTaskbar="True" Background="White">
     <Grid>
         <Grid.RowDefinitions>

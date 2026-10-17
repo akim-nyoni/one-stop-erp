@@ -9,8 +9,8 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Infrastructure.Reporting;
 
 /// <summary>
-/// Supplies live rows for the register-style reports of the lighter verticals — the housing stand register,
-/// the student register and open purchase orders — from their entities.
+/// Supplies live rows for the register-style reports of the lighter verticals - the housing stand register,
+/// the student register and open purchase orders - from their entities.
 /// </summary>
 public sealed class RegistersReportDataProvider : IReportDataProvider
 {

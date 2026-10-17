@@ -112,7 +112,7 @@ public sealed class Company : SoftDeletableEntity
     public decimal? PayrollSecondApprovalVariancePercent { get; set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether committing a regular payroll run also raises the AP invoices for its third parties —
+    /// Gets or sets a value indicating whether committing a regular payroll run also raises the AP invoices for its third parties -
     /// schemes and garnishee creditors with a supplier (brief §4.15.5).
     /// </summary>
     public bool RaisePayrollRemittances { get; set; }

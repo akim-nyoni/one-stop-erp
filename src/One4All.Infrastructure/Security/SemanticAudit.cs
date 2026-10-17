@@ -5,7 +5,7 @@ namespace One4All.Infrastructure.Security;
 
 /// <summary>
 /// Writes the business events the change log alone does not name (brief §6: "post, approve, reject, void… with who, when and where"): a posting,
-/// a decision in a workflow, a void or reversal — chained like every other audit entry, with the user and terminal of the caller.
+/// a decision in a workflow, a void or reversal - chained like every other audit entry, with the user and terminal of the caller.
 /// </summary>
 internal static class SemanticAudit
 {

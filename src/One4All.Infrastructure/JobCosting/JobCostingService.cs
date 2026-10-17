@@ -13,7 +13,7 @@ namespace One4All.Infrastructure.JobCosting;
 /// <summary>
 /// Construction / Job Costing (brief §4.12). Contracts accumulate captured costs for profitability;
 /// interim payment certificates raise the net payable on the client's AR account through the central
-/// ledger and recognise retention as a separate receivable — the gross is credited to contract revenue.
+/// ledger and recognise retention as a separate receivable - the gross is credited to contract revenue.
 /// </summary>
 public sealed class JobCostingService : IJobCostingService
 {
@@ -116,7 +116,7 @@ public sealed class JobCostingService : IJobCostingService
             NetAmount = certificate.NetPayable,
             TaxAmount = 0m,
             SalesAccountCode = contract.RevenueAccountCode,
-            Narrative = $"IPC {certificateNumber} — {contract.ContractNumber}",
+            Narrative = $"IPC {certificateNumber} - {contract.ContractNumber}",
         }, ct).ConfigureAwait(false);
 
         if (ar.IsFailure)
@@ -136,7 +136,7 @@ public sealed class JobCostingService : IJobCostingService
                 TransactionCurrency = company.BaseCurrency,
                 DocumentType = "RETENTION",
                 DocumentNumber = certificateNumber,
-                Narrative = $"Retention held — IPC {certificateNumber}",
+                Narrative = $"Retention held - IPC {certificateNumber}",
                 Lines =
                 [
                     new JournalLineRequest { AccountCode = retentionReceivableAccountCode, Side = JournalSide.Debit, TransactionAmount = certificate.RetentionThisCertificate },
@@ -158,7 +158,7 @@ public sealed class JobCostingService : IJobCostingService
             Result<PostingReceipt> recovered = await _posting.PostAsync(new JournalRequest
             {
                 CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "ADVANCE-RECOVERY", DocumentNumber = certificateNumber,
-                Narrative = $"Advance recovered — IPC {certificateNumber}",
+                Narrative = $"Advance recovered - IPC {certificateNumber}",
                 Lines =
                 [
                     new JournalLineRequest { AccountCode = contract.AdvanceAccountCode!, Side = JournalSide.Debit, TransactionAmount = advanceRecovery },
@@ -204,7 +204,7 @@ public sealed class JobCostingService : IJobCostingService
             Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
             {
                 CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "ADVANCE", DocumentNumber = documentNumber,
-                Narrative = $"Client advance — {contract.ContractNumber}",
+                Narrative = $"Client advance - {contract.ContractNumber}",
                 Lines =
                 [
                     new JournalLineRequest { AccountCode = bankAccountCode.Trim(), Side = JournalSide.Debit, TransactionAmount = amount },
@@ -341,7 +341,7 @@ public sealed class JobCostingService : IJobCostingService
             NetAmount = amount,
             TaxAmount = 0m,
             SalesAccountCode = retentionReceivableAccountCode,
-            Narrative = $"Retention release — {contract.ContractNumber}",
+            Narrative = $"Retention release - {contract.ContractNumber}",
         }, ct).ConfigureAwait(false);
 
         if (ar.IsFailure)
@@ -417,7 +417,7 @@ public sealed class JobCostingService : IJobCostingService
             DocumentType = "POC",
             DocumentNumber = documentNumber,
             Reference = contract.ContractNumber,
-            Narrative = $"Revenue recognition {poc.PercentComplete:0.00}% complete — {contract.ContractNumber}",
+            Narrative = $"Revenue recognition {poc.PercentComplete:0.00}% complete - {contract.ContractNumber}",
             Lines = lines,
         }, ct).ConfigureAwait(false);
         if (posting.IsFailure)
@@ -495,7 +495,7 @@ public sealed class JobCostingService : IJobCostingService
             DocumentType = "ONEROUS",
             DocumentNumber = documentNumber,
             Reference = contract.ContractNumber,
-            Narrative = (topUp ? "Expected loss provision" : "Expected loss provision release") + $" — {contract.ContractNumber}",
+            Narrative = (topUp ? "Expected loss provision" : "Expected loss provision release") + $" - {contract.ContractNumber}",
             Lines =
             [
                 Line(topUp ? lossExpenseAccountCode : provisionAccountCode, JournalSide.Debit, amount),

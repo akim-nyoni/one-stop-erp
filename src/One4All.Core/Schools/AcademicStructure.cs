@@ -130,7 +130,7 @@ public sealed class SchoolClass : Entity, ICompanyScoped
     /// <summary>Gets or sets the class teacher (an employee).</summary>
     public long? ClassTeacherEmployeeId { get; set; }
 
-    /// <summary>Gets or sets the grade its students move up to at year end (null: they leave — the final year).</summary>
+    /// <summary>Gets or sets the grade its students move up to at year end (null: they leave - the final year).</summary>
     public string? NextGrade { get; set; }
 
     /// <summary>Gets or sets a value indicating whether the class is in use.</summary>

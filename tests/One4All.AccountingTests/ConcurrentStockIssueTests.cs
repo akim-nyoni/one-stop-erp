@@ -14,7 +14,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers two stock issues of the same item racing: while one issue holds its transaction (and the stock balance and
 /// journal sequence rows) open, a second issue reads the balance as it was, loses the race when the first commits and
-/// is retried against the new balance — both issues stand, on-hand is right and agrees with the movements.
+/// is retried against the new balance - both issues stand, on-hand is right and agrees with the movements.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class ConcurrentStockIssueTests

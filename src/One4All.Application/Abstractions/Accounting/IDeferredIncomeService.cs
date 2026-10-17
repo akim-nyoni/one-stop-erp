@@ -23,7 +23,7 @@ public sealed record DeferredIncomeRunResult(DateOnly AsAtDate, IReadOnlyList<De
 /// <summary>
 /// Recognises income billed in advance over its service period (brief §3.7, IFRS 15 over time): each
 /// <c>DeferredIncomeSchedule</c> earns its amount evenly by day, and a run moves what has been earned by the date from
-/// deferred income to revenue — only what is not yet recognised, so repeating a run posts nothing.
+/// deferred income to revenue - only what is not yet recognised, so repeating a run posts nothing.
 /// </summary>
 public interface IDeferredIncomeService
 {

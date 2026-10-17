@@ -14,7 +14,7 @@ namespace One4All.Reporting.Engine;
 public sealed record RichRun(string Text, bool Bold = false, bool Italic = false, bool Underline = false, bool LineBreak = false);
 
 /// <summary>
-/// Rich text for report elements: a small, safe markup — <c>**bold**</c>, <c>*italic*</c>, <c>__underline__</c>, line breaks, and
+/// Rich text for report elements: a small, safe markup - <c>**bold**</c>, <c>*italic*</c>, <c>__underline__</c>, line breaks, and
 /// <c>{Field}</c> placeholders filled from the row (formatted like a field). Anything else is literal text; a placeholder's value is
 /// never itself read as markup.
 /// </summary>
@@ -95,7 +95,7 @@ public static class RichText
 
 /// <summary>
 /// Sub-reports: another report placed in a band, run with parameters linked from the parent row. The engine stays free of data
-/// access — the host supplies a resolver (<see cref="ReportInput.SubReports"/>) that returns the child's input for a code and
+/// access - the host supplies a resolver (<see cref="ReportInput.SubReports"/>) that returns the child's input for a code and
 /// parameter set, usually fetched beforehand for every distinct set (see <see cref="Key"/>).
 /// </summary>
 public static class SubReports

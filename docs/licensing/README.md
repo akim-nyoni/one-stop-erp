@@ -2,16 +2,16 @@
 
 Two components (brief §11):
 
-- **`One4All.Licensing.Core`** — shared primitives referenced by the ERP (validation only, embeds the **public** key) and by the Generator (signing). Ed25519 signatures (BouncyCastle) over a canonical-JSON payload; compact token `payload_base64url.signature_base64url`.
-- **`One4All.Licensing.Generator`** — vendor-only console tool that holds the **private** key (passphrase-protected: PBKDF2-SHA256 → AES-256-GCM). **Never shipped to customers.**
+- **`One4All.Licensing.Core`** - shared primitives referenced by the ERP (validation only, embeds the **public** key) and by the Generator (signing). Ed25519 signatures (BouncyCastle) over a canonical-JSON payload; compact token `payload_base64url.signature_base64url`.
+- **`One4All.Licensing.Generator`** - vendor-only console tool that holds the **private** key (passphrase-protected: PBKDF2-SHA256 → AES-256-GCM). **Never shipped to customers.**
 
 ## Commands
 
 ```bash
 # 1. One-time: create a signing key pair (kid supports rotation)
 dotnet run --project src/One4All.Licensing.Generator -- keygen --kid key-2026-01 --out ./keys --passphrase "<vendor secret>"
-#   -> keys/key-2026-01.key.json  (encrypted private key — keep secret, never commit)
-#   -> keys/key-2026-01.pub.txt   (public key — embed in the ERP's trusted-key set)
+#   -> keys/key-2026-01.key.json  (encrypted private key - keep secret, never commit)
+#   -> keys/key-2026-01.pub.txt   (public key - embed in the ERP's trusted-key set)
 
 # 2. Per customer: edit a payload template (see sample-licence-template.json) and sign it
 dotnet run --project src/One4All.Licensing.Generator -- issue \

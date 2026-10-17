@@ -80,7 +80,7 @@ public sealed class FinalCatalogueReportsTests
 
         await db.SaveChangesAsync();
         string master = await Render("INV95", new() { ["Category"] = "Apparel" });
-        master.Should().Contain("SHIRT,Shirt,,").And.Contain("Matrix — size M: Blue: SHIRT-M-BLUE  Red: SHIRT-M-RED").And.Contain("Matrix — size L: Blue: SHIRT-L-BLUE  Red: ·")
+        master.Should().Contain("SHIRT,Shirt,,").And.Contain("Matrix - size M: Blue: SHIRT-M-BLUE  Red: SHIRT-M-RED").And.Contain("Matrix - size L: Blue: SHIRT-L-BLUE  Red: ·")
             .And.Contain("SHIRT-L-BLUE,Shirt L Blue,SHIRT,L,Blue");
 
         // POS118 / POS119: two tabs, one billed with a tip; a fired line voided afterwards.

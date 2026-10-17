@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Trading;

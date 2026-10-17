@@ -15,8 +15,8 @@ namespace One4All.Infrastructure.Reporting;
 /// </summary>
 public sealed partial class SqlReportDataProvider : IReportDataProvider, IReportFieldDiscovery
 {
-    /// <summary>The most rows a query returns.</summary>
-    public const int MaxRows = 50_000;
+    /// <summary>The most rows a query returns: a guard against a runaway query, set well above the brief's 100,000-row report (§15) so such a report is fetched whole.</summary>
+    public const int MaxRows = 250_000;
 
     private readonly string _connectionString;
 

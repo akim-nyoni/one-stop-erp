@@ -12,8 +12,8 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers what a failed unit of work leaves in the caller's change tracker: entities the caller was tracking and the
-/// work did not touch stay tracked — a caller looping over items (offline sync, bank rules) can still update and save
-/// them — while what the work changed is forgotten and never saved.
+/// work did not touch stay tracked - a caller looping over items (offline sync, bank rules) can still update and save
+/// them - while what the work changed is forgotten and never saved.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class AtomicWorkTrackerTests

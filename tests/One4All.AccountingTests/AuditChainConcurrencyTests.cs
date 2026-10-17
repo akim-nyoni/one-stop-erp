@@ -9,7 +9,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the audit hash chain under concurrent writers (brief §6): many transactions recording events for one company at the same moment each
-/// link to the entry before them, so the chain still verifies — without the chain lock, two of them would link to the same previous hash.
+/// link to the entry before them, so the chain still verifies - without the chain lock, two of them would link to the same previous hash.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class AuditChainConcurrencyTests

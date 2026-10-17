@@ -149,7 +149,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         List<OpenItem> notes = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.ItemType == OpenItemType.CreditNote
             && i.DocumentDate >= fromDate && i.DocumentDate <= toDate).ToListAsync(ct).ConfigureAwait(false);
         return [.. notes.OrderBy(n => n.ReasonCode ?? "~", StringComparer.Ordinal).ThenBy(n => n.DocumentDate).ThenBy(n => n.DocumentNumber, StringComparer.Ordinal)
-            .Select(n => Row(("Reason", n.ReasonCode ?? "—"), ("Date", Date(n.DocumentDate)), ("Number", n.DocumentNumber), ("Customer", customers.GetValueOrDefault(n.TraderId, "?")), ("Narrative", n.Narrative ?? string.Empty),
+            .Select(n => Row(("Reason", n.ReasonCode ?? "-"), ("Date", Date(n.DocumentDate)), ("Number", n.DocumentNumber), ("Customer", customers.GetValueOrDefault(n.TraderId, "?")), ("Narrative", n.Narrative ?? string.Empty),
                 ("Amount", Math.Abs(n.OriginalBase))))];
     }
 
@@ -239,7 +239,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         List<PaymentPromise> promises = await _db.Set<PaymentPromise>().AsNoTracking().Where(p => p.CompanyId == companyId && p.MadeOn <= asAt).OrderBy(p => p.PayBy).ThenBy(p => p.Id)
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. promises.Select(p => Row(("PayBy", Date(p.PayBy)), ("Customer", customers.GetValueOrDefault(p.CustomerId)?.Name ?? "?"), ("Made", Date(p.MadeOn)),
-            ("Status", p.Status == PromiseStatus.Open && p.PayBy < asAt ? "Open (overdue)" : p.Status.ToString()), ("Resolved", p.ResolvedOn is DateOnly r ? Date(r) : "—"),
+            ("Status", p.Status == PromiseStatus.Open && p.PayBy < asAt ? "Open (overdue)" : p.Status.ToString()), ("Resolved", p.ResolvedOn is DateOnly r ? Date(r) : "-"),
             ("Note", p.Note ?? string.Empty), ("Amount", p.Amount)))];
     }
 
@@ -253,7 +253,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
             && i.DocumentDate >= from && i.DocumentDate <= to).OrderBy(i => i.DocumentDate).ThenBy(i => i.DocumentNumber).ToListAsync(ct).ConfigureAwait(false);
         return [.. items.Select(i => Row(("Date", Date(i.DocumentDate)), ("Customer", customers.GetValueOrDefault(i.TraderId)?.Name ?? "?"), ("Document", i.DocumentNumber),
             ("Case", cases.TryGetValue(i.TraderId, out DebtCase? c)
-                ? $"{c.CaseNumber}, approved by {(c.WriteOffApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "?")}" : "—"),
+                ? $"{c.CaseNumber}, approved by {(c.WriteOffApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "?")}" : "-"),
             ("Amount", i.OriginalBase)))];
     }
 
@@ -265,7 +265,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
         return [.. plans.Select(p =>
         {
             decimal price = p.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero));
-            string due = p.Status != LaybyStatus.Open ? "—" : p.FinalDate < asAt ? $"{asAt.DayNumber - p.FinalDate.DayNumber} overdue" : $"{p.FinalDate.DayNumber - asAt.DayNumber} to go";
+            string due = p.Status != LaybyStatus.Open ? "-" : p.FinalDate < asAt ? $"{asAt.DayNumber - p.FinalDate.DayNumber} overdue" : $"{p.FinalDate.DayNumber - asAt.DayNumber} to go";
             return Row(("Plan", p.PlanNumber), ("Customer", customers.GetValueOrDefault(p.CustomerId)?.Name ?? "?"), ("Opened", Date(p.OpenedOn)), ("Final", Date(p.FinalDate)), ("Status", p.Status.ToString()),
                 ("Price", Money(price)), ("Paid", Money(p.Paid)), ("Due", due), ("Balance", p.Status == LaybyStatus.Open ? price - p.Paid : 0m));
         })];
@@ -331,7 +331,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
                 return (Customer: customers[g.Key].Name, This: Sum(yearStart, asAt), Last: Sum(lastYearStart, lastYearTo), Last3: Sum(threeAgo.AddDays(1), asAt), Prior3: Sum(sixAgo.AddDays(1), threeAgo));
             })
             .OrderByDescending(x => x.This).ThenBy(x => x.Customer, StringComparer.Ordinal)
-            .Select(x => Row(("Customer", x.Customer), ("LastYear", Money(x.Last)), ("Change", x.Last == 0m ? "—" : ((x.This - x.Last) * 100m / x.Last).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
+            .Select(x => Row(("Customer", x.Customer), ("LastYear", Money(x.Last)), ("Change", x.Last == 0m ? "-" : ((x.This - x.Last) * 100m / x.Last).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Last3", Money(x.Last3)), ("Prior3", Money(x.Prior3)), ("Trend", x.Last3 > x.Prior3 ? "▲" : x.Last3 < x.Prior3 ? "▼" : "→"), ("ThisYear", x.This)))];
     }
 
@@ -340,7 +340,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 
-    private static string Percent(decimal part, decimal total) => total == 0m ? "—" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    private static string Percent(decimal part, decimal total) => total == 0m ? "-" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

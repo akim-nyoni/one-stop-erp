@@ -150,7 +150,7 @@ public sealed partial class ReplenishmentViewModel : ObservableObject
             Suppliers.Clear();
             foreach (var s in await db.Suppliers.Where(s => s.CompanyId == _companyId && s.IsActive && !s.OnHold).OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync(ct).ConfigureAwait(true))
             {
-                Suppliers.Add(new SupplierChoiceVm(s.Id, $"{s.Code} — {s.Name}"));
+                Suppliers.Add(new SupplierChoiceVm(s.Id, $"{s.Code} - {s.Name}"));
             }
 
             SelectedSupplier = Suppliers.FirstOrDefault(s => s.Id == keepSupplier);
@@ -165,7 +165,7 @@ public sealed partial class ReplenishmentViewModel : ObservableObject
             SelectedRow = null;
             StatusMessage = Rows.Count == 0
                 ? "Nothing is at or below its reorder level."
-                : $"{Rows.Count} item(s) need replenishing — refreshed {DateTime.Now:HH:mm:ss}.";
+                : $"{Rows.Count} item(s) need replenishing - refreshed {DateTime.Now:HH:mm:ss}.";
         }
         catch (Exception ex)
         {

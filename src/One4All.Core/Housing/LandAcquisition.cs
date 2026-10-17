@@ -175,7 +175,7 @@ public enum AcquisitionStatus
 /// <summary>
 /// A land acquisition case (<c>hse.land_acquisition</c>, brief §4.10.1): the method, counterparty and authorising
 /// resolution, the valuation obtained, the due-diligence checklist signed off item by item, and every cost capitalised
-/// into land WIP as it is incurred — completing it brings the parcel into the land bank at the total built-up cost.
+/// into land WIP as it is incurred - completing it brings the parcel into the land bank at the total built-up cost.
 /// </summary>
 public sealed class LandAcquisition : AuditableEntity, ICompanyScoped
 {

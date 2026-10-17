@@ -84,7 +84,7 @@ The list beside the form shows: Fee structures.
 
 ### Bursaries
 
-Request a bursary (percentage or value off compulsory fees) — it reduces fees only once approved by someone else with the bursary approval right, or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference. A bursary may expire: fees billed after its last day get no bursary. Expiring lists bursaries ending within the given days, for renewal.
+Request a bursary (percentage or value off compulsory fees) - it reduces fees only once approved by someone else with the bursary approval right, or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference. A bursary may expire: fees billed after its last day get no bursary. Expiring lists bursaries ending within the given days, for renewal.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ The list beside the form shows: Terms.
 
 ### Term dates, optional fees and leavers
 
-Term dates (with pro rata, a joiner pays from the admission date and a leaver is credited the unused part of the term invoice); a student taking or dropping an optional item (lunches, clubs, trips — billed with the term, not discounted); a student's admission date; withdrawing a student.
+Term dates (with pro rata, a joiner pays from the admission date and a leaver is credited the unused part of the term invoice); a student taking or dropping an optional item (lunches, clubs, trips - billed with the term, not discounted); a student's admission date; withdrawing a student.
 
 | Field | Required | Notes |
 | --- | --- | --- |

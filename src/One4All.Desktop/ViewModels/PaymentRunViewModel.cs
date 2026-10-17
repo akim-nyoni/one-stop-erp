@@ -29,7 +29,7 @@ public sealed record PaymentProposalRowVm(string Supplier, string Currency, int 
 
 /// <summary>
 /// Backs the supplier payment run screen: propose (nothing posted) for a payment date, due date and bank, review the
-/// per-supplier lines — credits netted, suppliers on hold skipped — then run it and save the EFT file. The rules live in
+/// per-supplier lines - credits netted, suppliers on hold skipped - then run it and save the EFT file. The rules live in
 /// the tested <see cref="IPaymentRunService"/>; this class lists and forwards.
 /// </summary>
 public sealed partial class PaymentRunViewModel : ObservableObject
@@ -112,7 +112,7 @@ public sealed partial class PaymentRunViewModel : ObservableObject
             foreach (var b in await db.Set<BankAccount>().Where(b => b.CompanyId == _companyId).OrderBy(b => b.Code)
                 .Select(b => new { b.Code, b.Name, b.Currency, b.GlAccountCode }).ToListAsync(ct).ConfigureAwait(true))
             {
-                Banks.Add(new PayFromBankVm(b.GlAccountCode, $"{b.Code} — {b.Name} ({b.Currency})"));
+                Banks.Add(new PayFromBankVm(b.GlAccountCode, $"{b.Code} - {b.Name} ({b.Currency})"));
             }
 
             SelectedBank = Banks.FirstOrDefault();
@@ -147,7 +147,7 @@ public sealed partial class PaymentRunViewModel : ObservableObject
             {
                 string status = line.OnHold ? "On hold" : line.ToPay > 0m ? "Pay" : "Settled by credits";
                 Rows.Add(new PaymentProposalRowVm(
-                    $"{line.SupplierCode} — {line.SupplierName}",
+                    $"{line.SupplierCode} - {line.SupplierName}",
                     line.Currency,
                     line.InvoicesDue,
                     Money(line.AmountDue),
@@ -161,7 +161,7 @@ public sealed partial class PaymentRunViewModel : ObservableObject
             Summary = result.Value.PaymentCount == 0
                 ? "Nothing to pay."
                 : $"{result.Value.PaymentCount} payment(s): {string.Join(", ", result.Value.ToPayByCurrency.Select(kv => $"{kv.Key} {Money(kv.Value)}"))}.";
-            StatusMessage = "Proposal only — nothing has been posted. Review, then run.";
+            StatusMessage = "Proposal only - nothing has been posted. Review, then run.";
         }
         catch (Exception ex)
         {

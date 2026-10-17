@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers two postings racing for the journal number sequence: while one user's posting holds its transaction open,
 /// another user's posting reads the same next number, waits on the locked sequence row, loses the race when the first
-/// commits — and is retried rather than failing, taking the following number. Both journals post, numbering stays
+/// commits - and is retried rather than failing, taking the following number. Both journals post, numbering stays
 /// gapless and check data is clean.
 /// </summary>
 [Collection(AccountingCollection.Name)]

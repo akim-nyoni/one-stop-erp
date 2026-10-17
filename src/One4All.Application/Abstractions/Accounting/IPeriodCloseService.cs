@@ -27,7 +27,7 @@ public sealed record PeriodCloseChecklist(DateOnly PeriodEnd, IReadOnlyList<Peri
 
 /// <summary>
 /// The period-end close checklist (brief §3.3): a cross-module readiness report a controller runs before
-/// closing a period — unposted journals, unsynced offline sales, unreconciled statement lines, open
+/// closing a period - unposted journals, unsynced offline sales, unreconciled statement lines, open
 /// stocktakes, goods received not invoiced and approvals still in progress. Pure read model.
 /// </summary>
 public interface IPeriodCloseService

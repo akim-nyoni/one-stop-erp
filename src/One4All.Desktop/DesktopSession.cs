@@ -3,7 +3,7 @@ using One4All.Application.Abstractions.Security;
 namespace One4All.Desktop;
 
 /// <summary>
-/// The signed-in user of this desktop instance, set once at login, so windows can act — and be audited — as that user
+/// The signed-in user of this desktop instance, set once at login, so windows can act - and be audited - as that user
 /// (for example the report viewer's previews and exports in the report run log).
 /// </summary>
 public sealed class DesktopSession

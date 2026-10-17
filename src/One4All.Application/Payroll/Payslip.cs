@@ -44,10 +44,10 @@ public sealed class PayslipDocument
     /// <summary>The net pay.</summary>
     public decimal NetPay { get; init; }
 
-    /// <summary>What the employer contributes on top (pension, medical aid, levies) — shown, not deducted.</summary>
+    /// <summary>What the employer contributes on top (pension, medical aid, levies) - shown, not deducted.</summary>
     public IReadOnlyList<PayslipItem> EmployerContributions { get; init; } = [];
 
-    /// <summary>Taxable benefits and other memo items — taxed, not paid.</summary>
+    /// <summary>Taxable benefits and other memo items - taxed, not paid.</summary>
     public IReadOnlyList<PayslipItem> MemoItems { get; init; } = [];
 
     /// <summary>How the net pay is paid (e.g. "Bank transfer to …4321"), or null.</summary>

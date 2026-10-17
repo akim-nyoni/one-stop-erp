@@ -9,8 +9,8 @@ namespace One4All.Application.Pos;
 public readonly record struct SplitShare(int LineIndex, decimal Quantity);
 
 /// <summary>
-/// Splitting one basket into several sales, each paid on its own (brief §4.1 split bill): by items — each part takes whole lines or
-/// part quantities — or evenly. Amounts follow the quantity taken; the last share of a line takes any rounding so every line's net,
+/// Splitting one basket into several sales, each paid on its own (brief §4.1 split bill): by items - each part takes whole lines or
+/// part quantities - or evenly. Amounts follow the quantity taken; the last share of a line takes any rounding so every line's net,
 /// tax and discount add back exactly.
 /// </summary>
 public static class SplitBill
@@ -146,7 +146,7 @@ public static class SplitBill
         return ByPercent(lines, percents);
     }
 
-    /// <summary>A part's gross (net plus tax) — what its payer must tender.</summary>
+    /// <summary>A part's gross (net plus tax) - what its payer must tender.</summary>
     /// <param name="lines">The part's lines.</param>
     /// <returns>The gross.</returns>
     public static decimal Gross(IEnumerable<PosSaleLineRequest> lines) => lines.Sum(l => l.LineNet + l.TaxAmount);

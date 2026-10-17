@@ -82,8 +82,8 @@ public enum RentalUnitType
 }
 
 /// <summary>
-/// A council rental unit (<c>hse.rental_unit</c>, brief §4.10.7): housing stock held to earn rent — kept out of the
-/// stands inventory — with its monthly rent and, while vacant, the date it fell void.
+/// A council rental unit (<c>hse.rental_unit</c>, brief §4.10.7): housing stock held to earn rent - kept out of the
+/// stands inventory - with its monthly rent and, while vacant, the date it fell void.
 /// </summary>
 public sealed class RentalUnit : AuditableEntity, ICompanyScoped
 {
@@ -149,7 +149,7 @@ public sealed class RentalUnit : AuditableEntity, ICompanyScoped
     /// <summary>Whether it is let.</summary>
     public bool IsLet => VacantSince is null;
 
-    /// <summary>Gets how the unit is accounted for (brief §4.10.9: held to earn rentals — investment property or PPE, never stock).</summary>
+    /// <summary>Gets how the unit is accounted for (brief §4.10.9: held to earn rentals - investment property or PPE, never stock).</summary>
     public RentalPropertyTreatment Treatment { get; private set; }
 
     /// <summary>Gets the asset account the unit is carried in.</summary>

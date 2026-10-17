@@ -105,7 +105,7 @@ public sealed partial class PayrollService : IPayrollVariableService
         if (preview.Value.ErrorCount > 0)
         {
             VariableImportLine first = preview.Value.Lines.First(l => l.Error is not null);
-            return Error.Validation("Payroll.VariableErrors", $"{preview.Value.ErrorCount} line(s) have errors — first, line {first.Line}: {first.Error}");
+            return Error.Validation("Payroll.VariableErrors", $"{preview.Value.ErrorCount} line(s) have errors - first, line {first.Line}: {first.Error}");
         }
 
         if (preview.Value.Lines.Count == 0)

@@ -47,7 +47,7 @@ public sealed class MunicipalBillingRunTests
                 db.Properties.Add(property);
             }
 
-            // A property with no refuse service — must be skipped.
+            // A property with no refuse service - must be skipped.
             Customer other = new(companyId, "STAND-9", "No refuse", Scenario.Usd);
             db.Customers.Add(other);
             await db.SaveChangesAsync();
@@ -65,7 +65,7 @@ public sealed class MunicipalBillingRunTests
             run.Value.TotalBilled.Should().Be(30m);       // 2 × 15
             run.Value.AlreadyBilled.Should().Be(0);
 
-            // Re-running March — same day or another day in the month — bills nobody again.
+            // Re-running March - same day or another day in the month - bills nobody again.
             var again = await billing.RunFixedChargeBillingAsync(companyId, ServiceType.Refuse, new DateOnly(2026, 3, 15), "REF");
             again.Value.PropertiesBilled.Should().Be(0);
             again.Value.TotalBilled.Should().Be(0m);

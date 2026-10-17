@@ -112,7 +112,7 @@ public sealed class PayrollRecoveryTests
             .AsEnumerable().Sum(i => i.Sign == LedgerSign.Debit ? i.OriginalBase : -i.OriginalBase);
         Balance().Should().Be(0m);
 
-        // April: another purchase and month of rent — then the run is reversed, putting both balances back.
+        // April: another purchase and month of rent - then the run is reversed, putting both balances back.
         (await pos.CompleteSaleAsync(Sale("RC-S2", new DateOnly(2026, 4, 3), 5m, new PosTenderRequest(TenderType.Credit, Scenario.Usd, 10m, "1491", false, StaffEmployeeId: rae.Id))))
             .IsSuccess.Should().BeTrue();
         (await rentals.RunRentAsync(companyId, new DateOnly(2026, 4, 1))).IsSuccess.Should().BeTrue();

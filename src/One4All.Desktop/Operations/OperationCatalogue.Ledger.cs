@@ -53,7 +53,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Year-end", ListTitle = "Fiscal years",
             Description = "Run: rolls the year's profit or loss to retained earnings (in the adjustment period when there is one), opens the next year on the same calendar and closes "
-                + "the year. Reverse: undoes a year-end not yet hard-locked so adjustments can be made and it can be run again. Hard lock: makes it final — every period permanently closed.",
+                + "the year. Reverse: undoes a year-end not yet hard-locked so adjustments can be made and it can be run again. Hard lock: makes it final - every period permanently closed.",
             Fields = [Num("Year", "Fiscal year id"), Pick("Step", "Step", ["Run", "Reverse", "Hard lock"]), Req("Retained", "Retained earnings account", "3200"), Opt("Reason", "Reason (reverse)")],
             Run = async (c, i) =>
             {
@@ -63,7 +63,7 @@ public static partial class OperationCatalogue
                 {
                     case "Reverse":
                         string journal = Check(await yearEnd.ReverseAsync(c.CompanyId, year, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true));
-                        return $"Year-end reversed (closing journal reversed by {journal}); the year is open again — reopen its periods to adjust.";
+                        return $"Year-end reversed (closing journal reversed by {journal}); the year is open again - reopen its periods to adjust.";
                     case "Hard lock":
                         _ = Check(await yearEnd.HardLockAsync(c.CompanyId, year).ConfigureAwait(true), string.Empty);
                         return "Year hard-locked: its periods are permanently closed.";
@@ -98,8 +98,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Funds, projects and fund accounting", ListTitle = "Funds and projects",
-            Description = "Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund — the default "
-                + "fund fills sub-ledger postings — and each fund must balance within each journal.",
+            Description = "Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund - the default "
+                + "fund fills sub-ledger postings - and each fund must balance within each journal.",
             Fields = [Pick("What", "What", ["Fund", "Project", "Fund accounting on", "Fund accounting off"]), Opt("Code", "Code (default fund for 'on')"), Opt("Name", "Name"),
                 Tick("Restricted", "Restricted fund"), Opt("Fund", "Project's fund"), Tick("Closed", "Inactive / closed")],
             Run = async (c, i) =>
@@ -222,8 +222,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "VAT return by tax point basis", ListTitle = "Journals awaiting approval",
-            Description = "The VAT due for a period on the company's basis — invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it "
-                + "is paid) — with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.",
+            Description = "The VAT due for a period on the company's basis - invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it "
+                + "is paid) - with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.",
             Fields = [Opt("From", "From (yyyy-MM-dd)"), Today("To", "To"), Pick("Basis", "Basis", Enum.GetNames<TaxPointBasis>()), Tick("Adopt", "Make it the company's basis")],
             Run = async (c, i) =>
             {
@@ -266,7 +266,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Budgeting", Title = "Multi-year framework, archive and lock", ListTitle = "Budget versions",
-            Description = "Outer years: indicative amounts for the years after the budget year (\"1:6100:1300; 2:6100:1400\" — years after:account:amount), set before approval. "
+            Description = "Outer years: indicative amounts for the years after the budget year (\"1:6100:1300; 2:6100:1400\" - years after:account:amount), set before approval. "
                 + "Show: the framework by account. Roll forward: next year's draft from an approved framework. Archive a superseded version (seal verified), then Lock it for good.",
             Fields = [Pick("Step", "Step", ["Outer years", "Show", "Roll forward", "Archive", "Lock"]), Num("Budget", "Budget id"), Opt("Years", "Outer years (outer years step)"),
                 OptNum("NextYear", "Next fiscal year (start year, roll forward)"), Opt("Label", "Label for the new draft")],
@@ -464,7 +464,7 @@ public static partial class OperationCatalogue
                     default:
                         IReadOnlyList<PettyCashFundRow> funds = await petty.ListFundsAsync(c.CompanyId).ConfigureAwait(true);
                         return funds.Count == 0 ? "No petty cash funds."
-                            : string.Join(Environment.NewLine, funds.Select(f => $"{f.Code,-10} {f.Name,-24} {f.AccountCode,-8} float {M(f.FloatAmount),10} book {M(f.Balance),10}  {f.Custodian ?? "—",-12} {(f.IsActive ? "open" : "closed")}"
+                            : string.Join(Environment.NewLine, funds.Select(f => $"{f.Code,-10} {f.Name,-24} {f.AccountCode,-8} float {M(f.FloatAmount),10} book {M(f.Balance),10}  {f.Custodian ?? "-",-12} {(f.IsActive ? "open" : "closed")}"
                                 + (f.LastCountDate is null ? string.Empty : $"  last count {f.LastCountDate:yyyy-MM-dd}")));
                 }
             },
@@ -574,8 +574,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Hyperinflation (IAS 29)",
-            Description = "Index: records a price index value for a month. Restate: the trial balance restated in current terms by the index — non-monetary items moved by the index "
-                + "change since they arose — with the gain or loss on the net monetary position.",
+            Description = "Index: records a price index value for a month. Restate: the trial balance restated in current terms by the index - non-monetary items moved by the index "
+                + "change since they arose - with the gain or loss on the net monetary position.",
             Fields = [Pick("Step", "Step", ["Index", "Restate"]), Req("Index", "Index code", "CPI"), Today("Date", "Month / as at"), Num("Value", "Index value (index)", "0")],
             Run = async (c, i) =>
             {

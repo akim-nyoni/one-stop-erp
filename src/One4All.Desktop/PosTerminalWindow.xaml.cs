@@ -96,7 +96,7 @@ public partial class PosTerminalWindow : Window
     {
         if (string.IsNullOrEmpty(_viewModel.LastReceiptText))
         {
-            MessageBox.Show(this, "No receipt yet — complete a sale first.", "Receipt", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "No receipt yet - complete a sale first.", "Receipt", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 

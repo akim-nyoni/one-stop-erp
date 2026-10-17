@@ -121,7 +121,7 @@ public sealed class TerminationService : ITerminationService
             NetPayAccountCode = request.NetPayAccount.Trim(),
         };
         termination.AddClearance("Final pay calculated and accrued" + (journal is null ? " (nothing due)" : $" ({journal}); paid once the checklist is cleared"), cleared: true);
-        termination.AddClearance(statement.UnrecoveredLoans > 0m ? $"Loans still owed: {statement.UnrecoveredLoans:N2} — arrange repayment" : "Staff loans settled", statement.UnrecoveredLoans == 0m);
+        termination.AddClearance(statement.UnrecoveredLoans > 0m ? $"Loans still owed: {statement.UnrecoveredLoans:N2} - arrange repayment" : "Staff loans settled", statement.UnrecoveredLoans == 0m);
         termination.AddClearance("Company property returned (keys, ID card, equipment, uniform)", cleared: false);
         foreach (EmployeeAssetIssue issued in await _db.Set<EmployeeAssetIssue>().AsNoTracking().Where(a => a.EmployeeId == employee.Id && a.ReturnedOn == null)
             .OrderBy(a => a.IssuedOn).ToListAsync(ct).ConfigureAwait(false))

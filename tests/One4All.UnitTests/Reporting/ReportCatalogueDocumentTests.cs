@@ -31,7 +31,7 @@ public class ReportCatalogueDocumentTests
     {
         string md = ReportCatalogueDocument.Render([new ReportDefinition { Code = "B", Name = "Bare" }, new ReportDefinition { Code = "A", Name = "Alpha", Module = "AR" }]);
         md.IndexOf("## AR", StringComparison.Ordinal).Should().BeLessThan(md.IndexOf("## General", StringComparison.Ordinal));
-        md.Should().Contain("| B | Bare | — | — | — | — | — |").And.Contain("2 reports.");
+        md.Should().Contain("| B | Bare | - | - | - | - | - |").And.Contain("2 reports.");
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class ReportCatalogueDocumentTests
         }
 
         File.Exists(path).Should().BeTrue("docs/reports/CATALOGUE.md must exist (regenerate with ONE4ALL_WRITE_CATALOGUE=1)");
-        File.ReadAllText(path).ReplaceLineEndings("\n").Should().Be(expected, "the catalogue is generated from the report definitions — regenerate it with ONE4ALL_WRITE_CATALOGUE=1");
+        File.ReadAllText(path).ReplaceLineEndings("\n").Should().Be(expected, "the catalogue is generated from the report definitions - regenerate it with ONE4ALL_WRITE_CATALOGUE=1");
     }
 
     private static string RepositoryRoot()

@@ -22,7 +22,7 @@ public static class Scenario
     public static async Task<long> SeedAsync(One4AllDbContext db, bool openPeriods = true, CurrencyCode? baseCurrency = null)
     {
         // Currencies and the FX rate are global reference data shared by the collection's single
-        // database — seed them only once.
+        // database - seed them only once.
         if (!await EntityFrameworkQueryableExtensions.AnyAsync(db.Currencies, c => c.Code == Usd))
         {
             db.Currencies.Add(new Currency(Usd, "US Dollar", "$"));

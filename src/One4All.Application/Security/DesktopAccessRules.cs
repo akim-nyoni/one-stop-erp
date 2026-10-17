@@ -5,7 +5,7 @@ namespace One4All.Application.Security;
 
 /// <summary>
 /// What a desktop console action needs (brief §5.1, enforced for the desktop as for the API): the modules whose menu carries the console
-/// module, a licence for one of them, and a permission in one of them — any to look, one that changes data to run an action. Pure.
+/// module, a licence for one of them, and a permission in one of them - any to look, one that changes data to run an action. Pure.
 /// </summary>
 public static class DesktopAccessRules
 {

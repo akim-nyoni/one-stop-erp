@@ -53,7 +53,7 @@ The list beside the form shows: Directory.
 
 ### Credit limits
 
-Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user. Policy: what an invoice over the limit does — Block (refused unless a supervisor overrides), Warn (posted, flagged and logged) or Ignore.
+Lowers a customer's credit limit at once; an increase is requested with the reason and approved (or rejected) by another user. Policy: what an invoice over the limit does - Block (refused unless a supervisor overrides), Warn (posted, flagged and logged) or Ignore.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ The list beside the form shows: Quotations.
 
 ### Sales orders
 
-Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; lines ITEM:quantity, or blank for everything outstanding — a part despatch leaves the rest on back order), invoice what has been despatched (tax at each line's tax code), take back goods returned from a despatch, or cancel what is left of the order.
+Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; lines ITEM:quantity, or blank for everything outstanding - a part despatch leaves the rest on back order), invoice what has been despatched (tax at each line's tax code), take back goods returned from a despatch, or cancel what is left of the order.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -166,7 +166,7 @@ The pick list for what is still to despatch on a sales order from a warehouse, i
 
 ### Drop-ship order lines
 
-The supplier sends sales-order items straight to the customer. Untick 'Confirm' to place it; tick it (with the supplier's invoice) once delivered — cost of sales is charged and the lines become invoiceable, no stock moves.
+The supplier sends sales-order items straight to the customer. Untick 'Confirm' to place it; tick it (with the supplier's invoice) once delivered - cost of sales is charged and the lines become invoiceable, no stock moves.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -542,7 +542,7 @@ Invoices, statements and other documents sent to a customer.
 
 ### Dunning reminders
 
-Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice — days configurable, or a dunning group's own; exempt groups are not chased), renders one customer's letter, or emails every letter due (not the same level again within the resend days). Groups and customer types are kept here too.
+Lists the customers due a reminder by how long their oldest debt is overdue (first reminder, second, final notice - days configurable, or a dunning group's own; exempt groups are not chased), renders one customer's letter, or emails every letter due (not the same level again within the resend days). Groups and customer types are kept here too.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -670,7 +670,7 @@ Prints the packing slip in the standard business document layout, or through the
 | AR-CUST | Customer Register | Customer master: code, name, currency, credit limit, payment terms, on-hold flag and analysis codes. |
 | AR-RECUR | Recurring Invoices | Standing recurring-invoice templates with amount, tax, interval, next run date and active flag. |
 | AR-STMT | Customer Statement | Outstanding items for a customer, with the closing balance. |
-| AR28 | Customer Statement — Consolidated Group | Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total. |
+| AR28 | Customer Statement - Consolidated Group | Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total. |
 | AR29 | Aged Debtors Detail | Every open item as at the date with its age from due date (or invoice date for customers aged that way) and band. |
 | AR30 | Aged Debtors by Sales Rep and Currency | Debtors aged as at the date, grouped by sales rep (or agent) and currency, in base. |
 | AR31 | Customer Ledger | One customer's documents in date order with running balance and what is still outstanding on each. |
@@ -683,15 +683,15 @@ Prints the packing slip in the standard business document layout, or through the
 | AR39 | Unallocated Receipts, Credits & Advances | Receipts, credit notes and advances not yet allocated to invoices at the date, with how long they have been unallocated. |
 | AR40 | Debtor Days (DSO) | Per customer: what is owed at the date against sales over the 90 days to it, as days of sales outstanding. |
 | AR41 | Promise-to-Pay Diary | Promises recorded by credit control: amount, date promised and whether kept, broken or still open at the date. |
-| AR42 | Dunning / Reminder Letters | Every customer with overdue debt at the date, at its reminder level (first, second, final), with the letter itself — overdue amount after unallocated credits and the oldest days overdue. |
+| AR42 | Dunning / Reminder Letters | Every customer with overdue debt at the date, at its reminder level (first, second, final), with the letter itself - overdue amount after unallocated credits and the oldest days overdue. |
 | AR43 | Bad Debt Write-off Listing | Write-offs in the period with the customer, document and the debt case that approved it. |
-| AR44 | Customer Deposits & Advance Payments Held | Money received from customers and not yet applied to an invoice at the date — deposits, advances and payments on account — with how long each has been held, in transaction currency and base. |
+| AR44 | Customer Deposits & Advance Payments Held | Money received from customers and not yet applied to an invoice at the date - deposits, advances and payments on account - with how long each has been held, in transaction currency and base. |
 | AR45 | Lay-bye Status & Arrears | Every lay-bye plan with price, paid, balance and days to (or past) its final date. |
 | AR46 | Sales Agent Commission Statement & Accrual Schedule | Per sales rep for the period: commission earned on each customer's base, the rep's total to accrue, optionally for one rep. |
 | AR47 | Debtor Exposure by Currency | What customers owe at the date in each currency, in transaction and base, with each currency's share. |
 | AR48 | New & Dormant Customers | Customers first invoiced in the period, and customers not invoiced for 90 days to its end. |
 | SO137 | Open Sales Orders & Allocation | Open order lines with what is outstanding to despatch and the free stock that can cover it. |
-| SO140 | Despatch / Delivery Performance (OTIF) | Orders due in the period: requested date, what was ordered and what was signed for by then — on time, in full and OTIF. |
+| SO140 | Despatch / Delivery Performance (OTIF) | Orders due in the period: requested date, what was ordered and what was signed for by then - on time, in full and OTIF. |
 | SO141 | Proof of Delivery Outstanding | Delivery notes despatched by the date that have not been signed for, oldest first. |
 | SO142 | Delivery Schedule / Load Sheet | Deliveries planned in the period by date, vehicle and route: what is on each load and its weight. |
 | SO143 | Quotation Conversion Rate | Quotations by month: count, converted to orders, value quoted, value converted and the conversion rate. |

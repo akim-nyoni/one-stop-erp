@@ -4,7 +4,7 @@ namespace One4All.Core.Procurement;
 
 /// <summary>
 /// A retained earlier version of a purchase order (<c>pop.purchase_order_revision</c>, brief §4.3): the order as it
-/// stood before an amendment — its lines and total — with why and by whom it was changed, so the amendment history is
+/// stood before an amendment - its lines and total - with why and by whom it was changed, so the amendment history is
 /// never lost.
 /// </summary>
 public sealed class PurchaseOrderRevision : AuditableEntity, ICompanyScoped

@@ -42,13 +42,13 @@ public static class DocumentReports
         yield return Business("DOC09", "Payment Certificate (designable)", "An interim payment certificate by its number", number);
         yield return Business("DOC10", "Municipal Bill (designable)", "A stand's monthly municipal bill by stand number and any day in the month", [("Number", ParameterType.String), ("Date", ParameterType.Date)]);
         yield return Listing("DOC11", "Tax Invoice / Credit Note (designable)", Module,
-            "A customer tax invoice or credit note by its number — company, customer and address, dates, each line, net, tax, gross and what is still outstanding — as the data source for a company's own invoice layout.",
+            "A customer tax invoice or credit note by its number - company, customer and address, dates, each line, net, tax, gross and what is still outstanding - as the data source for a company's own invoice layout.",
             "DocTaxInvoice",
             [new Column("Kind", "Document", 80), new Column("CustomerCode", "Customer", 70), new Column("CustomerName", "Name", 150), new Column("Number", "Number", 80), new Column("Date", "Date", 70),
              new Column("DueDate", "Due", 70), new Column("Description", "Description", 200), new Column("Amount", "Amount", 85, true), new Column("Net", "Net", 85), new Column("Tax", "Tax", 85),
              new Column("Gross", "Gross", 85), new Column("Outstanding", "Outstanding", 85)], number);
         yield return Listing("DOC12", "Purchase Order (designable)", Module,
-            "A purchase order by its number — supplier and address, date, terms, each line with quantity and price, and the order total — as the data source for a company's own purchase order layout.",
+            "A purchase order by its number - supplier and address, date, terms, each line with quantity and price, and the order total - as the data source for a company's own purchase order layout.",
             "DocPurchaseOrder",
             [new Column("SupplierCode", "Supplier", 70), new Column("SupplierName", "Name", 150), new Column("Number", "Order", 80), new Column("Date", "Date", 70), new Column("Status", "Status", 70),
              new Column("Code", "Code", 70), new Column("Description", "Description", 180), new Column("Quantity", "Qty", 60), new Column("UnitPrice", "Price", 70), new Column("Amount", "Amount", 85, true),
@@ -86,14 +86,14 @@ public static class DocumentReports
     private static ReportDefinition Business(string code, string name, string what, (string Name, ParameterType Type)[] parameters)
     {
         string kind = Kinds[code];
-        return Listing(code, name, Module, what + " — title, company, party, reference fields (Field1…Field6 with their labels), each line, the totals (Total = the last one), notes and signature lines "
-            + "— as the data source for a company's own layout in the report designer.", "Doc" + kind, BusinessColumns, parameters);
+        return Listing(code, name, Module, what + " - title, company, party, reference fields (Field1…Field6 with their labels), each line, the totals (Total = the last one), notes and signature lines "
+            + "- as the data source for a company's own layout in the report designer.", "Doc" + kind, BusinessColumns, parameters);
     }
 
     private static ReportDefinition Text(string code, string name, string what, bool withDate = false)
     {
         (string Name, ParameterType Type)[] parameters = withDate ? [("Number", ParameterType.String), ("Date", ParameterType.Date)] : [("Number", ParameterType.String)];
-        return Listing(code, name, Module, what + " — one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout "
+        return Listing(code, name, Module, what + " - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout "
             + "in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer.", "Doc" + Kinds[code], TextColumns, parameters);
     }
 }

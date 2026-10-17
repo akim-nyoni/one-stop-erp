@@ -311,7 +311,7 @@ public sealed class PettyCashService : IPettyCashService
             }
 
             decimal amount = Math.Abs(count.Variance);
-            // Shortage: the book is higher than the cash — write the cash down. Overage: take the extra cash in.
+            // Shortage: the book is higher than the cash - write the cash down. Overage: take the extra cash in.
             Result<PostingReceipt> variance = count.Variance < 0m
                 ? await PostAsync(companyId, date, "CB", documentNumber, $"Petty cash shortage {fund.Code} count {count.CountDate:yyyy-MM-dd}",
                     (fund.OverShortAccountCode, JournalSide.Debit, amount), (fund.AccountCode, JournalSide.Credit, amount)).ConfigureAwait(false)

@@ -10,7 +10,7 @@ public readonly record struct YearEndResult(string ClosingJournalNumber, decimal
 
 /// <summary>
 /// Runs the year-end routine (brief §3.4): rolls the profit or loss to retained earnings via a closing journal (in the adjustment
-/// period when the year has one), opens the next year on the same calendar, and closes the year — reversible and re-runnable until
+/// period when the year has one), opens the next year on the same calendar, and closes the year - reversible and re-runnable until
 /// it is hard-locked.
 /// Balance-sheet balances carry forward naturally because reports accumulate from inception.
 /// </summary>

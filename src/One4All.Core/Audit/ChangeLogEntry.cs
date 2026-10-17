@@ -170,7 +170,7 @@ public sealed class ChangeLogEntry : Entity
 
     /// <summary>
     /// Recomputes this entry's hash from a candidate previous hash and returns whether it matches the
-    /// stored <see cref="RowHash"/> — the primitive used by the chain-verification routine.
+    /// stored <see cref="RowHash"/> - the primitive used by the chain-verification routine.
     /// </summary>
     /// <param name="previousRowHash">The previous entry's stored hash.</param>
     /// <returns>True when the recomputed hash matches.</returns>

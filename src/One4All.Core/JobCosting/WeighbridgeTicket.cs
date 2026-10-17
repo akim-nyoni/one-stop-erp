@@ -100,7 +100,7 @@ public sealed class HaulageZone : Entity, ICompanyScoped
 }
 
 /// <summary>
-/// A weighbridge ticket for bulk materials — sand, stone, concrete (brief §3 weighbridge module). Captures
+/// A weighbridge ticket for bulk materials - sand, stone, concrete (brief §3 weighbridge module). Captures
 /// first weigh (gross) and second weigh (tare), computes net tonnage, and converts to m³ using a
 /// per-product factor so bulk orders can be measured and invoiced in either unit.
 /// </summary>
@@ -145,10 +145,10 @@ public sealed class WeighbridgeTicket : AuditableEntity, ICompanyScoped
     /// <summary>The product (sand, stone, concrete …).</summary>
     public string Product { get; private set; }
 
-    /// <summary>The gross weight (kg) — first weigh.</summary>
+    /// <summary>The gross weight (kg) - first weigh.</summary>
     public decimal GrossWeightKg { get; private set; }
 
-    /// <summary>The tare weight (kg) — second weigh.</summary>
+    /// <summary>The tare weight (kg) - second weigh.</summary>
     public decimal TareWeightKg { get; private set; }
 
     /// <summary>Whether the second weigh has been captured.</summary>

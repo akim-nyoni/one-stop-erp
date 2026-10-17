@@ -81,7 +81,7 @@ public sealed class LotTrackingTests
         }
 
         (await Render("INV82")).Should().Contain("DAMAGED,Damaged in store,1,0,1,-2");
-        (await Render("INV100")).Should().Contain("Uncategorised,DAMAGED Damaged in store,1,0.00,—,2");
+        (await Render("INV100")).Should().Contain("Uncategorised,DAMAGED Damaged in store,1,0.00,-,2");
         (await Render("INV88")).Should().Contain("LMILK Milk powder,LWH,B1,2026-03-01,2026-04-10,1,2").And.Contain("LMILK Milk powder,LWH,B2,2026-03-01,2026-08-28,2,4");
         string serials = await Render("INV89");
         serials.Should().Contain("LPHONE Handset,S-1,Out,LWH,2026-03-01,2026-03-05,Issue ISS").And.Contain("LPHONE Handset,S-2,In stock,LWH,2026-03-01,2026-03-01,Receipt");

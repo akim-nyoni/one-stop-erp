@@ -99,7 +99,7 @@ public sealed class BudgetingReportsTests
         (await Render("B1")).Should().Contain("Works,In progress,2,");
         (await Render("B13")).Should().Contain("Works,6000,").And.Contain("\"1,800.00\",\"1,500.00\",0.00,1800");
         (await Render("B19")).Should().Contain(",All,360.00,360.00,360.00,360.00,1440");
-        (await Render("B21")).Should().Contain("6000,").And.Contain(",—,1440");
+        (await Render("B21")).Should().Contain("6000,").And.Contain(",-,1440");
         (await Render("B22")).Should().Contain("OPEX v2,Active,6000,\"1,200.00\",\"1,440.00\",,240");
         (await Render("B38")).Should().Contain(",All,\"1,440.00\",450.00,\"1,350.00\",\"1,800.00\",-360");
         (await Render("B39")).Should().Contain("\"1,560.00\",\"1,800.00\",Fuel prices,240");
@@ -138,7 +138,7 @@ public sealed class BudgetingReportsTests
         string versions = await Render("B11");
         versions.Should().Contain("OPEX,1,OriginalApproved,Superseded").And.Contain("OPEX,2,SupplementaryRevised,Active").And.Contain("Yes").And.Contain("not sealed");
         string archive = await RenderWith("B16", new() { ["BudgetLabel"] = "opex" });
-        archive.Should().Contain("OPEX v2 2026 — seal verified").And.Contain("TOTAL").And.Contain("1440");
+        archive.Should().Contain("OPEX v2 2026 - seal verified").And.Contain("TOTAL").And.Contain("1440");
         (await RenderWith("B16", new() { ["BudgetLabel"] = "OPEX", ["Version"] = 1 })).Should().Contain("OPEX v1 2026").And.Contain("1200");
         (await RenderWith("B16", new() { ["BudgetLabel"] = "WORKS" })).Should().NotContain("WORKS v");
         (await RenderWith("B31", new() { ["Level"] = "Account", ["Basis"] = "YTD" })).Should().Contain("6000,").And.Contain("360.00,450.00,0.00,-90.00,125.0%,3");

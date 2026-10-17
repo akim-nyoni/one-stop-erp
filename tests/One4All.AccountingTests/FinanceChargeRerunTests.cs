@@ -52,7 +52,7 @@ public sealed class FinanceChargeRerunTests
         // Same date again: nothing new to charge.
         (await Run(provider, companyId, new DateOnly(2026, 1, 31))).Charges.Should().BeEmpty();
 
-        // Run 2 at 2 Mar: only the 30 days since 31 Jan — not 60 — and nothing on January's 9.86 finance charge.
+        // Run 2 at 2 Mar: only the 30 days since 31 Jan - not 60 - and nothing on January's 9.86 finance charge.
         FinanceChargeRunResult march = await Run(provider, companyId, new DateOnly(2026, 3, 2));
         CustomerFinanceCharge charge = march.Charges.Should().ContainSingle().Subject;
         charge.Interest.Should().Be(9.86m);

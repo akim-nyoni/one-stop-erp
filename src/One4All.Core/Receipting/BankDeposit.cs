@@ -9,7 +9,7 @@ public enum BankDepositStatus
     /// <summary>Cash handed to treasury / on the deposit slip, sitting in cash-in-transit.</summary>
     InTransit = 1,
 
-    /// <summary>Confirmed on the bank statement — cash-in-transit cleared.</summary>
+    /// <summary>Confirmed on the bank statement - cash-in-transit cleared.</summary>
     Banked = 2,
 }
 

@@ -74,7 +74,7 @@ public sealed class SchoolServicesTests
         }
 
         (await Render("SC179")).Should().Contain("Trust Fund,S Two (SS-002),\"1,000.00\",600.00,400");
-        (await Render("SC181")).Should().Contain("SS-T1-SS-001,Term 1 fees — S One,2026-01-01 to 2026-03-31,\"1,000.00\",0.00,1000").And.Contain("SS-T1-SS-002,");
+        (await Render("SC181")).Should().Contain("SS-T1-SS-001,Term 1 fees - S One,2026-01-01 to 2026-03-31,\"1,000.00\",0.00,1000").And.Contain("SS-T1-SS-002,");
         (await Render("SC183")).Should().Contain("R1,Route One,20,1,5.0%,150.00,150");
         (await Render("SC184")).Should().Contain("H1,North House,10,1,10.0%,400.00,400");
         (await Render("SC176")).Should().Contain("G1 A,S One (SS-001),Parent One,3,");

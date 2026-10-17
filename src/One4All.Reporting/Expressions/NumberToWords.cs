@@ -4,7 +4,7 @@ using System.Text;
 namespace One4All.Reporting.Expressions;
 
 /// <summary>
-/// Converts numbers to English words (brief §13.1) — essential for cheques and payment vouchers. Handles
+/// Converts numbers to English words (brief §13.1) - essential for cheques and payment vouchers. Handles
 /// the integer part and, for currency, the minor units (e.g. "One Hundred And Fifteen Dollars and Zero
 /// Cents"). Multi-language variants can be added as further methods.
 /// </summary>

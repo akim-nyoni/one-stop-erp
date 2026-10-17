@@ -30,7 +30,7 @@ public sealed record PricingRuleKey(long Id, PricingScope Scope, long? SchemeId,
 
 /// <summary>
 /// Stand selling prices (brief §4.10.2): land cost + servicing cost + overhead recovery + development levy + margin =
-/// price, and which approved rule prices a stand on a date — a stand's own rule before its size band's before its
+/// price, and which approved rule prices a stand on a date - a stand's own rule before its size band's before its
 /// scheme's, the latest effective one in that scope. Pure and unit-tested.
 /// </summary>
 public static class StandPricing

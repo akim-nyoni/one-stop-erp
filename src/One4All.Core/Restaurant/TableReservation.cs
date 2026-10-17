@@ -5,16 +5,16 @@ namespace One4All.Core.Restaurant;
 /// <summary>The lifecycle of a table reservation (Restaurant module).</summary>
 public enum ReservationStatus
 {
-    /// <summary>Booked — a future reservation awaiting the guest.</summary>
+    /// <summary>Booked - a future reservation awaiting the guest.</summary>
     Booked = 1,
 
-    /// <summary>Seated — the guest arrived and an order was opened.</summary>
+    /// <summary>Seated - the guest arrived and an order was opened.</summary>
     Seated = 2,
 
     /// <summary>Cancelled by the guest or the house.</summary>
     Cancelled = 3,
 
-    /// <summary>No-show — the guest never arrived.</summary>
+    /// <summary>No-show - the guest never arrived.</summary>
     NoShow = 4,
 }
 

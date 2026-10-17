@@ -19,8 +19,8 @@ namespace One4All.Desktop.ViewModels;
 public sealed record StageAgeingVm(string Stage, int Count, int AverageDays, int OldestDays);
 
 /// <summary>
-/// Backs the Title Deed Pipeline (brief §4.10.6): the pipeline as at a date — ageing by stage and every open application
-/// with its days at the stage — and the next step for the selected application with its particulars. All rules live in
+/// Backs the Title Deed Pipeline (brief §4.10.6): the pipeline as at a date - ageing by stage and every open application
+/// with its days at the stage - and the next step for the selected application with its particulars. All rules live in
 /// the tested <see cref="ITitleDeedService"/>.
 /// </summary>
 public sealed partial class TitlePipelineViewModel : ObservableObject
@@ -54,7 +54,7 @@ public sealed partial class TitlePipelineViewModel : ObservableObject
     [ObservableProperty]
     private TitleStage _nextStage = TitleStage.ConveyancerAssigned;
 
-    /// <summary>The conveyancer, the registry's query, the deed number or who signed — as the stage needs.</summary>
+    /// <summary>The conveyancer, the registry's query, the deed number or who signed - as the stage needs.</summary>
     [ObservableProperty]
     private string _particulars = string.Empty;
 

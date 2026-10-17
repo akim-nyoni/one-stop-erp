@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace One4All.Licensing.Core;
 
 /// <summary>
-/// The online activation contract (brief §11: an optional online activation service for self-service activation and renewal — the interfaces now,
+/// The online activation contract (brief §11: an optional online activation service for self-service activation and renewal - the interfaces now,
 /// the vendor's service later). The site sends its activation request code; the service answers with a signed licence (and, when it has one, the
 /// latest revocation list), which the site validates and installs exactly as it would a file from the vendor.
 /// </summary>

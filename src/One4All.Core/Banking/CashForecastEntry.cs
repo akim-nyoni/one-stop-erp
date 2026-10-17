@@ -4,7 +4,7 @@ namespace One4All.Core.Banking;
 
 /// <summary>
 /// A flow keyed into the cash forecast by hand (<c>cb.cash_forecast_entry</c>, brief §4.4): a loan drawdown, a tax payment, a grant
-/// expected — once, or repeating monthly until a date. Positive comes in, negative goes out.
+/// expected - once, or repeating monthly until a date. Positive comes in, negative goes out.
 /// </summary>
 public sealed class CashForecastEntry : AuditableEntity, ICompanyScoped
 {

@@ -2,7 +2,7 @@
 
 A Windows-desktop ERP (Sage 200-style) with a single codebase deployable to supermarkets,
 retail, hospitality, butchery, bulk materials, construction, schools, councils/municipalities
-and housing/land development — plus cross-cutting **budgeting** and **payroll**. Multi-company,
+and housing/land development - plus cross-cutting **budgeting** and **payroll**. Multi-company,
 multi-currency (IAS 21), IFRS-correct accounting core.
 
 > Full contract: [`docs/BRIEF.md`](docs/BRIEF.md). Progress log: [`docs/PROGRESS.md`](docs/PROGRESS.md).
@@ -11,10 +11,10 @@ multi-currency (IAS 21), IFRS-correct accounting core.
 
 | Concern | Choice |
 |---|---|
-| Runtime | .NET 10 (`net10.0`; WPF `net10.0-windows`) — see [ADR-0001](docs/decisions/ADR-0001-net10-instead-of-net8.md) |
+| Runtime | .NET 10 (`net10.0`; WPF `net10.0-windows`) - see [ADR-0001](docs/decisions/ADR-0001-net10-instead-of-net8.md) |
 | Desktop UI | WPF + CommunityToolkit.Mvvm (Avalonia-port-friendly: no business logic in code-behind) |
 | App server | ASP.NET Core Web API (`One4All.Server`); embedded in-process for single-PC installs |
-| Database | PostgreSQL 18 dev / 16+ supported — [ADR-0002](docs/decisions/ADR-0002-postgresql-18.md) |
+| Database | PostgreSQL 18 dev / 16+ supported - [ADR-0002](docs/decisions/ADR-0002-postgresql-18.md) |
 | Data access | EF Core 10 (write model) + Dapper (reporting / set-based reads) |
 | Tests | xUnit + FluentAssertions (7.x, last free version) + Testcontainers (CI) |
 
@@ -51,4 +51,4 @@ export ONE4ALL_CONNECTION="Host=localhost;Port=5432;Database=one4all;Username=po
 
 ## Build order
 
-Phased delivery per brief §16. Current phase: **Phase 0 — Foundations** (see `docs/PROGRESS.md`).
+Phased delivery per brief §16. Current phase: **Phase 0 - Foundations** (see `docs/PROGRESS.md`).

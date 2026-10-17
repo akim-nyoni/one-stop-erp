@@ -23,7 +23,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Language and terminology", ListTitle = "The company's terms",
-            Description = "The company's locale (screen language where translated, and the date and number formats of its reports — e.g. en-ZW, pt-MZ) and its own words for standard terms "
+            Description = "The company's locale (screen language where translated, and the date and number formats of its reports - e.g. en-ZW, pt-MZ) and its own words for standard terms "
                 + "(Stand → Erf) on screens and report labels. Sign in again to see the screens change.",
             Fields = [Opt("Locale", "Locale (blank: keep; '-' for English / invariant)"), Opt("Term", "Standard word"), Opt("Replacement", "The company's word (blank removes it)")],
             Run = async (c, i) =>
@@ -59,7 +59,7 @@ public static partial class OperationCatalogue
                 One4All.Infrastructure.Security.IFieldEncryptionService encryption = c.Get<One4All.Infrastructure.Security.IFieldEncryptionService>();
                 int rewritten = i.Flag("Encrypt") ? await encryption.ReencryptAsync().ConfigureAwait(true) : 0;
                 One4All.Infrastructure.Security.FieldEncryptionReport report = await encryption.StatusAsync().ConfigureAwait(true);
-                return $"Active key {report.ActiveKeyId}{(report.DevelopmentKey ? " (DEVELOPMENT key file — configure FieldEncryption keys before going live)" : string.Empty)}. "
+                return $"Active key {report.ActiveKeyId}{(report.DevelopmentKey ? " (DEVELOPMENT key file - configure FieldEncryption keys before going live)" : string.Empty)}. "
                     + (i.Flag("Encrypt") ? $"{rewritten} row(s) rewritten. " : string.Empty) + (report.Complete ? "Everything is encrypted with the active key." : $"{report.Pending.Values.Sum()} value(s) still to encrypt.");
             },
             List = async c => Table((await c.Get<One4All.Infrastructure.Security.IFieldEncryptionService>().StatusAsync().ConfigureAwait(true)).Pending.ToList(),

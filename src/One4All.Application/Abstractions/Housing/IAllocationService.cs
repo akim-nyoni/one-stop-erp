@@ -43,6 +43,15 @@ public sealed class AllocationProposal
 /// <param name="OfferedPrice">The stand's price frozen at the offer date, when an approved price applied.</param>
 public sealed record AllocationLine(int Sequence, string StandNumber, string WaitingListNumber, AllocationStatus Status, string? CertificateNumber, decimal? OfferedPrice = null);
 
+/// <summary>An open offer past its deadline, awaiting an officer's decision.</summary>
+/// <param name="CertificateNumber">The certificate.</param>
+/// <param name="StandNumber">The stand.</param>
+/// <param name="WaitingListNumber">The applicant.</param>
+/// <param name="OfferExpires">The deadline.</param>
+/// <param name="DaysOverdue">Days past it.</param>
+/// <param name="Extensions">How many times it was extended.</param>
+public sealed record ExpiredOffer(string CertificateNumber, string StandNumber, string WaitingListNumber, DateOnly OfferExpires, int DaysOverdue, int Extensions);
+
 /// <summary>An allocation run and its list.</summary>
 /// <param name="RunNumber">The run number.</param>
 /// <param name="Method">How the list was ordered.</param>
@@ -176,7 +185,32 @@ public interface IAllocationService
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> DeclineAsync(long companyId, string certificateNumber, DateOnly date, string reason, CancellationToken ct = default);
 
-    /// <summary>Lapses every open offer past its deadline, returning the stands to the pool.</summary>
+    /// <summary>The exceptions queue (brief §4.10.4): open offers past their deadline, for an officer to lapse or extend with a reason.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="asAtDate">The date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The expired offers, oldest deadline first.</returns>
+    Task<IReadOnlyList<ExpiredOffer>> ExpiredOffersAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>Lapses one open offer with a reason: the stand returns to the pool.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="certificateNumber">The allocation certificate.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="reason">Why (required).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> LapseOfferAsync(long companyId, string certificateNumber, DateOnly date, string reason, CancellationToken ct = default);
+
+    /// <summary>Extends one open offer's deadline with a reason.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="certificateNumber">The allocation certificate.</param>
+    /// <param name="newExpiry">The new deadline (after the current one).</param>
+    /// <param name="reason">Why (required).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> ExtendOfferAsync(long companyId, string certificateNumber, DateOnly newExpiry, string reason, CancellationToken ct = default);
+
+    /// <summary>Lapses every open offer past its deadline, returning the stands to the pool (an officer's bulk decision; the scheduled job only lists them).</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="asAtDate">The date.</param>
     /// <param name="ct">Cancellation token.</param>

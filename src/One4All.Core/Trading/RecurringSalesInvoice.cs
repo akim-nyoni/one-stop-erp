@@ -5,7 +5,7 @@ namespace One4All.Core.Trading;
 
 /// <summary>
 /// A recurring sales-invoice template (<c>ar.recurring_invoice</c>): standing instructions to raise a periodic
-/// AR invoice for a customer (subscriptions, retainers, rent). It holds no ledger balance itself — a billing
+/// AR invoice for a customer (subscriptions, retainers, rent). It holds no ledger balance itself - a billing
 /// run reads the due templates and posts real invoices through the sales ledger, then advances the next run.
 /// </summary>
 public sealed class RecurringSalesInvoice : AuditableEntity, ICompanyScoped

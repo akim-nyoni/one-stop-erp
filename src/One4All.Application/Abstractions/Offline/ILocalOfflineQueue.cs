@@ -15,7 +15,7 @@ public sealed record LocalOfflineEntry(Guid OperationId, long CompanyId, string 
 /// A durable, terminal-local queue used when the central database itself is unreachable (so the central
 /// <see cref="IOfflineOutbox"/> cannot be written). Operations are captured here and, on reconnect, handed
 /// off to the central outbox and then cleared. Unlike the central outbox this must not depend on the
-/// database — a file or embedded store on the terminal.
+/// database - a file or embedded store on the terminal.
 /// </summary>
 public interface ILocalOfflineQueue
 {

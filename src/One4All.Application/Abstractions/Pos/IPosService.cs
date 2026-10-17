@@ -256,7 +256,7 @@ public interface IPosService
 
     /// <summary>
     /// Hands the till to another cashier mid-shift (brief §4.1 cashier switch): the outgoing cashier's session is cashed up on their count and
-    /// closed, and a session opens on the same terminal for the incoming cashier with the counted cash as its float — one unit, so each
+    /// closed, and a session opens on the same terminal for the incoming cashier with the counted cash as its float - one unit, so each
     /// cashier answers for their own drawer.
     /// </summary>
     /// <param name="request">The hand-over.</param>

@@ -12,7 +12,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Covers the first H-series housing reports (brief §14 I-B): each renders through the generic runner against live data —
+/// Covers the first H-series housing reports (brief §14 I-B): each renders through the generic runner against live data -
 /// the land bank and acquisitions with what blocks them, the waiting list in seniority order and its age analysis, the
 /// allocation register and offers with their countdown, and the double-allocation exception report, which is empty until
 /// a stand is promised twice.
@@ -90,7 +90,7 @@ public sealed class HousingReportsTests
         register.Should().Contain("HR-1").And.Contain("HR-2").And.Contain("Offered");
         (await Render("H35")).Should().Contain("Expiring"); // 25 March, offers expire 31 March
 
-        // A stand promised twice — offered to an applicant and given to a cooperative behind the system's back.
+        // A stand promised twice - offered to an applicant and given to a cooperative behind the system's back.
         string clean = await Render("H39");
         clean.Should().NotContain("HR-1");
         db.Set<Cooperative>().Add(new Cooperative(companyId, $"HRC-{companyId}", "Rogue Coop", "R-1"));

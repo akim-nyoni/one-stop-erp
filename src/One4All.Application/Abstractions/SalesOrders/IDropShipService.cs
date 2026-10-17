@@ -16,7 +16,7 @@ public readonly record struct DropShipDelivered(decimal Cost, string SupplierInv
 /// <summary>
 /// Drop-shipment (brief §4.13): the supplier delivers sales-order lines straight to the customer. Ordering records what the supplier is
 /// to send (never more than is still to be despatched); confirming delivery posts the supplier's invoice to cost of sales, records a
-/// delivery note and counts the lines as despatched — no stock moves — so the order is invoiced to the customer as usual.
+/// delivery note and counts the lines as despatched - no stock moves - so the order is invoiced to the customer as usual.
 /// </summary>
 public interface IDropShipService
 {

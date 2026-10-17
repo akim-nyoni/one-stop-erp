@@ -39,10 +39,10 @@ public enum TransferType
 /// <summary>A pre-condition of a transfer (brief §4.10.6).</summary>
 public enum TransferRequirement
 {
-    /// <summary>Municipal clearance — checked live against the municipal register, never typed.</summary>
+    /// <summary>Municipal clearance - checked live against the municipal register, never typed.</summary>
     MunicipalClearance = 1,
 
-    /// <summary>Housing account clear — checked live against the sales ledger and instalment sales.</summary>
+    /// <summary>Housing account clear - checked live against the sales ledger and instalment sales.</summary>
     HousingAccountClear = 2,
 
     /// <summary>Identity of transferor and transferee verified.</summary>
@@ -57,7 +57,7 @@ public enum TransferRequirement
     /// <summary>Deceased-estate documents: death certificate, executor's appointment, distribution account.</summary>
     EstateDocuments = 6,
 
-    /// <summary>Transfer and administration fees receipted — the receipt is checked on the sales ledger.</summary>
+    /// <summary>Transfer and administration fees receipted - the receipt is checked on the sales ledger.</summary>
     FeesReceipted = 7,
 
     /// <summary>Capital gains / transfer-duty withholding computed and remitted.</summary>

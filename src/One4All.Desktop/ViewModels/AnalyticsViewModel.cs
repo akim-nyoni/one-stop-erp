@@ -28,7 +28,7 @@ public sealed record CashRowVm(string Account, string Balance, int Unreconciled)
 /// <summary>
 /// Backs the analytics dashboard: a one-glance view of the working-capital ratios (DSO/DPO/DIO and the cash
 /// conversion cycle), today's cash position across the bank accounts, and the CRM pipeline forecast and
-/// win-rate. It only reads — every figure comes from the already-tested read-side services, this class just
+/// win-rate. It only reads - every figure comes from the already-tested read-side services, this class just
 /// formats them for the screen.
 /// </summary>
 public sealed partial class AnalyticsViewModel : ObservableObject
@@ -148,7 +148,7 @@ public sealed partial class AnalyticsViewModel : ObservableObject
             {
                 foreach (CashPositionRow row in cash.Value.Rows)
                 {
-                    CashRows.Add(new CashRowVm($"{row.Code} — {row.Name}", Money(row.Balance), row.UnreconciledLines));
+                    CashRows.Add(new CashRowVm($"{row.Code} - {row.Name}", Money(row.Balance), row.UnreconciledLines));
                 }
 
                 TotalCash = Money(cash.Value.TotalBalance);

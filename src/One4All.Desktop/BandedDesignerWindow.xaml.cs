@@ -365,7 +365,7 @@ public partial class BandedDesignerWindow : Window
         }
 
         string name = _selected[0];
-        SelectionTitle.Text = _selected.Count == 1 ? $"Properties — {name}" : $"Properties — {name} (+{_selected.Count - 1} more; anchor for alignment)";
+        SelectionTitle.Text = _selected.Count == 1 ? $"Properties - {name}" : $"Properties - {name} (+{_selected.Count - 1} more; anchor for alignment)";
         _properties.Add(new PropertyRow("Name", name));
         foreach (string property in ReportDesignSession.EditableProperties)
         {
@@ -828,7 +828,7 @@ public partial class BandedDesignerWindow : Window
 
         RenderModel model = new ReportEngine().Build(new ReportInput { Definition = _session.Definition, Rows = _sample, Parameters = _parameters, CompanyName = "Preview", UserName = "designer" });
         (FixedDocument document, _) = FixedReportDocument.Build(model, drill: null);
-        new Window { Owner = this, Title = $"Preview — {_session.Definition.Name} (sample data)", Width = 900, Height = 900, Content = new DocumentViewer { Document = document } }.Show();
+        new Window { Owner = this, Title = $"Preview - {_session.Definition.Name} (sample data)", Width = 900, Height = 900, Content = new DocumentViewer { Document = document } }.Show();
     }
 
     private async void Save_Click(object sender, RoutedEventArgs e)

@@ -22,7 +22,7 @@ public sealed record IntegrityRowVm(string Severity, string Check, string Subjec
 
 /// <summary>
 /// Backs the Check Data screen: runs <see cref="ILedgerIntegrityService.CheckAsync"/> for the company and lists every
-/// finding, and offers the one safe repair — rebuilding the cached GL period balances from the posted lines. All rules
+/// finding, and offers the one safe repair - rebuilding the cached GL period balances from the posted lines. All rules
 /// live in the tested service; this class formats the result.
 /// </summary>
 public sealed partial class CheckDataViewModel : ObservableObject

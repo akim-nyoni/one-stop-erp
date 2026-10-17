@@ -29,7 +29,7 @@ public static class InventoryReports
         yield return Listing("INV86", "Overstock Report", "Inventory", "Items holding more than their reorder level plus reorder quantity (or more than 90 days of issues), with the excess value.",
             "StkOverstock", [new Column("Item", "Item", 150), new Column("OnHand", "On hand", 70), new Column("Ceiling", "Ceiling", 70), new Column("Excess", "Excess", 70), new Column("DaysCover", "Days cover", 70),
              new Column("Value", "Excess value", 95, true)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("INV87", "Negative Stock Report", "Inventory", "Item and warehouse balances below zero — an integrity exception to clear.",
+        yield return Listing("INV87", "Negative Stock Report", "Inventory", "Item and warehouse balances below zero - an integrity exception to clear.",
             "StkNegative", [new Column("Item", "Item", 150), new Column("Warehouse", "Warehouse", 90), new Column("OnHand", "On hand", 70), new Column("AverageCost", "Average cost", 85), new Column("Value", "Value", 95, true)], []);
         yield return Listing("INV88", "Batch / Lot Stock Report", "Inventory", "Batch-tracked stock on hand at the date per item, warehouse and batch, with first receipt, expiry and value at average cost.",
             "StkBatches", [new Column("Item", "Item", 150), new Column("Warehouse", "Warehouse", 80), new Column("Batch", "Batch", 100), new Column("Received", "First received", 80), new Column("Expiry", "Expiry", 75),

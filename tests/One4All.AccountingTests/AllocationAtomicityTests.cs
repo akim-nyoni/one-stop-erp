@@ -13,7 +13,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers allocation when its realised FX cannot be posted (the AR period is closed): the allocation fails without
-/// touching the items, so even a later save in the same scope persists nothing — check data stays clean — and once
+/// touching the items, so even a later save in the same scope persists nothing - check data stays clean - and once
 /// the period is reopened the same allocation succeeds with its realised gain.
 /// </summary>
 [Collection(AccountingCollection.Name)]

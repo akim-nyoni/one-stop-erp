@@ -24,7 +24,7 @@ public sealed record StoreIssueResult(string IssueNoteNumber, decimal Cost, bool
 
 /// <summary>
 /// Internal store requisition and issue vouchers (brief §4.8.4): a department requisitions goods, a different user
-/// approves, and the store issues them — in part or in full, never more than asked — charging the department's expense
+/// approves, and the store issues them - in part or in full, never more than asked - charging the department's expense
 /// account and cost centre at stock cost, each issue under its own issue note number.
 /// </summary>
 public interface IStoreRequisitionService

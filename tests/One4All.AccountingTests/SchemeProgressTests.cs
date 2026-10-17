@@ -79,15 +79,15 @@ public sealed class SchemeProgressTests
         }
 
         (await Render("H12", new DateOnly(2026, 4, 30))).Should().Contain($"{scheme.Code},3,1,1,1,0,60");
-        (await Render("H12", new DateOnly(2026, 2, 15))).Should().Contain($"{scheme.Code},3,1,2,0,0,—");
+        (await Render("H12", new DateOnly(2026, 2, 15))).Should().Contain($"{scheme.Code},3,1,2,0,0,-");
 
         string servicing = await Render("H13", new DateOnly(2026, 4, 30));
-        servicing.Should().Contain($"{scheme.Code},100%,80%,50%,90%,—,3,0,3");
+        servicing.Should().Contain($"{scheme.Code},100%,80%,50%,90%,-,3,0,3");
         (await progress.RecordServicingAsync(Certificate(BulkService.StormWater, 40m, 2))).IsSuccess.Should().BeTrue();
         (await Render("H13", new DateOnly(2026, 4, 30))).Should().Contain($"{scheme.Code},100%,80%,50%,90%,40%,3,2,1");
 
         string nrv = await Render("H9", new DateOnly(2026, 4, 30), 5m);
-        nrv.Should().Contain($"{bank},Parcel,—,\"50,000.00\",Valuation 2026-03-31 (Valuer & Co),\"40,000.00\",\"2,000.00\",\"38,000.00\",12000");
-        nrv.Should().Contain($"SP-1,Stand,{scheme.Code},\"4,000.00\",No price evidence,—,—,—,0");
+        nrv.Should().Contain($"{bank},Parcel,-,\"50,000.00\",Valuation 2026-03-31 (Valuer & Co),\"40,000.00\",\"2,000.00\",\"38,000.00\",12000");
+        nrv.Should().Contain($"SP-1,Stand,{scheme.Code},\"4,000.00\",No price evidence,-,-,-,0");
     }
 }

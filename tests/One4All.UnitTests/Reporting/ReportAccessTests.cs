@@ -8,7 +8,7 @@ namespace One4All.UnitTests.Reporting;
 
 /// <summary>
 /// Covers report security: a module with its own reports right (payroll, budget) needs it, a report can name its own permission, a super
-/// administrator runs everything; and report rows are cut to the user's scope — rows of another department or with the department blank
+/// administrator runs everything; and report rows are cut to the user's scope - rows of another department or with the department blank
 /// are left out, rows without a department column pass.
 /// </summary>
 public sealed class ReportAccessTests

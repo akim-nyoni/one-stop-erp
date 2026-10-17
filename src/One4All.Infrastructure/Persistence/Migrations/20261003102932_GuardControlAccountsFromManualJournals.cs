@@ -8,7 +8,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
     /// Brief §3.1: "Control accounts are locked from manual journals. Enforce in code AND with a DB trigger." Also closes a
     /// gap in the posted-journal guard: lines could still be inserted into a posted journal. Journals
     /// now record whether they are manual (<c>is_manual</c>, set by the posting engine), and a row trigger on
-    /// <c>gl.journal_line</c> refuses a line on a control account when its journal is manual — whatever wrote it. The
+    /// <c>gl.journal_line</c> refuses a line on a control account when its journal is manual - whatever wrote it. The
     /// posted-journal guard is redefined to keep <c>is_manual</c> fixed once posted.
     /// </summary>
     public partial class GuardControlAccountsFromManualJournals : Migration
@@ -57,7 +57,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
             migrationBuilder.Sql(PostedGuard(includeIsManual: true));
 
-            // Lines can no longer be added to a posted journal either (that would unbalance it) — except while the journal
+            // Lines can no longer be added to a posted journal either (that would unbalance it) - except while the journal
             // itself is being written, which the posting engine does in the same transaction as its lines. Journals inserted
             // by the current transaction are remembered in a transaction-local setting.
             migrationBuilder.Sql("""
@@ -107,7 +107,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
         }
 
         // Refuses a new line on a posted journal unless that journal was inserted by the current transaction (its id is in
-        // the transaction-local list kept by gl.journal_mark_new — savepoints included, which xmin would not cover).
+        // the transaction-local list kept by gl.journal_mark_new - savepoints included, which xmin would not cover).
         private const string InsertGuard = """
             SELECT status, journal_number INTO parent_status, parent_number FROM gl.journal WHERE id = NEW.journal_entry_id;
                     IF parent_status IN (2, 3)

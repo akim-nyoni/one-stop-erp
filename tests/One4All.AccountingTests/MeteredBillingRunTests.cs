@@ -10,8 +10,8 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Thirteenth audit #1 (brief §4.9): a billing run bills the metered consumption — every accepted reading on the stand's meters for the service that
-/// no run has billed yet — and marks those readings billed when the bill posts, so the next run bills only what was read since.
+/// Thirteenth audit #1 (brief §4.9): a billing run bills the metered consumption - every accepted reading on the stand's meters for the service that
+/// no run has billed yet - and marks those readings billed when the bill posts, so the next run bills only what was read since.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class MeteredBillingRunTests

@@ -108,7 +108,7 @@ public sealed partial class CreditControlViewModel : ObservableObject
             }
 
             SelectedRow = null;
-            StatusMessage = $"{Rows.Count} customer(s) with exposure — {Rows.Count(r => r.OnHold)} on hold. Refreshed {DateTime.Now:HH:mm:ss}.";
+            StatusMessage = $"{Rows.Count} customer(s) with exposure - {Rows.Count(r => r.OnHold)} on hold. Refreshed {DateTime.Now:HH:mm:ss}.";
         }
         catch (Exception ex)
         {
@@ -139,7 +139,7 @@ public sealed partial class CreditControlViewModel : ObservableObject
             CreditReviewResult review = result.Value;
             StatusMessage = review.Held.Count == 0
                 ? $"Review: {review.Reviewed} customer(s) examined, none placed on hold."
-                : $"Review: {review.Reviewed} examined, {review.Held.Count} placed on hold — {string.Join(", ", review.Held.Select(h => $"{h.CustomerCode} ({h.Reason})"))}.";
+                : $"Review: {review.Reviewed} examined, {review.Held.Count} placed on hold - {string.Join(", ", review.Held.Select(h => $"{h.CustomerCode} ({h.Reason})"))}.";
         }
         catch (Exception ex)
         {

@@ -5,7 +5,7 @@ namespace One4All.Reporting.Engine;
 
 /// <summary>
 /// Barcodes for report elements (brief §13.1), drawn as PNG images: QR codes (fiscal verification links, payment references) and Code 128
-/// (item codes, document numbers). Pure — no fonts or system drawing libraries.
+/// (item codes, document numbers). Pure - no fonts or system drawing libraries.
 /// </summary>
 public static class Barcodes
 {

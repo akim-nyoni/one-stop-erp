@@ -28,7 +28,7 @@ public sealed record EnquiryServiceVm(string Service, string Tariff, string Stat
 public sealed record EnquiryTransactionVm(string Date, string Document, string Type, string Amount, string Outstanding);
 
 /// <summary>
-/// Backs the municipal enquiry desk (brief §4.9): a stand looked up at the counter — the ratepayer, balance and overdue, services and meters,
+/// Backs the municipal enquiry desk (brief §4.9): a stand looked up at the counter - the ratepayer, balance and overdue, services and meters,
 /// recent transactions, arrangement, open orders and licences, a consumption graph per meter, and the statement ready to print.
 /// </summary>
 public sealed partial class EnquiryDeskViewModel : ObservableObject
@@ -122,7 +122,7 @@ public sealed partial class EnquiryDeskViewModel : ObservableObject
             foreach (EnquiryService s in e.Services)
             {
                 Services.Add(new EnquiryServiceVm(s.ServiceType.ToString(), s.TariffCode, s.Connected ? "Connected" : "Disconnected",
-                    s.MeterSerial is null ? "—" : $"{s.MeterSerial}: {s.LastReading?.ToString("0.###", CultureInfo.InvariantCulture) ?? "—"} on {s.LastReadingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"}"));
+                    s.MeterSerial is null ? "-" : $"{s.MeterSerial}: {s.LastReading?.ToString("0.###", CultureInfo.InvariantCulture) ?? "-"} on {s.LastReadingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-"}"));
             }
 
             Transactions.Clear();

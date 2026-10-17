@@ -17,7 +17,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Create or copy a budget", ListTitle = "Budgets",
             Description = "Create a budget for a fiscal year from lines ACCOUNT:period:amount[:cost centre]; or copy an existing budget as the start of a new version "
-                + "(a revision, a supplementary budget or a reforecast), optionally uplifted by a percentage — the copy records which budget it came from.",
+                + "(a revision, a supplementary budget or a reforecast), optionally uplifted by a percentage - the copy records which budget it came from.",
             Fields = [Pick("Step", "Step", ["Create", "Copy"]), Opt("Year", "Fiscal year code (create)"), Opt("Label", "Label"), Pick("Type", "Budget type", Enum.GetNames<Core.Budgeting.BudgetType>()),
                 Opt("Department", "Department (blank: company-wide)"), Opt("Lines", "Lines ACCOUNT:period:amount[:cost centre]; … (create)"), OptNum("From", "Budget id to copy"),
                 OptNum("Uplift", "Uplift % on the copy"), Opt("Reason", "Why (copy)")],
@@ -74,7 +74,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Carry unspent capital forward", ListTitle = "Capital budgets",
             Description = "Year-end: Propose lists each capital vote's approved budget, what was spent and what may still be carried; Approve carries the given amounts (VOTE:amount; …) "
-                + "into a later year's capital budget under the approval reference — a separate act, recorded for audit.",
+                + "into a later year's capital budget under the approval reference - a separate act, recorded for audit.",
             Fields = [Pick("Step", "Step", ["Propose", "Approve"]), Req("Year", "From fiscal year (code)"), Opt("Budget", "Into capital budget (label, approve)"),
                 Opt("Amounts", "VOTE:amount; … (approve)"), Opt("Reference", "Approval reference"), Today("AsAt", "As at")],
             Run = async (c, i) =>
@@ -110,7 +110,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Preparation deadlines and budget alerts", ListTitle = "Preparation board",
             Description = "Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go "
-                + "and their thresholds — with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). "
+                + "and their thresholds - with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). "
                 + "The scheduled task budget.notices does both daily.",
             Fields = [Pick("Step", "Step", ["Set deadline", "Send reminders", "Alert settings", "Send alerts"]), Opt("Department", "Department"), new("Deadline", "Deadline", FieldKind.Date, Required: false),
                 Num("Year", "Fiscal year id (board / reminders)", "0"), Num("Days", "Remind this many days before", "7"), Opt("Email", "Alert email"), Opt("Thresholds", "Thresholds % (e.g. 75, 90, 100)"), Today()],
@@ -148,8 +148,8 @@ public static partial class OperationCatalogue
             {
                 long year = await c.Db.FiscalYears.AsNoTracking().Where(y => y.CompanyId == c.CompanyId).OrderByDescending(y => y.StartDate).Select(y => y.Id).FirstOrDefaultAsync().ConfigureAwait(true);
                 return Table(await c.Get<IBudgetNotificationService>().BoardAsync(c.CompanyId, year, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
-                    ("Department", r => r.Department), ("Holder", r => r.BudgetHolder ?? "—"), ("Deadline", r => r.Deadline is DateOnly d ? D(d) : "—"), ("Status", r => r.Status ?? "not started"),
-                    ("Days left", r => r.DaysLeft?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "—"));
+                    ("Department", r => r.Department), ("Holder", r => r.BudgetHolder ?? "-"), ("Deadline", r => r.Deadline is DateOnly d ? D(d) : "-"), ("Status", r => r.Status ?? "not started"),
+                    ("Days left", r => r.DaysLeft?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "-"));
             },
         };
         yield return new Operation
@@ -209,7 +209,7 @@ public static partial class OperationCatalogue
             Run = async (c, i) =>
             {
                 BudgetTrail trail = Check(await c.Get<IBudgetPreparationService>().TrailAsync(c.CompanyId, (long)i.Number("Budget")).ConfigureAwait(true));
-                IEnumerable<string> steps = trail.Events.Select(e => $"Round {e.Round}: {e.Action} by user {e.UserId} on {e.OccurredOnUtc:yyyy-MM-dd HH:mm}{(e.Comment is null ? string.Empty : $" — {e.Comment}")}");
+                IEnumerable<string> steps = trail.Events.Select(e => $"Round {e.Round}: {e.Action} by user {e.UserId} on {e.OccurredOnUtc:yyyy-MM-dd HH:mm}{(e.Comment is null ? string.Empty : $" - {e.Comment}")}");
                 IEnumerable<string> figures = trail.Proposals.Select(p => $"Round {p.Round}: {p.AccountCode} p{p.Period} requested {M(p.Requested)}, proposed {M(p.Proposed)}{(p.Comment is null ? string.Empty : $" ({p.Comment})")}");
                 return string.Join(Environment.NewLine, [$"{trail.Status}, round {trail.Round}{(trail.ResolutionReference is null ? string.Empty : $", resolution {trail.ResolutionReference}")}", .. steps, .. figures]);
             },
@@ -218,7 +218,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Budget-holder statements", ListTitle = "Budgets in preparation",
-            Description = "Each department's active budget against actuals to the period of the date — budget and actual to date, the variance and the share of the year's "
+            Description = "Each department's active budget against actuals to the period of the date - budget and actual to date, the variance and the share of the year's "
                 + "budget used, with votes past the utilisation thresholds called out. Preview shows one department's; Send emails every budget holder with an address "
                 + "(the scheduled budget notices send them on the first of each month for the month just ended).",
             Fields = [Pick("Step", "Step", ["Preview", "Send"]), Opt("Department", "Department (preview)"), Today("Date", "As at")],
@@ -328,7 +328,7 @@ public static partial class OperationCatalogue
                 byte[] bytes = await System.IO.File.ReadAllBytesAsync(i.Text("File")).ConfigureAwait(true);
                 BudgetWorkbookImport import = Check(await c.Get<IBudgetWorkbookService>().ImportAsync(c.CompanyId, (long)i.Number("Budget"), bytes, c.UserId, i.Flag("Apply")).ConfigureAwait(true));
                 string head = $"{import.Changes.Count} figure(s) differ; total {M(import.AnnualTotalBefore)} → {M(import.AnnualTotalAfter)}. "
-                    + (import.Applied ? "Applied." : import.Problems.Count > 0 ? $"{import.Problems.Count} problem(s) — nothing written:" : "Preview only (tick Apply to write).");
+                    + (import.Applied ? "Applied." : import.Problems.Count > 0 ? $"{import.Problems.Count} problem(s) - nothing written:" : "Preview only (tick Apply to write).");
                 IEnumerable<string> detail = import.Problems.Count > 0
                     ? import.Problems.Select(p => $"  row {p.Row}: {p.Message}")
                     : import.Changes.Take(40).Select(ch => $"  {ch.AccountCode}{(ch.CostCentre is null ? string.Empty : $"/{ch.CostCentre}")} P{ch.Period}: {M(ch.Before)} → {M(ch.After)}");

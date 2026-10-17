@@ -39,7 +39,7 @@ public class ReceiptingReportsTests
     [Fact]
     public void Listing_reports_expose_a_detail_band_of_fields()
     {
-        // RC3 (Daily Collection Summary) is a listing — it must have a detail band with bound fields.
+        // RC3 (Daily Collection Summary) is a listing - it must have a detail band with bound fields.
         ReportDefinition rc3 = ReceiptingReports.All().Single(r => r.Code == "RC3");
         ReportBand detail = rc3.Bands.Single(b => b.Type == BandType.Detail);
         detail.Elements.Should().Contain(e => e.Kind == ElementKind.Field);

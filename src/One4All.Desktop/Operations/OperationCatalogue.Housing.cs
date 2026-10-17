@@ -163,11 +163,11 @@ public static partial class OperationCatalogue
             Module = module, Title = "Allocation run", ListTitle = "Allocation runs",
             Description = "Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify); the committee rejects a pairing with a reason or "
                 + "substitutes the next applicant stating why the skipped one was skipped; approve it (someone else; offers go out with a deadline; with a resolution the meeting's date and "
-                + "members are kept), cancel it, or verify a ballot's draw.",
-            Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands"]), Opt("Stands", "Only these stands (substitution run; ',')"),
+                + "members are kept), cancel it, or verify a ballot's draw. Expired offers wait in a queue for an officer to lapse or extend them with a reason.",
+            Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands", "Expired offers", "Lapse offer", "Extend offer"]), Opt("Stands", "Only these stands (substitution run; ',')"),
                 OptNum("Line", "Pairing sequence (reject / substitute)"), Opt("LineReason", "Reason (reject / substitute)"), Opt("Resolution", "Committee resolution (approve)"),
-                Opt("Meeting", "Meeting date yyyy-MM-dd (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
-                Opt("Reason", "Swap reason"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
+                Opt("Meeting", "Meeting date yyyy-MM-dd (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap / lapse / extend)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
+                Opt("Reason", "Reason (swap / lapse / extend)"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
                 Pick("Method", "Method", Enum.GetNames<AllocationMethod>()), OptNum("Seed", "Ballot seed (blank: random)"), Opt("Run", "Run number"), Today("Date", "Date"), Num("OfferDays", "Days to accept an offer", "30")],
             Run = async (c, i) =>
             {
@@ -196,6 +196,16 @@ public static partial class OperationCatalogue
                             ? allocation.ApproveByCommitteeAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"), new CommitteeMeeting(resolution,
                                 i.Optional("Meeting") is string meeting ? DateOnly.ParseExact(meeting, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null, i.Optional("Members")))
                             : allocation.ApproveAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"))).ConfigureAwait(true)));
+                    case "Expired offers":
+                        IReadOnlyList<ExpiredOffer> queue = await allocation.ExpiredOffersAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true);
+                        return queue.Count == 0 ? "No expired offers await a decision." : string.Join(Environment.NewLine, queue.Select(o =>
+                            $"{o.CertificateNumber,-14} stand {o.StandNumber,-10} {o.WaitingListNumber,-12} expired {D(o.OfferExpires)} ({o.DaysOverdue} day(s) ago; extended {o.Extensions} time(s))"));
+                    case "Lapse offer":
+                        return Check(await allocation.LapseOfferAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Date("Date"), i.Optional("Reason") ?? string.Empty).ConfigureAwait(true),
+                            "Offer lapsed; the stand is back in the pool.");
+                    case "Extend offer":
+                        return Check(await allocation.ExtendOfferAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Date("Date").AddDays(i.Whole("OfferDays")), i.Optional("Reason") ?? string.Empty)
+                            .ConfigureAwait(true), $"Offer extended to {D(i.Date("Date").AddDays(i.Whole("OfferDays")))}.");
                     case "Swap stands":
                         return Check(await allocation.SwapAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Optional("Other") ?? string.Empty, i.Date("Date"),
                             i.Optional("Document") ?? string.Empty, i.Optional("Reason") ?? string.Empty, c.UserId).ConfigureAwait(true), "Stands swapped.");
@@ -205,7 +215,7 @@ public static partial class OperationCatalogue
                     default:
                         DrawVerification v = Check(await allocation.VerifyDrawAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true));
                         return v.IsVerified ? "Verified: the inputs are unchanged and re-running the draw gives the same order."
-                            : $"NOT verified — inputs unchanged: {v.HashMatches}; same order: {v.OrderMatches}.";
+                            : $"NOT verified - inputs unchanged: {v.HashMatches}; same order: {v.OrderMatches}.";
                 }
             },
             List = async c => Table(await c.Db.Set<AllocationRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
@@ -632,8 +642,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Stand blocks and caveats", ListTitle = "Blocks in force",
-            Description = "Places a block on a stand (court interdict, family dispute, suspected fraud, double allocation, boundary dispute…) with its document — a blocked stand cannot be "
-                + "allocated, sold, leased or transferred — or lifts it with the reason. History shows every block on a stand.",
+            Description = "Places a block on a stand (court interdict, family dispute, suspected fraud, double allocation, boundary dispute…) with its document - a blocked stand cannot be "
+                + "allocated, sold, leased or transferred - or lifts it with the reason. History shows every block on a stand.",
             Fields = [Pick("Step", "Step", ["Place", "Lift", "History"]), Req("Stand", "Stand number"), Pick("Reason", "Reason (place)", Enum.GetNames<BlockReason>()),
                 Opt("Detail", "Detail / reason for lifting"), Opt("Document", "Document reference"), Today()],
             Run = async (c, i) =>
@@ -651,7 +661,7 @@ public static partial class OperationCatalogue
                     default:
                         IReadOnlyList<StandBlockEntry> history = await blocks.HistoryAsync(c.CompanyId, stand).ConfigureAwait(true);
                         return history.Count == 0 ? "No blocks." : string.Join(Environment.NewLine, history.Select(b =>
-                            $"{D(b.PlacedOn)} {b.Reason}: {b.Detail} ({b.DocumentReference}){(b.LiftedOn is DateOnly lifted ? $" — lifted {D(lifted)}: {b.LiftReason}" : " — in force")}"));
+                            $"{D(b.PlacedOn)} {b.Reason}: {b.Detail} ({b.DocumentReference}){(b.LiftedOn is DateOnly lifted ? $" - lifted {D(lifted)}: {b.LiftReason}" : " - in force")}"));
                 }
             },
             List = async c => Table(await c.Get<IStandBlockService>().InForceAsync(c.CompanyId).ConfigureAwait(true),
@@ -723,7 +733,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Rental maintenance", ListTitle = "Rental units",
             Description = "Report a repair on a unit; complete it with its cost (recharged to the tenant when they caused it); record an inspection with its condition grade (1–5) and "
                 + "whether it needs follow-up, and close the follow-up; History summarises a unit's repairs and condition. Void details record why a void unit is empty and its "
-                + "refurbishment job. The planned maintenance programme: plan a task (due on the date, then every so many months), list what is due, and mark one done — "
+                + "refurbishment job. The planned maintenance programme: plan a task (due on the date, then every so many months), list what is due, and mark one done - "
                 + "which raises the repair that carries its cost.",
             Fields = [Pick("Step", "Step", ["Report repair", "Complete repair", "Inspection", "Close follow-up", "History", "Void details", "Plan task", "Planned due", "Planned done"]),
                 Opt("Unit", "Unit code"), Opt("Repair", "Repair number (complete)"), Opt("Reason", "Void reason"), Opt("Job", "Refurbishment job (contract) number"),
@@ -819,7 +829,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Applicant intake and duplicate queue", ListTitle = "Duplicate queue",
             Description = "Contact: an applicant's gender, addresses, phone and employer. Lodge / Verify: supporting documents (ID copy, proof of residence, payslip, affidavit) "
-                + "verified one by one with the officer's name — the applicant is verified once all are. Death: adds to the deceased register. Scan: finds suspected duplicates "
+                + "verified one by one with the officer's name - the applicant is verified once all are. Death: adds to the deceased register. Scan: finds suspected duplicates "
                 + "(same ID, similar name with the same birth date, same phone) and applicants on the deceased register and queues them. Merge (keeps the earlier registration), "
                 + "Reject (removes the second) or Clear a case, with a reason.",
             Fields = [Pick("Step", "Step", ["Contact", "Lodge document", "Verify document", "Death", "Scan", "Merge", "Reject", "Clear"]), Opt("Applicant", "Waiting-list number"),
@@ -841,7 +851,7 @@ public static partial class OperationCatalogue
                             i.Date("Date")).ConfigureAwait(true), doc => $"Document {doc} lodged.");
                     case "Verify document":
                         bool all = Check(await intake.VerifyDocumentAsync(c.CompanyId, id, i.Optional("Officer") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
-                        return all ? "Verified — every document is, so the applicant is verified." : "Verified; other documents still await verification.";
+                        return all ? "Verified - every document is, so the applicant is verified." : "Verified; other documents still await verification.";
                     case "Death":
                         return Check(await intake.RecordDeathAsync(c.CompanyId, i.Optional("IdNumber") ?? string.Empty, i.Optional("Description") ?? string.Empty, i.Date("Date")).ConfigureAwait(true),
                             "Added to the deceased register.");
@@ -901,7 +911,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Instalment arrears and default notices", ListTitle = "Agreements in arrears",
             Description = "The arrears stages: a reminder from the first unpaid instalment, a letter of demand after 30 days, a notice of breach after 60 and a notice of cancellation "
-                + "after 90 (once the breach notice has stood 30 days) — each issued only after the previous one is served, with proof of service recorded. "
+                + "after 90 (once the breach notice has stood 30 days) - each issued only after the previous one is served, with proof of service recorded. "
                 + "Penalty: sets an agreement's annual penalty rate on arrears; Charge penalties invoices a month's penalty interest on each agreement's arrears once.",
             Fields = [Pick("Step", "Step", ["Issue next notice", "Record service", "Penalty rate", "Charge penalties"]), Opt("Agreement", "Agreement number"), Opt("Notice", "Notice number (service)"),
                 Opt("Method", "Served by (hand, registered post, email)"), Opt("ServedBy", "Who served it"), OptNum("Rate", "Penalty rate % a year"), Today()],
@@ -992,7 +1002,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Development levies", ListTitle = "Levies",
-            Description = "Defines a levy charged on allocation or on transfer — flat, per m² or a percentage of the price — to an income account, or deactivates it; charges the "
+            Description = "Defines a levy charged on allocation or on transfer - flat, per m² or a percentage of the price - to an income account, or deactivates it; charges the "
                 + "levies due on an allocation certificate or a transfer application.",
             Fields = [Pick("Step", "Step", ["Define", "Deactivate", "Charge allocation", "Charge transfer"]), Opt("Code", "Levy code"), Opt("Name", "Name"),
                 Pick("Trigger", "Charged on", Enum.GetNames<LevyTrigger>()), Pick("Basis", "Basis", Enum.GetNames<LevyBasis>()), Num("Rate", "Rate / amount", "0"), Opt("Income", "Income account"),
@@ -1216,7 +1226,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Sectional title schemes", ListTitle = "Stands",
-            Description = "Registers a sectional title scheme on a stand with its units' floor areas (\"U1:80; U2:120\" — participation quotas follow from the areas), transfers a unit, "
+            Description = "Registers a sectional title scheme on a stand with its units' floor areas (\"U1:80; U2:120\" - participation quotas follow from the areas), transfers a unit, "
                 + "lists the units and their owners, and raises a period's levy shared by participation quota.",
             Fields = [Pick("Step", "Step", ["Register", "Transfer unit", "Units", "Raise levy"]), Req("Scheme", "Scheme code"), Opt("Name", "Name (register)"), Opt("Stand", "Stand number (register)"),
                 Opt("Units", "Units: number:floor area; … (register)"), Opt("Unit", "Unit number (transfer)"), Opt("To", "To customer code (transfer)"), Num("Amount", "Consideration / levy", "0"),
@@ -1362,7 +1372,7 @@ public static partial class OperationCatalogue
                             HeadDateOfBirth = Day(i.Optional("Born") ?? string.Empty), HouseholdSize = i.Whole("Size"), MonthlyIncome = i.Number("Income"), OccupiedSince = Day(i.Optional("Since") ?? string.Empty),
                             StructureType = Enum.Parse<StructureType>(i.Text("Structure")), StructureReference = i.Optional("StructureRef") ?? string.Empty, Date = date,
                         }).ConfigureAwait(true));
-                        return household.IsEligible ? $"Household {household.HouseholdNumber} enumerated (eligible)." : $"Household {household.HouseholdNumber} enumerated — not eligible: {household.IneligibleReason}.";
+                        return household.IsEligible ? $"Household {household.HouseholdNumber} enumerated (eligible)." : $"Household {household.HouseholdNumber} enumerated - not eligible: {household.IneligibleReason}.";
                     case "Close enumeration":
                         return $"Enumeration closed with {Check(await settlements.CloseEnumerationAsync(c.CompanyId, code, date).ConfigureAwait(true))} household(s).";
                     case "To waiting list":
@@ -1438,7 +1448,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Scheme progress", ListTitle = "Schemes",
-            Description = "Records survey progress on stands (pegged, diagram lodged, diagram approved — several stands comma-separated), a bulk-service servicing certificate (water, "
+            Description = "Records survey progress on stands (pegged, diagram lodged, diagram approved - several stands comma-separated), a bulk-service servicing certificate (water, "
                 + "sewer, roads, electricity, storm water: % complete and stands reached), and a land parcel's valuation.",
             Fields = [Pick("Step", "Step", ["Survey", "Servicing certificate", "Valuation"]), Opt("Stands", "Stand numbers, comma-separated (survey)"), Pick("Stage", "Survey stage", Enum.GetNames<SurveyStage>()),
                 Opt("Scheme", "Scheme code (servicing)"), Pick("Service", "Bulk service", Enum.GetNames<BulkService>()), Num("Percent", "% complete", "0"), Num("Reached", "Stands reached", "0"),
@@ -1612,7 +1622,7 @@ public static partial class OperationCatalogue
                     case "History":
                         IReadOnlyList<LayoutVersionEntry> versions = Check(await plans.HistoryAsync(c.CompanyId, i.Text("Plan")).ConfigureAwait(true));
                         return string.Join(Environment.NewLine, versions.Select(v => $"v{v.Version} {D(v.SubmittedOn)} {v.Planner}, {v.Density}, {v.Stands} stands"
-                            + (v.ApprovedOn is DateOnly approved ? $", approved {D(approved)} ({v.ApprovalAuthority})" : ", not approved") + (v.AmendmentReason is null ? string.Empty : $" — {v.AmendmentReason}")));
+                            + (v.ApprovedOn is DateOnly approved ? $", approved {D(approved)} ({v.ApprovalAuthority})" : ", not approved") + (v.AmendmentReason is null ? string.Empty : $" - {v.AmendmentReason}")));
                     default:
                         LayoutReconciliation rec = Check(await plans.ReconcileAsync(c.CompanyId, i.Text("Plan")).ConfigureAwait(true));
                         return $"{rec.PlanNumber} v{rec.VersionInForce}: {rec.PlannedStands} planned, {rec.StandsOnRegister} on the register, difference {rec.Difference}.";
@@ -1624,7 +1634,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Stand pricing", ListTitle = "Pricing rules",
-            Description = "Proposes a pricing rule — for one stand, a size band or a whole scheme, from a date: cost plus overhead %, levies per stand and per m², margin %, rounded — "
+            Description = "Proposes a pricing rule - for one stand, a size band or a whole scheme, from a date: cost plus overhead %, levies per stand and per m², margin %, rounded - "
                 + "which another user approves; Quote shows a stand's price build-up under the rule in force.",
             Fields = [Pick("Step", "Step", ["Propose", "Approve", "Quote"]), Pick("Scope", "Applies to", Enum.GetNames<PricingScope>()), Opt("Scheme", "Scheme code"), OptNum("MinSize", "Size band from (m²)"),
                 OptNum("MaxSize", "Size band to (m²)"), Opt("Stand", "Stand number (stand rule / quote)"), Num("Overhead", "Overhead %", "0"), Num("LevyStand", "Levy per stand", "0"),
@@ -1660,7 +1670,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Land, schemes and stands", ListTitle = "Schemes",
-            Description = "Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands (\"S1:300; S2:250\" — number:size m²), its cost apportioned "
+            Description = "Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands (\"S1:300; S2:250\" - number:size m²), its cost apportioned "
                 + "equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available).",
             Fields = [Pick("Step", "Step", ["Acquire land", "Create scheme", "Subdivide", "Sell stand"]), Opt("Parcel", "Parcel number"), Opt("Description", "Description / scheme name"),
                 Num("Area", "Area m² (acquire)", "0"), Num("Amount", "Cost (acquire) / price (sell)", "0"), Opt("Scheme", "Scheme code"), Pick("SchemeType", "Delivery model", Enum.GetNames<SchemeType>()),
@@ -1742,7 +1752,7 @@ public static partial class OperationCatalogue
         [
             council.ToUpperInvariant(), string.Empty, D(date), string.Empty,
             $"{applicant.FullName}", $"ID {applicant.IdNumber}" + (applicant.WaitingListNumber is null ? string.Empty : $" · waiting list {applicant.WaitingListNumber}"), string.Empty,
-            offer ? $"OFFER OF STAND {stand.StandNumber} — certificate {certificate}" : $"ALLOCATION OF STAND {stand.StandNumber} — certificate {certificate}", new string('=', 60),
+            offer ? $"OFFER OF STAND {stand.StandNumber} - certificate {certificate}" : $"ALLOCATION OF STAND {stand.StandNumber} - certificate {certificate}", new string('=', 60),
             $"Scheme : {scheme}", $"Stand  : {stand.StandNumber}, {Q(stand.SizeSquareMetres)} m²", $"Price  : {M(price)}", $"Deposit: {M(deposit)} ({depositPercent:0.##}%)", string.Empty,
         ];
         text.AddRange(offer

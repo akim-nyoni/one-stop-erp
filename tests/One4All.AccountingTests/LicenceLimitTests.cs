@@ -67,5 +67,21 @@ public sealed class LicenceLimitTests
         await db.SaveChangesAsync();
         db.Employees.Add(new Employee(companyId, "LL-E2", "Second Hire", 1000m, today));
         await db.SaveChangesAsync();
+
+        // "payrolls" (PAY, brief §11.3): the companies running a payroll. With the limit at today's count, a first hire in another company is refused (thirteenth audit #15).
+        int payrolls = await db.Employees.IgnoreQueryFilters().Where(e => e.Status != EmployeeStatus.Terminated).Select(e => e.CompanyId).Distinct().CountAsync();
+        string capped = new LicenseSigner(keys.PrivateKeyBase64).Sign(new LicensePayload
+        {
+            KeyId = "lim-test", Product = LicenceService.Product, Customer = new LicenceCustomer { Id = "L", Name = "Limited Co" }, ValidFrom = new DateOnly(2025, 1, 1), ValidTo = today.AddYears(1),
+            Modules = [new LicenceModuleGrant { Code = "GL" }, new LicenceModuleGrant { Code = "PAY", Limits = new Dictionary<string, int?> { ["payrolls"] = payrolls } }],
+        });
+        (await licence.InstallAsync(capped)).IsUsable.Should().BeTrue();
+        long other = await Scenario.SeedAsync(db);
+        db.Employees.Add(new Employee(other, "LL-E3", "Other Company Hire", 1000m, today));
+        Func<Task> secondPayroll = () => db.SaveChangesAsync();
+        (await secondPayroll.Should().ThrowAsync<LicenceLimitException>()).Which.Message.Should().Contain("payrolls");
+        db.ChangeTracker.Clear();
+        db.Employees.Add(new Employee(companyId, "LL-E4", "Same Company Hire", 1000m, today));
+        await db.SaveChangesAsync();
     }
 }

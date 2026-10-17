@@ -16,7 +16,7 @@ public sealed record DuplicateScan(int Opened, int Deceased);
 
 /// <summary>
 /// Waiting-list intake (brief §4.10.3): the applicant's gender, addresses, contacts and employer; supporting documents lodged and verified one by one with the
-/// officer's name (the applicant is verified once every document is); and the duplicate queue — a scan across the waiting list, stand holders, property
+/// officer's name (the applicant is verified once every document is); and the duplicate queue - a scan across the waiting list, stand holders, property
 /// owners and the deceased register opens cases an officer merges, rejects or clears with a reason.
 /// </summary>
 public interface IApplicantIntakeService

@@ -13,7 +13,7 @@ public sealed record ParkedSaleSummary(long Id, string Tag, long TerminalId, int
 
 /// <summary>
 /// Recall, park and hold (brief §4.1): any number of sales held under a name / table / customer tag, listed, resumed at any till of the
-/// company with their lines intact, or discarded with a reason — each step audited with who and when.
+/// company with their lines intact, or discarded with a reason - each step audited with who and when.
 /// </summary>
 public interface IParkedSaleService
 {

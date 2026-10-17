@@ -58,7 +58,7 @@ public sealed record FinalPayStatement(int YearsOfService, decimal ProRataSalary
 
 /// <summary>
 /// The final pay of a leaver (pure): which entitlements the termination type carries, the last month's salary pro rata, and the
-/// recoveries the pay can bear — loans beyond that stay owed.
+/// recoveries the pay can bear - loans beyond that stay owed.
 /// </summary>
 public static class FinalPay
 {

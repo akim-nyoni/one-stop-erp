@@ -11,7 +11,7 @@ public readonly record struct RemittanceRaised(string Payee, string DocumentNumb
 
 /// <summary>
 /// Third-party payments (brief §4.15.5): after a run, raises the AP invoices for the tax authority, pension, medical and other schemes
-/// and garnishee creditors that have an AP supplier — Dr the payroll liability, Cr AP — so the money is paid through the payables
+/// and garnishee creditors that have an AP supplier - Dr the payroll liability, Cr AP - so the money is paid through the payables
 /// ledger and reconciles back to the deductions. Companies that set <c>RaisePayrollRemittances</c> get this on every committed run.
 /// </summary>
 public interface IPayrollRemittanceService

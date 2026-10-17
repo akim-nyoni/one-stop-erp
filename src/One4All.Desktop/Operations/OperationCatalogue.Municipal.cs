@@ -102,7 +102,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Fault ticket categories", ListTitle = "Fault ticket categories",
-            Description = "The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times — "
+            Description = "The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times - "
                 + "the clocks the fault desk measures every ticket against.",
             Fields = [Req("Code", "Category code"), Req("Name", "Name"), Pick("Service", "Service", ["(none)", .. Enum.GetNames<ServiceType>()]), Num("Response", "Respond within (hours)", "4"),
                 Num("Resolution", "Resolve within (hours)", "48")],
@@ -151,7 +151,7 @@ public static partial class OperationCatalogue
                     ? await readings.CaptureAsync(c.CompanyId, meterId, i.Date("Date"), reading, i.Flag("Tamper")).ConfigureAwait(true)
                     : await readings.EstimateAsync(c.CompanyId, meterId, i.Date("Date")).ConfigureAwait(true));
                 return $"Reading {Q(outcome.Reading)}: consumption {Q(outcome.Consumption)}, billed {Q(outcome.BilledConsumption)}"
-                    + (outcome.Flags == 0 ? "." : $"; flagged {outcome.Flags}{(outcome.Accepted ? string.Empty : " — held for checking")}.");
+                    + (outcome.Flags == 0 ? "." : $"; flagged {outcome.Flags}{(outcome.Accepted ? string.Empty : " - held for checking")}.");
             },
             List = async c =>
             {
@@ -228,7 +228,7 @@ public static partial class OperationCatalogue
             Run = async (c, i) => Check(await c.Get<IMunicipalServiceTypeService>().SaveAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<ServiceType>(i.Text("Category")), i.Flag("Metered"),
                 i.Number("Deposit"), i.Optional("Account")).ConfigureAwait(true), "Service type saved."),
             List = async c => Table(await c.Db.MunicipalServiceTypes.AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", t => t.Code), ("Name", t => t.Name), ("Bills as", t => t.Category), ("Metered", t => t.IsMetered), ("Deposit", t => M(t.DefaultDeposit)), ("Account", t => t.DepositAccountCode ?? "—")),
+                ("Code", t => t.Code), ("Name", t => t.Name), ("Bills as", t => t.Category), ("Metered", t => t.IsMetered), ("Deposit", t => M(t.DefaultDeposit)), ("Account", t => t.DepositAccountCode ?? "-")),
         };
         yield return new Operation
         {
@@ -257,9 +257,9 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Billing run", ListTitle = "Billing runs",
             Description = "Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve "
-                + "to post the bills — someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing); "
+                + "to post the bills - someone other than the proposer approves. Email bills sends each ratepayer billed in a posted run their statement (those without email are counted for printing); "
                 + "SMS bills texts each ratepayer with a mobile number from an SMS template (fields {{Name}} {{Account}} {{Stands}} {{Bills}} {{Amount}} {{Balance}} {{Currency}} {{BillDate}}); "
-                + "Print bills prints every bill in the run, one ratepayer per page in stand order — or Print bills not emailed for only those without email.",
+                + "Print bills prints every bill in the run, one ratepayer per page in stand order - or Print bills not emailed for only those without email.",
             Fields = [Pick("Step", "Step", ["Propose", "Show exceptions", "Exclude a stand", "Include a stand", "Approve", "Resume posting", "Email bills", "SMS bills", "Print bills",
                     "Print bills not emailed", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
                 Today("BillDate", "Bill date"), Opt("Ward", "Ward (blank: all)"), Opt("Route", "Reading route (blank: all)"), Pick("Cycle", "Billing cycle", ["Any", .. Enum.GetNames<BillingCycle>()]),
@@ -269,7 +269,7 @@ public static partial class OperationCatalogue
             {
                 IBillingRunService runs = c.Get<IBillingRunService>();
                 string Summary(BillingRunSummary s) => $"Run {s.RunNumber} {s.Status}: {s.Included} of {s.Lines} stand(s), {M(s.Total)}, {s.Exceptions} exception(s)."
-                    + (s.Status is BillingRunStatus.Posting or BillingRunStatus.Posted ? $" Posted {s.Posted}, failed {s.Failed}{(s.Remaining > 0 ? $", {s.Remaining} still to post — resume posting" : string.Empty)}." : string.Empty);
+                    + (s.Status is BillingRunStatus.Posting or BillingRunStatus.Posted ? $" Posted {s.Posted}, failed {s.Failed}{(s.Remaining > 0 ? $", {s.Remaining} still to post - resume posting" : string.Empty)}." : string.Empty);
                 switch (i.Text("Step"))
                 {
                     case "Propose":
@@ -378,7 +378,7 @@ public static partial class OperationCatalogue
                 {
                     One4All.Application.Municipal.ClearanceQuote quote = Check(await clearance.QuoteAsync(c.CompanyId, property, i.Date("Date"), i.Whole("Months")).ConfigureAwait(true));
                     return $"Balance {M(quote.Balance)} + {quote.MonthsInAdvance} month(s) at {M(quote.AverageMonthlyBilling)} = advance {M(quote.AdvanceRequired)}; to pay {M(quote.AmountDue)}"
-                        + (quote.CanIssue ? " — can be issued now." : ".");
+                        + (quote.CanIssue ? " - can be issued now." : ".");
                 }
 
                 IssuedClearance issued = Check(await clearance.IssueAsync(c.CompanyId, property, i.Date("Date"), i.Whole("Months"), i.Whole("Valid"), c.UserId).ConfigureAwait(true));
@@ -604,7 +604,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Property ownership",
-            Description = "Registers a stand's owners and their shares (\"CUST1:50:R; CUST2:50\" — R marks the ratepayer), transfers it to buyers against a clearance certificate, "
+            Description = "Registers a stand's owners and their shares (\"CUST1:50:R; CUST2:50\" - R marks the ratepayer), transfers it to buyers against a clearance certificate, "
                 + "and shows the owners now or the full history. Also keeps the tenants, occupiers and managing agents (each optionally copied on the bills) and a correspondence "
                 + "address separate from the property's own.",
             Fields = [Pick("Step", "Step", ["Register", "Transfer", "Settle transfer", "Owners", "History", "Add party", "End party", "Parties", "Correspondence address", "Bill goes to"]),
@@ -737,7 +737,7 @@ public static partial class OperationCatalogue
 
         List<long> tariffIds = [.. services.Select(s => s.TariffId)];
         Dictionary<long, Core.Municipal.Tariff> tariffs = await c.Db.Tariffs.AsNoTracking().Include(t => t.Blocks).Where(t => tariffIds.Contains(t.Id)).ToDictionaryAsync(t => t.Id).ConfigureAwait(true);
-        List<string> text = [string.Empty, $"SERVICES AND READINGS — stand {property.StandNumber}, {property.Ward}"];
+        List<string> text = [string.Empty, $"SERVICES AND READINGS - stand {property.StandNumber}, {property.Ward}"];
         foreach (Core.Municipal.PropertyServiceLink service in services.OrderBy(s => s.ServiceType))
         {
             Core.Municipal.Tariff? tariff = tariffs.GetValueOrDefault(service.TariffId);
@@ -779,7 +779,7 @@ public static partial class OperationCatalogue
                     .OrderByDescending(r => r.ReadingDate).Take(2).ToListAsync().ConfigureAwait(true);
                 text.AddRange(readings.Count == 0
                     ? [$"    meter {serial}: no readings yet"]
-                    : readings.Select(r => $"    meter {serial}: {D(r.ReadingDate)} read {Q(r.Reading)} (previous {Q(r.PreviousReading)}), used {Q(r.Consumption)} — {r.Kind}"));
+                    : readings.Select(r => $"    meter {serial}: {D(r.ReadingDate)} read {Q(r.Reading)} (previous {Q(r.PreviousReading)}), used {Q(r.Consumption)} - {r.Kind}"));
             }
         }
 
@@ -794,7 +794,7 @@ public static partial class OperationCatalogue
         Core.Municipal.Property property = await c.Db.Properties.AsNoTracking().SingleAsync(p => p.Id == certificate.PropertyId).ConfigureAwait(true);
         string council = await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.Name).SingleAsync().ConfigureAwait(true);
         string ratepayer = await c.Db.Customers.AsNoTracking().Where(x => x.Id == property.RatepayerCustomerId).Select(x => x.Code + " " + x.Name).FirstOrDefaultAsync().ConfigureAwait(true) ?? "?";
-        string issuer = await c.Db.Users.AsNoTracking().Where(u => u.Id == certificate.IssuedByUserId).Select(u => u.DisplayName).FirstOrDefaultAsync().ConfigureAwait(true) ?? "—";
+        string issuer = await c.Db.Users.AsNoTracking().Where(u => u.Id == certificate.IssuedByUserId).Select(u => u.DisplayName).FirstOrDefaultAsync().ConfigureAwait(true) ?? "-";
         const int width = 72;
         string Centre(string text) => text.Length >= width ? text : new string(' ', (width - text.Length) / 2) + text;
         return string.Join(Environment.NewLine,

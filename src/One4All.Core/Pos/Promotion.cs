@@ -10,7 +10,7 @@ public enum PromotionKind
 
     /// <summary>
     /// Buy X get Y: for every X qualifying units, Y reward units are discounted by a percentage (100 = free). With no reward items the
-    /// reward comes from the qualifying items themselves, cheapest first — lowest-price-free.
+    /// reward comes from the qualifying items themselves, cheapest first - lowest-price-free.
     /// </summary>
     BuyXGetY = 2,
 
@@ -77,7 +77,7 @@ public sealed class Promotion : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the set price (N for price, meal deal).</summary>
     public decimal? Price { get; set; }
 
-    /// <summary>Gets or sets the percentage off (percent off; buy X get Y — 100 is free).</summary>
+    /// <summary>Gets or sets the percentage off (percent off; buy X get Y - 100 is free).</summary>
     public decimal? Percent { get; set; }
 
     /// <summary>Gets or sets the item category a percent-off promotion covers (when it lists no items).</summary>

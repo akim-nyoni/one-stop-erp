@@ -193,7 +193,7 @@ public sealed class WorkflowService : IWorkflowService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         await Security.SemanticAudit.RecordAsync(_audit, _caller, instance.CompanyId, "Workflow", instance.DocumentType, instance.DocumentReference,
             action == WorkflowActionType.Approve ? Core.Audit.AuditAction.Approve : Core.Audit.AuditAction.Reject,
-            $"{action} at stage {currentStage?.Name ?? "?"} — now {result.Value}" + (onBehalfOf is long principal ? $" (for user {principal})" : string.Empty), comment, userId, ct).ConfigureAwait(false);
+            $"{action} at stage {currentStage?.Name ?? "?"} - now {result.Value}" + (onBehalfOf is long principal ? $" (for user {principal})" : string.Empty), comment, userId, ct).ConfigureAwait(false);
         if (result.Value == WorkflowStatus.InProgress)
         {
             if (instance.CurrentStageSequence != currentStage?.Sequence && applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence) is WorkflowStage next)
@@ -390,7 +390,7 @@ public sealed class WorkflowService : IWorkflowService
     }
 
     // Whether a user may act at a stage: named on it (or it names nobody), added to this instance's stage, or the delegate of someone who
-    // may — then acting on their behalf.
+    // may - then acting on their behalf.
     // The named approvers of a stage: its users, those added to this instance, the holders of its role and (when asked) the requester's manager.
     private async Task<IReadOnlyList<long>> ApproversAsync(WorkflowInstance instance, WorkflowStage stage, CancellationToken ct)
     {

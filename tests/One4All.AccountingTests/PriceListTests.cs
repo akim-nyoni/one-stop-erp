@@ -70,7 +70,7 @@ public sealed class PriceListTests
             (await pricing.SetPriceAsync(companyId, standardId, widgetId, 100m, 8.00m)).IsSuccess.Should().BeTrue();
             (await pricing.SetPriceAsync(companyId, standardId, gadgetId, 1m, 25.00m)).IsSuccess.Should().BeTrue();
 
-            // Trade: widget only, 7.50 flat — gadget falls through to the default list.
+            // Trade: widget only, 7.50 flat - gadget falls through to the default list.
             (await pricing.SetPriceAsync(companyId, tradeListId, widgetId, 1m, 7.50m)).IsSuccess.Should().BeTrue();
 
             // Validation.

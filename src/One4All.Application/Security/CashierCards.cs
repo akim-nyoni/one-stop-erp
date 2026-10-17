@@ -4,8 +4,8 @@ using System.Text;
 namespace One4All.Application.Security;
 
 /// <summary>
-/// Cashier cards (brief §4.1: login by PIN / card swipe / fingerprint): what a swipe or scan reads is reduced to the card number — magnetic-stripe
-/// sentinels, separators and spaces dropped — and only its hash is stored. Pure and unit-tested.
+/// Cashier cards (brief §4.1: login by PIN / card swipe / fingerprint): what a swipe or scan reads is reduced to the card number - magnetic-stripe
+/// sentinels, separators and spaces dropped - and only its hash is stored. Pure and unit-tested.
 /// </summary>
 public static class CashierCards
 {

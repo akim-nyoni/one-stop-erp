@@ -4,7 +4,7 @@ namespace One4All.Application.Communications;
 
 /// <summary>
 /// Fills an SMS provider's request template (brief §8 gateway abstraction): <c>{to}</c>, <c>{body}</c> and <c>{from}</c> are replaced,
-/// escaped for the request's content type — JSON strings for JSON bodies, URL encoding for form or query bodies. Pure.
+/// escaped for the request's content type - JSON strings for JSON bodies, URL encoding for form or query bodies. Pure.
 /// </summary>
 public static class SmsRequest
 {

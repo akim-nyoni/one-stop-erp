@@ -76,8 +76,8 @@ public sealed class HrRecordsTests
 
         (await Render("PR21")).Should().Contain("HR-A Ann,CO-1,Court Sheriff,1,2026-01-01,150.00,400.00,300.00,100");
         (await Render("PR47")).Should().Contain("Ops,G1,3,2,1,0,12000").And.Contain("Ops,G2,0,1,0,1,0").And.Contain("Admin,G3,2,0,2,0,20000");
-        (await Render("PR55")).Should().Contain("HR-A Ann,CONTRACT,C-1,2026-03-10,Expiring").And.Contain("HR-B Ben,ID,ID-B,2026-01-15,Expired").And.Contain("HR-B Ben,CONTRACT,—,—,Missing")
-            .And.Contain("HR-C Cy,ID,—,—,Missing").And.NotContain("HR-A Ann,ID");
+        (await Render("PR55")).Should().Contain("HR-A Ann,CONTRACT,C-1,2026-03-10,Expiring").And.Contain("HR-B Ben,ID,ID-B,2026-01-15,Expired").And.Contain("HR-B Ben,CONTRACT,-,-,Missing")
+            .And.Contain("HR-C Cy,ID,-,-,Missing").And.NotContain("HR-A Ann,ID");
         (await Render("PR56")).Should().Contain("HR-A Ann,2025-06-01,Late,VerbalWarning,2025-12-01,Lapsed").And.Contain("HR-B Ben,2026-01-10,Absent,WrittenWarning,2027-01-10,Live");
         (await Render("PR57")).Should().Contain("Training,HR-A Ann,First Aid (Red Cross),2025-03-01,2026-03-01,Expiring,50").And.Contain("Appraisal,HR-A Ann,Rated 4,2025-02-01,2026-02-01,Overdue,0");
     }

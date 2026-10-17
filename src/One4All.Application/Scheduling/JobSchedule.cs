@@ -4,7 +4,7 @@ namespace One4All.Application.Scheduling;
 
 /// <summary>
 /// When a scheduled job next runs (brief §4.17 scheduled jobs), in UTC: hourly at a minute past the hour, daily at a time,
-/// weekly on a day at a time, or monthly on a day at a time — a day beyond the month's end runs on its last day. Pure and
+/// weekly on a day at a time, or monthly on a day at a time - a day beyond the month's end runs on its last day. Pure and
 /// unit-tested.
 /// </summary>
 public static class JobSchedule

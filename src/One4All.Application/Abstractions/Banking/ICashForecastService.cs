@@ -4,7 +4,7 @@ namespace One4All.Application.Abstractions.Banking;
 
 /// <summary>
 /// The full cash-flow forecast (brief §4.4): bank balances, then week by week what receivables and payables fall due, saved payment runs on
-/// their payment dates, open sales and purchase orders on delivery plus terms, standing orders and payroll — with the weeks cash would fall
+/// their payment dates, open sales and purchase orders on delivery plus terms, standing orders and payroll - with the weeks cash would fall
 /// below a minimum flagged.
 /// </summary>
 public interface ICashForecastService

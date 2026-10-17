@@ -17,8 +17,8 @@ public enum BankRuleDirection
 
 /// <summary>
 /// A bank rule (brief §4.7, <c>cb.bank_rule</c>): statement lines whose description contains a phrase (and,
-/// optionally, fall in a direction and amount range) are posted straight to a nominal account — bank charges,
-/// interest, standing orders — and matched, without anyone keying them.
+/// optionally, fall in a direction and amount range) are posted straight to a nominal account - bank charges,
+/// interest, standing orders - and matched, without anyone keying them.
 /// </summary>
 public sealed class BankRule : AuditableEntity, ICompanyScoped
 {

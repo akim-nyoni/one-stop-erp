@@ -55,10 +55,10 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         };
     }
 
-    // The common parameters of the run in progress (branch, cost centre, department, unposted) — set at the start of each GetRowsAsync.
+    // The common parameters of the run in progress (branch, cost centre, department, unposted) - set at the start of each GetRowsAsync.
     private Application.Reporting.ReportCommonParameters _common = Application.Reporting.ReportCommonParameters.None;
 
-    // Posted lines on a set of ledger accounts, with their journal, in date order — narrowed to the branch, cost centre and department asked for,
+    // Posted lines on a set of ledger accounts, with their journal, in date order - narrowed to the branch, cost centre and department asked for,
     // and taking draft and deferred journals in too when unposted ones are wanted (brief §9 common parameters).
     private async Task<List<(JournalEntry Journal, JournalLine Line)>> LinesAsync(long companyId, IReadOnlyCollection<string> accounts, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
@@ -170,7 +170,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         foreach ((JournalEntry journal, JournalLine line) in await LinesAsync(companyId, accounts, fromDate, toDate, ct).ConfigureAwait(false))
         {
             balance += line.BaseDebit - line.BaseCredit;
-            rows.Add(Row(("Date", Date(journal.PostingDate)), ("Journal", journal.JournalNumber), ("Document", journal.DocumentNumber ?? "—"), ("Narrative", line.Narrative ?? journal.Narrative ?? string.Empty),
+            rows.Add(Row(("Date", Date(journal.PostingDate)), ("Journal", journal.JournalNumber), ("Document", journal.DocumentNumber ?? "-"), ("Narrative", line.Narrative ?? journal.Narrative ?? string.Empty),
                 ("In", line.BaseDebit == 0m ? string.Empty : Money(line.BaseDebit)), ("Out", line.BaseCredit == 0m ? string.Empty : Money(line.BaseCredit)), ("Balance", Money(balance))));
         }
 
@@ -189,8 +189,8 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
             JournalLine? from = j.Lines.FirstOrDefault(l => banks.ContainsKey(l.AccountCode) && l.BaseCredit > 0m);
             JournalLine? to = j.Lines.FirstOrDefault(l => banks.ContainsKey(l.AccountCode) && l.BaseDebit > 0m);
             decimal difference = j.Lines.Where(l => !banks.ContainsKey(l.AccountCode)).Sum(l => l.BaseCredit - l.BaseDebit);
-            return Row(("Date", Date(j.PostingDate)), ("Journal", j.JournalNumber), ("Document", j.DocumentNumber ?? "—"), ("From", from is null ? "?" : banks[from.AccountCode]), ("To", to is null ? "?" : banks[to.AccountCode]),
-                ("Out", from is null ? "—" : $"{Money(from.TransactionCredit)} {from.TransactionCurrency.Value}"), ("In", to is null ? "—" : $"{Money(to.TransactionDebit)} {to.TransactionCurrency.Value}"),
+            return Row(("Date", Date(j.PostingDate)), ("Journal", j.JournalNumber), ("Document", j.DocumentNumber ?? "-"), ("From", from is null ? "?" : banks[from.AccountCode]), ("To", to is null ? "?" : banks[to.AccountCode]),
+                ("Out", from is null ? "-" : $"{Money(from.TransactionCredit)} {from.TransactionCurrency.Value}"), ("In", to is null ? "-" : $"{Money(to.TransactionDebit)} {to.TransactionCurrency.Value}"),
                 ("Difference", difference));
         })];
     }
@@ -204,8 +204,8 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         {
             bool open = c.Status == Core.Banking.ChequeStatus.Issued;
             string status = open && c.IssuedOn.AddMonths(staleMonths) < toDate ? "Stale" : c.Status.ToString();
-            return Row(("Bank", banks.GetValueOrDefault(c.BankAccountId, "?")), ("Cheque", c.ChequeNumber), ("Issued", Date(c.IssuedOn)), ("Payee", c.Payee), ("Document", c.DocumentNumber ?? "—"), ("Status", status),
-                ("StatusDate", Date(c.StatusDate)), ("Days", open ? (toDate.DayNumber - c.IssuedOn.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"), ("Reason", c.Reason ?? string.Empty), ("Amount", c.Amount));
+            return Row(("Bank", banks.GetValueOrDefault(c.BankAccountId, "?")), ("Cheque", c.ChequeNumber), ("Issued", Date(c.IssuedOn)), ("Payee", c.Payee), ("Document", c.DocumentNumber ?? "-"), ("Status", status),
+                ("StatusDate", Date(c.StatusDate)), ("Days", open ? (toDate.DayNumber - c.IssuedOn.DayNumber).ToString(CultureInfo.InvariantCulture) : "-"), ("Reason", c.Reason ?? string.Empty), ("Amount", c.Amount));
         })];
     }
 
@@ -250,7 +250,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
             }
 
             Application.Abstractions.Banking.BankReconciliationReport rec = result.Value;
-            string Head(string text) => $"{bank.Code} — {text}";
+            string Head(string text) => $"{bank.Code} - {text}";
             rows.Add(Row(("Section", Head("Balance per bank statement")), ("Date", asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Description", bank.Name), ("Amount", rec.StatementBalance)));
             rows.AddRange(rec.UnpresentedGlItems.Where(i => i.Amount < 0m).Select(i => Row(("Section", Head("Less: payments not yet presented")), ("Date", i.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
                 ("Description", i.Description), ("Amount", i.Amount))));
@@ -259,7 +259,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
             rows.AddRange(rec.UnmatchedStatementItems.Select(i => Row(("Section", Head("Less: statement items not yet in the cash book")), ("Date", i.Date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
                 ("Description", i.Description), ("Amount", -i.Amount))));
             rows.Add(Row(("Section", Head("Balance per cash book")), ("Date", asAt.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Description", bank.GlAccountCode), ("Amount", rec.GlBalance)));
-            rows.Add(Row(("Section", Head(rec.Difference == 0m ? "Reconciled — no difference" : "UNEXPLAINED DIFFERENCE")), ("Date", string.Empty), ("Description", string.Empty), ("Amount", rec.Difference)));
+            rows.Add(Row(("Section", Head(rec.Difference == 0m ? "Reconciled - no difference" : "UNEXPLAINED DIFFERENCE")), ("Date", string.Empty), ("Description", string.Empty), ("Amount", rec.Difference)));
         }
 
         return rows;
@@ -299,7 +299,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
                 string journals = string.Join(", ", new[] { count.VarianceJournalNumber, count.ReimbursementJournalNumber }.Where(j => j is not null));
                 rows.Add(Row(("Fund", fund.Code), ("Date", Date(count.CountDate)), ("Float", string.Empty), ("Book", Money(count.BookBalance)), ("Counted", Money(count.CountedAmount)),
                     ("Variance", Money(count.Variance)), ("Status", count.Status.ToString()), ("CountedBy", users.TryGetValue(count.CountedByUserId, out string? who) ? who : count.CountedByUserId.ToString(CultureInfo.InvariantCulture)),
-                    ("Journals", journals.Length == 0 ? "—" : journals), ("Note", count.Note ?? string.Empty)));
+                    ("Journals", journals.Length == 0 ? "-" : journals), ("Note", count.Note ?? string.Empty)));
             }
         }
 

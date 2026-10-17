@@ -79,7 +79,7 @@ public sealed class RestaurantVoidsAndCompsTests
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
 
-            // Void the fries (sent wrong) — a reason is mandatory.
+            // Void the fries (sent wrong) - a reason is mandatory.
             (await res.VoidLineAsync(companyId, orderId, friesLineId, "  ")).IsFailure.Should().BeTrue();
             (await res.VoidLineAsync(companyId, orderId, friesLineId, "Wrong order")).IsSuccess.Should().BeTrue();
             // Cannot void it twice.

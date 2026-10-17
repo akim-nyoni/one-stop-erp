@@ -10,7 +10,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the depreciation run guards: an asset acquired after the run month is not charged, re-running a
-/// month posts nothing, and the next month charges again — with accumulated depreciation equal to the ledger.
+/// month posts nothing, and the next month charges again - with accumulated depreciation equal to the ledger.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class DepreciationRunGuardTests

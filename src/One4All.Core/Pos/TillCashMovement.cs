@@ -20,7 +20,7 @@ public enum TillCashKind
 
 /// <summary>
 /// Cash moved in or out of a till drawer during a session other than by sales (<c>pos.till_cash_movement</c>): pickups to the safe,
-/// paid-outs for expenses and float top-ups — each posted, and each counted in the cash expected at cash-up.
+/// paid-outs for expenses and float top-ups - each posted, and each counted in the cash expected at cash-up.
 /// </summary>
 public sealed class TillCashMovement : Entity, ICompanyScoped
 {

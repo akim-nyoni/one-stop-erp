@@ -18,7 +18,7 @@ public enum PayerKind
     /// <summary>A student / guardian / sponsor.</summary>
     Student = 4,
 
-    /// <summary>No account — a sundry / anonymous receipt.</summary>
+    /// <summary>No account - a sundry / anonymous receipt.</summary>
     Anonymous = 99,
 }
 
@@ -68,7 +68,7 @@ public enum ReceiptStatus
 }
 
 /// <summary>
-/// An official receipt (brief §RCP-2, <c>rcp.receipt</c>) — an immutable document collecting money against
+/// An official receipt (brief §RCP-2, <c>rcp.receipt</c>) - an immutable document collecting money against
 /// an account or as sundry income. One receipt has one gapless number, one or more lines (what the money is
 /// for) and one or more tenders (how it was paid).
 /// </summary>
@@ -185,7 +185,7 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
         return tender;
     }
 
-    /// <summary>How the cashier allocated the payment when not by the default (oldest first) — e.g. "UserDirected"; null when the default was used.</summary>
+    /// <summary>How the cashier allocated the payment when not by the default (oldest first) - e.g. "UserDirected"; null when the default was used.</summary>
     public string? AllocationOverride { get; private set; }
 
     /// <summary>Why the cashier allocated against the default (brief §RCP RC19).</summary>
@@ -217,7 +217,7 @@ public sealed class Receipt : AuditableEntity, ICompanyScoped
     }
 }
 
-/// <summary>One line of a receipt — what the money is for (<c>rcp.receipt_line</c>).</summary>
+/// <summary>One line of a receipt - what the money is for (<c>rcp.receipt_line</c>).</summary>
 public sealed class ReceiptLine : Entity
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>
@@ -259,7 +259,7 @@ public sealed class ReceiptLine : Entity
     public string? Service { get; private set; }
 }
 
-/// <summary>One tender of a receipt — how it was paid (<c>rcp.receipt_tender</c>).</summary>
+/// <summary>One tender of a receipt - how it was paid (<c>rcp.receipt_tender</c>).</summary>
 public sealed class ReceiptTender : Entity
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>

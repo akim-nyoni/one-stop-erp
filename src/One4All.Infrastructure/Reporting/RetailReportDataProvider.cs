@@ -51,25 +51,25 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             "RETLPROMOTIONS" => await PromotionsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLTENDERS" => await TendersAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLVOIDS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.LineVoid, PosEventKind.SaleVoid], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)),
-                ("Kind", e.Kind == PosEventKind.SaleVoid ? "Sale" : "Line"), ("Sale", e.SaleNumber ?? "—"), ("Description", e.Description), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", n.Authoriser(e)), ("Amount", e.Amount)), ct)
+                ("Kind", e.Kind == PosEventKind.SaleVoid ? "Sale" : "Line"), ("Sale", e.SaleNumber ?? "-"), ("Description", e.Description), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", n.Authoriser(e)), ("Amount", e.Amount)), ct)
                 .ConfigureAwait(false),
-            "RETLREFUNDS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Refund], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
-                ("Description", e.Description), ("Quantity", Qty(e.Quantity ?? 0m)), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", n.Authoriser(e)), ("Journal", e.Reference ?? "—"), ("Restock", e.Outcome ?? string.Empty),
+            "RETLREFUNDS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Refund], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "-"),
+                ("Description", e.Description), ("Quantity", Qty(e.Quantity ?? 0m)), ("Reason", e.Reason ?? string.Empty), ("AuthorisedBy", n.Authoriser(e)), ("Journal", e.Reference ?? "-"), ("Restock", e.Outcome ?? string.Empty),
                 ("Amount", e.Amount)), ct).ConfigureAwait(false),
-            "RETLDISCOUNTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.LineDiscount], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
+            "RETLDISCOUNTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.LineDiscount], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "-"),
                 ("Description", e.Description), ("List", Money(e.OriginalAmount ?? 0m)), ("Rate", Percent(e.Amount, e.OriginalAmount ?? 0m)), ("Reason", e.Reason ?? string.Empty), ("Amount", e.Amount)), ct).ConfigureAwait(false),
             "RETLOVERRIDES" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.PriceOverride], (e, n) => Row(("Date", Date(e.EventDate)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("AuthorisedBy", n.Authoriser(e)),
-                ("Sale", e.SaleNumber ?? "—"), ("Description", e.Description), ("List", Money(e.OriginalAmount ?? 0m)), ("Keyed", Money(e.Amount)), ("Reason", e.Reason ?? string.Empty), ("Difference", e.Amount - (e.OriginalAmount ?? 0m))), ct)
+                ("Sale", e.SaleNumber ?? "-"), ("Description", e.Description), ("List", Money(e.OriginalAmount ?? 0m)), ("Keyed", Money(e.Amount)), ("Reason", e.Reason ?? string.Empty), ("Difference", e.Amount - (e.OriginalAmount ?? 0m))), ct)
                 .ConfigureAwait(false),
             "RETLNOSALE" => await NoSaleAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLGIFTCARDS" => await GiftCardsAsync(companyId, toDate, ct).ConfigureAwait(false),
             "RETLALLOWANCEVOUCHERS" => await AllowanceVouchersAsync(companyId, toDate, ct).ConfigureAwait(false),
             "RETLPARKED" => await ParkedAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "RETLLOYALTY" => await LoyaltyAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
-            "RETLREPRINTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Reprint], (e, n) => Row(("Printed", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "—"),
+            "RETLREPRINTS" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.Reprint], (e, n) => Row(("Printed", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Cashier", n.Cashier(e)), ("Sale", e.SaleNumber ?? "-"),
                 ("Reason", e.Reason ?? string.Empty), ("Amount", e.Amount)), ct).ConfigureAwait(false),
-            "RETLFISCAL" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.FiscalSubmission], (e, n) => Row(("Submitted", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Sale", e.SaleNumber ?? "—"),
-                ("Reference", e.Reference ?? "—"), ("Outcome", e.Outcome ?? "Pending"), ("Amount", e.Amount)), ct).ConfigureAwait(false),
+            "RETLFISCAL" => await EventsAsync(companyId, fromDate, toDate, [PosEventKind.FiscalSubmission], (e, n) => Row(("Submitted", Stamp(e.OccurredOnUtc)), ("Till", n.Till(e)), ("Sale", e.SaleNumber ?? "-"),
+                ("Reference", e.Reference ?? "-"), ("Outcome", e.Outcome ?? "Pending"), ("Amount", e.Amount)), ct).ConfigureAwait(false),
             "RETLOFFLINE" => await OfflineAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
         };
@@ -91,7 +91,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
                 List<Sale> completed = [.. g.Where(s => s.Status == SaleStatus.Completed)];
                 decimal net = completed.SelectMany(s => s.Lines).Sum(l => l.LineNet), tax = completed.SelectMany(s => s.Lines).Sum(l => l.TaxAmount);
                 string tenders = string.Join(", ", completed.SelectMany(s => s.Tenders).GroupBy(t => t.TenderType)
-                    .Select(t => $"{t.Key} {Money(t.Sum(x => x.IsChange ? -x.BaseAmount : x.BaseAmount))}").DefaultIfEmpty("—"));
+                    .Select(t => $"{t.Key} {Money(t.Sum(x => x.IsChange ? -x.BaseAmount : x.BaseAmount))}").DefaultIfEmpty("-"));
                 return Row(("Date", Date(g.Key.SaleDate)), ("Till", tills.GetValueOrDefault(g.Key.TerminalId, "?")), ("Cashier", users.GetValueOrDefault(g.Key.CashierUserId, $"user {g.Key.CashierUserId}")),
                     ("Sales", completed.Count), ("Voided", g.Count(s => s.Status == SaleStatus.Voided)), ("Net", Money(net)), ("Tax", Money(tax)), ("Tenders", tenders), ("Gross", net + tax));
             })];
@@ -107,7 +107,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             List<Sale> completed = [.. g.Where(s => s.Status == SaleStatus.Completed)];
             decimal net = completed.SelectMany(s => s.Lines).Sum(l => l.LineNet);
             return Row(("Cashier", users.GetValueOrDefault(g.Key, $"user {g.Key}")), ("Sessions", g.Select(s => s.TillSessionId).Distinct().Count()), ("Sales", completed.Count),
-                ("Items", Qty(completed.SelectMany(s => s.Lines).Sum(l => l.Quantity))), ("AverageBasket", completed.Count == 0 ? "—" : Money(net / completed.Count)),
+                ("Items", Qty(completed.SelectMany(s => s.Lines).Sum(l => l.Quantity))), ("AverageBasket", completed.Count == 0 ? "-" : Money(net / completed.Count)),
                 ("Voids", g.Count(s => s.Status == SaleStatus.Voided)), ("Variance", Money(cashUps.Where(c => c.CashierUserId == g.Key).Sum(c => c.Variance))), ("Net", net));
         })];
     }
@@ -189,7 +189,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         List<GiftCard> cards = await _db.GiftCards.AsNoTracking().Where(c => c.CompanyId == companyId && c.Balance > 0m && c.Status != GiftCardStatus.Redeemed && c.IssuedDate <= asAt)
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. cards.Select(c => (Card: c, Age: asAt.DayNumber - c.IssuedDate.DayNumber)).OrderByDescending(x => x.Age).ThenBy(x => x.Card.CardNumber, StringComparer.Ordinal)
-            .Select(x => Row(("Card", x.Card.CardNumber), ("Currency", x.Card.Currency.Value), ("Issued", Date(x.Card.IssuedDate)), ("Expires", x.Card.ExpiryDate is DateOnly expiry ? Date(expiry) : "—"),
+            .Select(x => Row(("Card", x.Card.CardNumber), ("Currency", x.Card.Currency.Value), ("Issued", Date(x.Card.IssuedDate)), ("Expires", x.Card.ExpiryDate is DateOnly expiry ? Date(expiry) : "-"),
                 ("Status", x.Card.Status.ToString()), ("AgeDays", x.Age), ("Band", x.Age <= 90 ? "0–90" : x.Age <= 180 ? "91–180" : x.Age <= 365 ? "181–365" : "Over 365"),
                 ("Original", Money(x.Card.OriginalValue)), ("Balance", x.Card.Balance)))];
     }
@@ -216,7 +216,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             int count = used?.Count ?? 0;
             decimal spend = used?.Spend ?? 0m, discount = used?.Discount ?? 0m;
             return Row(("Campaign", c.Code), ("Name", c.Name), ("Valid", $"{Date(c.ValidFrom)} to {Date(c.ValidTo)}"), ("Redemptions", count), ("Spend", Money(spend)),
-                ("AverageSpend", count == 0 ? "—" : Money(spend / count)), ("DiscountRate", Percent(discount, spend)), ("Discount", discount));
+                ("AverageSpend", count == 0 ? "-" : Money(spend / count)), ("DiscountRate", Percent(discount, spend)), ("Discount", discount));
         })];
     }
 
@@ -236,7 +236,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
     {
         DateTimeOffset start = new(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero), end = new(toDate.ToDateTime(TimeOnly.MaxValue), TimeSpan.Zero);
         return [.. (await _db.OfflineOperations.AsNoTracking().Where(o => o.CompanyId == companyId && o.CreatedUtc >= start && o.CreatedUtc <= end).OrderBy(o => o.CreatedUtc).ToListAsync(ct).ConfigureAwait(false))
-            .Select(o => Row(("Created", Stamp(o.CreatedUtc)), ("Kind", o.Kind), ("Status", o.Status.ToString()), ("Attempts", o.Attempts), ("Synced", o.SyncedUtc is DateTimeOffset s ? Stamp(s) : "—"),
+            .Select(o => Row(("Created", Stamp(o.CreatedUtc)), ("Kind", o.Kind), ("Status", o.Status.ToString()), ("Attempts", o.Attempts), ("Synced", o.SyncedUtc is DateTimeOffset s ? Stamp(s) : "-"),
                 ("Error", o.LastError ?? string.Empty)))];
     }
 
@@ -247,7 +247,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
 
         public string Cashier(PosEvent e) => Users.GetValueOrDefault(e.CashierUserId, $"user {e.CashierUserId}");
 
-        public string Authoriser(PosEvent e) => e.AuthorisedByUserId is long id ? Users.GetValueOrDefault(id, $"user {id}") : "—";
+        public string Authoriser(PosEvent e) => e.AuthorisedByUserId is long id ? Users.GetValueOrDefault(id, $"user {id}") : "-";
     }
 
     private async Task<(List<PosEvent> Events, EventNames Names)> LoadEventsAsync(long companyId, DateOnly fromDate, DateOnly toDate, PosEventKind[] kinds, CancellationToken ct)
@@ -282,8 +282,8 @@ public sealed class RetailReportDataProvider : IReportDataProvider
         return [.. parked.Select(e =>
         {
             PosEvent? back = resumed.Where(r => r.SaleNumber == e.SaleNumber && r.OccurredOnUtc >= e.OccurredOnUtc).OrderBy(r => r.OccurredOnUtc).FirstOrDefault();
-            return Row(("Parked", Stamp(e.OccurredOnUtc)), ("Till", names.Till(e)), ("Cashier", names.Cashier(e)), ("Sale", e.SaleNumber ?? "—"), ("Status", back is null ? "Abandoned" : "Resumed"),
-                ("Resumed", back is null ? "—" : Stamp(back.OccurredOnUtc)), ("Waited", back is null ? "—" : $"{(int)(back.OccurredOnUtc - e.OccurredOnUtc).TotalMinutes} min"), ("Amount", e.Amount));
+            return Row(("Parked", Stamp(e.OccurredOnUtc)), ("Till", names.Till(e)), ("Cashier", names.Cashier(e)), ("Sale", e.SaleNumber ?? "-"), ("Status", back is null ? "Abandoned" : "Resumed"),
+                ("Resumed", back is null ? "-" : Stamp(back.OccurredOnUtc)), ("Waited", back is null ? "-" : $"{(int)(back.OccurredOnUtc - e.OccurredOnUtc).TotalMinutes} min"), ("Amount", e.Amount));
         })];
     }
 
@@ -309,7 +309,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 
-    private static string Percent(decimal part, decimal total) => total == 0m ? "—" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+    private static string Percent(decimal part, decimal total) => total == 0m ? "-" : (part * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
     private static string Qty(decimal quantity) => quantity.ToString("0.###", CultureInfo.InvariantCulture);
 
@@ -352,11 +352,11 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             string read = session.ZReadNumber is int z ? $"Z{z}" : "X (open)";
             IReadOnlyDictionary<string, object?> Line(string tender, string currency, decimal amount, decimal baseAmount) => Row(("Till", tills.GetValueOrDefault(session.TerminalId, "?")),
                 ("Cashier", users.GetValueOrDefault(session.CashierUserId, "?")), ("Opened", session.OpenedOnUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
-                ("Closed", session.ClosedOnUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "—"), ("Read", read), ("Float", session.OpeningFloat), ("Sales", mine.Count),
+                ("Closed", session.ClosedOnUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "-"), ("Read", read), ("Float", session.OpeningFloat), ("Sales", mine.Count),
                 ("Tender", tender), ("Currency", currency), ("Amount", amount), ("Base", baseAmount));
             if (tenders.Count == 0)
             {
-                rows.Add(Line("—", string.Empty, 0m, 0m));
+                rows.Add(Line("-", string.Empty, 0m, 0m));
             }
 
             rows.AddRange(tenders.Select(t => Line(t.TenderType.ToString(), t.Currency, t.Amount, t.Base)));
@@ -383,7 +383,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             List<(Core.Restaurant.TableOrder Order, Core.Restaurant.RestaurantBill Bill)> closed = [.. g.Join(bills, o => o.Id, b => b.TableOrderId, (o, b) => (o, b))];
             double minutes = closed.Count == 0 ? 0 : closed.Average(x => Math.Max(0, (x.Bill.CreatedOnUtc - x.Order.CreatedOnUtc).TotalMinutes));
             return Row(("Section", "Waiter"), ("Waiter", Waiter(g.Key)), ("Tab", $"{g.Count(o => o.Status == Core.Restaurant.TableOrderStatus.Open)} still open"), ("Opened", string.Empty),
-                ("Tabs", g.Count()), ("Minutes", closed.Count == 0 ? "—" : Math.Round(minutes).ToString(CultureInfo.InvariantCulture)),
+                ("Tabs", g.Count()), ("Minutes", closed.Count == 0 ? "-" : Math.Round(minutes).ToString(CultureInfo.InvariantCulture)),
                 ("Spend", closed.Count == 0 ? 0m : Math.Round(closed.Average(x => x.Bill.Gross - x.Bill.Tip), 2, MidpointRounding.AwayFromZero)), ("Tips", Math.Round(closed.Sum(x => x.Bill.Tip), 2, MidpointRounding.AwayFromZero)));
         }));
         return rows;
@@ -493,7 +493,7 @@ public sealed class RetailReportDataProvider : IReportDataProvider
             R("Header", "Date and time", $"{sale.SaleDate:yyyy-MM-dd} {sale.CreatedOnUtc.ToLocalTime():HH:mm}"),
             R("Header", "Buyer", "Cash sale (buyer details not captured at the till)"),
         ];
-        rows.AddRange(sale.Lines.Select(l => R("Line", $"{l.Description} — {l.Quantity.ToString("0.###", CultureInfo.InvariantCulture)} × {M(l.UnitPrice)}",
+        rows.AddRange(sale.Lines.Select(l => R("Line", $"{l.Description} - {l.Quantity.ToString("0.###", CultureInfo.InvariantCulture)} × {M(l.UnitPrice)}",
             $"net {M(l.LineNet)}, {taxCodes.GetValueOrDefault(l.ItemId) ?? "no tax code"} {M(l.TaxAmount)}, gross {M(l.LineNet + l.TaxAmount)}")));
         rows.AddRange(sale.Lines.GroupBy(l => taxCodes.GetValueOrDefault(l.ItemId) ?? "(none)").OrderBy(g => g.Key, StringComparer.Ordinal).Select(g =>
         {

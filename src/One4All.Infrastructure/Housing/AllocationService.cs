@@ -498,6 +498,71 @@ public sealed class AllocationService : IAllocationService
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<ExpiredOffer>> ExpiredOffersAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    {
+        var expired = await (from a in _db.Set<StandAllocation>().AsNoTracking()
+                             join s in _db.HousingStands.AsNoTracking() on a.StandId equals s.Id
+                             join p in _db.HousingApplicants.AsNoTracking() on a.ApplicantId equals p.Id
+                             where a.CompanyId == companyId && a.Status == AllocationStatus.Offered && a.OfferExpires < asAtDate
+                             orderby a.OfferExpires, a.CertificateNumber
+                             select new { a.CertificateNumber, s.StandNumber, p.WaitingListNumber, a.OfferExpires, a.OfferExtensions }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. expired.Select(e => new ExpiredOffer(e.CertificateNumber ?? string.Empty, e.StandNumber, e.WaitingListNumber ?? string.Empty, e.OfferExpires!.Value,
+            asAtDate.DayNumber - e.OfferExpires.Value.DayNumber, e.OfferExtensions))];
+    }
+
+    /// <inheritdoc />
+    public Task<Result> LapseOfferAsync(long companyId, string certificateNumber, DateOnly date, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(() => LapseOfferCoreAsync(companyId, certificateNumber, date, reason, ct), ct);
+
+    private async Task<Result> LapseOfferCoreAsync(long companyId, string certificateNumber, DateOnly date, string reason, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Hse.ReasonRequired", "Give the reason for lapsing the offer."));
+        }
+
+        StandAllocation? allocation = await OpenOfferAsync(companyId, certificateNumber, ct).ConfigureAwait(false);
+        if (allocation is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.OfferNotOpen", $"No open offer {certificateNumber}."));
+        }
+
+        await ReleaseAsync(allocation, AllocationStatus.Lapsed, date, reason.Trim(), ct).ConfigureAwait(false);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> ExtendOfferAsync(long companyId, string certificateNumber, DateOnly newExpiry, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Hse.ReasonRequired", "Give the reason for extending the offer."));
+        }
+
+        StandAllocation? allocation = await OpenOfferAsync(companyId, certificateNumber, ct).ConfigureAwait(false);
+        if (allocation is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.OfferNotOpen", $"No open offer {certificateNumber}."));
+        }
+
+        if (allocation.OfferExpires is DateOnly current && newExpiry <= current)
+        {
+            return Result.Failure(Error.Validation("Hse.OfferExtension", $"The new deadline must be after the current one ({current:yyyy-MM-dd})."));
+        }
+
+        allocation.ExtendOffer(newExpiry, reason.Trim());
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    private Task<StandAllocation?> OpenOfferAsync(long companyId, string certificateNumber, CancellationToken ct)
+    {
+        string number = (certificateNumber ?? string.Empty).Trim();
+        return _db.Set<StandAllocation>().FirstOrDefaultAsync(a => a.CompanyId == companyId && a.CertificateNumber == number && a.Status == AllocationStatus.Offered, ct);
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<string>> LapseExpiredAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
     {
         List<StandAllocation> expired = await (

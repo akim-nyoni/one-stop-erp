@@ -10,9 +10,9 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Infrastructure.Housing;
 
 /// <summary>
-/// Housing, Land &amp; Estates (brief §4.10). Treats the land bank as IAS 2 inventory — acquisition and
+/// Housing, Land &amp; Estates (brief §4.10). Treats the land bank as IAS 2 inventory - acquisition and
 /// servicing capitalise to WIP, subdivision releases cost to Stands Available for Sale, and the first sale
-/// releases cost to cost of sales on transfer of control — while maintaining each stand's tamper-evident
+/// releases cost to cost of sales on transfer of control - while maintaining each stand's tamper-evident
 /// chain of ownership. All money movements post through the central engine.
 /// </summary>
 public sealed class HousingService : IHousingService
@@ -231,7 +231,7 @@ public sealed class HousingService : IHousingService
             TransactionCurrency = company.BaseCurrency,
             DocumentType = "LAND-COGS",
             DocumentNumber = invoiceNumber,
-            Narrative = $"Cost of sale — stand {stand.StandNumber}",
+            Narrative = $"Cost of sale - stand {stand.StandNumber}",
             Lines =
             [
                 new JournalLineRequest { AccountCode = costOfSalesAccountCode, Side = JournalSide.Debit, TransactionAmount = stand.AllocatedCost },

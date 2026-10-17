@@ -8,14 +8,14 @@ public sealed record TerminalSeed(string Code, string Name, Core.Pos.TerminalPro
 
 /// <summary>
 /// What else a vertical seeds beyond its ledger (brief §12 Industry Setup Wizard): item categories, a POS terminal profile at head office,
-/// and its report set — the vertical's documents (statements, receipts, slips) and key reports, featured first in the report viewer.
+/// and its report set - the vertical's documents (statements, receipts, slips) and key reports, featured first in the report viewer.
 /// </summary>
 /// <param name="ItemCategories">Item categories (code, name).</param>
 /// <param name="Terminals">POS terminals.</param>
 /// <param name="FeaturedReports">Report codes featured for the company.</param>
 /// <param name="DocumentLayouts">
 /// Document layouts the company gets its own copy of, on the paper the industry prints them on (report code, paper: A4, A5, Letter, Receipt58,
-/// Receipt80) — a till receipt on an 80 mm roll, a council counter receipt on A5.
+/// Receipt80) - a till receipt on an 80 mm roll, a council counter receipt on A5.
 /// </param>
 public sealed record VerticalExtras(IReadOnlyList<(string Code, string Name)> ItemCategories, IReadOnlyList<TerminalSeed> Terminals, IReadOnlyList<string> FeaturedReports,
     IReadOnlyList<(string ReportCode, string Paper)>? DocumentLayouts = null)

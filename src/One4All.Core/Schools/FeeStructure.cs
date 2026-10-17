@@ -134,7 +134,7 @@ public sealed class FeeStructure : SoftDeletableEntity, ICompanyScoped
 
     public IReadOnlyList<FeeItem> Items => _items.AsReadOnly();
 
-    /// <summary>The total of the compulsory items — the default term charge before discounts.</summary>
+    /// <summary>The total of the compulsory items - the default term charge before discounts.</summary>
     public decimal CompulsoryTotal => _items.Where(i => i.IsCompulsory).Sum(i => i.Amount);
 
     /// <summary>Adds a fee item.</summary>

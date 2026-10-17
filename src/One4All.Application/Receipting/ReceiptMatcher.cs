@@ -38,7 +38,7 @@ public readonly record struct ReceiptMatch(long? CustomerId, MatchedBy By);
 /// <summary>
 /// Matches an imported payment to one account (brief §RCP-8). In order: the council's rules (lowest priority first; the first that fits decides); the account
 /// code as a whole word of the reference, ignoring spaces, dashes and slashes inside it ("AC 00-12" is AC0012); a stand number likewise, which matches
-/// its ratepayer; then an account code anywhere in the reference. Every step but the rules matches only when it identifies exactly one account —
+/// its ratepayer; then an account code anywhere in the reference. Every step but the rules matches only when it identifies exactly one account -
 /// anything ambiguous goes to suspense rather than to a guess.
 /// </summary>
 public static class ReceiptMatcher

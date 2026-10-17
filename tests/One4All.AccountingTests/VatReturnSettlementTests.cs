@@ -90,7 +90,7 @@ public sealed class VatReturnSettlementTests
             tb.Rows.Should().NotContain(r => r.AccountCode == "2210" && r.Debit > 0m);
         }
 
-        // Re-running the settled period nets to zero — nothing to post.
+        // Re-running the settled period nets to zero - nothing to post.
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IVatReturnService vat = scope.ServiceProvider.GetRequiredService<IVatReturnService>();

@@ -7,7 +7,7 @@ namespace One4All.Infrastructure.Workflow;
 
 /// <summary>
 /// Puts a document under the company's approval workflow for its type when one is defined (brief §7), and tells a module whether a
-/// document is governed by a workflow still in progress — then it is approved or rejected only through the workflow.
+/// document is governed by a workflow still in progress - then it is approved or rejected only through the workflow.
 /// </summary>
 internal static class WorkflowGate
 {
@@ -27,7 +27,7 @@ internal static class WorkflowGate
 
     /// <summary>
     /// Starts the company's workflow for a document with the attributes its stage rules can test (brief §4.3 / §7: "rules by value band, currency, department,
-    /// cost centre, item category, project, requester") — the requester's user name is always added.
+    /// cost centre, item category, project, requester") - the requester's user name is always added.
     /// </summary>
     /// <param name="db">The database context.</param>
     /// <param name="workflow">The workflow service (null: none in this host).</param>

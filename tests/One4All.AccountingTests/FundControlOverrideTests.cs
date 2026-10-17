@@ -56,7 +56,7 @@ public sealed class FundControlOverrideTests
         var rendered = await scope.ServiceProvider.GetRequiredService<IReportRunner>().RenderAsync(companyId, "B27", new Dictionary<string, object?> { ["AsAtDate"] = new DateOnly(2026, 3, 31) }, ReportFormat.Csv);
         rendered.IsSuccess.Should().BeTrue();
         string report = Encoding.UTF8.GetString(rendered.Value.Content);
-        report.Should().Contain(",Blocked,2026-03-05,6800,—,Journal FC-1,").And.Contain(",Blocked,2026-03-05,6800,—,Journal FC-2,")
-            .And.Contain(",Overridden,2026-03-05,6800,—,Journal FC-3,").And.Contain(",Urgent repair,75"); // the authoriser shows by name when user 9 exists
+        report.Should().Contain(",Blocked,2026-03-05,6800,-,Journal FC-1,").And.Contain(",Blocked,2026-03-05,6800,-,Journal FC-2,")
+            .And.Contain(",Overridden,2026-03-05,6800,-,Journal FC-3,").And.Contain(",Urgent repair,75"); // the authoriser shows by name when user 9 exists
     }
 }

@@ -42,7 +42,7 @@
             <Button DockPanel.Dock="Right" Content="Refresh" Padding="14,6" FontWeight="SemiBold" Background="#DDEFE0" VerticalAlignment="Center" Command="{Binding RefreshCommand}" />
             <StackPanel>
                 <TextBlock Text="Data Health" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
-                <TextBlock Text="Unbalanced batches, control account variances, negative stock, unposted batches, orphan balances and the rest of the ledger integrity check — in one view."
+                <TextBlock Text="Unbalanced batches, control account variances, negative stock, unposted batches, orphan balances and the rest of the ledger integrity check - in one view."
                            Foreground="#667" FontSize="12" TextWrapping="Wrap" />
             </StackPanel>
         </DockPanel>
@@ -87,7 +87,7 @@
             <!-- Findings of the selected indicator -->
             <Border Grid.Column="2" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="8">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="{Binding SelectedIndicator.Name, StringFormat='Findings — {0}'}" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="0,0,0,6" />
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding SelectedIndicator.Name, StringFormat='Findings - {0}'}" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="0,0,0,6" />
                     <ListBox ItemsSource="{Binding Findings}" BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate>

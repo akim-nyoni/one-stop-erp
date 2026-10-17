@@ -2,7 +2,7 @@ namespace One4All.Application.Budgeting;
 
 /// <summary>
 /// Department isolation in budget preparation (brief §4.18 "Departments cannot see or edit each other's numbers unless granted; Finance sees everything"):
-/// a user tied to departments — through their employee record or a department data scope — reaches only those departments' budgets, unless granted every
+/// a user tied to departments - through their employee record or a department data scope - reaches only those departments' budgets, unless granted every
 /// department. A user tied to no department is not restricted by this rule. Pure.
 /// </summary>
 public static class BudgetDepartmentAccess

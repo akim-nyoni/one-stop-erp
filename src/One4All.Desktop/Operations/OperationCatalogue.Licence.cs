@@ -52,12 +52,12 @@ public static partial class OperationCatalogue
                     case "Activation request code":
                         string code = new LicenceRequestCode(licence.MachineFingerprint, i.Optional("Customer"), Environment.MachineName, DateTimeOffset.UtcNow).Encode();
                         System.Windows.Clipboard.SetText(code);
-                        return $"Copied to the clipboard — send it to your vendor:{Environment.NewLine}{code}";
+                        return $"Copied to the clipboard - send it to your vendor:{Environment.NewLine}{code}";
                     default:
                         LicensePayload? p = licence.Current.Payload;
                         return string.Join(Environment.NewLine, new[]
                         {
-                            $"Status: {licence.Current.Status} — {licence.Current.Message}",
+                            $"Status: {licence.Current.Status} - {licence.Current.Message}",
                             p is null ? "No licence." : $"Customer: {p.Customer.Name} ({p.Customer.Id}) · {p.Edition} {p.LicenceType} · licence {p.LicenceId}",
                             p is null ? string.Empty : $"Valid {p.ValidFrom:yyyy-MM-dd} to {p.ValidTo?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "perpetual"}, grace {p.GraceDays} day(s)",
                             p is null || p.Limits.Count == 0 ? string.Empty : "Limits: " + string.Join(", ", p.Limits.Select(l => $"{l.Key} {l.Value?.ToString(CultureInfo.InvariantCulture) ?? "unlimited"}")),

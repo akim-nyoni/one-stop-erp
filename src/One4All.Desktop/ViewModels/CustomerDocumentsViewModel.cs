@@ -111,7 +111,7 @@ public sealed partial class CustomerDocumentsViewModel : ObservableObject
             Customers.Clear();
             foreach (var c in await db.Customers.Where(c => c.CompanyId == _companyId).OrderBy(c => c.Code).Select(c => new { c.Id, c.Code, c.Name }).ToListAsync(ct).ConfigureAwait(true))
             {
-                Customers.Add(new CustomerChoiceVm(c.Id, $"{c.Code} — {c.Name}"));
+                Customers.Add(new CustomerChoiceVm(c.Id, $"{c.Code} - {c.Name}"));
             }
 
             StatusMessage = $"{Customers.Count} customer(s). Choose one to see their documents.";
@@ -174,7 +174,7 @@ public sealed partial class CustomerDocumentsViewModel : ObservableObject
         await PreviewAsync(
             sp => sp.GetRequiredService<IInvoiceDocumentService>().RenderTextAsync(_companyId, doc.OpenItemId),
             $"{doc.Number}.txt",
-            $"{doc.Kind} {doc.Number} ready — Save writes it to a file.").ConfigureAwait(true);
+            $"{doc.Kind} {doc.Number} ready - Save writes it to a file.").ConfigureAwait(true);
     }
 
     /// <summary>Previews the selected customer's statement as at the statement date.</summary>
@@ -191,7 +191,7 @@ public sealed partial class CustomerDocumentsViewModel : ObservableObject
         await PreviewAsync(
             sp => sp.GetRequiredService<IStatementService>().RenderCustomerStatementTextAsync(_companyId, customer.Id, asAt),
             $"statement-{customer.Label.Split(' ')[0]}-{asAt:yyyyMMdd}.txt",
-            $"Statement as at {asAt:yyyy-MM-dd} ready — Save writes it to a file.").ConfigureAwait(true);
+            $"Statement as at {asAt:yyyy-MM-dd} ready - Save writes it to a file.").ConfigureAwait(true);
     }
 
     private async Task PreviewAsync(Func<IServiceProvider, Task<Result<string>>> render, string fileName, string done)

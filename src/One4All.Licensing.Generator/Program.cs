@@ -71,7 +71,7 @@ public static class Program
         else
         {
             File.WriteAllText(privPath, pair.PrivateKeyBase64);
-            Console.WriteLine($"Private key (PLAINTEXT — protect with --passphrase!) : {privPath}");
+            Console.WriteLine($"Private key (PLAINTEXT - protect with --passphrase!) : {privPath}");
         }
 
         Console.WriteLine($"Key id                  : {kid}");

@@ -21,7 +21,7 @@ Open a session at a station with the float, or close yours by declaring the cash
 | Step | yes | One of: Open, Close; default Open |
 | Station code (open) | no | Text |
 | Currency | no | Text; default USD |
-| Float (open) / cash counted (close) — an amount or notes, e.g. 50x10 + 20x5 | no | Text |
+| Float (open) / cash counted (close) - an amount or notes, e.g. 50x10 + 20x5 | no | Text |
 | Date | yes | Date |
 | Cash account | no | Text; default 1000 |
 | Cash shortages / overs account (close) | no | Text |
@@ -181,7 +181,7 @@ The list beside the form shows: Receipt books.
 
 ### Cashiers' own and related accounts
 
-The accounts a cashier may not take payments on — their own, a spouse's or relative's, a business they have an interest in. Another cashier must take those payments; an attempt is refused and shows on RC23.
+The accounts a cashier may not take payments on - their own, a spouse's or relative's, a business they have an interest in. Another cashier must take those payments; an attempt is refused and shows on RC23.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -234,34 +234,34 @@ The list beside the form shows: Matching rules (tried first, lowest priority fir
 | RC14 | Till Variance Report | Shortages and overages by cashier and period, with recovery status. |
 | RC15 | Cancelled & Reversed Receipts | With reason, authorising supervisor and value. |
 | RC16 | Receipt Reprint Log | Every reprint, watermarked COPY, numbered and logged. |
-| RC17 | Receipt Number Gap Analysis | Per station — must show no gaps. |
+| RC17 | Receipt Number Gap Analysis | Per station - must show no gaps. |
 | RC18 | Back-Dated Receipt Report | Receipts posted with a date before the transaction date. |
 | RC19 | Allocation Override Report | Where a cashier directed money against the default policy, with the reason. |
 | RC2 | X-Read / Z-Read | Mid-shift non-resetting (X) and session-close immutable (Z) totals by tender and currency. |
 | RC20 | Manual / Pre-Numbered Stationery Control | Books issued, serials used, serials unaccounted, books unreturned. |
-| RC21 | Receipting Audit Trail | Every receipt, cancellation, allocation, suspense movement and refund — before/after values, user, station. |
-| RC22 | Segregation of Duties Violations — Receipting | Blocked or granted SoD-conflicting actions. |
+| RC21 | Receipting Audit Trail | Every receipt, cancellation, allocation, suspense movement and refund - before/after values, user, station. |
+| RC22 | Segregation of Duties Violations - Receipting | Blocked or granted SoD-conflicting actions. |
 | RC23 | Receipts Against Related-Party Accounts | Blocked attempts and any granted exceptions. |
 | RC24 | Banking / Deposit Slip | Per bank account and currency. |
 | RC25 | Daily Banking Summary | Collected vs handed to treasury vs banked vs confirmed on statement. |
 | RC26 | Cash in Transit Ageing | Anything unbanked or unconfirmed beyond N days. |
 | RC27 | Unbanked Collections Report | Takings not yet moved into cash-in-transit. |
 | RC28 | Pickups, Drops & Petty Cash Pay-outs | Mid-shift cash movements with reason. |
-| RC29 | Unallocated / Suspense Receipts Register | With ageing — the report that recovers lost money. |
+| RC29 | Unallocated / Suspense Receipts Register | With ageing - the report that recovers lost money. |
 | RC3 | Daily Collection Summary | Collections by station, cashier, tender type, currency and revenue head. |
 | RC30 | Suspense Allocation Report | What was allocated out, by whom, to which account, with the reason. |
 | RC31 | Bulk Import Batch Report | File, records, matched, unmatched, duplicates rejected, total value. |
 | RC32 | Import Matching Exceptions | Unmatched references, ambiguous matches, amount mismatches. |
 | RC33 | Pending Tenders Report | Claimed deposits and transfers not yet confirmed on the bank statement, aged. |
 | RC34 | Dishonoured Cheque / Reversed Payment Register | With penalties raised and recovery status. |
-| RC35 | Official Receipt | Thermal / A5 / A4 / multi-part — allocation by service, balance after payment, currency and rate. |
-| RC36 | Counter Mini-Statement | Last N transactions and the current balance — printed on request. |
+| RC35 | Official Receipt | Thermal / A5 / A4 / multi-part - allocation by service, balance after payment, currency and rate. |
+| RC36 | Counter Mini-Statement | Last N transactions and the current balance - printed on request. |
 | RC37 | Full Account Statement | The AR / municipal / housing / school statement, printable from the counter. |
 | RC38 | Payment History per Account | All receipts, allocations and reversals for one payer. |
-| RC39 | Credit Balances / Overpayments | Residents in credit, with ageing — a liability that must be reported. |
+| RC39 | Credit Balances / Overpayments | Residents in credit, with ageing - a liability that must be reported. |
 | RC4 | Receipt Listing / Cashier Day Book | Every receipt with payer, amount, tender and allocation. |
 | RC40 | Deposits Held Register | By payer, type, date received, refundable amount. |
-| RC41 | Refunds Register | Requested, approved, paid, outstanding — with turnaround times. |
+| RC41 | Refunds Register | Requested, approved, paid, outstanding - with turnaround times. |
 | RC42 | Payment Arrangements Captured at Counter | New arrangements, honoured, defaulted. |
 | RC43 | Top Payers / Largest Receipts | For review, and for spotting structuring. |
 | RC44 | Accounts With No Payment in N Months | Feeds credit control and disconnection lists. |
@@ -275,7 +275,7 @@ The list beside the form shows: Matching rules (tried first, lowest priority fir
 | RC51 | Collection Trend & Seasonality | Daily, weekly, monthly, year-on-year. |
 | RC52 | Prepaid Token Sales & Credit-off-Arrears Recovery | Token value issued and the arrears portion recovered. |
 | RC53 | Receipting Executive Dashboard | Today's collections by channel and service, cash unbanked, suspense pool and its age, variance trend, queue load. |
-| RC6 | Collection by Service | What residents paid for — water, rates, refuse, sewer, licences, fees. |
+| RC6 | Collection by Service | What residents paid for - water, rates, refuse, sewer, licences, fees. |
 | RC7 | Collection by Tender Type & Channel | Counter cash, card, mobile money, bank, agent, field. |
 | RC8 | Collection by Currency | Amounts by currency with the rates applied and the realised FX effect. |
 | RC9 | Collection by Ward / Zone | Collections by ward, zone, suburb, class or scheme. |

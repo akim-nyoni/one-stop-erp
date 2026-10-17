@@ -178,7 +178,7 @@ public sealed partial class AuditTrailViewModel : ObservableObject
             }
 
             SelectedEntry = null;
-            StatusMessage = entries.Count >= 1_000 ? "Showing the newest 1,000 entries — narrow the filter to see more." : $"{entries.Count} entr{(entries.Count == 1 ? "y" : "ies")}.";
+            StatusMessage = entries.Count >= 1_000 ? "Showing the newest 1,000 entries - narrow the filter to see more." : $"{entries.Count} entr{(entries.Count == 1 ? "y" : "ies")}.";
         }
         catch (Exception ex)
         {

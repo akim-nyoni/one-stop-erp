@@ -8,7 +8,7 @@ namespace One4All.Application.Housing;
 public sealed record HolderShare(long CustomerId, decimal SharePercent);
 
 /// <summary>
-/// Joint ownership of a stand (brief §4.10.6): the holders' shares must total 100%; one holder's share — or part of it —
+/// Joint ownership of a stand (brief §4.10.6): the holders' shares must total 100%; one holder's share - or part of it -
 /// can be transferred on its own; and on a death, joint tenancy passes the deceased's share to the survivors in
 /// proportion to their shares, while tenancy in common leaves it with the deceased's estate. Pure and unit-tested.
 /// </summary>
@@ -62,7 +62,7 @@ public static class JointHolding
 
     /// <summary>
     /// The holders after a death. Joint tenancy: the deceased's share is shared among the survivors in proportion to their
-    /// shares (any rounding to the largest survivor). Tenancy in common: unchanged — the share belongs to the estate.
+    /// shares (any rounding to the largest survivor). Tenancy in common: unchanged - the share belongs to the estate.
     /// </summary>
     /// <param name="holders">The holders before.</param>
     /// <param name="deceasedCustomerId">The holder who died.</param>

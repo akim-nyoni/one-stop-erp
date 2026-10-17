@@ -83,8 +83,8 @@ public sealed class LeaveApplication : AuditableEntity, ICompanyScoped
 }
 
 /// <summary>
-/// A change to an employee's own details asked for through self-service (<c>hr.detail_change_request</c>) — bank or wallet details,
-/// mostly — applied only when HR approves it, so a payment destination is never changed by one person alone.
+/// A change to an employee's own details asked for through self-service (<c>hr.detail_change_request</c>) - bank or wallet details,
+/// mostly - applied only when HR approves it, so a payment destination is never changed by one person alone.
 /// </summary>
 public sealed class DetailChangeRequest : AuditableEntity, ICompanyScoped
 {

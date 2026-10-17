@@ -15,8 +15,8 @@ public sealed record EvictionCaseEntry(string CaseNumber, string TenancyNumber, 
 
 /// <summary>
 /// The eviction workflow for council tenancies (brief §4.10.7): open a case for a tenancy in arrears with a reminder,
-/// record each later stage in order with the notice period honoured, end with eviction — which ends the tenancy, settles
-/// the deposit and returns the unit as void — or withdraw the case.
+/// record each later stage in order with the notice period honoured, end with eviction - which ends the tenancy, settles
+/// the deposit and returns the unit as void - or withdraw the case.
 /// </summary>
 public interface IEvictionService
 {

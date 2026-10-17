@@ -53,7 +53,7 @@ public sealed record FinanceChargeRunResult(IReadOnlyList<CustomerFinanceCharge>
 /// <summary>
 /// Raises interest (finance charges) on overdue customer balances (brief §4.5). Scans the AR ledger for
 /// overdue open items, computes simple interest per customer, and posts a finance-charge invoice
-/// (Dr AR control / Cr interest income) for each — so the charge ages and can be collected like any invoice.
+/// (Dr AR control / Cr interest income) for each - so the charge ages and can be collected like any invoice.
 /// </summary>
 public interface IFinanceChargeService
 {

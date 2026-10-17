@@ -27,7 +27,7 @@ public static partial class ApiAccessRules
     public static readonly IReadOnlyList<string> ActorParameters = ["userId", "approverUserId"];
 
     /// <summary>
-    /// Body fields that record who acted or who gave an authority: over the API they must be the signed-in user — a client cannot act for, or
+    /// Body fields that record who acted or who gave an authority: over the API they must be the signed-in user - a client cannot act for, or
     /// claim the authority of, anyone else (a supervisor authorises by making the request themselves).
     /// </summary>
     public static readonly IReadOnlySet<string> BodyActorFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)

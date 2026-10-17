@@ -9,7 +9,7 @@ namespace One4All.Application.Pos;
 public sealed record PromotionItemRef(long ItemId, int Group);
 
 /// <summary>
-/// A promotion as the till prices it — everything <see cref="PromotionPricing"/> needs, detached from the database so the offline snapshot can carry it
+/// A promotion as the till prices it - everything <see cref="PromotionPricing"/> needs, detached from the database so the offline snapshot can carry it
 /// (brief §6B: offline sales keep their promotions).
 /// </summary>
 public sealed record PromotionDefinition(

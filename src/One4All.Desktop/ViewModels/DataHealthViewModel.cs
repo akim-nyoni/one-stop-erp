@@ -101,7 +101,7 @@ public sealed partial class DataHealthViewModel : ObservableObject
             }
 
             Show(result.Value);
-            StatusMessage = $"Taken {DateTime.Now:HH:mm} — control accounts reconciled as at {today:dd MMM yyyy}.";
+            StatusMessage = $"Taken {DateTime.Now:HH:mm} - control accounts reconciled as at {today:dd MMM yyyy}.";
         }
         finally
         {

@@ -17,8 +17,8 @@ public enum PricingScope
 
 /// <summary>
 /// An effective-dated stand pricing rule (<c>hse.stand_pricing_rule</c>, brief §4.10.2 selling price build-up): the
-/// overhead recovery, development levy, margin and rounding applied to a stand's capitalised cost. Rules are never edited —
-/// a price change is a new rule from a later date — and only an approved rule prices a stand.
+/// overhead recovery, development levy, margin and rounding applied to a stand's capitalised cost. Rules are never edited -
+/// a price change is a new rule from a later date - and only an approved rule prices a stand.
 /// </summary>
 public sealed class StandPricingRule : AuditableEntity, ICompanyScoped
 {

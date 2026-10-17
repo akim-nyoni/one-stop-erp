@@ -124,6 +124,15 @@ public sealed class TransferApplicationTests
         HousingStand after = await db.HousingStands.AsNoTracking().Include(s => s.Ownership).SingleAsync(s => s.Id == stand.Id);
         (after.CurrentHolderCustomerId, after.Ownership[^1].ChangeType, after.Ownership[^1].Consideration).Should().Be((buyer.Id, OwnershipChangeType.Cession, 9000m));
         after.VerifyOwnershipChain().Should().BeTrue();
+        PropertyOwner owner = await db.Set<PropertyOwner>().AsNoTracking().SingleAsync(o => o.PropertyId == property.Id && o.OwnedTo == null);
+        (owner.CustomerId, owner.Reference, owner.OwnedFrom).Should().Be((buyer.Id, certificate, effective));
+        (await db.Set<TransferApplication>().AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.ApplicationNumber == number)).Status.Should().Be(TransferStatus.Completed);
+
+        // A change of name has a shorter checklist (no clearance or account checks) and can be rejected.
+        string rename = (await transfers.LodgeAsync(new TransferLodgement { CompanyId = companyId, StandId = stand.Id, TransferType = TransferType.ChangeOfName, ToCustomerId = buyer.Id, Date = effective })).Value;
+        (await transfers.ChecklistAsync(companyId, rename, effective)).Value.Select(l => l.Requirement).Should().Equal(TransferRequirement.Identity, TransferRequirement.FeesReceipted);
+        (await transfers.RejectAsync(companyId, rename, "Marriage certificate not certified", effective)).IsSuccess.Should().BeTrue();
+        (await transfers.RejectAsync(companyId, rename, "Again", effective)).Error.Code.Should().Be("Hse.TransferClosed");
     }
 
     [SkippableFact]
@@ -178,7 +187,7 @@ public sealed class TransferApplicationTests
         db.Set<ClearanceCertificate>().Add(new ClearanceCertificate(companyId, $"CC-TRA-{companyId}", property.Id, new DateOnly(2026, 5, 1), new DateOnly(2026, 7, 31), 0m, 1));
         await db.SaveChangesAsync();
 
-        // The transferor owes 6,000: instead of settling, the transferee assumes it — approved by an approving officer who did not verify the application (SOD-HSE-05).
+        // The transferor owes 6,000: instead of settling, the transferee assumes it - approved by an approving officer who did not verify the application (SOD-HSE-05).
         (await transfers.SubmitAsync(companyId, number, verifier.Id, day)).Error.Message.Should().Contain("owes 6,000.00");
         (await transfers.AssumeBalanceAsync(companyId, number, verifier.Id, "2900", day)).Error.Code.Should().Be("Hse.NotAuthorised");
         (await transfers.AssumeBalanceAsync(companyId, number, approverOne.Id, "NOPE", day)).Error.Code.Should().Be("Hse.ClearingAccount");
@@ -196,14 +205,5 @@ public sealed class TransferApplicationTests
         (assumed.OutstandingBase, assumed.Sign).Should().Be((6000m, LedgerSign.Debit));
         (await db.Set<JournalLine>().AsNoTracking().Where(l => l.CompanyId == companyId && l.AccountCode == "2900" && l.PostingDate == effective).SumAsync(l => l.BaseDebit - l.BaseCredit)).Should().Be(0m, "the clearing account nets to nil");
         (await db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == stand.Id)).CurrentHolderCustomerId.Should().Be(buyer.Id);
-        PropertyOwner owner = await db.Set<PropertyOwner>().AsNoTracking().SingleAsync(o => o.PropertyId == property.Id && o.OwnedTo == null);
-        (owner.CustomerId, owner.Reference, owner.OwnedFrom).Should().Be((buyer.Id, certificate, effective));
-        (await db.Set<TransferApplication>().AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.ApplicationNumber == number)).Status.Should().Be(TransferStatus.Completed);
-
-        // A change of name has a shorter checklist (no clearance or account checks) and can be rejected.
-        string rename = (await transfers.LodgeAsync(new TransferLodgement { CompanyId = companyId, StandId = stand.Id, TransferType = TransferType.ChangeOfName, ToCustomerId = buyer.Id, Date = effective })).Value;
-        (await transfers.ChecklistAsync(companyId, rename, effective)).Value.Select(l => l.Requirement).Should().Equal(TransferRequirement.Identity, TransferRequirement.FeesReceipted);
-        (await transfers.RejectAsync(companyId, rename, "Marriage certificate not certified", effective)).IsSuccess.Should().BeTrue();
-        (await transfers.RejectAsync(companyId, rename, "Again", effective)).Error.Code.Should().Be("Hse.TransferClosed");
     }
 }

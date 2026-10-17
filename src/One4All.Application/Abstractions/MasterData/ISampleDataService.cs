@@ -8,9 +8,9 @@ namespace One4All.Application.Abstractions.MasterData;
 public sealed record SampleDataSummary(long CompanyId, IReadOnlyList<string> Loaded);
 
 /// <summary>
-/// Fills a company with realistic sample records across the modules — products with stock, customers with invoices and receipts, suppliers with
+/// Fills a company with realistic sample records across the modules - products with stock, customers with invoices and receipts, suppliers with
 /// invoices, employees on the payroll, rated properties with meters and readings, a housing scheme with stands and applicants, a bank account, a
-/// cashier station and a few assets — so every screen has something to show while the system is being tried out. Every record is marked by
+/// cashier station and a few assets - so every screen has something to show while the system is being tried out. Every record is marked by
 /// the <c>SMP-</c> prefix on its code; loading twice is refused.
 /// </summary>
 public interface ISampleDataService

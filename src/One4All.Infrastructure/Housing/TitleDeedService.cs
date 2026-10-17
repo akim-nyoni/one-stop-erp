@@ -141,7 +141,7 @@ public sealed class TitleDeedService : ITitleDeedService
     /// <inheritdoc />
     public async Task<TitlePipelineReport> PipelineAsync(long companyId, DateOnly asAt, CancellationToken ct = default)
     {
-        // As at the date, from the steps taken by then — never the current stage, which may have moved on since.
+        // As at the date, from the steps taken by then - never the current stage, which may have moved on since.
         var titles = await (
             from t in _db.Set<TitleDeed>().AsNoTracking().Include(t => t.Steps)
             join s in _db.HousingStands.AsNoTracking() on t.StandId equals s.Id

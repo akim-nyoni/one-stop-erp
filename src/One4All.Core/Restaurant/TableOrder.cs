@@ -8,7 +8,7 @@ public enum TableStatus
     /// <summary>Free.</summary>
     Free = 1,
 
-    /// <summary>Occupied — has an open order.</summary>
+    /// <summary>Occupied - has an open order.</summary>
     Occupied = 2,
 }
 
@@ -75,10 +75,10 @@ public sealed class RestaurantTable : SoftDeletableEntity, ICompanyScoped
     public void LeaveGroup() => GroupId = null;
 }
 
-/// <summary>A dining course (Restaurant module) — the order items are fired to the kitchen course by course.</summary>
+/// <summary>A dining course (Restaurant module) - the order items are fired to the kitchen course by course.</summary>
 public enum MenuCourse
 {
-    /// <summary>Drinks — usually fired first.</summary>
+    /// <summary>Drinks - usually fired first.</summary>
     Drinks = 1,
 
     /// <summary>Starter / appetiser.</summary>
@@ -97,10 +97,10 @@ public enum OrderType
     /// <summary>Dine-in at a table.</summary>
     DineIn = 1,
 
-    /// <summary>Takeaway / collection — no table.</summary>
+    /// <summary>Takeaway / collection - no table.</summary>
     Takeaway = 2,
 
-    /// <summary>Delivery to the guest — no table.</summary>
+    /// <summary>Delivery to the guest - no table.</summary>
     Delivery = 3,
 }
 
@@ -126,10 +126,10 @@ public enum DeliveryStatus
 /// <summary>The lifecycle of a table order (Restaurant module).</summary>
 public enum TableOrderStatus
 {
-    /// <summary>Open — items being added.</summary>
+    /// <summary>Open - items being added.</summary>
     Open = 1,
 
-    /// <summary>Billed &amp; settled — revenue and cost of sales posted.</summary>
+    /// <summary>Billed &amp; settled - revenue and cost of sales posted.</summary>
     Billed = 2,
 
     /// <summary>Cancelled.</summary>
@@ -305,7 +305,7 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
 
     /// <summary>
     /// Takes a quantity of another tab's line onto this one (brief §4.1: "transfer lines between tabs"): the same item, price, accounts, course and
-    /// modifiers, its share of the tax, and whether it has gone to the kitchen — so it is not fired again.
+    /// modifiers, its share of the tax, and whether it has gone to the kitchen - so it is not fired again.
     /// </summary>
     /// <param name="source">The line on the other tab.</param>
     /// <param name="quantity">How much of it moves (at most what is unbilled).</param>
@@ -350,7 +350,7 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
 }
 
 /// <summary>
-/// A customization applied to an order line (<c>res.order_line_modifier</c>) — e.g. "extra cheese" (+price)
+/// A customization applied to an order line (<c>res.order_line_modifier</c>) - e.g. "extra cheese" (+price)
 /// or "no onions" (0). May consume extra stock of an ingredient on billing.
 /// </summary>
 public sealed class OrderLineModifier : Entity
@@ -495,13 +495,13 @@ public sealed class TableOrderLine : Entity
     /// <summary>The cost-of-sales account.</summary>
     public string CostOfSalesAccountCode { get; private set; }
 
-    /// <summary>True when the line has been voided (removed before billing — never sold).</summary>
+    /// <summary>True when the line has been voided (removed before billing - never sold).</summary>
     public bool IsVoided { get; private set; }
 
     /// <summary>The void reason, if voided.</summary>
     public string? VoidReason { get; private set; }
 
-    /// <summary>True when the line is comped (given free — still made, so it consumes stock, but no revenue).</summary>
+    /// <summary>True when the line is comped (given free - still made, so it consumes stock, but no revenue).</summary>
     public bool IsComped { get; private set; }
 
     /// <summary>The comp reason, if comped.</summary>
@@ -520,7 +520,7 @@ public sealed class TableOrderLine : Entity
         AuthorizedByUserId = authorizedByUserId;
     }
 
-    /// <summary>Comps the line (free to the guest — still made and served, so cost of sales is recognised).</summary>
+    /// <summary>Comps the line (free to the guest - still made and served, so cost of sales is recognised).</summary>
     /// <param name="reason">The comp reason.</param>
     /// <param name="authorizedByUserId">The authorising manager, if recorded.</param>
     public void Comp(string reason, long? authorizedByUserId = null)

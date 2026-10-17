@@ -46,7 +46,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             "MUNIREVENUECOLLECTION" => [.. (await CollectionAnalysis.ComputeAsync(_db, companyId, Date(parameters, "FromDate") ?? new DateOnly(asAt.Year, 1, 1), Date(parameters, "ToDate") ?? asAt, ct)
                     .ConfigureAwait(false))
                 .Select(c => Row(("Month", c.Month), ("Ward", c.Ward), ("Service", c.Service), ("Billed", Money(c.Billed)), ("Collected", Money(c.Collected)),
-                    ("Efficiency", c.Efficiency is decimal e ? e.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "—"), ("Outstanding", c.Billed - c.Collected)))],
+                    ("Efficiency", c.Efficiency is decimal e ? e.ToString("0.0", CultureInfo.InvariantCulture) + "%" : "-"), ("Outstanding", c.Billed - c.Collected)))],
             "MUNIDEPOSITSHELD" => await DepositsHeldAsync(companyId, asAt, ct).ConfigureAwait(false),
             "MUNILICENCES" => await LicencesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "MUNITICKETSLA" => await TicketSlaAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -72,7 +72,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             List<BillingRunLine> included = [.. r.Lines.Where(l => l.Included)];
             return Row(("Run", r.RunNumber), ("Service", r.ServiceType.ToString()), ("Period", r.Period.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Ward", r.Ward ?? "All"),
                 ("Status", r.Status.ToString()), ("Lines", included.Count), ("Excluded", r.Lines.Count - included.Count), ("Previous", Money(included.Sum(l => l.PreviousCharge ?? 0m))),
-                ("Approver", r.ApprovedByUserId is long a ? users.GetValueOrDefault(a, $"user {a}") : "—"), ("Billed", included.Sum(l => l.Charge)));
+                ("Approver", r.ApprovedByUserId is long a ? users.GetValueOrDefault(a, $"user {a}") : "-"), ("Billed", included.Sum(l => l.Charge)));
         })];
     }
 
@@ -81,8 +81,8 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         List<BillingRun> runs = await _db.Set<BillingRun>().AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == companyId).OrderBy(r => r.BillDate).ThenBy(r => r.RunNumber)
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. runs.SelectMany(r => r.Lines.Where(l => l.Exceptions != BillingExceptions.None).OrderBy(l => l.StandNumber, StringComparer.Ordinal)
-            .Select(l => Row(("Run", r.RunNumber), ("Stand", l.StandNumber), ("Exceptions", l.Exceptions.ToString()), ("Message", l.Message ?? "—"), ("Included", l.Included ? "Yes" : "No"),
-                ("Previous", l.PreviousCharge is decimal p ? Money(p) : "—"), ("Charge", l.Charge))))];
+            .Select(l => Row(("Run", r.RunNumber), ("Stand", l.StandNumber), ("Exceptions", l.Exceptions.ToString()), ("Message", l.Message ?? "-"), ("Included", l.Included ? "Yes" : "No"),
+                ("Previous", l.PreviousCharge is decimal p ? Money(p) : "-"), ("Charge", l.Charge))))];
     }
 
     // Each ratepayer's open items as at the date: ward and category from their (first) property, service from the billing run that raised the invoice.
@@ -93,7 +93,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
     {
         List<BulkSupplyReading> bulk = await _db.BulkSupplyReadings.AsNoTracking().Where(b => b.CompanyId == companyId && b.PeriodStart >= fromDate && b.PeriodEnd <= toDate).ToListAsync(ct).ConfigureAwait(false);
         List<Property> properties = await _db.Properties.AsNoTracking().Include(p => p.Services).Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
-        Dictionary<long, string> meterZone = properties.SelectMany(p => p.Services.Where(s => s.ServiceType == ServiceType.Water && s.MeterId != null).Select(s => (Meter: s.MeterId!.Value, Zone: p.Zone ?? "—")))
+        Dictionary<long, string> meterZone = properties.SelectMany(p => p.Services.Where(s => s.ServiceType == ServiceType.Water && s.MeterId != null).Select(s => (Meter: s.MeterId!.Value, Zone: p.Zone ?? "-")))
             .GroupBy(x => x.Meter).ToDictionary(g => g.Key, g => g.First().Zone);
         List<long> meters = [.. meterZone.Keys];
         List<MeterReading> readings = await _db.MeterReadings.AsNoTracking().Where(r => r.CompanyId == companyId && meters.Contains(r.MeterId) && r.Accepted && r.ReadingDate >= fromDate && r.ReadingDate <= toDate)
@@ -104,7 +104,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             List<MeterReading> own = [.. readings.Where(r => meterZone[r.MeterId] == zone)];
             decimal billed = own.Sum(r => r.BilledConsumption), lost = supplied - billed;
             return Row(("Zone", zone), ("Bulk", Money(supplied)), ("Billed", Money(billed)), ("Meters", own.Select(r => r.MeterId).Distinct().Count()),
-                ("LossRate", supplied == 0m ? "—" : (lost * 100m / supplied).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Lost", lost));
+                ("LossRate", supplied == 0m ? "-" : (lost * 100m / supplied).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Lost", lost));
         })];
     }
 
@@ -143,8 +143,8 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
 
             if (issues.Count > 0)
             {
-                rows.Add(Row(("Meter", meter.Serial), ("Stand", stands.GetValueOrDefault(meter.Id, "—")), ("LastRead", meter.LastReadingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"),
-                    ("LastActual", meter.LastActualDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "—"), ("Estimated", meter.EstimatedSinceActual.ToString("0.###", CultureInfo.InvariantCulture)),
+                rows.Add(Row(("Meter", meter.Serial), ("Stand", stands.GetValueOrDefault(meter.Id, "-")), ("LastRead", meter.LastReadingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-"),
+                    ("LastActual", meter.LastActualDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-"), ("Estimated", meter.EstimatedSinceActual.ToString("0.###", CultureInfo.InvariantCulture)),
                     ("Issue", string.Join("; ", issues))));
             }
         }
@@ -161,7 +161,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         {
             Property first = g.First();
             PropertyServiceLink? link = first.Services.FirstOrDefault(s => s.IsActive);
-            return (first.Ward, link is null ? "—" : tariffCategories.GetValueOrDefault(link.TariffId).ToString());
+            return (first.Ward, link is null ? "-" : tariffCategories.GetValueOrDefault(link.TariffId).ToString());
         });
         Dictionary<string, string> services = (await _db.Set<BillingRun>().AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
             .SelectMany(r => r.Lines.Select(l => (l.InvoiceNumber, Service: r.ServiceType.ToString()))).GroupBy(x => x.InvoiceNumber, StringComparer.Ordinal)
@@ -197,7 +197,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             .Select(v => Row(("Stand", properties[v.PropertyId].StandNumber), ("Ward", properties[v.PropertyId].Ward), ("Kind", v.Kind.ToString()), ("Reference", v.Reference),
                 ("EffectiveFrom", Date(v.EffectiveFrom)),
                 ("Objection", objections.TryGetValue(v.Id, out ValuationObjection? o)
-                    ? $"{o.ObjectionNumber} {o.Status}{(o.DecidedValue is decimal d ? $" at {Money(d)}" : string.Empty)}" : "—"),
+                    ? $"{o.ObjectionNumber} {o.Status}{(o.DecidedValue is decimal d ? $" at {Money(d)}" : string.Empty)}" : "-"),
                 ("Value", v.Value)))];
     }
 
@@ -212,10 +212,10 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         return [.. properties.Select(p =>
         {
             List<PropertyServiceLink> active = [.. p.Services.Where(s => s.IsActive)];
-            return Row(("Stand", p.StandNumber), ("Ward", p.Ward), ("Address", p.Address ?? "—"), ("Owners", owners.TryGetValue(p.Id, out List<string>? o) ? string.Join("; ", o) : "—"),
+            return Row(("Stand", p.StandNumber), ("Ward", p.Ward), ("Address", p.Address ?? "-"), ("Owners", owners.TryGetValue(p.Id, out List<string>? o) ? string.Join("; ", o) : "-"),
                 ("Ratepayer", names.GetValueOrDefault(p.RatepayerCustomerId, "?")),
-                ("Services", active.Count == 0 ? "—" : string.Join("; ", active.Select(s => $"{s.ServiceType} ({tariffs.GetValueOrDefault(s.TariffId, "?")})"))),
-                ("Meters", string.Join("; ", active.Where(s => s.MeterId != null).Select(s => meters.GetValueOrDefault(s.MeterId!.Value, "?")).DefaultIfEmpty("—"))),
+                ("Services", active.Count == 0 ? "-" : string.Join("; ", active.Select(s => $"{s.ServiceType} ({tariffs.GetValueOrDefault(s.TariffId, "?")})"))),
+                ("Meters", string.Join("; ", active.Where(s => s.MeterId != null).Select(s => meters.GetValueOrDefault(s.MeterId!.Value, "?")).DefaultIfEmpty("-"))),
                 ("Valuation", p.Valuation));
         })];
     }
@@ -243,9 +243,9 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         return [.. routes.SelectMany(r => r.Stops.OrderBy(s => s.Sequence).Where(s => meters.ContainsKey(s.MeterId)).Select(s =>
         {
             Meter meter = meters[s.MeterId];
-            (string stand, string? address) = where.GetValueOrDefault(s.MeterId, ("—", null));
-            return Row(("Route", r.Code), ("Reader", r.ReaderName), ("Sequence", s.Sequence), ("Meter", meter.Serial), ("Stand", stand), ("Address", address ?? "—"),
-                ("LastReading", meter.LastReading.ToString("0.##", CultureInfo.InvariantCulture)), ("LastDate", meter.LastReadingDate is DateOnly d ? Date(d) : "—"), ("NewReading", string.Empty));
+            (string stand, string? address) = where.GetValueOrDefault(s.MeterId, ("-", null));
+            return Row(("Route", r.Code), ("Reader", r.ReaderName), ("Sequence", s.Sequence), ("Meter", meter.Serial), ("Stand", stand), ("Address", address ?? "-"),
+                ("LastReading", meter.LastReading.ToString("0.##", CultureInfo.InvariantCulture)), ("LastDate", meter.LastReadingDate is DateOnly d ? Date(d) : "-"), ("NewReading", string.Empty));
         }))];
     }
 
@@ -258,8 +258,8 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         List<MeterReading> readings = await _db.Set<MeterReading>().AsNoTracking()
             .Where(r => r.CompanyId == companyId && r.ReadingDate <= asAt && (r.Flags != ReadingFlags.None || r.Kind == MeterReadingKind.Estimated || !r.Accepted))
             .OrderBy(r => r.ReadingDate).ThenBy(r => r.Id).ToListAsync(ct).ConfigureAwait(false);
-        return [.. readings.Select(r => Row(("Date", Date(r.ReadingDate)), ("Meter", serials.GetValueOrDefault(r.MeterId, "?")), ("Stand", stands.GetValueOrDefault(r.MeterId, "—")),
-            ("Kind", r.Kind.ToString()), ("Flags", r.Flags == ReadingFlags.None ? "—" : r.Flags.ToString()), ("Previous", r.PreviousReading.ToString("0.##", CultureInfo.InvariantCulture)),
+        return [.. readings.Select(r => Row(("Date", Date(r.ReadingDate)), ("Meter", serials.GetValueOrDefault(r.MeterId, "?")), ("Stand", stands.GetValueOrDefault(r.MeterId, "-")),
+            ("Kind", r.Kind.ToString()), ("Flags", r.Flags == ReadingFlags.None ? "-" : r.Flags.ToString()), ("Previous", r.PreviousReading.ToString("0.##", CultureInfo.InvariantCulture)),
             ("Reading", r.Reading.ToString("0.##", CultureInfo.InvariantCulture)), ("Accepted", r.Accepted ? "Yes" : "No"), ("Consumption", r.Consumption)))];
     }
 
@@ -288,10 +288,10 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             {
                 decimal current = g.Where(r => r.ReadingDate > from).Sum(r => r.Consumption);
                 decimal prior = g.Where(r => r.ReadingDate <= from).Sum(r => r.Consumption);
-                (string stand, _, string service, string category) = places.GetValueOrDefault(g.Key, ("—", "—", "—", "—"));
+                (string stand, _, string service, string category) = places.GetValueOrDefault(g.Key, ("-", "-", "-", "-"));
                 return Row(("Stand", stand), ("Meter", serials.GetValueOrDefault(g.Key, "?")), ("Service", service), ("Category", category), ("Readings", g.Count(r => r.ReadingDate > from)),
                     ("PriorYear", prior.ToString("0.##", CultureInfo.InvariantCulture)),
-                    ("Change", prior == 0m ? "—" : ((current - prior) * 100m / prior).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Consumption", current));
+                    ("Change", prior == 0m ? "-" : ((current - prior) * 100m / prior).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Consumption", current));
             })];
     }
 
@@ -313,10 +313,10 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
 
         return [.. meters.Select(m =>
         {
-            (string stand, _, string service, _) = places.GetValueOrDefault(m.Id, ("—", "—", "—", "—"));
-            return Row(("Meter", m.Serial), ("Stand", stand), ("Service", service), ("Installed", m.InstalledOn is DateOnly i ? Date(i) : "—"), ("Removed", m.RemovedOn is DateOnly r ? Date(r) : "—"),
-                ("ReplacedBy", ReplacedBy(m) ?? "—"),
-                ("LastActual", m.LastActualDate is DateOnly a ? $"{m.LastActualReading.ToString("0.##", CultureInfo.InvariantCulture)} on {Date(a)}" : "—"),
+            (string stand, _, string service, _) = places.GetValueOrDefault(m.Id, ("-", "-", "-", "-"));
+            return Row(("Meter", m.Serial), ("Stand", stand), ("Service", service), ("Installed", m.InstalledOn is DateOnly i ? Date(i) : "-"), ("Removed", m.RemovedOn is DateOnly r ? Date(r) : "-"),
+                ("ReplacedBy", ReplacedBy(m) ?? "-"),
+                ("LastActual", m.LastActualDate is DateOnly a ? $"{m.LastActualReading.ToString("0.##", CultureInfo.InvariantCulture)} on {Date(a)}" : "-"),
                 ("Status", m.RemovedOn is not null ? "Removed" : m.IsActive ? "Active" : "Inactive"), ("EstimatedSinceActual", m.EstimatedSinceActual));
         })];
     }
@@ -327,7 +327,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         List<ServiceOrder> orders = await _db.Set<ServiceOrder>().AsNoTracking().Where(o => o.CompanyId == companyId).OrderBy(o => o.RaisedOn).ThenBy(o => o.OrderNumber).ToListAsync(ct).ConfigureAwait(false);
         return [.. orders.Select(o => Row(("Order", o.OrderNumber), ("Kind", o.Kind.ToString()), ("Stand", properties.GetValueOrDefault(o.PropertyId)?.StandNumber ?? "?"),
             ("Ward", properties.GetValueOrDefault(o.PropertyId)?.Ward ?? "?"), ("Service", o.ServiceType.ToString()), ("Raised", Date(o.RaisedOn)), ("Status", o.Status.ToString()),
-            ("Executed", o.ExecutedOn is DateOnly e ? Date(e) : "—"), ("Fee", o.FeeInvoiceNumber ?? "—"), ("Arrears", o.Arrears)))];
+            ("Executed", o.ExecutedOn is DateOnly e ? Date(e) : "-"), ("Fee", o.FeeInvoiceNumber ?? "-"), ("Arrears", o.Arrears)))];
     }
 
     // Standing measured as the arrangement monitor does, read-only; ward from the debtor's (first) property.
@@ -346,7 +346,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             DateOnly from = new(a.StartDate.Year, a.StartDate.Month, 1);
             decimal paid = receipts.Where(r => r.TraderId == a.CustomerId && r.DocumentDate >= from).Sum(r => r.OriginalBase);
             var standing = Application.Trading.InstalmentSchedule.Assess(Application.Trading.InstalmentSchedule.Build(a.TotalAmount, a.InstalmentAmount, a.StartDate), paid, asAt, 0, int.MaxValue);
-            return Row(("Ward", wards.GetValueOrDefault(a.CustomerId, "—")), ("Debtor", names.GetValueOrDefault(a.CustomerId, "?")), ("Started", Date(a.StartDate)), ("Total", Money(a.TotalAmount)),
+            return Row(("Ward", wards.GetValueOrDefault(a.CustomerId, "-")), ("Debtor", names.GetValueOrDefault(a.CustomerId, "?")), ("Started", Date(a.StartDate)), ("Total", Money(a.TotalAmount)),
                 ("Instalment", Money(a.InstalmentAmount)), ("Status", a.Status.ToString()), ("DueToDate", Money(standing.DueToDate)), ("Paid", Money(standing.Paid)),
                 ("Missed", standing.InstalmentsMissed), ("Shortfall", standing.Shortfall));
         })];
@@ -378,7 +378,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         Dictionary<long, CouncilInspection> inspections = (await _db.Set<CouncilInspection>().AsNoTracking().Where(i => i.CompanyId == companyId && i.InspectedOn <= asAt).ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(i => i.LicenceId).ToDictionary(g => g.Key, g => g.OrderBy(i => i.InspectedOn).ThenBy(i => i.Id).Last());
         return [.. licences.Select(l => Row(("Licence", l.LicenceNumber), ("Kind", l.Kind.ToString()), ("Holder", names.GetValueOrDefault(l.HolderCustomerId, "?")), ("Expires", Date(l.ExpiresOn)),
-            ("Due", l.Status != CouncilLicenceStatus.Active ? "—" : l.ExpiresOn < asAt ? $"expired {asAt.DayNumber - l.ExpiresOn.DayNumber} days" : (l.ExpiresOn.DayNumber - asAt.DayNumber).ToString(CultureInfo.InvariantCulture)),
+            ("Due", l.Status != CouncilLicenceStatus.Active ? "-" : l.ExpiresOn < asAt ? $"expired {asAt.DayNumber - l.ExpiresOn.DayNumber} days" : (l.ExpiresOn.DayNumber - asAt.DayNumber).ToString(CultureInfo.InvariantCulture)),
             ("Status", l.Status.ToString()), ("Renewals", l.Renewals),
             ("Inspection", inspections.TryGetValue(l.Id, out CouncilInspection? i) ? $"{Date(i.InspectedOn)} {(i.Passed ? "passed" : "failed")} ({i.Inspector})" : "none"), ("Fee", l.Fee)))];
     }
@@ -416,7 +416,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
             IEnumerable<string> blocks = t.Blocks.Select(b => $"{Amount(b.FromUnit)}–{(b.ToUnit is decimal to ? Amount(to) : "∞")} @ {Amount(b.Rate)}")
                 .Concat(t.Seasons.Select(s => $"months {s.FromMonth}–{s.ToMonth} @ {Amount(s.PerUnitRate)}"));
             return Row(("Tariff", t.Code), ("Name", t.Name), ("Service", t.ServiceType.ToString()), ("Type", t.TariffType.ToString()), ("Category", t.Category.ToString()), ("Ward", t.Ward ?? "All"),
-                ("Effective", Date(t.EffectiveFrom)), ("Charges", charges.Count == 0 ? "—" : string.Join(", ", charges)), ("Blocks", string.Join("; ", blocks.DefaultIfEmpty("—"))),
+                ("Effective", Date(t.EffectiveFrom)), ("Charges", charges.Count == 0 ? "-" : string.Join(", ", charges)), ("Blocks", string.Join("; ", blocks.DefaultIfEmpty("-"))),
                 ("Active", t.IsActive ? "Yes" : "No"));
         })];
     }
@@ -429,7 +429,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         return properties.GroupBy(p => p.RatepayerCustomerId).ToDictionary(g => g.Key, g =>
         {
             PropertyServiceLink? link = g.SelectMany(p => p.Services).FirstOrDefault(s => s.IsActive);
-            return (g.First().Ward, link is null ? "—" : categories.GetValueOrDefault(link.TariffId).ToString(), g.Count());
+            return (g.First().Ward, link is null ? "-" : categories.GetValueOrDefault(link.TariffId).ToString(), g.Count());
         });
     }
 
@@ -448,7 +448,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
                 Overdue: Math.Max(0m, g.Sum(i => i.Signed(LedgerSign.Debit) < 0m || i.Item.DueDate < asAt ? i.Signed(LedgerSign.Debit) : 0m))))
             .Where(x => x.Overdue > 0m).OrderByDescending(x => x.Overdue).ThenBy(x => names.GetValueOrDefault(x.Debtor), StringComparer.Ordinal)
             .Select(x => Row(("Debtor", names.GetValueOrDefault(x.Debtor, "?")), ("Ward", ratepayers[x.Debtor].Ward), ("Properties", ratepayers[x.Debtor].Properties), ("Overdue", Money(x.Overdue)),
-                ("LastPayment", lastPaid.TryGetValue(x.Debtor, out DateOnly paid) ? Date(paid) : "never"), ("Arrangement", arrangements.GetValueOrDefault(x.Debtor, "—")), ("Owing", x.Owing)))];
+                ("LastPayment", lastPaid.TryGetValue(x.Debtor, out DateOnly paid) ? Date(paid) : "never"), ("Arrangement", arrangements.GetValueOrDefault(x.Debtor, "-")), ("Owing", x.Owing)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> InterestAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -479,13 +479,13 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         string Approval(long debtor, DateOnly date)
         {
             DebtCase? debtCase = cases.GetValueOrDefault(debtor)?.Where(c => c.ClosedOn == date).FirstOrDefault() ?? cases.GetValueOrDefault(debtor)?.FirstOrDefault();
-            return debtCase is null ? "—"
+            return debtCase is null ? "-"
                 : $"{debtCase.CaseNumber}, approved by {(debtCase.WriteOffApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "?")}";
         }
 
         return [.. items.Select(i => Row(("Date", Date(i.DocumentDate)), ("Debtor", names.GetValueOrDefault(i.TraderId, "?")), ("Ward", ratepayers[i.TraderId].Ward),
             ("Type", i.ItemType == OpenItemType.WriteOff ? "Write-off" : "Credit adjustment"), ("Document", i.DocumentNumber),
-            ("Approval", i.ItemType == OpenItemType.WriteOff ? Approval(i.TraderId, i.DocumentDate) : "—"), ("Amount", i.OriginalBase)))];
+            ("Approval", i.ItemType == OpenItemType.WriteOff ? Approval(i.TraderId, i.DocumentDate) : "-"), ("Amount", i.OriginalBase)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RevenueAsync(long companyId, DateOnly asAt, CancellationToken ct)
@@ -496,7 +496,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
         List<(string Source, string Vote, int Documents, decimal Amount)> rows = [.. runs.SelectMany(r => r.Lines.Where(l => l.Included).Select(l => (Service: r.ServiceType.ToString(), l.RevenueAccountCode, l.Charge)))
             .GroupBy(x => (x.Service, x.RevenueAccountCode)).Select(g => ($"Billed: {g.Key.Service}", g.Key.RevenueAccountCode, g.Count(), g.Sum(x => x.Charge)))];
         rows.AddRange((await _db.Set<PrepaidSale>().AsNoTracking().Where(p => p.CompanyId == companyId && p.SoldOn >= yearStart && p.SoldOn <= asAt).ToListAsync(ct).ConfigureAwait(false))
-            .GroupBy(p => p.ServiceType).Select(g => ($"Prepaid: {g.Key}", "—", g.Count(), g.Sum(p => p.Amount - p.ToArrears))));
+            .GroupBy(p => p.ServiceType).Select(g => ($"Prepaid: {g.Key}", "-", g.Count(), g.Sum(p => p.Amount - p.ToArrears))));
         rows.AddRange((await _db.Set<CouncilLicence>().AsNoTracking().Where(l => l.CompanyId == companyId && l.IssuedOn >= yearStart && l.IssuedOn <= asAt).ToListAsync(ct).ConfigureAwait(false))
             .GroupBy(l => (l.Kind, l.RevenueAccountCode)).Select(g => ($"Licences: {g.Key.Kind}", g.Key.RevenueAccountCode, g.Count(), g.Sum(l => l.Fee))));
         return [.. rows.OrderBy(r => r.Source, StringComparer.Ordinal).ThenBy(r => r.Vote, StringComparer.Ordinal)
@@ -558,7 +558,7 @@ public sealed class MunicipalReportDataProvider : IReportDataProvider
                 decimal prepaid = vends.Sum(v => v.Amount - v.ToArrears);
                 rows.Add(Row(("Month", $"{asAt.Year}-{month:00}"), ("Service", service.ToString()), ("Vends", vends.Count), ("Units", vends.Sum(v => v.Units).ToString("0.##", CultureInfo.InvariantCulture)),
                     ("ToArrears", Money(vends.Sum(v => v.ToArrears))), ("Conventional", Money(conventional)),
-                    ("Share", prepaid + conventional == 0m ? "—" : (prepaid * 100m / (prepaid + conventional)).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Prepaid", prepaid)));
+                    ("Share", prepaid + conventional == 0m ? "-" : (prepaid * 100m / (prepaid + conventional)).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Prepaid", prepaid)));
             }
         }
 

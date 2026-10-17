@@ -44,7 +44,7 @@ public sealed record ConsolidationRowVm(string AccountCode, string AccountName, 
 
 /// <summary>
 /// Backs the Group Consolidation enquiry: choose the companies, an as-at date and a presentation currency, optionally
-/// intercompany accounts to eliminate, and see the consolidated trial balance — translated (IAS 21) when the companies'
+/// intercompany accounts to eliminate, and see the consolidated trial balance - translated (IAS 21) when the companies'
 /// base currencies differ from the presentation currency, with the translation reserve and each company's rate. The
 /// rules live in the tested <see cref="IConsolidationService"/>; this class lists and formats.
 /// </summary>
@@ -110,7 +110,7 @@ public sealed partial class GroupConsolidationViewModel : ObservableObject
             var companies = await db.Companies.OrderBy(c => c.Code).Select(c => new { c.Id, c.Code, c.Name, c.BaseCurrency }).ToListAsync(ct).ConfigureAwait(true);
             foreach (var c in companies)
             {
-                Companies.Add(new ConsolidationCompanyVm(c.Id, $"{c.Code} — {c.Name} ({c.BaseCurrency})"));
+                Companies.Add(new ConsolidationCompanyVm(c.Id, $"{c.Code} - {c.Name} ({c.BaseCurrency})"));
             }
 
             Currencies.Clear();

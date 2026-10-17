@@ -64,7 +64,7 @@ public sealed class PayrollRemittanceTests
         db.Add(order);
         await db.SaveChangesAsync();
 
-        // September: PAYE 300, pension 150 + 150 employer, court order 100 — three supplier invoices with the run.
+        // September: PAYE 300, pension 150 + 150 employer, court order 100 - three supplier invoices with the run.
         IPayrollService payroll = scope.ServiceProvider.GetRequiredService<IPayrollService>();
         var september = await payroll.RunAsync(companyId, "2026-09", new DateOnly(2026, 9, 25), "2420", "RM-09");
         september.IsSuccess.Should().BeTrue(september.IsFailure ? september.Error.ToString() : null);

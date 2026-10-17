@@ -6,7 +6,7 @@ namespace One4All.Core.SalesOrders;
 /// <summary>The status of a sales order (brief §4.13).</summary>
 public enum SalesOrderStatus
 {
-    /// <summary>Open — nothing despatched.</summary>
+    /// <summary>Open - nothing despatched.</summary>
     Open = 0,
 
     /// <summary>Partially despatched.</summary>

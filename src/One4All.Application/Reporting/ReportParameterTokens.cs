@@ -4,7 +4,7 @@ namespace One4All.Application.Reporting;
 
 /// <summary>
 /// Relative date tokens for scheduled reports (brief §13.3 scheduling): a subscription stores <c>@PrevMonthEnd</c> rather
-/// than a fixed date, and each run resolves it against the run date — <c>@Today</c>, <c>@Yesterday</c>,
+/// than a fixed date, and each run resolves it against the run date - <c>@Today</c>, <c>@Yesterday</c>,
 /// <c>@MonthStart</c>, <c>@MonthEnd</c>, <c>@PrevMonthStart</c>, <c>@PrevMonthEnd</c>, <c>@YearStart</c>,
 /// <c>@PrevYearEnd</c>. ISO dates become dates, whole numbers become numbers, anything else stays text. Pure and
 /// unit-tested.

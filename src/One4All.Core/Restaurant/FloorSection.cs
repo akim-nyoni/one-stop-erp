@@ -3,7 +3,7 @@ using One4All.Core.Common;
 namespace One4All.Core.Restaurant;
 
 /// <summary>
-/// A section (zone) of the restaurant floor plan (<c>res.floor_section</c>) — e.g. Main Dining, Patio, Bar,
+/// A section (zone) of the restaurant floor plan (<c>res.floor_section</c>) - e.g. Main Dining, Patio, Bar,
 /// Private Room. Tables belong to a section and a section can be assigned to a server. Operational only (no GL).
 /// </summary>
 public sealed class FloorSection : SoftDeletableEntity, ICompanyScoped

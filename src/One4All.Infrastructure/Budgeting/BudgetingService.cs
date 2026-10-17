@@ -11,7 +11,7 @@ namespace One4All.Infrastructure.Budgeting;
 /// <summary>
 /// Budgeting, Planning &amp; Commitment Control (brief §4.18). Budgets are stored in the <c>bud</c> schema and
 /// never post to the GL; actuals are read from the GL period balances and joined by account at report time.
-/// Versions are retained permanently — activating a new version supersedes the previous active one.
+/// Versions are retained permanently - activating a new version supersedes the previous active one.
 /// </summary>
 public sealed class BudgetingService : IBudgetingService
 {
@@ -236,7 +236,7 @@ public sealed class BudgetingService : IBudgetingService
     private async Task<Dictionary<string, decimal>> ActualsByAccountAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct)
     {
         // Actual movement (debit-positive) per account for the year up to the as-at period, read from the
-        // GL period balances — budgets never post, so this is the only place actuals come from.
+        // GL period balances - budgets never post, so this is the only place actuals come from.
         var query =
             from bal in _db.Set<GlPeriodBalance>()
             join period in _db.Set<FiscalPeriod>() on bal.FiscalPeriodId equals period.Id

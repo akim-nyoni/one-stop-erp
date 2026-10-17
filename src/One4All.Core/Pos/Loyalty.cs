@@ -4,7 +4,7 @@ namespace One4All.Core.Pos;
 
 /// <summary>
 /// A company's loyalty scheme (<c>pos.loyalty_scheme</c>, brief §4.1): points earned per currency unit spent, what a point is worth when
-/// redeemed, how long points last, the tiers (earn multipliers by points earned in the last twelve months) and the GL accounts — the
+/// redeemed, how long points last, the tiers (earn multipliers by points earned in the last twelve months) and the GL accounts - the
 /// value of unredeemed points is a liability, its cost an expense.
 /// </summary>
 public sealed class LoyaltyScheme : Entity, ICompanyScoped

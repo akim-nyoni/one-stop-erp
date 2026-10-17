@@ -8,7 +8,7 @@ namespace One4All.UnitTests.Reporting;
 
 /// <summary>
 /// Covers the added barcode symbologies (Code 39 with its start/stop asterisks; EAN-13 with its check digit and parity) and the drawn chart
-/// types (column, stacked column, line, area, pie, donut) — checked pixel by pixel in the PNG they produce, with legends and category labels.
+/// types (column, stacked column, line, area, pie, donut) - checked pixel by pixel in the PNG they produce, with legends and category labels.
 /// </summary>
 public sealed class BarcodeAndChartTypeTests
 {

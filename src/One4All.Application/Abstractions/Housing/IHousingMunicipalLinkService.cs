@@ -22,7 +22,7 @@ public enum MunicipalLinkOutcome
 public sealed record MunicipalLinkResult(MunicipalLinkOutcome Outcome, long? PropertyId);
 
 /// <summary>
-/// Housing → municipality (brief §4.10.10): at the configured event — an allocation accepted, a sale or title registration —
+/// Housing → municipality (brief §4.10.10): at the configured event - an allocation accepted, a sale or title registration -
 /// a stand becomes a billable property on the municipal register, its holder registered as owner and ratepayer and the
 /// configured services started from the effective date (so the first bill is pro-rata). The housing services call it at
 /// each event; only the configured one acts.

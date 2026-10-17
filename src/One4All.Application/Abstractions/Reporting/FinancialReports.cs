@@ -21,7 +21,7 @@ public sealed record TrialBalanceReport(
     long CompanyId, DateOnly AsAtDate, string Currency,
     IReadOnlyList<TrialBalanceRow> Rows, decimal TotalDebit, decimal TotalCredit)
 {
-    /// <summary>True when total debits equal total credits — the trial balance balances.</summary>
+    /// <summary>True when total debits equal total credits - the trial balance balances.</summary>
     public bool IsBalanced => TotalDebit == TotalCredit;
 }
 
@@ -91,7 +91,7 @@ public sealed record BalanceSheet(
     /// <summary>Total equity (including current-year earnings).</summary>
     public decimal TotalEquity => Equity.Sum(l => l.Amount);
 
-    /// <summary>True when assets equal liabilities plus equity — the balance sheet balances.</summary>
+    /// <summary>True when assets equal liabilities plus equity - the balance sheet balances.</summary>
     public bool IsBalanced => TotalAssets == TotalLiabilities + TotalEquity;
 }
 
@@ -271,7 +271,7 @@ public sealed record CashFlowStatement(
 
     /// <summary>
     /// Gets the lines behind each activity, the indirect method (IAS 7.18(b)): the profit or loss of the period, then the movement on each
-    /// balance-sheet account in that activity — working capital and non-cash items under operating, each asset and source of finance under
+    /// balance-sheet account in that activity - working capital and non-cash items under operating, each asset and source of finance under
     /// investing and financing. Each section's lines add up to its total.
     /// </summary>
     public IReadOnlyList<CashFlowLine> Lines { get; init; } = [];
@@ -318,7 +318,7 @@ public interface IGeneralLedgerReports
     /// <summary>
     /// Reconciles the GL control accounts (AR, AP, Stock) against their sub-ledgers as at a date: the GL balance
     /// in the account's natural sign versus the sub-ledger total (open receivables, open payables, stock value),
-    /// with the difference — which should be zero when the ledgers agree.
+    /// with the difference - which should be zero when the ledgers agree.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The as-at date.</param>
@@ -387,7 +387,7 @@ public interface IGeneralLedgerReports
     Task<TrialBalanceReport> TrialBalanceAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>
-    /// Produces a summarised trial balance grouped by account type (Asset/Liability/Equity/Income/Expense) —
+    /// Produces a summarised trial balance grouped by account type (Asset/Liability/Equity/Income/Expense) -
     /// each type's net debit and credit totals as at a date. Balances overall because the detailed trial
     /// balance does.
     /// </summary>
@@ -423,7 +423,7 @@ public interface IGeneralLedgerReports
     Task<IncomeStatement> IncomeStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>
-    /// Produces the income statement for a single department over a date range — the same profit-and-loss,
+    /// Produces the income statement for a single department over a date range - the same profit-and-loss,
     /// restricted to journal lines tagged with the given department dimension.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -435,7 +435,7 @@ public interface IGeneralLedgerReports
     Task<IncomeStatement> IncomeStatementByDepartmentAsync(long companyId, DateOnly fromDate, DateOnly toDate, string department, CancellationToken ct = default);
 
     /// <summary>
-    /// Produces the income statement for a single cost centre over a date range — the same profit-and-loss,
+    /// Produces the income statement for a single cost centre over a date range - the same profit-and-loss,
     /// restricted to journal lines tagged with the given cost-centre dimension.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -516,7 +516,7 @@ public interface IGeneralLedgerReports
 
     /// <summary>
     /// Returns one journal with every line (account names, dimensions, base and transaction amounts) and its
-    /// reversal links — the drill-down from any ledger enquiry. Any status is returned, so a deferred or
+    /// reversal links - the drill-down from any ledger enquiry. Any status is returned, so a deferred or
     /// reversed journal can be inspected too.
     /// </summary>
     /// <param name="companyId">The company.</param>

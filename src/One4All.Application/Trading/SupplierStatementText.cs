@@ -12,7 +12,7 @@ public sealed record SupplierStatementParseResult(IReadOnlyList<SupplierStatemen
 }
 
 /// <summary>
-/// Reads a supplier statement pasted or exported as delimited text — one line per document:
+/// Reads a supplier statement pasted or exported as delimited text - one line per document:
 /// <c>DocumentNumber, Date, Amount</c> (invoices positive, credits / payments negative). Uses the tested bank
 /// CSV parser, so quoting, thousands separators and bracketed negatives behave the same way. Pure.
 /// </summary>

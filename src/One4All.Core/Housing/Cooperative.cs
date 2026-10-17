@@ -4,7 +4,7 @@ namespace One4All.Core.Housing;
 
 /// <summary>
 /// A registered housing cooperative (<c>hse.cooperative</c>, brief §4.10.5 cooperative allocations): stands are allocated
-/// to it, and it sub-allocates them to its members — both levels tracked.
+/// to it, and it sub-allocates them to its members - both levels tracked.
 /// </summary>
 public sealed class Cooperative : AuditableEntity, ICompanyScoped
 {

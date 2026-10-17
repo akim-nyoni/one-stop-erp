@@ -66,7 +66,7 @@ public interface IRecurringJournalService
     /// <summary>
     /// Posts a recurring-journal template as a real journal on the given date, returning the journal number.
     /// Refuses an inactive or unbalanced template, and one already posted for that month or a later one
-    /// (<c>Gl.RecurringAlreadyPosted</c>) — posting is forward-only, one journal per template per month.
+    /// (<c>Gl.RecurringAlreadyPosted</c>) - posting is forward-only, one journal per template per month.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="recurringJournalId">The template.</param>

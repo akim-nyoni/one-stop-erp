@@ -130,7 +130,7 @@ public sealed partial class BackupService : IBackupService
         string name = (databaseName ?? string.Empty).Trim();
         if (!DatabaseName().IsMatch(name) || string.Equals(name, live.Database, StringComparison.OrdinalIgnoreCase))
         {
-            return Error.Validation("Backup.TargetInvalid", "Restore into a new database named with lower-case letters, digits and underscores — never the live one.");
+            return Error.Validation("Backup.TargetInvalid", "Restore into a new database named with lower-case letters, digits and underscores - never the live one.");
         }
 
         if (!string.Equals(confirmation?.Trim(), $"RESTORE {name}", StringComparison.Ordinal))
@@ -155,7 +155,7 @@ public sealed partial class BackupService : IBackupService
         string name = (databaseName ?? string.Empty).Trim();
         if (!DatabaseName().IsMatch(name) || string.Equals(name, live.Database, StringComparison.OrdinalIgnoreCase))
         {
-            return Error.Validation("Backup.TargetInvalid", "Restore into a new database named with lower-case letters, digits and underscores — never the live one.");
+            return Error.Validation("Backup.TargetInvalid", "Restore into a new database named with lower-case letters, digits and underscores - never the live one.");
         }
 
         if (!string.Equals(confirmation?.Trim(), $"RESTORE {name}", StringComparison.Ordinal))

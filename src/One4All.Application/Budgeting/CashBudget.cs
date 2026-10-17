@@ -21,7 +21,7 @@ public sealed record CashBudgetRow(int Period, decimal Opening, decimal Receipts
 
 /// <summary>
 /// The cash budget (brief §4.6): each budget line (debit-positive: expenses and assets bought positive, income negative) becomes cash as its
-/// timing says — sales collected over the following months, purchases paid on credit terms — and the months run from the opening cash.
+/// timing says - sales collected over the following months, purchases paid on credit terms - and the months run from the opening cash.
 /// Cash falling after month 12 is left out of the year (reported as the carry-out). Pure.
 /// </summary>
 public static class CashBudget

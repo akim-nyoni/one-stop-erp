@@ -78,7 +78,8 @@ public sealed class HousingMunicipalLinkService : IHousingMunicipalLinkService
             return new MunicipalLinkResult(MunicipalLinkOutcome.AlreadyLinked, existing);
         }
 
-        Property property = new(companyId, stand.StandNumber, settings.Ward, holderCustomerId)
+        // The stand's own ward when it has one; the link's default ward otherwise (thirteenth audit #14).
+        Property property = new(companyId, stand.StandNumber, string.IsNullOrWhiteSpace(stand.Ward) ? settings.Ward : stand.Ward, holderCustomerId)
         {
             SizeSquareMetres = stand.SizeSquareMetres,
             Valuation = stand.SellingPrice > 0m ? stand.SellingPrice : stand.AllocatedCost,

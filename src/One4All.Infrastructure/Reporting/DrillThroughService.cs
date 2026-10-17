@@ -189,9 +189,9 @@ public sealed class DrillThroughService : IDrillThroughService
         string? parcel = await _db.LandParcels.AsNoTracking().Where(p => p.Id == stand.LandParcelId).Select(p => p.ParcelNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         string? scheme = stand.SchemeId is long schemeId ? await _db.HousingSchemes.AsNoTracking().Where(s => s.Id == schemeId).Select(s => s.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null;
         string holder = stand.CurrentHolderCustomerId is long holderId
-            ? await _db.Customers.AsNoTracking().Where(c => c.Id == holderId).Select(c => c.Code + "  " + c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "?" : "—";
+            ? await _db.Customers.AsNoTracking().Where(c => c.Id == holderId).Select(c => c.Code + "  " + c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "?" : "-";
         StringBuilder text = new();
-        text.AppendLine(CultureInfo.InvariantCulture, $"Stand {stand.StandNumber}   parcel {parcel ?? "?"}   scheme {scheme ?? "—"}   {stand.SizeSquareMetres:N0} m²   status {stand.Status}   holder {holder}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"Stand {stand.StandNumber}   parcel {parcel ?? "?"}   scheme {scheme ?? "-"}   {stand.SizeSquareMetres:N0} m²   status {stand.Status}   holder {holder}");
         text.AppendLine();
         text.AppendLine("Chain of title");
         foreach (OwnershipRecord record in stand.Ownership)
@@ -245,12 +245,12 @@ public sealed class DrillThroughService : IDrillThroughService
                            orderby j.PostingDate, j.JournalNumber, l.Id
                            select new { j.PostingDate, j.JournalNumber, j.DocumentNumber, l.AccountCode, l.BaseDebit, l.BaseCredit, l.Narrative }).ToListAsync(ct).ConfigureAwait(false);
         StringBuilder text = new();
-        text.AppendLine(CultureInfo.InvariantCulture, $"Tax code {tax.Code}  {tax.Name}  ({tax.Type}, output {tax.OutputAccountCode ?? "—"}, input {tax.InputAccountCode ?? "—"})   {start:yyyy-MM-dd} to {finish:yyyy-MM-dd}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"Tax code {tax.Code}  {tax.Name}  ({tax.Type}, output {tax.OutputAccountCode ?? "-"}, input {tax.InputAccountCode ?? "-"})   {start:yyyy-MM-dd} to {finish:yyyy-MM-dd}");
         text.AppendLine();
         text.AppendLine(CultureInfo.InvariantCulture, $"{"Date",-12}{"Journal",-20}{"Document",-16}{"Account",-10}{"Debit",14}{"Credit",14}  Narrative");
         foreach (var line in lines)
         {
-            text.AppendLine(CultureInfo.InvariantCulture, $"{line.PostingDate:yyyy-MM-dd}  {line.JournalNumber,-20}{line.DocumentNumber ?? "—",-16}{line.AccountCode,-10}{line.BaseDebit,14:N2}{line.BaseCredit,14:N2}  {line.Narrative}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"{line.PostingDate:yyyy-MM-dd}  {line.JournalNumber,-20}{line.DocumentNumber ?? "-",-16}{line.AccountCode,-10}{line.BaseDebit,14:N2}{line.BaseCredit,14:N2}  {line.Narrative}");
         }
 
         text.AppendLine(CultureInfo.InvariantCulture, $"{string.Empty,-58}{lines.Sum(l => l.BaseDebit),14:N2}{lines.Sum(l => l.BaseCredit),14:N2}   {lines.Count} line(s)");

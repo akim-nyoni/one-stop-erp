@@ -1,4 +1,4 @@
-# ADR-0003 — Product name "One4All" (replacing "Meridian")
+# ADR-0003 - Product name "One4All" (replacing "Meridian")
 
 - **Status:** Accepted
 - **Date:** 2026-09-14
@@ -19,7 +19,7 @@ Use **One4All** everywhere the brief says Meridian:
 | database `meridian` | database `one4all` |
 | licence `"product": "Meridian ERP"` | `"product": "One4All ERP"` |
 
-The **solution layout, module boundaries, schema names (`sys`, `sec`, `audit`, `gl`, …) and all functional requirements from the brief are unchanged** — only the product brand and root namespace differ.
+The **solution layout, module boundaries, schema names (`sys`, `sec`, `audit`, `gl`, …) and all functional requirements from the brief are unchanged** - only the product brand and root namespace differ.
 
 ## Consequences
 

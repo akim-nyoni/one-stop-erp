@@ -58,7 +58,7 @@ public sealed class ServiceDeskTests
         string refuse = (await desk.LogAsync(Report("REFUSE", TicketPriority.Normal, null, "Bins not collected on 3rd Street"))).Value;
         burst.Should().StartWith("FLT");
 
-        // The burst: assigned at 08:20 (the foreman is notified), fixed at 10:30 — inside the 3-hour critical target.
+        // The burst: assigned at 08:20 (the foreman is notified), fixed at 10:30 - inside the 3-hour critical target.
         (await desk.ResolveAsync(companyId, burst, "Clamp fitted", eight.AddHours(1))).Error.Code.Should().Be("Svc.NotAssigned");
         (await desk.AssignAsync(companyId, burst, officer.Id, eight.AddMinutes(20), "Crew 3 dispatched")).IsSuccess.Should().BeTrue();
         IReadOnlyList<NotificationEntry> inbox = await scope.ServiceProvider.GetRequiredService<INotificationService>().InboxAsync(companyId, officer.Id, unreadOnly: true);

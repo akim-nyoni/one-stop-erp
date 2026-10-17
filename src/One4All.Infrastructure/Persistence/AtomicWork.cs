@@ -117,7 +117,7 @@ internal static class AtomicWork
     /// <summary>
     /// Puts the change tracker back as it was before the failed work: every entity the work started tracking is removed
     /// from the collections of entities that were already tracked and then detached; every entity that was already
-    /// tracked gets its values, original values (concurrency token included) and state back — the same instances, so
+    /// tracked gets its values, original values (concurrency token included) and state back - the same instances, so
     /// collections and references that hold them stay valid and match the rolled-back database.
     /// </summary>
     private static void RestoreTracker(One4AllDbContext db, List<TrackedState> before)
@@ -155,7 +155,7 @@ internal static class AtomicWork
             if (entry.State == EntityState.Detached && was.State != EntityState.Detached)
             {
                 // The work stopped tracking it (e.g. to re-read a counter row) and loaded another copy, which has just been
-                // detached — so this instance, with its earlier values, is tracked again.
+                // detached - so this instance, with its earlier values, is tracked again.
                 entry.State = was.State;
             }
 

@@ -5,19 +5,19 @@ namespace One4All.Core.Receipting;
 /// <summary>The state of a payment arrangement (brief §RCP-16 RC42).</summary>
 public enum ArrangementStatus
 {
-    /// <summary>Active — instalments being paid.</summary>
+    /// <summary>Active - instalments being paid.</summary>
     Active = 1,
 
-    /// <summary>Honoured — fully paid.</summary>
+    /// <summary>Honoured - fully paid.</summary>
     Honoured = 2,
 
-    /// <summary>Defaulted — instalments missed.</summary>
+    /// <summary>Defaulted - instalments missed.</summary>
     Defaulted = 3,
 }
 
 /// <summary>
 /// A payment arrangement captured at the counter (brief §RCP-16 RC42, <c>rcp.payment_arrangement</c>): a
-/// promise to clear a balance in instalments. Not a GL posting — the receipts against it settle the debt;
+/// promise to clear a balance in instalments. Not a GL posting - the receipts against it settle the debt;
 /// the arrangement tracks the promise and its status for credit control.
 /// </summary>
 public sealed class PaymentArrangement : AuditableEntity, ICompanyScoped

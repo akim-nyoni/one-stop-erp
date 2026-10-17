@@ -80,7 +80,7 @@ public sealed record DimensionBudgetRow(string Value, string AccountCode, decima
 /// <summary>
 /// Budgeting, Planning &amp; Commitment Control (brief §4.18). Budgets live in their own schema and never
 /// post to the GL; they are joined to GL actuals by posting dimensions at report time. Versions are
-/// retained permanently — a new active version supersedes the previous one for the same year/type/department.
+/// retained permanently - a new active version supersedes the previous one for the same year/type/department.
 /// </summary>
 public interface IBudgetingService
 {
@@ -174,7 +174,7 @@ public interface IBudgetingService
     Task<Result<AvailabilityResult>> CheckAvailabilityAsync(long companyId, long fiscalYearId, BudgetType type, string? department, string accountCode, decimal proposedAmount, int asAtPeriod, CancellationToken ct = default);
 
     /// <summary>
-    /// Raises a budget commitment (encumbrance) reserving an amount against a budget line — the reservation
+    /// Raises a budget commitment (encumbrance) reserving an amount against a budget line - the reservation
     /// a purchase order makes so its funds cannot be committed twice. Open commitments reduce the available
     /// balance in <see cref="CheckAvailabilityAsync"/>.
     /// </summary>

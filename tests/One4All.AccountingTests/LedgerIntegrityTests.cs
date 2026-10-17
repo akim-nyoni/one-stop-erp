@@ -13,9 +13,9 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers check data: after ordinary activity across AR, AP, stock, deferred release and reversal the company is
-/// clean; then each kind of disagreement is planted directly in the database — a cached period balance, a stock
+/// clean; then each kind of disagreement is planted directly in the database - a cached period balance, a stock
 /// quantity, an open item's outstanding, a deleted (deferred) journal leaving a number gap, and a posted line
-/// edited with its guard trigger disabled — and each is reported; rebuilding the period balances clears that class.
+/// edited with its guard trigger disabled - and each is reported; rebuilding the period balances clears that class.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class LedgerIntegrityTests

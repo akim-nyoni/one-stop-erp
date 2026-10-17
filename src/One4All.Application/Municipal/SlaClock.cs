@@ -20,7 +20,7 @@ public enum SlaState
 
 /// <summary>
 /// Service-desk SLA timing (brief §4.16): targets in round-the-clock hours from the report, shortened for urgent faults
-/// (critical ×0.25, high ×0.5, normal ×1, low ×2), and each target's state — met, on track, at risk once 80% of the time is
+/// (critical ×0.25, high ×0.5, normal ×1, low ×2), and each target's state - met, on track, at risk once 80% of the time is
 /// gone, or breached. Pure and unit-tested.
 /// </summary>
 public static class SlaClock

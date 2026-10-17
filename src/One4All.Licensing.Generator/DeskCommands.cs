@@ -95,7 +95,7 @@ internal static class DeskCommands
                 IReadOnlyList<BulkIssueRow> rows = desk.BulkIssue(File.ReadAllText(Need(a, "csv")));
                 foreach (BulkIssueRow row in rows)
                 {
-                    Console.WriteLine($"line {row.Line}: {row.CustomerId} {(row.Error is null ? $"issued {row.LicenceId}" : $"NOT issued — {row.Error}")}");
+                    Console.WriteLine($"line {row.Line}: {row.CustomerId} {(row.Error is null ? $"issued {row.LicenceId}" : $"NOT issued - {row.Error}")}");
                 }
 
                 return rows.Any(r => r.Error is not null) ? 4 : 0;

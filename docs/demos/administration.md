@@ -23,11 +23,11 @@ Goal: show that the company, users and security, importing data and looking afte
 12. Open **Quick search**. Finds items, customers, suppliers, leads and accounts by name or code, forgiving a mistyped letter or two. Fill in: Search for. Press OK and point out the result line and the list on the right.
 
 ## Looking after the system
-13. Open **Back up or restore the database**. Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database (type RESTORE <name> to confirm) — the live database is never overwritten. Fill in: Action. Press OK and point out the result line and the list on the right.
+13. Open **Back up or restore the database**. Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database (type RESTORE <name> to confirm) - the live database is never overwritten. Fill in: Action. Press OK and point out the result line and the list on the right.
 14. Open **Licence**. Shows the licence; installs a new licence or the vendor's revocation list (paste the text or give the file path); or gives this machine's activation request code to send to the vendor. Fill in: Action. Press OK and point out the result line and the list on the right.
 15. Open **Scheduled jobs**. Jobs that run by themselves, when they last ran and what they did.
 
 ## Reports to end on
 - DB251 Executive Dashboard: Year to date at the date: revenue, expenses, profit, cash, debtors, creditors, stock, working capital and the cash cycle. Show the drill-through by clicking a document or account.
 - DB252 Daily Flash Report: The day's sales, receipts and payments against the same day last week and the month to date, with cash at close. Show the drill-through by clicking a document or account.
-- DB253 KPI Scorecard: This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle — with the direction of travel. Show the drill-through by clicking a document or account.
+- DB253 KPI Scorecard: This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle - with the direction of travel. Show the drill-through by clicking a document or account.

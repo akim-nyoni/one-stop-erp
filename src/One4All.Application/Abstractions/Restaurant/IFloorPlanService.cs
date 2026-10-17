@@ -4,8 +4,8 @@ using One4All.Core.Restaurant;
 namespace One4All.Application.Abstractions.Restaurant;
 
 /// <summary>
-/// The restaurant floor plan (brief §4.1 table / tab management): where each table sits and its shape, what is on it now — the open tab,
-/// its total and how long it has been open — and the warnings for tabs open too long or running too high.
+/// The restaurant floor plan (brief §4.1 table / tab management): where each table sits and its shape, what is on it now - the open tab,
+/// its total and how long it has been open - and the warnings for tabs open too long or running too high.
 /// </summary>
 public interface IFloorPlanService
 {

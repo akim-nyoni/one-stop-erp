@@ -268,7 +268,7 @@ public static partial class ScreenPermissions
     public static IEnumerable<string> ConsoleModules => Rules.Select(r => r.Module).Distinct(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// The operation flags running a screen needs — any one of them: printing a document needs Print; approving or deciding needs an approval
+    /// The operation flags running a screen needs - any one of them: printing a document needs Print; approving or deciding needs an approval
     /// flag; reversing, voiding or cancelling needs a reversal flag; an enquiry needs View; anything else needs a flag that changes data. Only flags
     /// the feature offers count, so what the permission grid can grant is always enough.
     /// </summary>

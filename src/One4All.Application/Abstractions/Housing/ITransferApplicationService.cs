@@ -36,7 +36,7 @@ public sealed record TransferChecklistLine(TransferRequirement Requirement, bool
 /// Change of ownership and cession (brief §4.10.6): an application is lodged with its transfer type; each document item on
 /// the type's checklist is verified by an officer against a document, while municipal clearance and the housing account are
 /// checked live by the system; once complete it is submitted, approved by two officers (neither of whom verified it), and
-/// completed — the stand's ownership chain and, where the stand is rated, the municipal owner register updated together.
+/// completed - the stand's ownership chain and, where the stand is rated, the municipal owner register updated together.
 /// </summary>
 public interface ITransferApplicationService
 {

@@ -14,7 +14,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Request a master-data change", ListTitle = "Master-data changes",
-            Description = "Changes a tariff's rates or a customer's, supplier's or item's field — held for the \"MasterDataChange\" workflow when one is defined, applied at once otherwise. "
+            Description = "Changes a tariff's rates or a customer's, supplier's or item's field - held for the \"MasterDataChange\" workflow when one is defined, applied at once otherwise. "
                 + "Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, "
                 + "InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, "
                 + "StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.",
@@ -87,7 +87,7 @@ public static partial class OperationCatalogue
                 List<long> ids = [.. i.Text("Instances").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(x => long.Parse(x, System.Globalization.CultureInfo.InvariantCulture))];
                 IReadOnlyList<BulkActionResult> results = await c.Get<IWorkflowService>().ActManyAsync(ids, c.UserId, Enum.Parse<Core.Workflow.WorkflowActionType>(i.Text("Action")), i.Optional("Comment"))
                     .ConfigureAwait(true);
-                return string.Join(Environment.NewLine, results.Select(r => r.Succeeded ? $"{r.InstanceId}: {r.Status}" : $"{r.InstanceId}: not done — {r.Error}"));
+                return string.Join(Environment.NewLine, results.Select(r => r.Succeeded ? $"{r.InstanceId}: {r.Status}" : $"{r.InstanceId}: not done - {r.Error}"));
             },
             List = WaitingOnMeAsync,
         };

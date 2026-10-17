@@ -10,7 +10,7 @@ public readonly record struct StatementLinePosting(string JournalNumber, long Jo
 
 /// <summary>
 /// Posts the cash-book entry for an unreconciled bank statement line and matches the two in one step
-/// (brief §4.7) — the receipt, payment or charge the bank already knows about but the books do not. Each
+/// (brief §4.7) - the receipt, payment or charge the bank already knows about but the books do not. Each
 /// posting and its match commit together or not at all.
 /// </summary>
 public interface IBankStatementPostingService
@@ -42,8 +42,8 @@ public interface IBankStatementPostingService
     Task<Result<StatementLinePosting>> PostSupplierPaymentAsync(long companyId, long bankAccountId, long statementLineId, long supplierId, string? documentNumber = null, CancellationToken ct = default);
 
     /// <summary>
-    /// Posts a statement line straight to a nominal account — bank charges, interest received, a standing
-    /// order — as a cash-book journal (either direction) and matches it.
+    /// Posts a statement line straight to a nominal account - bank charges, interest received, a standing
+    /// order - as a cash-book journal (either direction) and matches it.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="bankAccountId">The bank account.</param>

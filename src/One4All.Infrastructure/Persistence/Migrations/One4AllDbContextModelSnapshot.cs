@@ -10981,9 +10981,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("decided_on");
 
+                    b.Property<string>("ExtensionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("extension_reason");
+
                     b.Property<DateOnly?>("OfferExpires")
                         .HasColumnType("date")
                         .HasColumnName("offer_expires");
+
+                    b.Property<int>("OfferExtensions")
+                        .HasColumnType("integer")
+                        .HasColumnName("offer_extensions");
 
                     b.Property<decimal?>("OfferedPrice")
                         .HasPrecision(19, 4)

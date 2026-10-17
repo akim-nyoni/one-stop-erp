@@ -8,7 +8,7 @@ namespace One4All.Application.Abstractions.Accounting;
 public readonly record struct ReversingJournalResult(string PostingJournalNumber, string ReversalJournalNumber);
 
 /// <summary>
-/// Posts auto-reversing period-end journals — accruals and prepayments — through the central posting engine.
+/// Posts auto-reversing period-end journals - accruals and prepayments - through the central posting engine.
 /// Each call posts the period-end entry and immediately posts its exact inverse dated in the next period (via
 /// <see cref="IPostingEngine.ReverseAsync"/>), so the two net to zero once the actual invoice lands, the classic
 /// month-end accrual/prepayment treatment with no manual reversal to remember.

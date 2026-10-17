@@ -1,4 +1,4 @@
-# ADR-0004 — Which tables are partitioned
+# ADR-0004 - Which tables are partitioned
 
 **Status:** accepted · 2026-10-09
 
@@ -16,7 +16,7 @@ table itself.
   by key, and they are the fastest-growing append-mostly tables. Each has a year partition from 2020 to 2040 plus a default partition. Further years are
   added with `audit.ensure_change_log_year(y)` / `mun.ensure_meter_reading_year(y)`. Neither maps `xmin`, because PostgreSQL cannot return it from an insert
   into a partitioned table.
-- **Not partitioned (yet):** the line tables — `gl.journal_line`, `pos.sale_line`, `pay.payslip_line`, `bud.budget_line`, `hse.ownership_record`. They have no company or date
+- **Not partitioned (yet):** the line tables - `gl.journal_line`, `pos.sale_line`, `pay.payslip_line`, `bud.budget_line`, `hse.ownership_record`. They have no company or date
   of their own; those live on their parent (journal, sale, payslip, budget, stand). Partitioning them would mean copying a year onto every line and
   making it part of the key. For journal lines it would also mean reworking the posted-journal immutability triggers and the posting engine's
   balance updates. None of that is needed at today's volumes. PostgreSQL serves them well through their parent-id and date indexes, and the BRIN date

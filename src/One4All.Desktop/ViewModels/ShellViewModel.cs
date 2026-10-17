@@ -160,7 +160,7 @@ public sealed partial class ShellViewModel : ObservableObject
 
     /// <summary>Gets the line under the page's title.</summary>
     public string PageSubtitle => SelectedModule is not null
-        ? $"{SelectedModule.Purpose} Its screens are below by kind of work — Maintenance, Transactions, Enquiries, Utilities; each opens in its own window."
+        ? $"{SelectedModule.Purpose} Its screens are below by kind of work - Maintenance, Transactions, Enquiries, Utilities; each opens in its own window."
         : Welcome;
 
     /// <summary>Re-reads the licence status line.</summary>

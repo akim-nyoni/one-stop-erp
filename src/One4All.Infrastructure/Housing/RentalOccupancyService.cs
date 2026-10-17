@@ -163,7 +163,7 @@ public sealed class RentalOccupancyService : IRentalOccupancyService
         return new TenancyOccupancy(tenancy.TenancyNumber, unit.Code, occupants, lodgers, (tenantThere ? 1 : 0) + occupants.Count + lodgers.Count, unit.MaxOccupants);
     }
 
-    // Everyone living there on the date — the tenant, occupants and lodgers — plus those arriving, against the unit's limit.
+    // Everyone living there on the date - the tenant, occupants and lodgers - plus those arriving, against the unit's limit.
     private async Task<Error?> OverLimitAsync(Tenancy tenancy, RentalUnit unit, DateOnly date, int arriving, CancellationToken ct)
     {
         if (unit.MaxOccupants is not int max)

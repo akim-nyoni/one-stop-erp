@@ -26,7 +26,7 @@ public sealed record BudgetWorkbookImport(IReadOnlyList<BudgetWorkbookChange> Ch
 
 /// <summary>
 /// The Excel round trip for budget preparation (brief §4.18): a budget out to a workbook (one row per account and cost centre, a column
-/// per period and a total formula), edited offline, and back in — every row checked (the workbook belongs to this budget, accounts and
+/// per period and a total formula), edited offline, and back in - every row checked (the workbook belongs to this budget, accounts and
 /// cost centres exist, figures are numbers and not negative, no row twice), the differences previewed, and applied together only when
 /// nothing is wrong and the budget is still a draft or returned. Rows taken out of the workbook leave those figures as they were.
 /// </summary>

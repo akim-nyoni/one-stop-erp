@@ -148,7 +148,7 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
     }
 }
 
-/// <summary>A recorded action on a workflow (<c>wf.approval</c>, brief §7 — full history).</summary>
+/// <summary>A recorded action on a workflow (<c>wf.approval</c>, brief §7 - full history).</summary>
 public sealed class WorkflowApproval : Entity
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>

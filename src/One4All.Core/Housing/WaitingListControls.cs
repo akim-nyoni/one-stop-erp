@@ -17,7 +17,7 @@ public enum ChangeRequestStatus
 
 /// <summary>
 /// A request to change an applicant's registration date (<c>hse.registration_date_change</c>, brief §4.10.3: the date
-/// that determines seniority — any change is a dual-authorisation, fully audited event). Requested by one officer,
+/// that determines seniority - any change is a dual-authorisation, fully audited event). Requested by one officer,
 /// approved or rejected by another; the old and new dates and the reason are kept.
 /// </summary>
 public sealed class RegistrationDateChange : AuditableEntity, ICompanyScoped
@@ -95,7 +95,7 @@ public enum ApplicantNoticeType
 
 /// <summary>
 /// A notice to a waiting-list applicant (<c>hse.applicant_notice</c>, brief §4.10.3: non-responders flagged, then
-/// suspended, then removed — with notification history proving they were contacted).
+/// suspended, then removed - with notification history proving they were contacted).
 /// </summary>
 public sealed class ApplicantNotice : AuditableEntity, ICompanyScoped
 {

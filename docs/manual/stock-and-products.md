@@ -148,7 +148,7 @@ An item's reorder level and quantity at one warehouse; replenishment for that wa
 
 ### Replenishment policy
 
-Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. With a forecast window, the reorder level rises to the average daily issues over that window times the lead time — scaled, with seasonal factors, by the factor for the month the lead time ends in (twelve numbers, January first).
+Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. With a forecast window, the reorder level rises to the average daily issues over that window times the lead time - scaled, with seasonal factors, by the factor for the month the lead time ends in (twelve numbers, January first).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -283,9 +283,9 @@ Counts only the items due: never-counted items first, then A items every 30 days
 | Warehouse | yes | Choice |
 | Date | yes | Date |
 | Count reference | yes | Text |
-| Days between counts — A items | yes | Number; default 30 |
-| Days between counts — B items | yes | Number; default 90 |
-| Days between counts — C items | yes | Number; default 180 |
+| Days between counts - A items | yes | Number; default 30 |
+| Days between counts - B items | yes | Number; default 90 |
+| Days between counts - C items | yes | Number; default 180 |
 | Most items in this count | yes | Number; default 50 |
 | Recount tolerance % (blank: none) | no | Number |
 
@@ -365,7 +365,7 @@ The list beside the form shows: Bills of materials.
 
 ### Stock on hand and back orders
 
-An item's stock on hand, allocated to sales orders, on order and free — available to promise; the list shows every back-ordered sales order line and whether stock now covers it.
+An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether stock now covers it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -440,10 +440,10 @@ Assesses the IAS 2 provision on stock: down to net realisable value (selling pri
 | INV-AGE | Stock Ageing | On-hand items with their value and the age band since last movement (0-30 / 31-60 / 61-90 / 90+ days). |
 | INV-BACKORDER | Back-order Book | Every undespatched sales-order line, oldest order first, with stock on hand allocated to earlier orders so each line shows whether it can be fulfilled and any shortfall. |
 | INV-ITEMS | Item Master | Stock item master: code, description, unit, reorder level, default accounts and active status. |
-| INV-MOVE | Stock Movements | Every stock movement over a period — receipts, issues, transfers, adjustments and reversals. |
-| INV-REORDER | Reorder Report | Items at or below their reorder level, with the suggested reorder quantity — a purchasing aid. |
-| INV-SLOW | Slow-moving Stock | Items on hand with no movement since the given date — capital tied up in dead stock. |
-| INV-VAL | Stock Valuation | Quantity on hand and value per item and warehouse, with the item's category and costing method — now, or as at any earlier date (from the stock movements to it). |
+| INV-MOVE | Stock Movements | Every stock movement over a period - receipts, issues, transfers, adjustments and reversals. |
+| INV-REORDER | Reorder Report | Items at or below their reorder level, with the suggested reorder quantity - a purchasing aid. |
+| INV-SLOW | Slow-moving Stock | Items on hand with no movement since the given date - capital tied up in dead stock. |
+| INV-VAL | Stock Valuation | Quantity on hand and value per item and warehouse, with the item's category and costing method - now, or as at any earlier date (from the stock movements to it). |
 | INV100 | Wastage / Shrinkage Report | Stock written down in the period through adjustments, by department (item category) and reason, against the department's sales. |
 | INV101 | Consignment Stock | Our stock held at customers' sites on consignment, per customer and item, with the last movement and value at average cost. |
 | INV78 | Stock Valuation vs GL Stock Control | The stock register's value at the date by warehouse against the stock control accounts, with the difference. |
@@ -451,7 +451,7 @@ Assesses the IAS 2 provision on stock: down to net realisable value (selling pri
 | INV81 | Stocktake Count Sheets & Variance | Each stocktake's lines: system quantity, counted, variance in quantity and value (uncounted lines flagged). |
 | INV82 | Stock Adjustments by Reason Code | Adjustments in the period per reason code: count, units gained and lost, and the net value. |
 | INV86 | Overstock Report | Items holding more than their reorder level plus reorder quantity (or more than 90 days of issues), with the excess value. |
-| INV87 | Negative Stock Report | Item and warehouse balances below zero — an integrity exception to clear. |
+| INV87 | Negative Stock Report | Item and warehouse balances below zero - an integrity exception to clear. |
 | INV88 | Batch / Lot Stock Report | Batch-tracked stock on hand at the date per item, warehouse and batch, with first receipt, expiry and value at average cost. |
 | INV89 | Serial Number Register | Every serial number: where it is, when it came in and when and how it last moved, and whether it is still in stock. |
 | INV90 | Expiry Report | Batches on hand that have expired or expire within the window, soonest first, with the value at risk. |

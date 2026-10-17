@@ -45,7 +45,7 @@ public sealed class ItemAlias : Entity, ICompanyScoped
 }
 
 /// <summary>
-/// A unit an item is also bought or sold in (<c>inv.item_unit</c>): a box of 12, a case of 24 — with its own barcode — converting to the
+/// A unit an item is also bought or sold in (<c>inv.item_unit</c>): a box of 12, a case of 24 - with its own barcode - converting to the
 /// item's base unit by a factor.
 /// </summary>
 public sealed class ItemUnit : Entity, ICompanyScoped

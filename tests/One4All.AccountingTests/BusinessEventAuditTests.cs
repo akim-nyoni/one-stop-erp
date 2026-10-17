@@ -14,7 +14,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the business events in the audit trail (brief §6): a posting writes Post, a reversal Void with its reason, a workflow decision Approve or
-/// Reject by the approver — each with the terminal it came from, which the journal keeps too — and the chain still verifies.
+/// Reject by the approver - each with the terminal it came from, which the journal keeps too - and the chain still verifies.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class BusinessEventAuditTests

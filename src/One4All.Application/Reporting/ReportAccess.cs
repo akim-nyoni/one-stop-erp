@@ -30,7 +30,7 @@ public sealed record ReportAccess(IReadOnlySet<SensitiveField> Hidden, DataScope
 
 /// <summary>
 /// Cuts report rows to a user's data scope (brief §13.3, §4.15.10, §4.18.2): a row naming a branch, department, cost centre, warehouse,
-/// ward or job outside the scope is left out — one with the column blank too, so company-wide figures do not reach a restricted user.
+/// ward or job outside the scope is left out - one with the column blank too, so company-wide figures do not reach a restricted user.
 /// Rows without such columns pass.
 /// </summary>
 public static class ReportRowScope

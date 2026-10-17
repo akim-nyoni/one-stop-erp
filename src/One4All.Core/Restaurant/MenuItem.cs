@@ -3,7 +3,7 @@ using One4All.Core.Common;
 namespace One4All.Core.Restaurant;
 
 /// <summary>
-/// A menu item (brief: Restaurant module, <c>res.menu_item</c>) — a sellable composite that is <b>not</b>
+/// A menu item (brief: Restaurant module, <c>res.menu_item</c>) - a sellable composite that is <b>not</b>
 /// stocked itself. Its price is what the guest pays; its cost is derived by exploding its recipe into the
 /// ingredient stock items, which <i>are</i> stock-tracked. This keeps menu items off the stock ledger while
 /// their ingredients remain valued at moving-average cost.
@@ -72,7 +72,7 @@ public sealed class MenuItem : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the item is currently available to order.</summary>
     public bool IsAvailable { get; set; }
 
-    /// <summary>The recipe — ingredient stock items and quantities consumed per unit sold.</summary>
+    /// <summary>The recipe - ingredient stock items and quantities consumed per unit sold.</summary>
     public IReadOnlyList<RecipeLine> Recipe => _recipe.AsReadOnly();
 
     /// <summary>Adds an ingredient to the recipe.</summary>

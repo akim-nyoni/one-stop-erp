@@ -140,7 +140,7 @@ public sealed class EnumerationExercise : AuditableEntity, ICompanyScoped
 
 /// <summary>
 /// A household counted in an enumeration exercise (<c>hse.enumerated_household</c>): the head of household, the household,
-/// the structure, whether it qualifies for regularisation, and what became of it — a waiting-list registration or a stand
+/// the structure, whether it qualifies for regularisation, and what became of it - a waiting-list registration or a stand
 /// allocated directly. A person is enumerated once per council, and a stand regularised to one household, in the database.
 /// </summary>
 public sealed class EnumeratedHousehold : AuditableEntity, ICompanyScoped

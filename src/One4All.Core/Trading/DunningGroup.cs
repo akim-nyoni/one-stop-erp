@@ -3,8 +3,8 @@ using One4All.Core.Common;
 namespace One4All.Core.Trading;
 
 /// <summary>
-/// A dunning group (<c>ar.dunning_group</c>, brief §4.4): customers chased on their own timetable — government departments given longer,
-/// cash customers chased sooner — or not chased at all.
+/// A dunning group (<c>ar.dunning_group</c>, brief §4.4): customers chased on their own timetable - government departments given longer,
+/// cash customers chased sooner - or not chased at all.
 /// </summary>
 public sealed class DunningGroup : AuditableEntity, ICompanyScoped
 {

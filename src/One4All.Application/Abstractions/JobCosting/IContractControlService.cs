@@ -71,7 +71,7 @@ public interface IContractControlService
 
     /// <summary>
     /// Checks a BOQ file (CSV: item, description, unit, quantity, rate[, cost head]; a header row and quoted fields allowed) against the contract
-    /// without saving anything: each line with its error — a missing field, a bad number, an item repeated in the file or already on the contract.
+    /// without saving anything: each line with its error - a missing field, a bad number, an item repeated in the file or already on the contract.
     /// </summary>
     Task<Result<BoqImportPreview>> PreviewBoqImportAsync(long companyId, long contractId, string csv, CancellationToken ct = default);
 

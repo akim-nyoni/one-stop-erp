@@ -59,8 +59,8 @@ public sealed class LoginActivityTests
         }
 
         string activity = await Render("SYS236");
-        activity.Should().Contain($"{name},2,1,0,").And.Contain("\"PC-1, PC-2\",0").And.Contain($"(unknown) {ghost},0,1,0,—,—,0.0,—,0");
+        activity.Should().Contain($"{name},2,1,0,").And.Contain("\"PC-1, PC-2\",0").And.Contain($"(unknown) {ghost},0,1,0,-,-,0.0,-,0");
         string sessions = await Render("SYS249");
-        sessions.Should().Contain($"{name},PC-1,Password,").And.Contain(",PC-2").And.Contain($"{name},PC-2,Password,").And.Contain(",open,—,PC-1");
+        sessions.Should().Contain($"{name},PC-1,Password,").And.Contain(",PC-2").And.Contain($"{name},PC-2,Password,").And.Contain(",open,-,PC-1");
     }
 }

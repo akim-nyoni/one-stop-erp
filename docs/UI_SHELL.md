@@ -1,9 +1,9 @@
-# Desktop Shell — UI Reference (module-centric, built for non-technical users)
+# Desktop Shell - UI Reference (module-centric, built for non-technical users)
 
 Since 2026-10-14 the shell is organised **by business module, in plain language**, after user testing showed the Sage-style
 "kind of work first" menus were hard to follow. The source of truth is `One4All.Desktop/Navigation/NavigationMap.cs`.
 
-## Layout regions (Explorer, modelled on Sage 200 Evolution — user request 2026-10-16)
+## Layout regions (Explorer, modelled on Sage 200 Evolution - user request 2026-10-16)
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -25,7 +25,7 @@ Since 2026-10-14 the shell is organised **by business module, in plain language*
 ## Behaviour rules
 
 - **20 modules** with plain-language groups of screens (`NavigationMap`), each screen with a kind of work: Maintenance (green), Transactions (red),
-  Enquiries (blue), Utilities (purple) — `NavCategory.BrushFor`.
+  Enquiries (blue), Utilities (purple) - `NavCategory.BrushFor`.
 - **Tree**: module ▸ kind of work ▸ screen. The Filter box narrows it to screens whose name (or group) contains the text. Selecting a module or a
   kind opens the module's tab; double-click / Enter on a screen opens it.
 - **Tabs**: Home (Quick start tiles, module tiles); a module page (`ModulePage`: Related Tasks = its everyday screens; the kinds of work side by

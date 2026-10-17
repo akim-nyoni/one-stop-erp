@@ -15,7 +15,7 @@ public static class ReceivablesReports
     /// <returns>The definitions, in brief order.</returns>
     public static IEnumerable<ReportDefinition> All()
     {
-        yield return Listing("AR28", "Customer Statement — Consolidated Group", "Receivables", "Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total.",
+        yield return Listing("AR28", "Customer Statement - Consolidated Group", "Receivables", "Per group (parent account and its branches): each account's opening balance, debits and credits in the period and closing balance, with the group total.",
             "RecvGroupStatement", [new Column("Group", "Group", 140), new Column("Account", "Account", 180), new Column("Opening", "Opening", 95), new Column("Debits", "Debits", 95), new Column("Credits", "Credits", 95),
              new Column("Closing", "Closing", 100, true)], Period);
         yield return Listing("AR29", "Aged Debtors Detail", "Sales", "Every open item as at the date with its age from due date (or invoice date for customers aged that way) and band.",
@@ -58,8 +58,8 @@ public static class ReceivablesReports
         yield return Listing("AR43", "Bad Debt Write-off Listing", "Sales", "Write-offs in the period with the customer, document and the debt case that approved it.",
             "RecvWriteOffs", [new Column("Date", "Date", 75), new Column("Customer", "Customer", 150), new Column("Document", "Document", 110), new Column("Case", "Debt case", 170), new Column("Amount", "Amount", 90, true)],
             Period);
-        yield return Listing("AR44", "Customer Deposits & Advance Payments Held", "Receivables", "Money received from customers and not yet applied to an invoice at the date — deposits, "
-            + "advances and payments on account — with how long each has been held, in transaction currency and base.", "RecvDeposits",
+        yield return Listing("AR44", "Customer Deposits & Advance Payments Held", "Receivables", "Money received from customers and not yet applied to an invoice at the date - deposits, "
+            + "advances and payments on account - with how long each has been held, in transaction currency and base.", "RecvDeposits",
             [new Column("Customer", "Customer", 160), new Column("Document", "Document", 110), new Column("Date", "Received", 75), new Column("Type", "Type", 80), new Column("Currency", "Currency", 55),
              new Column("Received", "Received", 90), new Column("Unapplied", "Unapplied", 90), new Column("Days", "Days held", 55), new Column("Base", "Base held", 100, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("AR45", "Lay-bye Status & Arrears", "Sales", "Every lay-bye plan with price, paid, balance and days to (or past) its final date.",

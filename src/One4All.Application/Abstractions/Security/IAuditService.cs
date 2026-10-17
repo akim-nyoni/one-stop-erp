@@ -69,7 +69,7 @@ public sealed record AuditChainVerification(int EntriesChecked, bool IsIntact, l
 
 /// <summary>
 /// The audit trail (brief §6): query the append-only change log, and verify its SHA-256 hash chain so any
-/// tampering with a historical row — even by direct SQL — is detected and located.
+/// tampering with a historical row - even by direct SQL - is detected and located.
 /// </summary>
 /// <summary>An event to record that is not a data change (a print, export, override, permission or licence change, sign-in).</summary>
 /// <param name="CompanyId">The company, or null for system-wide events.</param>

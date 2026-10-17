@@ -13,4 +13,4 @@ Goal: show that leads, opportunities, activities and messages work end to end. A
 6. Open **WhatsApp replies**. Messages customers and leads sent on WhatsApp (matched by their number), oldest first. Fill in: Message id. Press OK and point out the result line and the list on the right.
 
 ## Reports to end on
-- CRM-PIPE Sales Pipeline: Open opportunities by stage — estimated value, win probability and the probability-weighted value. Show the drill-through by clicking a document or account.
+- CRM-PIPE Sales Pipeline: Open opportunities by stage - estimated value, win probability and the probability-weighted value. Show the drill-through by clicking a document or account.

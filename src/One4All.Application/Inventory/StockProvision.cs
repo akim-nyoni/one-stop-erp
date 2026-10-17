@@ -2,7 +2,7 @@ namespace One4All.Application.Inventory;
 
 /// <summary>
 /// The provisioning policy for stock (IAS 2): a write-down to net realisable value, and an ageing provision for stock
-/// that has not moved — the larger of the two applies to each holding, never more than its cost.
+/// that has not moved - the larger of the two applies to each holding, never more than its cost.
 /// </summary>
 /// <param name="CostToSellPercent">Selling costs as a percent of the selling price (NRV = price × (1 − this)).</param>
 /// <param name="SlowMovingDays">Days without an issue after which stock counts as slow-moving.</param>

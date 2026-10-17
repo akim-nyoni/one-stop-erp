@@ -24,10 +24,10 @@ public enum Vertical
     /// <summary>Contracting: work in progress, retentions, subcontractors.</summary>
     Construction = 5,
 
-    /// <summary>Hospitality: bars, restaurants and lodges — food, beverage and liquor sales and costs, tabs, tips and functions.</summary>
+    /// <summary>Hospitality: bars, restaurants and lodges - food, beverage and liquor sales and costs, tabs, tips and functions.</summary>
     Hospitality = 6,
 
-    /// <summary>Butchery: carcasses broken into cuts at the counter scale — meat and deli sales, yield loss and wastage, cold-room costs.</summary>
+    /// <summary>Butchery: carcasses broken into cuts at the counter scale - meat and deli sales, yield loss and wastage, cold-room costs.</summary>
     Butchery = 7,
 
     /// <summary>Bulk materials and concrete: sand, aggregates and ready-mix sold over the weighbridge, with haulage and stockpile variances.</summary>

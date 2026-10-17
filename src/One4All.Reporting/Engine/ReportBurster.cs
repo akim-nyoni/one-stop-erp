@@ -1,7 +1,7 @@
 namespace One4All.Reporting.Engine;
 
 /// <summary>
-/// Splits one report run by a key field into many documents — one per key (brief §13.3 bursting). This is
+/// Splits one report run by a key field into many documents - one per key (brief §13.3 bursting). This is
 /// how bulk statements and bills are produced: burst the dataset by customer/property/student, render each
 /// slice, and deliver each to the right recipient.
 /// </summary>

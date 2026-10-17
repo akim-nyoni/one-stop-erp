@@ -39,7 +39,7 @@ public sealed class IssueGiftCardRequest
 public readonly record struct GiftCardResult(long CardId, decimal Balance, GiftCardStatus Status);
 
 /// <summary>
-/// Voucher management (brief §4.8) — gift cards as a liability. Issuing loads value against a liability
+/// Voucher management (brief §4.8) - gift cards as a liability. Issuing loads value against a liability
 /// account; redemption draws the balance down (the value is a tender in the sale that debits the liability);
 /// unredeemed expired balances are recognised as breakage income.
 /// </summary>
@@ -78,7 +78,7 @@ public interface IVoucherService
 
     /// <summary>
     /// Recognises breakage for every active card whose expiry date has passed and that still has a residual
-    /// balance — the periodic run that releases stale gift-card liabilities to income.
+    /// balance - the periodic run that releases stale gift-card liabilities to income.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The recognition date; cards expiring on or before it are swept.</param>

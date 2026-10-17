@@ -9,7 +9,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Covers waiting-list intake: contact details; documents verified one by one (the applicant once all are); the duplicate queue — the same phone under two IDs
+/// Covers waiting-list intake: contact details; documents verified one by one (the applicant once all are); the duplicate queue - the same phone under two IDs
 /// and an applicant on the deceased register are queued once, merged keeping the earlier registration, rejected and cleared with reasons.
 /// </summary>
 [Collection(AccountingCollection.Name)]

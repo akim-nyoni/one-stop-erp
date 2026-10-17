@@ -51,7 +51,7 @@ public sealed class PayrollPeriodGuardTests
             first.IsSuccess.Should().BeTrue(first.IsFailure ? first.Error.ToString() : null);
             first.Value.TotalNet.Should().Be(1500m);
 
-            // Same period again — including with stray whitespace — is refused.
+            // Same period again - including with stray whitespace - is refused.
             (await payroll.RunAsync(companyId, "2026-01", new DateOnly(2026, 1, 26), "2420", "PG-2026-01B")).Error.Code.Should().Be("Payroll.PeriodAlreadyRun");
             (await payroll.RunAsync(companyId, " 2026-01 ", new DateOnly(2026, 1, 26), "2420", "PG-2026-01C")).Error.Code.Should().Be("Payroll.PeriodAlreadyRun");
 

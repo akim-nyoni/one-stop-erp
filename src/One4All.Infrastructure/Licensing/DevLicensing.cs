@@ -4,14 +4,14 @@ namespace One4All.Infrastructure.Licensing;
 /// Development-only embedded licence so the app runs out of the box on a dev machine. The public key is
 /// safe to embed; the token is a signed grant (not a secret) covering all modules, perpetual, machine
 /// binding <c>None</c>. In production the trusted key is configured and a real licence is installed via
-/// System Manager — this class is not used.
+/// System Manager - this class is not used.
 /// </summary>
 public static class DevLicensing
 {
     /// <summary>The dev signing key id.</summary>
     public const string KeyId = "dev-2026";
 
-    /// <summary>The dev public key (Base64) — embed/trust this to verify the dev licence.</summary>
+    /// <summary>The dev public key (Base64) - embed/trust this to verify the dev licence.</summary>
     public const string PublicKeyBase64 = "0imcObQiC8pwXosR1q8W8QNL4qMyGb9kXiRizZqBnrs=";
 
     /// <summary>The signed dev licence token (all modules, perpetual).</summary>

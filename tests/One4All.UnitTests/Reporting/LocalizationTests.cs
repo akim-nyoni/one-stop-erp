@@ -25,7 +25,7 @@ public sealed partial class LocalizationTests
         TextCatalog.For("xx-NOPE")["Account Enquiry…"].Should().Be("Account Enquiry…");
         TextCatalog.For(null)["Exit"].Should().Be("Exit");
         TextCatalog.For("ar-SA").RightToLeft.Should().BeTrue();
-        TextCatalog.For("en", new Dictionary<string, string> { ["Stand"] = "Erf" })["Housing — Waiting List, Allocation Runs, Offers, Stands…"].Should().EndWith("Offers, Erfs…");
+        TextCatalog.For("en", new Dictionary<string, string> { ["Stand"] = "Erf" })["Housing - Waiting List, Allocation Runs, Offers, Stands…"].Should().EndWith("Offers, Erfs…");
     }
 
     [Fact]

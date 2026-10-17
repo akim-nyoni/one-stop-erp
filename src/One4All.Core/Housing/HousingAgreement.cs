@@ -38,7 +38,7 @@ public enum AgreementType
 
 /// <summary>
 /// A housing agreement on the agreement register (<c>hse.housing_agreement</c>, brief §4.10.5): the parties, stand and
-/// type, with its versions — an amendment creates a new version and the superseded one is kept.
+/// type, with its versions - an amendment creates a new version and the superseded one is kept.
 /// </summary>
 public sealed class HousingAgreement : AuditableEntity, ICompanyScoped
 {

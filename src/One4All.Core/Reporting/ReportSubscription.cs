@@ -76,7 +76,7 @@ public sealed class ReportSubscription : AuditableEntity, ICompanyScoped
     public void SetActive(bool active) => IsActive = active;
 }
 
-/// <summary>One delivery of a subscription's report (<c>rpt.report_delivery</c>) — the delivery log.</summary>
+/// <summary>One delivery of a subscription's report (<c>rpt.report_delivery</c>) - the delivery log.</summary>
 public sealed class ReportDelivery : Entity, ICompanyScoped
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>

@@ -85,7 +85,7 @@ public enum BudgetStatus
 
 /// <summary>
 /// A budget version (brief §4.18, <c>bud.budget</c>). Budgets live in their own schema and never post to
-/// the general ledger — they are joined to actuals by posting dimensions at report time. Versions are
+/// the general ledger - they are joined to actuals by posting dimensions at report time. Versions are
 /// retained permanently; a new version supersedes the previous active one for the same year/type/department.
 /// </summary>
 public sealed class Budget : SoftDeletableEntity, ICompanyScoped
@@ -363,7 +363,7 @@ public sealed class Budget : SoftDeletableEntity, ICompanyScoped
     }
 }
 
-/// <summary>One budget line — account × period × amount (<c>bud.budget_line</c>).</summary>
+/// <summary>One budget line - account × period × amount (<c>bud.budget_line</c>).</summary>
 public sealed class BudgetLine : Entity
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>
@@ -450,7 +450,7 @@ public sealed class BudgetLine : Entity
 }
 
 /// <summary>
-/// An actual volume against a budgeted account (<c>bud.actual_volume</c>): units sold, tonnes hauled, hours worked — what the volume
+/// An actual volume against a budgeted account (<c>bud.actual_volume</c>): units sold, tonnes hauled, hours worked - what the volume
 /// variance (B35) compares with the budget lines' quantities.
 /// </summary>
 public sealed class ActualVolume : Entity, ICompanyScoped
@@ -635,7 +635,7 @@ public enum RephaseStatus
 
 /// <summary>
 /// A re-phasing of an approved budget (<c>bud.rephase</c>, brief §4.18.6): moves an amount on an account from one period to another
-/// within the year — a timing change kept apart from virements, with its own request and approval.
+/// within the year - a timing change kept apart from virements, with its own request and approval.
 /// </summary>
 public sealed class BudgetRephase : Entity, ICompanyScoped
 {

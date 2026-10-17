@@ -129,7 +129,7 @@ public sealed partial class AccountEnquiryViewModel : ObservableObject
             Accounts.Clear();
             foreach (var a in await db.Accounts.Where(a => a.CompanyId == _companyId).OrderBy(a => a.AccountCode).Select(a => new { a.AccountCode, a.Name }).ToListAsync(ct).ConfigureAwait(true))
             {
-                Accounts.Add(new AccountChoiceVm(a.AccountCode, $"{a.AccountCode} — {a.Name}"));
+                Accounts.Add(new AccountChoiceVm(a.AccountCode, $"{a.AccountCode} - {a.Name}"));
             }
 
             StatusMessage = $"{Accounts.Count} account(s). Choose one and press Show.";

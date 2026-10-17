@@ -10,7 +10,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Covers credit control when an order is taken (brief §4.5): the balance, the orders not yet invoiced and the new order against the limit —
+/// Covers credit control when an order is taken (brief §4.5): the balance, the orders not yet invoiced and the new order against the limit -
 /// refused under a blocking policy, taken and logged under a warning policy.
 /// </summary>
 [Collection(AccountingCollection.Name)]

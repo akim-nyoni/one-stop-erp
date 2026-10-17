@@ -31,7 +31,7 @@ public interface IEmployeeLoanService
     /// <param name="loanId">The loan.</param>
     /// <param name="amount">The repayment amount (positive).</param>
     /// <param name="date">The repayment date.</param>
-    /// <param name="fundingAccountCode">The account the repayment funds come from (debited — e.g. net-pay control on a payroll deduction, or bank).</param>
+    /// <param name="fundingAccountCode">The account the repayment funds come from (debited - e.g. net-pay control on a payroll deduction, or bank).</param>
     /// <param name="documentNumber">The repayment document number.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The loan's outstanding balance after the repayment.</returns>

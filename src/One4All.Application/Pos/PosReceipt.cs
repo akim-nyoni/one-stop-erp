@@ -47,7 +47,7 @@ public sealed class PosReceiptModel
     /// <summary>The gross total.</summary>
     public decimal TotalGross { get; init; }
 
-    /// <summary>The tenders taken (change excluded — shown separately).</summary>
+    /// <summary>The tenders taken (change excluded - shown separately).</summary>
     public IReadOnlyList<PosReceiptTender> Tenders { get; init; } = [];
 
     /// <summary>The change given.</summary>

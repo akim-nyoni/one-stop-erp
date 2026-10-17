@@ -31,7 +31,7 @@ public sealed class PageSetup
     public string? Watermark { get; set; }
 
     /// <summary>
-    /// An expression giving the watermark for each run (brief §13.4: "CONFIDENTIAL/DRAFT" driven by expression) — evaluated against the parameters,
+    /// An expression giving the watermark for each run (brief §13.4: "CONFIDENTIAL/DRAFT" driven by expression) - evaluated against the parameters,
     /// the first row's fields, the user and the date, e.g. <c>"Draft".Equals(Param("Status")) ? "DRAFT" : ""</c>; blank falls back to <see cref="Watermark"/>.
     /// </summary>
     public string? WatermarkExpression { get; set; }
@@ -42,7 +42,7 @@ public sealed class PageSetup
     /// <summary>Gets or sets the gap between columns, in points.</summary>
     public double ColumnGap { get; set; } = 12;
 
-    /// <summary>Gets or sets a picture (base64 or a data URI) printed behind every page — letterhead, a form, a certificate border.</summary>
+    /// <summary>Gets or sets a picture (base64 or a data URI) printed behind every page - letterhead, a form, a certificate border.</summary>
     public string? BackgroundImage { get; set; }
 
     /// <summary>Gets or sets the printer tray the report prefers (Auto, Manual, Cassette, Tractor…), offered first in the print dialog.</summary>

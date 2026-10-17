@@ -28,7 +28,7 @@ Approve or reject journals others have entered.
 
 ### Accounting vouchers
 
-Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … — for a journal, debits positive and credits negative), checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, and printed with prepared / checked / approved signature blocks. Supporting documents attach under Attachments (target AccountingVoucher, key the voucher number).
+Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … - for a journal, debits positive and credits negative), checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, and printed with prepared / checked / approved signature blocks. Supporting documents attach under Attachments (target AccountingVoucher, key the voucher number).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -186,7 +186,7 @@ The list beside the form shows: Cost centres and departments.
 
 ### Funds, projects and fund accounting
 
-Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund — the default fund fills sub-ledger postings — and each fund must balance within each journal.
+Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund - the default fund fills sub-ledger postings - and each fund must balance within each journal.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -240,7 +240,7 @@ The list beside the form shows: Tax codes.
 
 ### VAT return
 
-The VAT due for a period on the company's basis — invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it is paid) — with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.
+The VAT due for a period on the company's basis - invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it is paid) - with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -333,7 +333,7 @@ Revalues the foreign-currency balances (banks, debtors, creditors, loans) at the
 
 ### Set the reporting currency
 
-A second currency every posting is also kept in (e.g. USD beside ZWG), each at the base→reporting rate of its day, so statements can be drawn in it (General Ledger report GL2R). It applies to postings from now on — posted journals cannot change — so set it before go-live. Leave blank to stop keeping it.
+A second currency every posting is also kept in (e.g. USD beside ZWG), each at the base→reporting rate of its day, so statements can be drawn in it (General Ledger report GL2R). It applies to postings from now on - posted journals cannot change - so set it before go-live. Leave blank to stop keeping it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -343,7 +343,7 @@ The list beside the form shows: Company currencies.
 
 ### Hyperinflation (IAS 29)
 
-Index: records a price index value for a month. Restate: the trial balance restated in current terms by the index — non-monetary items moved by the index change since they arose — with the gain or loss on the net monetary position.
+Index: records a price index value for a month. Restate: the trial balance restated in current terms by the index - non-monetary items moved by the index change since they arose - with the gain or loss on the net monetary position.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -373,7 +373,7 @@ The list beside the form shows: Periods of the latest fiscal year.
 
 ### Create a fiscal year
 
-Monthly periods from the start date (any month — e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit and year-end adjustments. Tick to open the periods for every ledger at once.
+Monthly periods from the start date (any month - e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit and year-end adjustments. Tick to open the periods for every ledger at once.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -415,7 +415,7 @@ The list beside the form shows: Allocation rules.
 
 ### Year-end
 
-Run: rolls the year's profit or loss to retained earnings (in the adjustment period when there is one), opens the next year on the same calendar and closes the year. Reverse: undoes a year-end not yet hard-locked so adjustments can be made and it can be run again. Hard lock: makes it final — every period permanently closed.
+Run: rolls the year's profit or loss to retained earnings (in the adjustment period when there is one), opens the next year on the same calendar and closes the year. Reverse: undoes a year-end not yet hard-locked so adjustments can be made and it can be run again. Hard lock: makes it final - every period permanently closed.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -430,13 +430,13 @@ The list beside the form shows: Fiscal years.
 
 | Code | Report | What it shows |
 | --- | --- | --- |
-| GL-BS | Balance Sheet | Assets, liabilities and equity as at a date; assets equal liabilities plus equity — beside the position a year earlier and the change. |
+| GL-BS | Balance Sheet | Assets, liabilities and equity as at a date; assets equal liabilities plus equity - beside the position a year earlier and the change. |
 | GL-CF | Statement of Cash Flows | Cash generated by operating, investing and financing activities for a period, reconciled to the change in cash. |
 | GL-COA | Chart of Accounts | Every ledger account with its type, report category, control flag and active status. |
-| GL-CTRL | Control Reconciliation | GL control-account balances (AR, AP, Stock) versus their sub-ledger totals, with the difference — zero when they agree. |
-| GL-DAYBOOK | Journal Daybook | Every journal over a period — date, number, source module, document, narrative and base total (draft and deferred too when asked; a branch, cost centre or department narrows the lines counted). |
+| GL-CTRL | Control Reconciliation | GL control-account balances (AR, AP, Stock) versus their sub-ledger totals, with the difference - zero when they agree. |
+| GL-DAYBOOK | Journal Daybook | Every journal over a period - date, number, source module, document, narrative and base total (draft and deferred too when asked; a branch, cost centre or department narrows the lines counted). |
 | GL-DEPT-IS | Departmental Income Statement | Income and expenses for a period restricted to one department; the difference is the department's net profit. |
-| GL-IS | Income Statement | Income and expenses for a period; the difference is the net profit — beside the same period a year earlier and the change. |
+| GL-IS | Income Statement | Income and expenses for a period; the difference is the net profit - beside the same period a year earlier and the change. |
 | GL-IS-FN | Income Statement by Function | Revenue, cost of sales and gross profit, then distribution, administrative and other operating expenses, operating profit, finance costs and the profit for the period, beside the same period a year earlier. Expenses fall to a function by their account's report category ("Distribution", "Administrative", "Finance"…); the accounts items post cost of sales to are cost of sales. |
 | GL-RECUR | Recurring Journals | Standing recurring journal templates with code, description, source module, value, balanced and active flags. |
 | GL-SNAP | Financial Snapshot | Headline figures as at a date: assets, liabilities, equity and year-to-date income, expenses and net profit. |
@@ -445,7 +445,7 @@ The list beside the form shows: Fiscal years.
 | GL-TBTYPE | Trial Balance by Type | The trial balance summarised to one line per account type, with debit and credit totals that balance. |
 | GL-TREE | Statement by Reporting Tree | A financial statement laid out by a reporting tree (statutory, management or consolidation): each heading with everything mapped beneath it rolled up. |
 | GL-VAT | VAT Return | Output tax on sales less input tax on purchases for a period, giving the net VAT payable. |
-| GL-VATC | VAT Return by Code | Output and input tax by tax code for a period, with the net per code — the multi-rate VAT breakdown. |
+| GL-VATC | VAT Return by Code | Output and input tax by tax code for a period, with the net per code - the multi-rate VAT breakdown. |
 | GL10 | Notes to the Accounts Schedules | Accounts grouped by their note reference: opening balance, the period's movement and closing balance, with a total per note. |
 | GL11 | Management Accounts Pack | Results for the period and the year to date, the financial position at the end date and the working-capital balances. |
 | GL12 | Budget vs Actual vs Commitment | Year to date per budgeted account and department: budget, actual, open commitments, what is still available and the share used. |
@@ -453,16 +453,16 @@ The list beside the form shows: Fiscal years.
 | GL15 | FX Revaluation Report | Unrealised revaluations of foreign-currency balances (ledger and trading) in the period, by account. |
 | GL16 | Realised FX Gain / Loss | Exchange differences realised on settlement in the period. |
 | GL17 | Suspense & Unallocated Items Review | Balances on suspense accounts and unallocated receipts and payments on the trading ledgers at the date. |
-| GL18 | Control Reconciliation — VAT and Bank | Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap. |
+| GL18 | Control Reconciliation - VAT and Bank | Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap. |
 | GL19 | Period Close Checklist & Status | Each period of the year to the date: its status per module, whether it is ready to close, and every close check with its count, value and whether it blocks. |
-| GL2 | Trial Balance — Multi-currency | Posted balances as at the date per account and transaction currency, in transaction and base. |
+| GL2 | Trial Balance - Multi-currency | Posted balances as at the date per account and transaction currency, in transaction and base. |
 | GL20 | Year-End Pack | For the year containing the date: the close checklist, the trial balance totals, the result for the year and the year's journals by source. |
 | GL22 | Recurring Journals Due & Missed | Each active recurring template's last posted month against the date: posted, due or missed. |
 | GL23 | Accruals, Prepayments & Deferred Income Schedule | Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise. |
 | GL24 | Intercompany Balances & Reconciliation | Intercompany journals in the period and whether the counterparty company holds the mirror entry. |
 | GL25 | Hyperinflation (IAS 29) Working Papers | Each account's historical balance restated by the price index at the date, monetary items unchanged, with the restatement. |
 | GL26 | FX Revaluation by Trader (before / after) | Every debtor and creditor with foreign-currency open items at the date: the base value booked, the value at the closing rate and the unrealised difference, from the revaluation preview (nothing is posted). |
-| GL2R | Trial Balance — Reporting Currency | Posted balances as at the date per account in base and in the company's reporting currency, each posting carried at the rate of its day. |
+| GL2R | Trial Balance - Reporting Currency | Posted balances as at the date per account in base and in the company's reporting currency, each posting carried at the rate of its day. |
 | GL5 | Journal Listing & Journal Audit | Every journal in the period with status, source, manual flag, who prepared and approved it, reversals and value. |
 | GL8 | Statement of Changes in Equity | Each equity account's opening balance, the period's profit and other movements, and closing balance. |
 | TX216 | VAT Detail / Audit Report | Every posted line carrying a tax code in the period, by code, with its journal and document. |
@@ -470,6 +470,6 @@ The list beside the form shows: Fiscal years.
 | TX218 | Exempt, Zero-rated & Out-of-scope Supplies | Lines in the period under zero-rated, exempt and out-of-scope tax codes, totalled per code. |
 | TX219 | Reverse Charge & Import VAT | Lines in the period under reverse-charge and deemed (import) tax codes: the output tax self-assessed, the input tax claimed and what is left payable. |
 | TX220 | Withholding Tax Return | Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted. |
-| TX223 | Tax Invoice / Fiscal Receipt Compliance Layout | A sale laid out as a tax invoice — supplier and tax number, document number and time, lines with tax, the tax summary by code, totals, the fiscal device status — followed by the compliance checks it passes or fails. |
+| TX223 | Tax Invoice / Fiscal Receipt Compliance Layout | A sale laid out as a tax invoice - supplier and tax number, document number and time, lines with tax, the tax summary by code, totals, the fiscal device status - followed by the compliance checks it passes or fails. |
 | TX224 | Annual Financial Statements Pack | Statement of financial position and profit or loss by report category for the year to the date, with the prior year's comparatives and the note each line is disclosed in. |
-| TX225 | Audit File Export (SAF-T style) | Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit — the GL audit file. |
+| TX225 | Audit File Export (SAF-T style) | Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit - the GL audit file. |

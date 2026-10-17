@@ -25,7 +25,7 @@ public readonly record struct PayrollRunResult(int PayslipCount, decimal TotalGr
 
 /// <summary>
 /// Payroll (brief §4.15.6). Calculates pay from configured, formula-driven pay elements (transparent and
-/// reproducible) and commits a run — producing immutable payslips and a single balanced GL journal
+/// reproducible) and commits a run - producing immutable payslips and a single balanced GL journal
 /// (Dr earning expenses, Cr statutory/deduction liabilities, Cr net pay) through the central engine.
 /// </summary>
 public interface IPayrollService
@@ -54,8 +54,8 @@ public interface IPayrollService
 
     /// <summary>
     /// Runs and commits one pay group's payroll (brief §4.15.6: monthly staff, weekly wages and casuals run independently): only active
-    /// employees in the group are paid, and the period guard applies per group. A blank group is the default payroll — employees with
-    /// no pay group — which is what <see cref="RunAsync"/> runs.
+    /// employees in the group are paid, and the period guard applies per group. A blank group is the default payroll - employees with
+    /// no pay group - which is what <see cref="RunAsync"/> runs.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="payGroup">The pay group (blank for the default payroll).</param>

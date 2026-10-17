@@ -28,7 +28,7 @@ public sealed record BackOrderLine(long SalesOrderId, string OrderNumber, DateOn
 
 /// <summary>
 /// Stock availability (brief §4.2/§4.13): what is free to promise after open sales-order commitments, and
-/// the back-order book — every undespatched order line with whether stock on hand can fulfil it, allocating
+/// the back-order book - every undespatched order line with whether stock on hand can fulfil it, allocating
 /// on-hand to back-orders oldest-first so the view is honest about who gets served.
 /// </summary>
 public interface IStockAvailabilityService

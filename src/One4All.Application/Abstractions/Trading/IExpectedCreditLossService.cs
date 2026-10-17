@@ -26,7 +26,7 @@ public sealed record EclPostingResult(EclReport Report, string? JournalNumber);
 
 /// <summary>
 /// The IFRS 9 expected credit loss allowance on trade receivables (brief §4.5), simplified approach: receivables as at
-/// the date — each customer's unallocated receipts and credit notes set against their oldest debts first — are banded by
+/// the date - each customer's unallocated receipts and credit notes set against their oldest debts first - are banded by
 /// days past due and provided at the matrix rates. The allowance sits on a contra-receivables account; posting adjusts
 /// it to the target against bad-debt expense, so a repeat posts nothing and collections release it.
 /// </summary>

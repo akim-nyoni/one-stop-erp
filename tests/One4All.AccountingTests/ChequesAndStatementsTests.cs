@@ -88,11 +88,11 @@ public sealed class ChequesAndStatementsTests
             return Encoding.UTF8.GetString(rendered.Value.Content);
         }
 
-        (await Render("CB75")).Should().Contain("CHQ,001,2025-08-01,Supplier A,PAY-1,Stale,2025-08-01,242,,100").And.Contain("CHQ,002,2026-03-05,Supplier B,—,Presented,2026-03-10,—,,200")
-            .And.Contain("CHQ,003,2026-03-06,(void),—,Voided,2026-03-06,—,Spoilt,0").And.Contain("CHQ,004,2026-03-20,Supplier C,—,Cancelled,2026-03-25,—,Lost in post,50");
+        (await Render("CB75")).Should().Contain("CHQ,001,2025-08-01,Supplier A,PAY-1,Stale,2025-08-01,242,,100").And.Contain("CHQ,002,2026-03-05,Supplier B,-,Presented,2026-03-10,-,,200")
+            .And.Contain("CHQ,003,2026-03-06,(void),-,Voided,2026-03-06,-,Spoilt,0").And.Contain("CHQ,004,2026-03-20,Supplier C,-,Cancelled,2026-03-25,-,Lost in post,50");
         (await Render("CB76")).Should().Contain("MOMO Mobile Wallet,150.00,130.00,150.00,130.00,0");
         string recon = await Render("AP61");
-        recon.Should().Contain("Supplier S,Balances at 2026-03-31,—,420.00,500.00,-80").And.Contain("Supplier S,On their statement only,INV-3,120.00,—,0")
-            .And.Contain("Supplier S,In our ledger only,INV-2,—,200.00,0").And.NotContain("Amount differs");
+        recon.Should().Contain("Supplier S,Balances at 2026-03-31,-,420.00,500.00,-80").And.Contain("Supplier S,On their statement only,INV-3,120.00,-,0")
+            .And.Contain("Supplier S,In our ledger only,INV-2,-,200.00,0").And.NotContain("Amount differs");
     }
 }

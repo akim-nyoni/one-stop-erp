@@ -12,7 +12,7 @@ namespace One4All.Infrastructure.Schools;
 
 /// <summary>
 /// School fee billing (brief §4.11). Resolves a fee structure's compulsory total, applies each student's
-/// bursary, and raises the net on the guardian/sponsor account through the central AR ledger — so fees
+/// bursary, and raises the net on the guardian/sponsor account through the central AR ledger - so fees
 /// age, reconcile and appear on the guardian statement like any receivable.
 /// </summary>
 public sealed class SchoolBillingService : ISchoolBillingService
@@ -209,7 +209,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             siblingPercent = SiblingDiscount.PercentFor(rules, ordinal);
         }
 
-        // A staff member's child takes the staff discount while the parent is employed — the better of it and the sibling discount.
+        // A staff member's child takes the staff discount while the parent is employed - the better of it and the sibling discount.
         decimal staffPercent = 0m;
         if (student.StaffEmployeeId is long parent && company.StaffChildDiscountPercent > 0m
             && await _db.Employees.AnyAsync(e => e.Id == parent && e.Status != Core.Payroll.EmployeeStatus.Terminated, ct).ConfigureAwait(false))
@@ -248,7 +248,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             TaxAmount = 0m,
             SalesAccountCode = structure.DefersIncome ? structure.DeferredIncomeAccountCode! : structure.RevenueAccountCode,
             RevenueLines = revenue,
-            Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber})" + (share < 1m ? FormattableString.Invariant($" [{share:P0} of term]") : string.Empty),
+            Narrative = $"{structure.Term} fees - {student.FullName} ({student.AdmissionNumber})" + (share < 1m ? FormattableString.Invariant($" [{share:P0} of term]") : string.Empty),
         }, ct).ConfigureAwait(false);
 
         if (posted.IsFailure)
@@ -260,7 +260,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
         {
             // Fees paid in advance are earned over the term (IFRS 15): billed to deferred income, recognised by the
             // deferred income run.
-            _db.Set<DeferredIncomeSchedule>().Add(new DeferredIncomeSchedule(company.Id, invoiceNumber, $"{structure.Term} fees — {student.FullName}",
+            _db.Set<DeferredIncomeSchedule>().Add(new DeferredIncomeSchedule(company.Id, invoiceNumber, $"{structure.Term} fees - {student.FullName}",
                 structure.DeferredIncomeAccountCode!, structure.RevenueAccountCode, net, structure.TermStart!.Value, structure.TermEnd!.Value));
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
@@ -367,7 +367,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
                 {
                     CompanyId = companyId, CustomerId = invoice!.TraderId, DocumentNumber = creditNumber, DocumentDate = leftOn, Currency = company.BaseCurrency, NetAmount = credit,
                     SalesAccountCode = structure.DefersIncome ? structure.DeferredIncomeAccountCode! : structure.RevenueAccountCode,
-                    Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber}) [left {leftOn:yyyy-MM-dd}]",
+                    Narrative = $"{structure.Term} fees - {student.FullName} ({student.AdmissionNumber}) [left {leftOn:yyyy-MM-dd}]",
                 }, ct).ConfigureAwait(false);
                 if (posted.IsFailure)
                 {
@@ -416,7 +416,7 @@ public sealed class SchoolBillingService : ISchoolBillingService
             Result<TradingPostingResult> posted = await _salesLedger.PostInvoiceAsync(new SalesInvoiceRequest
             {
                 CompanyId = company.Id, CustomerId = student.PayerCustomerId, DocumentNumber = invoiceNumber + suffix, DocumentDate = date, Currency = company.BaseCurrency, NetAmount = fee, TaxAmount = 0m,
-                SalesAccountCode = account, Narrative = $"{structure.Term} fees — {student.FullName} ({student.AdmissionNumber}) [{tag}]",
+                SalesAccountCode = account, Narrative = $"{structure.Term} fees - {student.FullName} ({student.AdmissionNumber}) [{tag}]",
             }, ct).ConfigureAwait(false);
             if (posted.IsFailure)
             {

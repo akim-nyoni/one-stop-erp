@@ -15,7 +15,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the multi-currency tax split (PR35): earnings paid in a second currency are converted at the pay date's rate, and the tax is
-/// apportioned from the base table by share — or computed on the currency's own table once one is in force.
+/// apportioned from the base table by share - or computed on the currency's own table once one is in force.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class PayrollCurrencySplitTests

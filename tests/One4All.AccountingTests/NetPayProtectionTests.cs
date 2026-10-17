@@ -15,7 +15,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers net-pay protection: deductions that would take net pay below the minimum take-home (an amount or a percentage of gross) are
-/// suspended — highest suspension priority first, statutory deductions never — carried forward as arrears, recovered when pay allows,
+/// suspended - highest suspension priority first, statutory deductions never - carried forward as arrears, recovered when pay allows,
 /// undone by a run reversal, and listed in PR71.
 /// </summary>
 [Collection(AccountingCollection.Name)]
@@ -72,7 +72,7 @@ public sealed class NetPayProtectionTests
         await db.SaveChangesAsync();
         (await Run(3)).TotalNet.Should().Be(1500m - 150m - 150m - 450m);
 
-        // April: a 70%-of-gross floor (1,050) suspends 100 of the loan again — then the run is reversed and so are its arrears.
+        // April: a 70%-of-gross floor (1,050) suspends 100 of the loan again - then the run is reversed and so are its arrears.
         company.MinimumTakeHomeAmount = null;
         company.MinimumTakeHomePercent = 70m;
         await db.SaveChangesAsync();

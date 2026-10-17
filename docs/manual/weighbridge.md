@@ -37,7 +37,7 @@ The list beside the form shows: Tickets still on the bridge.
 
 ### Second weigh (complete a ticket)
 
-Completes the ticket: net weight, haulage by zone and — for an outbound load from a stockpile — the stock issue.
+Completes the ticket: net weight, haulage by zone and - for an outbound load from a stockpile - the stock issue.
 
 | Field | Required | Notes |
 | --- | --- | --- |

@@ -49,7 +49,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
         };
     }
 
-    // The common parameters of the run in progress (branch, cost centre, department, unposted) — set at the start of each GetRowsAsync.
+    // The common parameters of the run in progress (branch, cost centre, department, unposted) - set at the start of each GetRowsAsync.
     private Application.Reporting.ReportCommonParameters _common = Application.Reporting.ReportCommonParameters.None;
 
     // Journal lines narrowed to the branch, cost centre and department asked for, and drafts and deferred journals counted when unposted ones are wanted.
@@ -157,8 +157,8 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FullyDepreciatedAsync(long companyId, CancellationToken ct)
         => [.. (await _db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == companyId && a.Status == FixedAssetStatus.FullyDepreciated).OrderBy(a => a.AssetNumber).ToListAsync(ct).ConfigureAwait(false))
-            .Select(a => Row(("Asset", a.AssetNumber), ("Description", a.Description), ("Class", a.AssetClass), ("Acquired", Date(a.AcquisitionDate)), ("Location", a.Location ?? "—"),
-                ("Custodian", a.Custodian ?? "—"), ("Cost", a.Cost)))];
+            .Select(a => Row(("Asset", a.AssetNumber), ("Description", a.Description), ("Class", a.AssetClass), ("Acquired", Date(a.AcquisitionDate)), ("Location", a.Location ?? "-"),
+                ("Custodian", a.Custodian ?? "-"), ("Cost", a.Cost)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VatDetailAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
         => [.. (await Posted(companyId, fromDate, toDate).Where(l => l.TaxCode != null).ToListAsync(ct).ConfigureAwait(false))
@@ -205,19 +205,19 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
                 if (c != 0m || p != 0m)
                 {
                     string notes = string.Join(", ", line.Select(a => a.NoteReference).Where(n => n != null).Distinct().Order(StringComparer.Ordinal));
-                    rows.Add(Row(("Statement", statement), ("Line", $"{line.Key.Type}: {line.Key.ReportCategory}"), ("Note", notes.Length == 0 ? "—" : notes), ("Prior", Money(p)), ("Current", c)));
+                    rows.Add(Row(("Statement", statement), ("Line", $"{line.Key.Type}: {line.Key.ReportCategory}"), ("Note", notes.Length == 0 ? "-" : notes), ("Prior", Money(p)), ("Current", c)));
                 }
             }
         }
 
-        Section("Financial position — assets", [AccountType.Asset], closing, priorClosing, creditNatural: false);
-        Section("Financial position — liabilities", [AccountType.Liability], closing, priorClosing, creditNatural: true);
-        Section("Financial position — equity", [AccountType.Equity], closing, priorClosing, creditNatural: true);
+        Section("Financial position - assets", [AccountType.Asset], closing, priorClosing, creditNatural: false);
+        Section("Financial position - liabilities", [AccountType.Liability], closing, priorClosing, creditNatural: true);
+        Section("Financial position - equity", [AccountType.Equity], closing, priorClosing, creditNatural: true);
         decimal Earnings(Dictionary<string, decimal> balances) => -accounts.Where(a => a.Type is AccountType.Income or AccountType.Expense).Sum(a => balances.GetValueOrDefault(a.AccountCode));
-        rows.Add(Row(("Statement", "Financial position — equity"), ("Line", "Retained earnings not yet closed"), ("Note", "—"), ("Prior", Money(Earnings(priorClosing))), ("Current", Earnings(closing))));
-        Section("Profit or loss — income", [AccountType.Income], year, priorYear, creditNatural: true);
-        Section("Profit or loss — expenses", [AccountType.Expense], year, priorYear, creditNatural: false);
-        rows.Add(Row(("Statement", "Profit or loss"), ("Line", "Profit for the year"), ("Note", "—"), ("Prior", Money(Earnings(priorYear))), ("Current", Earnings(year))));
+        rows.Add(Row(("Statement", "Financial position - equity"), ("Line", "Retained earnings not yet closed"), ("Note", "-"), ("Prior", Money(Earnings(priorClosing))), ("Current", Earnings(closing))));
+        Section("Profit or loss - income", [AccountType.Income], year, priorYear, creditNatural: true);
+        Section("Profit or loss - expenses", [AccountType.Expense], year, priorYear, creditNatural: false);
+        rows.Add(Row(("Statement", "Profit or loss"), ("Line", "Profit for the year"), ("Note", "-"), ("Prior", Money(Earnings(priorYear))), ("Current", Earnings(year))));
         return rows;
     }
 
@@ -293,7 +293,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             decimal spent = p.Costs.Where(c => c.Date <= toDate).Sum(c => c.Amount);
             return Row(("Project", p.Code), ("Name", p.Name), ("Opened", Date(p.OpenedOn)), ("Status", capitalisedInPeriod ? $"Capitalised {assets.GetValueOrDefault(p.AssetId ?? 0, "?")}" : "In progress"),
                 ("Budget", Money(p.Budget)), ("Opening", Money(opening)), ("Added", Money(added)), ("Capitalised", Money(capitalised)),
-                ("Spent", p.Budget == 0m ? "—" : (spent * 100m / p.Budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Closing", opening + added - capitalised));
+                ("Spent", p.Budget == 0m ? "-" : (spent * 100m / p.Budget).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Closing", opening + added - capitalised));
         })];
     }
 
@@ -311,8 +311,8 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
                 AssetCountResult.FoundElsewhere => "Found elsewhere",
                 _ => l.Result.ToString(),
             };
-            return Row(("Count", c.CountNumber), ("Date", Date(c.Date)), ("Asset", l.Tag), ("Description", asset?.Description ?? "Not on the register"), ("Expected", l.ExpectedLocation ?? "—"),
-                ("Found", l.FoundLocation ?? "—"), ("Condition", l.Condition ?? string.Empty), ("Result", result),
+            return Row(("Count", c.CountNumber), ("Date", Date(c.Date)), ("Asset", l.Tag), ("Description", asset?.Description ?? "Not on the register"), ("Expected", l.ExpectedLocation ?? "-"),
+                ("Found", l.FoundLocation ?? "-"), ("Condition", l.Condition ?? string.Empty), ("Result", result),
                 ("Nbv", l.Result is AssetCountResult.Missing or AssetCountResult.NotSeen ? asset?.NetBookValue ?? 0m : 0m));
         }))];
     }
@@ -347,9 +347,9 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             issues.RemoveAll(i => i.Length == 0);
             if (issues.Count > 0)
             {
-                rows.Add(Row(("Asset", asset.AssetNumber), ("Description", asset.Description), ("Insurer", string.Join(" ", new[] { asset.Insurer, asset.PolicyNumber }.Where(x => !string.IsNullOrEmpty(x))) is { Length: > 0 } p ? p : "—"),
-                    ("InsuranceExpiry", asset.InsuranceExpiry is DateOnly i ? Date(i) : "—"), ("WarrantyExpiry", asset.WarrantyExpiry is DateOnly w ? Date(w) : "—"), ("Issue", string.Join("; ", issues)),
-                    ("Insured", asset.InsuredValue is decimal v ? Money(v) : "—"), ("Nbv", asset.NetBookValue)));
+                rows.Add(Row(("Asset", asset.AssetNumber), ("Description", asset.Description), ("Insurer", string.Join(" ", new[] { asset.Insurer, asset.PolicyNumber }.Where(x => !string.IsNullOrEmpty(x))) is { Length: > 0 } p ? p : "-"),
+                    ("InsuranceExpiry", asset.InsuranceExpiry is DateOnly i ? Date(i) : "-"), ("WarrantyExpiry", asset.WarrantyExpiry is DateOnly w ? Date(w) : "-"), ("Issue", string.Join("; ", issues)),
+                    ("Insured", asset.InsuredValue is decimal v ? Money(v) : "-"), ("Nbv", asset.NetBookValue)));
             }
         }
 
@@ -364,8 +364,8 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
         string Number(long id) => assets.GetValueOrDefault(id)?.AssetNumber ?? "?";
         string Name(long id) => assets.GetValueOrDefault(id)?.Description ?? "?";
         return [.. plans.Select(p => Row(("Section", "Schedule"), ("Asset", Number(p.AssetId)), ("Description", Name(p.AssetId)), ("Task", $"{p.Description} (every {p.IntervalMonths} months)"),
-                ("LastDone", p.LastDone is DateOnly d ? Date(d) : "—"), ("NextDue", Date(p.NextDue)), ("Status", p.NextDue < asAt ? "Overdue" : p.NextDue <= asAt.AddDays(30) ? "Due soon" : "Planned"), ("Cost", 0m))),
-            .. history.Select(m => Row(("Section", "History"), ("Asset", Number(m.AssetId)), ("Description", Name(m.AssetId)), ("Task", m.Description), ("LastDone", Date(m.Date)), ("NextDue", m.Provider ?? "—"),
+                ("LastDone", p.LastDone is DateOnly d ? Date(d) : "-"), ("NextDue", Date(p.NextDue)), ("Status", p.NextDue < asAt ? "Overdue" : p.NextDue <= asAt.AddDays(30) ? "Due soon" : "Planned"), ("Cost", 0m))),
+            .. history.Select(m => Row(("Section", "History"), ("Asset", Number(m.AssetId)), ("Description", Name(m.AssetId)), ("Task", m.Description), ("LastDone", Date(m.Date)), ("NextDue", m.Provider ?? "-"),
                 ("Status", "Done"), ("Cost", m.Cost)))];
     }
 

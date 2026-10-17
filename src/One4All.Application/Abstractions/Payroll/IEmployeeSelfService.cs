@@ -49,8 +49,8 @@ public sealed record SelfServiceRequest(string Kind, long Id, string EmployeeNum
 
 /// <summary>
 /// Employee self-service (brief §4.15.7): the signed-in user's own payslips, tax certificate and leave, and leave applications and
-/// detail changes that wait for HR. Everything is found through the user's employee record — never an employee id supplied by the
-/// caller — and HR decisions are maker-checker: nobody decides their own request.
+/// detail changes that wait for HR. Everything is found through the user's employee record - never an employee id supplied by the
+/// caller - and HR decisions are maker-checker: nobody decides their own request.
 /// </summary>
 public interface IEmployeeSelfService
 {

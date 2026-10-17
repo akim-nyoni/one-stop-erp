@@ -92,7 +92,7 @@ public sealed class EmployeeGrievance : AuditableEntity, ICompanyScoped
     }
 }
 
-/// <summary>Company property issued to an employee (<c>hr.asset_issue</c>): laptop, phone, keys, uniform, tools — to be returned when they leave.</summary>
+/// <summary>Company property issued to an employee (<c>hr.asset_issue</c>): laptop, phone, keys, uniform, tools - to be returned when they leave.</summary>
 public sealed class EmployeeAssetIssue : AuditableEntity, ICompanyScoped
 {
     private EmployeeAssetIssue() => Description = string.Empty;

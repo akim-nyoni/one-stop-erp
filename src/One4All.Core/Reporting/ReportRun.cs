@@ -14,13 +14,13 @@ public enum ReportRunPurpose
     /// <summary>Exported to a file.</summary>
     Export = 3,
 
-    /// <summary>Printed again — the same report with the same parameters had been printed before.</summary>
+    /// <summary>Printed again - the same report with the same parameters had been printed before.</summary>
     Reprint = 4,
 }
 
 /// <summary>
 /// One run of a report (<c>rpt.report_run</c>): who ran which report with which parameters, for what, the document's size
-/// and SHA-256 fingerprint, and — for prints — which copy it was. Append-only.
+/// and SHA-256 fingerprint, and - for prints - which copy it was. Append-only.
 /// </summary>
 public sealed class ReportRun : Entity, ICompanyScoped
 {

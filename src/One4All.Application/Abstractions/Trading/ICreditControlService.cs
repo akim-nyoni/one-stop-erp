@@ -36,7 +36,7 @@ public sealed record CreditReviewResult(DateOnly AsAt, int OverdueToleranceDays,
 /// <summary>
 /// Credit control (brief §4.5): the periodic review that places customers on stop, and the controlled
 /// release. A held customer is refused new sales orders and invoices until released; the review never
-/// releases anyone — that is a deliberate human decision.
+/// releases anyone - that is a deliberate human decision.
 /// </summary>
 public interface ICreditControlService
 {

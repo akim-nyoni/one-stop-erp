@@ -14,7 +14,7 @@ public sealed record ClockDay(string EmployeeNumber, DateOnly Date, TimeOnly Clo
 }
 
 /// <summary>
-/// Reads a time-clock export (brief §4.15 clock import): one punch a line — badge, then the date and time ("E001,2026-05-04 07:58") — and pairs
+/// Reads a time-clock export (brief §4.15 clock import): one punch a line - badge, then the date and time ("E001,2026-05-04 07:58") - and pairs
 /// each employee's punches into days, the first punch in and the last out. Lines that cannot be read are reported, not guessed. Pure.
 /// </summary>
 public static class ClockPunches

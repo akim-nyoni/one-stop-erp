@@ -86,8 +86,8 @@ public sealed record BillingRunLineView(long PropertyId, string StandNumber, str
 
 /// <summary>
 /// The reviewed billing run (brief §4.9): propose bills for a service, month and ward without posting, with an exception
-/// report (already billed, nothing to bill, failed, large change against the last bill); leave lines out; approve — by
-/// someone other than the proposer — to post every included bill in one unit; or cancel before posting and run again.
+/// report (already billed, nothing to bill, failed, large change against the last bill); leave lines out; approve - by
+/// someone other than the proposer - to post every included bill in one unit; or cancel before posting and run again.
 /// </summary>
 public interface IBillingRunService
 {
@@ -172,7 +172,7 @@ public interface IBillingRunService
     Task<Result<BillSmsDespatch>> SmsBillsAsync(long companyId, string runNumber, string templateCode, string language, CancellationToken ct = default);
 
     /// <summary>
-    /// Prints a posted run's bills in one document, one ratepayer statement per page in stand order (brief §4.9 bulk bill print) — all of them, or only the
+    /// Prints a posted run's bills in one document, one ratepayer statement per page in stand order (brief §4.9 bulk bill print) - all of them, or only the
     /// ratepayers without an email address (the ones emailing did not reach).
     /// </summary>
     /// <param name="companyId">The council.</param>

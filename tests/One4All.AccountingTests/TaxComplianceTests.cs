@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers tax compliance: exemption certificates stop tax being charged and are required for exempt invoicing, with expiry warnings; and
-/// the VAT return on each basis — invoice date (the ledger), tax point (an invoice delivered last period moved there), and cash accounting
+/// the VAT return on each basis - invoice date (the ledger), tax point (an invoice delivered last period moved there), and cash accounting
 /// (invoice VAT due only as it is paid, part payments releasing their share).
 /// </summary>
 [Collection(AccountingCollection.Name)]

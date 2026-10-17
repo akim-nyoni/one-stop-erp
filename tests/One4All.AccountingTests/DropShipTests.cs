@@ -11,7 +11,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// Covers drop-shipment: the supplier sends order lines straight to the customer — never more than is left to send — and its confirmed
+/// Covers drop-shipment: the supplier sends order lines straight to the customer - never more than is left to send - and its confirmed
 /// delivery puts the supplier's invoice to cost of sales and makes the lines invoiceable, with no stock movement.
 /// </summary>
 [Collection(AccountingCollection.Name)]

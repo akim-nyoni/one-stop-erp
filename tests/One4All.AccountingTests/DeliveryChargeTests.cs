@@ -70,7 +70,7 @@ public sealed class DeliveryChargeTests
         (await charges.InvoiceAsync(companyId, "DC-D1", "DC-INV-1B", new DateOnly(2026, 3, 6), "4000", null, null)).Error.Code.Should().Be("Sop.DeliveryCharged");
         (await db.OpenItems.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.DocumentNumber == "DC-INV-1")).OriginalBase.Should().Be(108m);
 
-        // 200 bags are worth 1,600 — above the 1,000 free-delivery value.
+        // 200 bags are worth 1,600 - above the 1,000 free-delivery value.
         (await charges.QuoteAsync(companyId, "DC-D2")).Value.Charge.Should().Be(0m);
         (await charges.InvoiceAsync(companyId, "DC-D2", "DC-INV-2", new DateOnly(2026, 3, 6), "4000", null, null)).Error.Code.Should().Be("Sop.FreeDelivery");
     }

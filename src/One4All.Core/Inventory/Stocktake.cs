@@ -5,10 +5,10 @@ namespace One4All.Core.Inventory;
 /// <summary>The state of a stocktake session.</summary>
 public enum StocktakeStatus
 {
-    /// <summary>Being counted — the on-hand snapshot is frozen and counts are being captured.</summary>
+    /// <summary>Being counted - the on-hand snapshot is frozen and counts are being captured.</summary>
     Draft = 0,
 
-    /// <summary>Posted — variances have been adjusted into stock and the session is closed.</summary>
+    /// <summary>Posted - variances have been adjusted into stock and the session is closed.</summary>
     Posted = 1,
 }
 

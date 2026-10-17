@@ -5,7 +5,7 @@ namespace One4All.Application.Abstractions.Trading;
 
 /// <summary>
 /// Receivables control accounts beyond the company's main one (its lowest-numbered receivables control): a customer can post to a dedicated
-/// control — instalment debtors per tenure type (brief §4.10.9) — and the control reconciliation then matches each control to its own customers.
+/// control - instalment debtors per tenure type (brief §4.10.9) - and the control reconciliation then matches each control to its own customers.
 /// </summary>
 public interface IReceivableControlService
 {

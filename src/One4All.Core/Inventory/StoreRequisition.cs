@@ -23,7 +23,7 @@ public enum StoreRequisitionStatus
 
 /// <summary>
 /// An internal store requisition voucher (<c>inv.store_requisition</c>, brief §4.8.4): a department asks the store for
-/// goods for its own use; once a different user approves, the store issues against it — in part or in full — charging
+/// goods for its own use; once a different user approves, the store issues against it - in part or in full - charging
 /// the department's expense account and cost centre, each issue under its own issue note number.
 /// </summary>
 public sealed class StoreRequisition : AuditableEntity, ICompanyScoped

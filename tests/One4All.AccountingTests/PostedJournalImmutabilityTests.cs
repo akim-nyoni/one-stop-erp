@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the database guard on posted journals: editing an amount or account on a posted line, deleting a
-/// posted line or journal, or rewriting a posted journal's narrative or date is refused by trigger — while a
+/// posted line or journal, or rewriting a posted journal's narrative or date is refused by trigger - while a
 /// deferred journal can still be released and a posted one can still be reversed.
 /// </summary>
 [Collection(AccountingCollection.Name)]

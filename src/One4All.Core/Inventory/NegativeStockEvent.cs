@@ -3,7 +3,7 @@ using One4All.Core.Common;
 namespace One4All.Core.Inventory;
 
 /// <summary>
-/// Stock issued with none (or not enough) on hand (<c>inv.negative_stock_event</c>, brief §3.6): how much went short, why and who allowed it —
+/// Stock issued with none (or not enough) on hand (<c>inv.negative_stock_event</c>, brief §3.6): how much went short, why and who allowed it -
 /// and, once a receipt covers it, the cost correction posted.
 /// </summary>
 public sealed class NegativeStockEvent : Entity, ICompanyScoped

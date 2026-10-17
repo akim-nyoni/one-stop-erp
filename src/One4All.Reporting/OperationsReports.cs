@@ -90,7 +90,7 @@ public static class OperationsReports
         yield return Listing("SO137", "Open Sales Orders & Allocation", "SalesOrders", "Open order lines with what is outstanding to despatch and the free stock that can cover it.",
             "OpsOpenOrders", [new Column("Order", "Order", 85), new Column("Date", "Date", 75), new Column("Customer", "Customer", 140), new Column("Item", "Item", 150), new Column("Ordered", "Ordered", 60),
              new Column("Despatched", "Despatched", 70), new Column("Outstanding", "Outstanding", 70), new Column("Free", "Free stock", 70), new Column("Cover", "Cover", 80), new Column("Value", "Outstanding value", 95, true)], []);
-        yield return Listing("SO140", "Despatch / Delivery Performance (OTIF)", "SalesOrders", "Orders due in the period: requested date, what was ordered and what was signed for by then — on time, in full and OTIF.",
+        yield return Listing("SO140", "Despatch / Delivery Performance (OTIF)", "SalesOrders", "Orders due in the period: requested date, what was ordered and what was signed for by then - on time, in full and OTIF.",
             "OpsOtif", [new Column("Order", "Order", 90), new Column("Customer", "Customer", 140), new Column("Requested", "Requested", 75), new Column("Ordered", "Ordered", 60), new Column("OnTimeQty", "Delivered by date", 90),
              new Column("LastDelivered", "Last delivered", 80), new Column("OnTime", "On time", 55), new Column("InFull", "In full", 55), new Column("Otif", "OTIF", 45)], [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         yield return Listing("SO141", "Proof of Delivery Outstanding", "SalesOrders", "Delivery notes despatched by the date that have not been signed for, oldest first.",

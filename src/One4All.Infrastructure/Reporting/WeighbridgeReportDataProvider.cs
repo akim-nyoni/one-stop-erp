@@ -64,7 +64,7 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
     {
         List<WeighbridgeTicket> tickets = [.. (await TicketListAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(t => t.IsComplete)];
         Dictionary<long, string> customers = await CustomersAsync(companyId, ct).ConfigureAwait(false);
-        return [.. tickets.GroupBy(t => (t.Date, t.Product, Customer: t.CustomerId is long c ? customers.GetValueOrDefault(c, "?") : "—", t.VehicleRegistration, Driver: t.DriverName ?? "—"))
+        return [.. tickets.GroupBy(t => (t.Date, t.Product, Customer: t.CustomerId is long c ? customers.GetValueOrDefault(c, "?") : "-", t.VehicleRegistration, Driver: t.DriverName ?? "-"))
             .OrderBy(g => g.Key.Date).ThenBy(g => g.Key.Product, StringComparer.Ordinal).ThenBy(g => g.Key.Customer, StringComparer.Ordinal).ThenBy(g => g.Key.VehicleRegistration, StringComparer.Ordinal)
             .Select(g => Row(("Date", Date(g.Key.Date)), ("Product", g.Key.Product), ("Customer", g.Key.Customer), ("Vehicle", g.Key.VehicleRegistration), ("Driver", g.Key.Driver), ("Loads", g.Count()),
                 ("Cubic", Qty(g.Sum(t => t.NetCubicMetres))), ("Tonnes", g.Sum(t => t.NetTonnes))))];
@@ -78,8 +78,8 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
         {
             WeighbridgeVehicle? vehicle = register.GetValueOrDefault(g.Key);
             List<int> minutes = [.. g.Select(t => WeighbridgeRules.TurnaroundMinutes(t.TimeInUtc, t.TimeOutUtc)).Where(m => m.HasValue).Select(m => m!.Value)];
-            return Row(("Vehicle", g.Key), ("Haulier", vehicle?.Haulier ?? "—"), ("Loads", g.Count(t => t.IsComplete)), ("Average", minutes.Count == 0 ? "—" : Math.Round(minutes.Average()).ToString(CultureInfo.InvariantCulture)),
-                ("Longest", minutes.Count == 0 ? "—" : minutes.Max().ToString(CultureInfo.InvariantCulture)), ("Open", g.Count(t => !t.IsComplete)),
+            return Row(("Vehicle", g.Key), ("Haulier", vehicle?.Haulier ?? "-"), ("Loads", g.Count(t => t.IsComplete)), ("Average", minutes.Count == 0 ? "-" : Math.Round(minutes.Average()).ToString(CultureInfo.InvariantCulture)),
+                ("Longest", minutes.Count == 0 ? "-" : minutes.Max().ToString(CultureInfo.InvariantCulture)), ("Open", g.Count(t => !t.IsComplete)),
                 ("Overloads", vehicle?.MaxGrossKg is decimal max ? g.Count(t => t.IsComplete && t.GrossWeightKg > max) : 0), ("Tonnes", g.Sum(t => t.NetTonnes)));
         })];
     }
@@ -88,7 +88,7 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
     {
         List<WeighbridgeTicket> tickets = [.. (await TicketListAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(t => t.IsComplete && t.Direction == WeighDirection.Outbound)];
         Dictionary<long, string> customers = await CustomersAsync(companyId, ct).ConfigureAwait(false);
-        return [.. tickets.GroupBy(t => (Customer: t.CustomerId is long c ? customers.GetValueOrDefault(c, "?") : "Cash / walk-in", Site: t.SiteName ?? "—"))
+        return [.. tickets.GroupBy(t => (Customer: t.CustomerId is long c ? customers.GetValueOrDefault(c, "?") : "Cash / walk-in", Site: t.SiteName ?? "-"))
             .OrderBy(g => g.Key.Customer, StringComparer.Ordinal).ThenBy(g => g.Key.Site, StringComparer.Ordinal)
             .Select(g => Row(("Customer", g.Key.Customer), ("Site", g.Key.Site), ("Loads", g.Count()), ("Tonnes", Qty(g.Sum(t => t.NetTonnes))), ("Cubic", Qty(g.Sum(t => t.NetCubicMetres))),
                 ("Haulage", g.Sum(t => t.HaulageCharge))))];
@@ -98,7 +98,7 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
     {
         List<WeighbridgeTicket> tickets = [.. (await TicketListAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).Where(t => t.IsManualWeight)];
         Dictionary<long, string> users = await UsersAsync(ct).ConfigureAwait(false);
-        string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "-";
         return [.. tickets.Select(t => Row(("Ticket", t.TicketNumber), ("Date", Date(t.Date)), ("Vehicle", t.VehicleRegistration), ("Operator", User(t.OperatorUserId)), ("AuthorisedBy", User(t.ManualAuthorisedByUserId)),
             ("Reason", t.ManualReason ?? string.Empty), ("Net", t.NetTonnes)))];
     }
@@ -157,13 +157,13 @@ public sealed class WeighbridgeReportDataProvider : IReportDataProvider
         {
             decimal tonneKm = g.Sum(t => t.NetTonnes * (t.DistanceKm ?? 0m)), charge = g.Sum(t => t.HaulageCharge);
             return Row(("Zone", g.Key), ("Name", zones.GetValueOrDefault(g.Key, "?")), ("Loads", g.Count()), ("Tonnes", Qty(g.Sum(t => t.NetTonnes))), ("Km", Qty(g.Sum(t => t.DistanceKm ?? 0m))),
-                ("PerTonneKm", tonneKm == 0m ? "—" : Math.Round(charge / tonneKm, 4).ToString("0.####", CultureInfo.InvariantCulture)), ("Charge", charge));
+                ("PerTonneKm", tonneKm == 0m ? "-" : Math.Round(charge / tonneKm, 4).ToString("0.####", CultureInfo.InvariantCulture)), ("Charge", charge));
         })];
     }
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
 
-    private static string Time(DateTimeOffset? at) => at is { } t ? t.ToString("HH:mm", CultureInfo.InvariantCulture) : "—";
+    private static string Time(DateTimeOffset? at) => at is { } t ? t.ToString("HH:mm", CultureInfo.InvariantCulture) : "-";
 
     private static string Qty(decimal quantity) => quantity.ToString("0.###", CultureInfo.InvariantCulture);
 

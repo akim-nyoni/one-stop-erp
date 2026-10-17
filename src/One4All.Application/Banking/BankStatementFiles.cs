@@ -150,7 +150,7 @@ public static partial class OfxParser
 /// <summary>
 /// Reads ISO 20022 camt.053 statements: each <c>Ntry</c> (entry) with its amount, credit / debit indicator, booking
 /// date (else value date), reference (end-to-end id, else the bank's reference) and remittance / additional information.
-/// Any camt.053 version is accepted — elements are matched by local name. Pure and unit-tested.
+/// Any camt.053 version is accepted - elements are matched by local name. Pure and unit-tested.
 /// </summary>
 public static class Camt053Parser
 {

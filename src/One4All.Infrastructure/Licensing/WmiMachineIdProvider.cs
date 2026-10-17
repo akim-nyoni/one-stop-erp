@@ -18,7 +18,7 @@ namespace One4All.Infrastructure.Licensing;
 /// </summary>
 public sealed class WmiMachineIdProvider : IMachineIdProvider
 {
-    // Values BIOS/board vendors leave as fillers — never distinctive, so they are dropped.
+    // Values BIOS/board vendors leave as fillers - never distinctive, so they are dropped.
     private static readonly HashSet<string> Placeholders = new(StringComparer.OrdinalIgnoreCase)
     {
         "", "0", "none", "n/a", "na", "default string", "to be filled by o.e.m.",

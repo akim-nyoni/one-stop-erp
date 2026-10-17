@@ -11,7 +11,7 @@ namespace One4All.Infrastructure.Inventory;
 
 /// <summary>
 /// Available-to-promise and the back-order book, read from stock balances, open sales-order lines and open
-/// purchase-order lines. Pure read model — nothing here moves stock.
+/// purchase-order lines. Pure read model - nothing here moves stock.
 /// </summary>
 public sealed class StockAvailabilityService : IStockAvailabilityService
 {

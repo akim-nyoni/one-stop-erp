@@ -16,8 +16,8 @@ public enum ParkedSaleStatus
 }
 
 /// <summary>
-/// A sale held part-way (<c>pos.parked_sale</c>, brief §4.1): its lines kept under a name, table or customer tag so it can be resumed —
-/// at any till — or discarded with a reason. Any number may be parked at once.
+/// A sale held part-way (<c>pos.parked_sale</c>, brief §4.1): its lines kept under a name, table or customer tag so it can be resumed -
+/// at any till - or discarded with a reason. Any number may be parked at once.
 /// </summary>
 public sealed class ParkedSale : Entity, ICompanyScoped
 {

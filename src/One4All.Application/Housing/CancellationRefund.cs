@@ -10,7 +10,7 @@ public sealed record RefundComputation(int MonthsOccupied, decimal OccupationRen
 /// <summary>
 /// The refund on cancelling an instalment agreement (brief §14 H53): what the buyer paid, less occupation rental for every
 /// month or part month from signing to cancellation, less the admin charge (a percentage of the cash price), less the
-/// instalments billed and unpaid — and nothing is refunded when those exceed what was paid. Pure and unit-tested.
+/// instalments billed and unpaid - and nothing is refunded when those exceed what was paid. Pure and unit-tested.
 /// </summary>
 public static class CancellationRefund
 {

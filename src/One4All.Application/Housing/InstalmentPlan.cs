@@ -43,7 +43,7 @@ public static class InstalmentPlan
 
     /// <summary>
     /// Builds an escalating schedule (brief §4.10.5 "escalation"): the instalment steps up by a percentage every twelve months, sized so the plan
-    /// still clears exactly — zero and flat plans spread the same total over the rising instalments; a reducing-balance plan charges interest
+    /// still clears exactly - zero and flat plans spread the same total over the rising instalments; a reducing-balance plan charges interest
     /// on the balance, which falls more slowly early on.
     /// </summary>
     /// <param name="principal">The amount financed.</param>

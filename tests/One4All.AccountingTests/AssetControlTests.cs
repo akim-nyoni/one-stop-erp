@@ -82,12 +82,12 @@ public sealed class AssetControlTests
         }
 
         string countNumber = (await db.AssetCounts.AsNoTracking().SingleAsync(c => c.Id == count)).CountNumber;
-        (await Render("FA210")).Should().Contain($"{countNumber},2026-03-15,ACL-PRN,Printer,HQ,—,,Missing,600").And.Contain("ACL-FRK,Forklift,Yard,HQ,Worn tyres,Found elsewhere,0")
-            .And.Contain("GHOST-1,Not on the register,—,HQ,,Unregistered,0").And.Contain("ACL-LAP,Laptop,HQ,HQ,Good,Found,0");
+        (await Render("FA210")).Should().Contain($"{countNumber},2026-03-15,ACL-PRN,Printer,HQ,-,,Missing,600").And.Contain("ACL-FRK,Forklift,Yard,HQ,Worn tyres,Found elsewhere,0")
+            .And.Contain("GHOST-1,Not on the register,-,HQ,,Unregistered,0").And.Contain("ACL-LAP,Laptop,HQ,HQ,Good,Found,0");
         string cover = await Render("FA213");
-        cover.Should().Contain("ACL-LAP,Laptop,Safe Ins P-1,2026-04-10,—,Insurance ends in 10 days; Under-insured,\"1,000.00\",1200")
-            .And.Contain("ACL-PRN,Printer,—,—,2026-03-01,Not insured; Warranty expired,—,600").And.NotContain("ACL-FRK");
-        (await Render("FA214")).Should().Contain("Schedule,ACL-LAP,Laptop,Clean (every 12 months),—,2026-04-15,Due soon,0")
+        cover.Should().Contain("ACL-LAP,Laptop,Safe Ins P-1,2026-04-10,-,Insurance ends in 10 days; Under-insured,\"1,000.00\",1200")
+            .And.Contain("ACL-PRN,Printer,-,-,2026-03-01,Not insured; Warranty expired,-,600").And.NotContain("ACL-FRK");
+        (await Render("FA214")).Should().Contain("Schedule,ACL-LAP,Laptop,Clean (every 12 months),-,2026-04-15,Due soon,0")
             .And.Contain("Schedule,ACL-FRK,Forklift,Service (every 6 months),2026-03-20,2026-09-20,Planned,0").And.Contain("History,ACL-FRK,Forklift,Service (planned),2026-03-20,Fix Co,Done,250");
     }
 }

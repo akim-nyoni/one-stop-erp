@@ -12,9 +12,6 @@ public sealed class InvoiceDisputeService : IInvoiceDisputeService
     private const string PriceMismatch = "Pop.PriceMismatch";
     private const string QuantityMismatch = "Pop.QuantityMismatch";
 
-    // Accepting a price dispute posts the invoice as presented, so the price check must let any difference through.
-    private const decimal AcceptAnyPrice = 1_000_000m;
-
     private readonly One4AllDbContext _db;
     private readonly IProcurementService _procurement;
 
@@ -91,7 +88,7 @@ public sealed class InvoiceDisputeService : IInvoiceDisputeService
             PurchaseOrderId = dispute.PurchaseOrderId,
             InvoiceNumber = dispute.InvoiceNumber,
             Date = dispute.InvoiceDate,
-            TolerancePercent = AcceptAnyPrice,
+            PriceAcceptedThroughDispute = true, // accepting a price dispute posts the invoice as presented, whatever the price rule
             PriceVarianceAccountCode = priceVarianceAccountCode,
             Lines = [.. dispute.Lines.Select(l => new InvoiceMatchLine(l.PurchaseOrderLineId, l.Quantity, l.UnitPrice))],
         }, ct).ConfigureAwait(false);

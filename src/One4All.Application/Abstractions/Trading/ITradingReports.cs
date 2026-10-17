@@ -92,7 +92,7 @@ public interface ITradingReports
 {
     /// <summary>
     /// Produces the payments-due schedule: every outstanding supplier invoice ordered by due date, with the
-    /// days until due (negative when overdue) relative to <paramref name="asAtDate"/> — the line-level companion
+    /// days until due (negative when overdue) relative to <paramref name="asAtDate"/> - the line-level companion
     /// to the bucketed cash-flow forecast, driving the payment run.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -103,8 +103,8 @@ public interface ITradingReports
 
     /// <summary>
     /// Produces a short-term cash-flow forecast: outstanding receivables (inflows) and payables (outflows)
-    /// bucketed by when they fall due relative to <paramref name="asAtDate"/> — overdue, then 0-30 / 31-60 /
-    /// 61-90 / 90+ days ahead — with the net and running net per bucket.
+    /// bucketed by when they fall due relative to <paramref name="asAtDate"/> - overdue, then 0-30 / 31-60 /
+    /// 61-90 / 90+ days ahead - with the net and running net per bucket.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAtDate">The date the buckets are measured from.</param>

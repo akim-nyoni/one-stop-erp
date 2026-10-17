@@ -130,7 +130,7 @@ public sealed class BankRuleService : IBankRuleService
             Result<StatementLinePosting> result = await _posting.PostToAccountAsync(companyId, bankAccountId, line.Id, rule.AccountCode, rule.Narrative, ct).ConfigureAwait(false);
             if (result.IsFailure)
             {
-                failures.Add($"{line.Description} ({line.Amount:0.00}) — rule '{rule.Name}': {result.Error.Message}");
+                failures.Add($"{line.Description} ({line.Amount:0.00}) - rule '{rule.Name}': {result.Error.Message}");
                 continue;
             }
 

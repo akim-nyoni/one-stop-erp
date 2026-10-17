@@ -24,7 +24,7 @@ public static class StatementReports
     public static IEnumerable<ReportDefinition> All()
     {
         yield return Listing("AR42", "Dunning / Reminder Letters", "Receivables", "Every customer with overdue debt at the date, at its reminder level (first, second, final), with the "
-            + "letter itself — overdue amount after unallocated credits and the oldest days overdue.", "StmtDunning",
+            + "letter itself - overdue amount after unallocated credits and the oldest days overdue.", "StmtDunning",
             [new Column("Customer", "Customer", 160), new Column("Level", "Level", 40), new Column("Stage", "Stage", 100), new Column("Overdue", "Overdue", 90),
              new Column("OldestDays", "Oldest days", 60), new Column("Letter", "Letter", 400)],
             [("AsAtDate", ParameterType.Date), ("FirstDays", ParameterType.Integer), ("SecondDays", ParameterType.Integer), ("FinalDays", ParameterType.Integer)]);
@@ -35,8 +35,8 @@ public static class StatementReports
         yield return Listing("AP51", "Supplier Statement / Remittance Statement", "Purchasing", "Our view of a supplier's account for confirmation: opening balance, every document in the "
             + "period with running balance, closing balance and what is outstanding aged by due date.", "StmtSupplier", StatementColumns(),
             [("SupplierCode", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
-        yield return Listing("AP56", "Cash Requirement Forecast / Payment Due Report", "Purchasing", "What must be paid to suppliers by week of due date and currency — overdue, each of the "
-            + "coming weeks and later — net of unallocated payments and debit notes.", "StmtCashRequirement",
+        yield return Listing("AP56", "Cash Requirement Forecast / Payment Due Report", "Purchasing", "What must be paid to suppliers by week of due date and currency - overdue, each of the "
+            + "coming weeks and later - net of unallocated payments and debit notes.", "StmtCashRequirement",
             [new Column("Currency", "Currency", 55), new Column("Week", "Week", 80), new Column("From", "From", 75), new Column("To", "To", 75), new Column("Suppliers", "Suppliers", 55),
              new Column("Documents", "Documents", 60), new Column("Amount", "Amount", 100), new Column("Base", "Base", 100, true)],
             [("AsAtDate", ParameterType.Date), ("Weeks", ParameterType.Integer)]);

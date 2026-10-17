@@ -5,7 +5,7 @@ namespace One4All.Reporting;
 /// <summary>
 /// The shipped Cashiering &amp; Receipting report catalogue (brief §RCP-16, the <c>RC</c> series), seeded as
 /// system report definitions into <c>rpt.report_definition</c>. Each is a banded definition built from a
-/// compact column spec — read-only; a customer copies one to a company/user version to customise it. The
+/// compact column spec - read-only; a customer copies one to a company/user version to customise it. The
 /// live data providers that feed these commands are wired separately.
 /// </summary>
 public static class ReceiptingReports
@@ -32,7 +32,7 @@ public static class ReceiptingReports
             [new Col("ReceiptNumber", "Receipt", 90), new Col("Payer", "Payer", 180), new Col("Tender", "Tender", 90), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
         yield return Listing("RC5", "Collection by Revenue Vote", "Sundry income analysed to the GL vote.",
             [new Col("AccountCode", "Vote", 80), new Col("AccountName", "Description", 230), new Col("Amount", "Amount", 100, true)], ["FromDate", "ToDate"]);
-        yield return Listing("RC6", "Collection by Service", "What residents paid for — water, rates, refuse, sewer, licences, fees.",
+        yield return Listing("RC6", "Collection by Service", "What residents paid for - water, rates, refuse, sewer, licences, fees.",
             [new Col("Service", "Service", 220), new Col("Amount", "Amount", 100, true)], ["FromDate", "ToDate"]);
         yield return Listing("RC7", "Collection by Tender Type & Channel", "Counter cash, card, mobile money, bank, agent, field.",
             [new Col("Tender", "Tender", 160), new Col("Channel", "Channel", 120), new Col("Amount", "Amount", 100, true)], ["FromDate", "ToDate"]);
@@ -56,7 +56,7 @@ public static class ReceiptingReports
             [new Col("ReceiptNumber", "Receipt", 90), new Col("Reason", "Reason", 180), new Col("Supervisor", "By", 100), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
         yield return Listing("RC16", "Receipt Reprint Log", "Every reprint, watermarked COPY, numbered and logged.",
             [new Col("ReceiptNumber", "Receipt", 90), new Col("PrintedOn", "Printed", 110), new Col("PrintedBy", "By", 150)], ["FromDate", "ToDate"]);
-        yield return Listing("RC17", "Receipt Number Gap Analysis", "Per station — must show no gaps.",
+        yield return Listing("RC17", "Receipt Number Gap Analysis", "Per station - must show no gaps.",
             [new Col("Station", "Station", 120), new Col("FromNumber", "From", 110), new Col("ToNumber", "To", 110), new Col("Gaps", "Gaps", 80)], ["Station"]);
         yield return Listing("RC18", "Back-Dated Receipt Report", "Receipts posted with a date before the transaction date.",
             [new Col("ReceiptNumber", "Receipt", 90), new Col("ReceiptDate", "Receipt date", 100), new Col("CapturedOn", "Captured", 100), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
@@ -64,9 +64,9 @@ public static class ReceiptingReports
             [new Col("ReceiptNumber", "Receipt", 90), new Col("Account", "Account", 150), new Col("Reason", "Reason", 160), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
         yield return Listing("RC20", "Manual / Pre-Numbered Stationery Control", "Books issued, serials used, serials unaccounted, books unreturned.",
             [new Col("BookNumber", "Book", 90), new Col("Range", "Serials", 120), new Col("Used", "Used", 70), new Col("Unaccounted", "Gaps", 80)], ["AsAtDate"]);
-        yield return Listing("RC21", "Receipting Audit Trail", "Every receipt, cancellation, allocation, suspense movement and refund — before/after values, user, station.",
+        yield return Listing("RC21", "Receipting Audit Trail", "Every receipt, cancellation, allocation, suspense movement and refund - before/after values, user, station.",
             [new Col("When", "When", 120), new Col("Action", "Action", 120), new Col("User", "User", 110), new Col("Detail", "Detail", 160)], ["FromDate", "ToDate"]);
-        yield return Listing("RC22", "Segregation of Duties Violations — Receipting", "Blocked or granted SoD-conflicting actions.",
+        yield return Listing("RC22", "Segregation of Duties Violations - Receipting", "Blocked or granted SoD-conflicting actions.",
             [new Col("User", "User", 150), new Col("Conflict", "Conflict", 220), new Col("When", "When", 110)], ["FromDate", "ToDate"]);
         yield return Listing("RC23", "Receipts Against Related-Party Accounts", "Blocked attempts and any granted exceptions.",
             [new Col("Cashier", "Cashier", 150), new Col("Account", "Account", 150), new Col("Outcome", "Outcome", 100), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
@@ -83,7 +83,7 @@ public static class ReceiptingReports
             [new Col("When", "When", 120), new Col("Type", "Type", 110), new Col("Reason", "Reason", 160), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
 
         // Suspense, imports and pending
-        yield return Listing("RC29", "Unallocated / Suspense Receipts Register", "With ageing — the report that recovers lost money.",
+        yield return Listing("RC29", "Unallocated / Suspense Receipts Register", "With ageing - the report that recovers lost money.",
             [new Col("Reference", "Reference", 130), new Col("PayerName", "Payer", 150), new Col("Days", "Days", 60), new Col("Amount", "Amount", 100, true)], ["AsAtDate"]);
         yield return Listing("RC30", "Suspense Allocation Report", "What was allocated out, by whom, to which account, with the reason.",
             [new Col("When", "When", 110), new Col("Account", "Account", 150), new Col("Reason", "Reason", 150), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
@@ -97,16 +97,16 @@ public static class ReceiptingReports
             [new Col("Reference", "Cheque", 120), new Col("Drawer", "Drawer", 150), new Col("Penalty", "Penalty", 90, true), new Col("Amount", "Amount", 90, true)], ["FromDate", "ToDate"]);
 
         // Payer-facing and account-level
-        yield return Doc("RC35", "Official Receipt", "Thermal / A5 / A4 / multi-part — allocation by service, balance after payment, currency and rate.", ["Receipt"]);
-        yield return Doc("RC36", "Counter Mini-Statement", "Last N transactions and the current balance — printed on request.", ["Account"]);
+        yield return Doc("RC35", "Official Receipt", "Thermal / A5 / A4 / multi-part - allocation by service, balance after payment, currency and rate.", ["Receipt"]);
+        yield return Doc("RC36", "Counter Mini-Statement", "Last N transactions and the current balance - printed on request.", ["Account"]);
         yield return Doc("RC37", "Full Account Statement", "The AR / municipal / housing / school statement, printable from the counter.", ["Account"]);
         yield return Listing("RC38", "Payment History per Account", "All receipts, allocations and reversals for one payer.",
             [new Col("Date", "Date", 90), new Col("ReceiptNumber", "Receipt", 100), new Col("Type", "Type", 110), new Col("Amount", "Amount", 100, true)], ["Account", "FromDate", "ToDate"]);
-        yield return Listing("RC39", "Credit Balances / Overpayments", "Residents in credit, with ageing — a liability that must be reported.",
+        yield return Listing("RC39", "Credit Balances / Overpayments", "Residents in credit, with ageing - a liability that must be reported.",
             [new Col("Account", "Account", 150), new Col("Name", "Name", 160), new Col("Days", "Days", 60), new Col("Credit", "Credit", 100, true)], ["AsAtDate"]);
         yield return Listing("RC40", "Deposits Held Register", "By payer, type, date received, refundable amount.",
             [new Col("Payer", "Payer", 170), new Col("Type", "Type", 120), new Col("ReceivedOn", "Received", 100), new Col("Amount", "Amount", 100, true)], ["AsAtDate"]);
-        yield return Listing("RC41", "Refunds Register", "Requested, approved, paid, outstanding — with turnaround times.",
+        yield return Listing("RC41", "Refunds Register", "Requested, approved, paid, outstanding - with turnaround times.",
             [new Col("Payer", "Payer", 170), new Col("Status", "Status", 100), new Col("Days", "Days", 60), new Col("Amount", "Amount", 100, true)], ["FromDate", "ToDate"]);
         yield return Listing("RC42", "Payment Arrangements Captured at Counter", "New arrangements, honoured, defaulted.",
             [new Col("Account", "Account", 150), new Col("StartDate", "Start", 100), new Col("Status", "Status", 100), new Col("Instalment", "Instalment", 90, true)], ["FromDate", "ToDate"]);

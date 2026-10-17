@@ -24,7 +24,7 @@ public enum JsonChangeKind
 public sealed record JsonChange(string Path, JsonChangeKind Kind, string? Before, string? After);
 
 /// <summary>
-/// Structural comparison of two JSON documents — how report definition versions are diffed (brief §13.2 version history
+/// Structural comparison of two JSON documents - how report definition versions are diffed (brief §13.2 version history
 /// with diff): property order and formatting are ignored; objects compare property by property, arrays element by element,
 /// and every leaf that differs is reported with its path. Pure and unit-tested.
 /// </summary>

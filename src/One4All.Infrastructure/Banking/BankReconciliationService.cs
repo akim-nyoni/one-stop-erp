@@ -84,7 +84,7 @@ public sealed class BankReconciliationService : IBankReconciliationService
         {
             string detail = string.Join("; ", parsed.Errors.Take(5).Select(e => $"line {e.LineNumber}: {e.Reason}"));
             string more = parsed.Errors.Count > 5 ? $" (+{parsed.Errors.Count - 5} more)" : string.Empty;
-            return Error.Validation("Cb.StatementParse", $"{parsed.Errors.Count} line(s) could not be read — {detail}{more}.");
+            return Error.Validation("Cb.StatementParse", $"{parsed.Errors.Count} line(s) could not be read - {detail}{more}.");
         }
 
         if (parsed.Lines.Count == 0)

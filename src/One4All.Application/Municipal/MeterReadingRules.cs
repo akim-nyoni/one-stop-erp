@@ -34,7 +34,7 @@ public readonly record struct ConsumptionPoint(DateOnly Date, decimal Consumptio
 
 /// <summary>
 /// Meter reading validation and estimation (brief §4.9): rollover past the last dial, negative readings, high and low
-/// consumption against the meter's own history, tamper flags, and estimates that the next actual reading trues up — an
+/// consumption against the meter's own history, tamper flags, and estimates that the next actual reading trues up - an
 /// over-estimate becomes a credit of units netted off later consumption. Pure and unit-tested.
 /// </summary>
 public static class MeterReadingRules

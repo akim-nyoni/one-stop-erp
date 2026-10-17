@@ -102,11 +102,16 @@ public sealed class LicenceService : ILicenceService
     /// <inheritdoc />
     public Result WithinLimit(string key, int count, string? moduleCode = null)
     {
-        int? limit = moduleCode is null ? _current.GetLimit(key) : _current.GetModuleLimit(moduleCode, key) ?? _current.GetLimit(key);
+        int? limit = moduleCode is null ? _current.GetLimit(key) : ModuleLimit(moduleCode, key) ?? _current.GetLimit(key);
         return !_enforce || limit is null || count <= limit
             ? Result.Success()
             : Result.Failure(Error.Rule("Licence.LimitReached", $"The licence allows {limit} {key.Replace('_', ' ')}; this would be {count}. Free one up or contact your vendor."));
     }
+
+    // A module's limit is keyed either as the global key ("pos_terminals") or, as the brief's payload writes it, without the module prefix ("terminals" under POS).
+    private int? ModuleLimit(string moduleCode, string key)
+        => _current.GetModuleLimit(moduleCode, key)
+            ?? (key.StartsWith(moduleCode + "_", StringComparison.OrdinalIgnoreCase) ? _current.GetModuleLimit(moduleCode, key[(moduleCode.Length + 1)..]) : null);
 
     /// <inheritdoc />
     public async Task ReloadAsync(CancellationToken ct = default)

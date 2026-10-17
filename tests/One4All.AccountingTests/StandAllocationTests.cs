@@ -89,8 +89,15 @@ public sealed class StandAllocationTests
 
         // Offered and left to lapse: the stand returns to the pool.
         AllocationRunView offered = (await allocations.ApproveAsync(companyId, rerun.RunNumber, 72, new DateOnly(2026, 6, 1), 7)).Value;
-        (await allocations.LapseExpiredAsync(companyId, new DateOnly(2026, 6, 8))).Should().BeEmpty();
-        (await allocations.LapseExpiredAsync(companyId, new DateOnly(2026, 6, 9))).Should().Equal(offered.Lines[0].CertificateNumber);
+        string lateCert = offered.Lines[0].CertificateNumber!;
+        (await allocations.ExpiredOffersAsync(companyId, new DateOnly(2026, 6, 8))).Should().BeEmpty();
+        (await allocations.ExpiredOffersAsync(companyId, new DateOnly(2026, 6, 9))).Should().ContainSingle().Which.Should().Match<ExpiredOffer>(o => o.CertificateNumber == lateCert && o.DaysOverdue == 1);
+        (await allocations.ExtendOfferAsync(companyId, lateCert, new DateOnly(2026, 6, 5), "Too early")).Error.Code.Should().Be("Hse.OfferExtension");
+        (await allocations.ExtendOfferAsync(companyId, lateCert, new DateOnly(2026, 6, 20), "Deposit on its way")).IsSuccess.Should().BeTrue();
+        (await allocations.ExpiredOffersAsync(companyId, new DateOnly(2026, 6, 9))).Should().BeEmpty("the extended offer is open again");
+        (await allocations.LapseExpiredAsync(companyId, new DateOnly(2026, 6, 9))).Should().BeEmpty();
+        (await allocations.LapseOfferAsync(companyId, lateCert, new DateOnly(2026, 6, 21), " ")).Error.Code.Should().Be("Hse.ReasonRequired");
+        (await allocations.LapseOfferAsync(companyId, lateCert, new DateOnly(2026, 6, 21), "No response after the extension")).IsSuccess.Should().BeTrue();
         (await db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == second.Id)).Status.Should().Be(StandStatus.Available);
 
         // The database itself refuses a second live allocation of the accepted stand.

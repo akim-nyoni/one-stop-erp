@@ -7,7 +7,7 @@ namespace One4All.Infrastructure.Housing;
 /// <summary>
 /// The anti-double-allocation check shared by every route a stand can be promised through: a live waiting-list allocation,
 /// a cooperative, a regularised informal-settlement household, or a developer agreement (until a council-quota stand is
-/// handed over, when it returns to the council's own pool) — and the caveat check: a stand under a block in force.
+/// handed over, when it returns to the council's own pool) - and the caveat check: a stand under a block in force.
 /// </summary>
 internal static class StandClaims
 {

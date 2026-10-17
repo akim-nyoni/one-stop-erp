@@ -49,7 +49,7 @@ public sealed record BankTransferResult(IReadOnlyList<string> JournalNumbers, de
 /// <summary>
 /// Treasury transfers between the company's bank accounts (brief §4.7). A same-currency transfer is one journal. A
 /// cross-currency transfer posts each leg in its own currency at the day's rate through a clearing account, and the
-/// difference between the base value sent and received is a realised exchange gain or loss — all in one unit.
+/// difference between the base value sent and received is a realised exchange gain or loss - all in one unit.
 /// </summary>
 public interface ITreasuryService
 {

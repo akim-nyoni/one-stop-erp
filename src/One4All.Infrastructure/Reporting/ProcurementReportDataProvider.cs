@@ -26,7 +26,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             string status = asAt < a.StartDate ? "Not started" : asAt > a.EndDate ? "Expired" : remaining <= 0m ? "Exhausted" : "Live";
             return Row(("Agreement", a.Reference), ("Supplier", suppliers.GetValueOrDefault(a.SupplierId, "?")),
                 ("Term", $"{a.StartDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} to {a.EndDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}"), ("Ceiling", Money(a.CeilingValue)), ("Orders", own.Count),
-                ("Called", Money(called)), ("Used", a.CeilingValue == 0m ? "—" : (called * 100m / a.CeilingValue).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Status", status), ("Remaining", remaining));
+                ("Called", Money(called)), ("Used", a.CeilingValue == 0m ? "-" : (called * 100m / a.CeilingValue).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Status", status), ("Remaining", remaining));
         })];
     }
 
@@ -128,8 +128,8 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             DateOnly? approved = approvals.TryGetValue(r.RequisitionNumber, out DateTimeOffset at) ? DateOnly.FromDateTime(at.UtcDateTime)
                 : r.ApprovedByUserId is not null && r.ModifiedOnUtc is DateTimeOffset m ? DateOnly.FromDateTime(m.UtcDateTime) : null;
             return Row(("Requisition", r.RequisitionNumber), ("Supplier", suppliers.GetValueOrDefault(r.SupplierId, "?")), ("Requested", Date(r.RequestedDate)), ("Status", r.Status.ToString()),
-                ("Approver", r.ApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "—"), ("Approved", approved is DateOnly d ? Date(d) : "—"),
-                ("Days", approved is DateOnly a ? Math.Max(0, a.DayNumber - r.RequestedDate.DayNumber).ToString(CultureInfo.InvariantCulture) : "—"),
+                ("Approver", r.ApprovedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "-"), ("Approved", approved is DateOnly d ? Date(d) : "-"),
+                ("Days", approved is DateOnly a ? Math.Max(0, a.DayNumber - r.RequestedDate.DayNumber).ToString(CultureInfo.InvariantCulture) : "-"),
                 ("Value", r.Lines.Sum(l => Math.Round(l.Quantity * l.UnitPrice, 2, MidpointRounding.AwayFromZero))));
         })];
     }
@@ -187,9 +187,9 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             List<double> waiting = [.. g.Where(s => s.WaitingHours is not null).Select(s => s.WaitingHours!.Value)];
             int? stageSla = g.Select(s => sla.GetValueOrDefault((s.Definition, s.Stage))).FirstOrDefault(h => h is not null);
             return Row(("Document", g.Key.Document), ("Stage", g.Key.Stage), ("Decisions", decided.Count),
-                ("AverageHours", decided.Count == 0 ? "—" : Math.Round(decided.Average(), 1).ToString("0.0", CultureInfo.InvariantCulture)),
-                ("LongestHours", decided.Count == 0 ? "—" : Math.Round(decided.Max(), 1).ToString("0.0", CultureInfo.InvariantCulture)),
-                ("SlaHours", stageSla?.ToString(CultureInfo.InvariantCulture) ?? "—"), ("Breaches", timed.Count(t => t.Sla is int h && t.Hours > h)), ("Waiting", waiting.Count),
+                ("AverageHours", decided.Count == 0 ? "-" : Math.Round(decided.Average(), 1).ToString("0.0", CultureInfo.InvariantCulture)),
+                ("LongestHours", decided.Count == 0 ? "-" : Math.Round(decided.Max(), 1).ToString("0.0", CultureInfo.InvariantCulture)),
+                ("SlaHours", stageSla?.ToString(CultureInfo.InvariantCulture) ?? "-"), ("Breaches", timed.Count(t => t.Sla is int h && t.Hours > h)), ("Waiting", waiting.Count),
                 ("OldestWaitHours", waiting.Count == 0 ? 0m : (decimal)Math.Round(waiting.Max(), 1)));
         })];
     }
@@ -205,8 +205,8 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             decimal received = o.Lines.Sum(l => Value(l.ReceivedQuantity, l.UnitPrice));
             bool open = !Done.Contains(o.Status);
             return Row(("Order", o.OrderNumber), ("Date", Date(o.OrderDate)), ("Supplier", suppliers.GetValueOrDefault(o.SupplierId, "?")),
-                ("Status", o.AwaitingReapproval ? $"{o.Status} (awaiting re-approval)" : o.Status.ToString()), ("RequiredBy", o.RequiredBy is DateOnly r ? Date(r) : "—"),
-                ("Overdue", open && o.RequiredBy is DateOnly due && due < asAt ? $"{asAt.DayNumber - due.DayNumber} days" : "—"), ("Currency", o.Currency.Value),
+                ("Status", o.AwaitingReapproval ? $"{o.Status} (awaiting re-approval)" : o.Status.ToString()), ("RequiredBy", o.RequiredBy is DateOnly r ? Date(r) : "-"),
+                ("Overdue", open && o.RequiredBy is DateOnly due && due < asAt ? $"{asAt.DayNumber - due.DayNumber} days" : "-"), ("Currency", o.Currency.Value),
                 ("Ordered", Money(ordered)), ("Received", Money(received)), ("Outstanding", open ? ordered - received : 0m));
         })];
     }
@@ -214,7 +214,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CommitmentsAsync(long companyId, CancellationToken ct)
         => [.. (await _db.Set<BudgetCommitment>().AsNoTracking().Where(c => c.CompanyId == companyId).OrderBy(c => c.AccountCode).ThenBy(c => c.Department).ThenBy(c => c.Period).ThenBy(c => c.Reference)
                 .ToListAsync(ct).ConfigureAwait(false))
-            .Select(c => Row(("Account", c.AccountCode), ("Department", c.Department ?? "—"), ("Period", c.Period), ("Reference", c.Reference), ("Type", c.Type.ToString()), ("Status", c.Status.ToString()),
+            .Select(c => Row(("Account", c.AccountCode), ("Department", c.Department ?? "-"), ("Period", c.Period), ("Reference", c.Reference), ("Type", c.Type.ToString()), ("Status", c.Status.ToString()),
                 ("Amount", c.Status == CommitmentStatus.Open ? c.Amount : 0m)))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GoodsReceivedAsync(long companyId, DateOnly fromDate, DateOnly to, CancellationToken ct)
@@ -232,7 +232,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             decimal priceVariance = line is null ? 0m : Value(l.Quantity, l.UnitPrice - line.UnitPrice);
             return Row(("Grn", n.GrnNumber), ("Date", Date(n.Date)), ("Order", order?.OrderNumber ?? "?"), ("Supplier", suppliers.GetValueOrDefault(n.SupplierId, "?")), ("Item", items.GetValueOrDefault(l.ItemId, "?")),
                 ("Ordered", Qty(line?.OrderedQuantity ?? 0m)), ("Received", Qty(line?.ReceivedQuantity ?? l.Quantity)),
-                ("QuantityVariance", line is null ? "—" : Qty(line.ReceivedQuantity - line.OrderedQuantity)), ("PriceVariance", Money(priceVariance)), ("Value", Value(l.Quantity, l.UnitPrice)));
+                ("QuantityVariance", line is null ? "-" : Qty(line.ReceivedQuantity - line.OrderedQuantity)), ("PriceVariance", Money(priceVariance)), ("Value", Value(l.Quantity, l.UnitPrice)));
         }))];
     }
 
@@ -249,7 +249,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
         {
             decimal price = x.Note.Lines.FirstOrDefault(g => g.ItemId == l.ItemId)?.UnitPrice ?? 0m;
             return Row(("Grn", x.Note.GrnNumber), ("Inspected", Date(x.Inspection.InspectedOn)), ("Supplier", suppliers.GetValueOrDefault(x.Note.SupplierId, "?")), ("Item", items.GetValueOrDefault(l.ItemId, "?")),
-                ("Passed", Qty(l.Passed)), ("Rejected", Qty(l.Rejected)), ("Reason", l.RejectionReason ?? "—"), ("Value", Value(l.Rejected, price)));
+                ("Passed", Qty(l.Passed)), ("Rejected", Qty(l.Rejected)), ("Reason", l.RejectionReason ?? "-"), ("Value", Value(l.Rejected, price)));
         }))];
     }
 
@@ -288,7 +288,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             {
                 rows.Add(Row(("Item", items.GetValueOrDefault(line.ItemId, "?")), ("Order", order.OrderNumber), ("Date", Date(order.OrderDate)), ("Supplier", suppliers.GetValueOrDefault(order.SupplierId, "?")),
                     ("Previous", Money(previous)), ("Price", Money(line.UnitPrice)),
-                    ("Change", previous == 0m ? "—" : ((line.UnitPrice - previous) * 100m / previous).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
+                    ("Change", previous == 0m ? "-" : ((line.UnitPrice - previous) * 100m / previous).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"),
                     ("Quantity", Qty(line.OrderedQuantity)), ("Variance", Value(line.OrderedQuantity, line.UnitPrice - previous))));
             }
 
@@ -309,7 +309,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
         Dictionary<string, decimal> totals = groups.GroupBy(g => g.Key.Currency).ToDictionary(g => g.Key, g => g.Sum(x => x.Spend));
         return [.. groups.OrderBy(g => g.Key.Currency, StringComparer.Ordinal).ThenByDescending(g => g.Spend)
             .Select(g => Row(("Supplier", suppliers.GetValueOrDefault(g.Key.SupplierId, "?")), ("Currency", g.Key.Currency), ("Orders", g.Orders), ("Lines", g.Lines), ("Items", g.Items),
-                ("Share", totals[g.Key.Currency] == 0m ? "—" : (g.Spend * 100m / totals[g.Key.Currency]).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Spend", g.Spend)))];
+                ("Share", totals[g.Key.Currency] == 0m ? "-" : (g.Spend * 100m / totals[g.Key.Currency]).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Spend", g.Spend)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LeadTimesAsync(long companyId, DateOnly fromDate, DateOnly to, CancellationToken ct)
@@ -326,7 +326,7 @@ public sealed class ProcurementReportDataProvider : IReportDataProvider
             int withDate = g.Count(r => r.RequiredBy is not null);
             int onTime = g.Count(r => r.RequiredBy is DateOnly due && r.First <= due);
             return Row(("Supplier", suppliers.GetValueOrDefault(g.Key, "?")), ("Orders", g.Count()), ("Average", days.Average().ToString("0.0", CultureInfo.InvariantCulture)), ("Fastest", days.Min()),
-                ("Slowest", days.Max()), ("OnTime", withDate == 0 ? "—" : $"{onTime} of {withDate}"));
+                ("Slowest", days.Max()), ("OnTime", withDate == 0 ? "-" : $"{onTime} of {withDate}"));
         })];
     }
 

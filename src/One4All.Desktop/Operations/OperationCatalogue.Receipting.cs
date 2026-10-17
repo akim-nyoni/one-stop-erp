@@ -135,7 +135,7 @@ public static partial class OperationCatalogue
             Description = "Open a session at a station with the float, or close yours by declaring the cash counted (shortages and overs are posted). "
                 + "Type the amount, or count note by note: 50x10 + 20x5 + 1x7 is ten 50s, five 20s and seven 1s; each note or coin must be one of the currency's.",
             Fields = [Pick("Step", "Step", ["Open", "Close"]), Opt("Station", "Station code (open)"), Opt("Currency", "Currency", "USD"),
-                Opt("Amount", "Float (open) / cash counted (close) — an amount or notes, e.g. 50x10 + 20x5"),
+                Opt("Amount", "Float (open) / cash counted (close) - an amount or notes, e.g. 50x10 + 20x5"),
                 Today("Date", "Date"), Opt("Cash", "Cash account", "1000"), Opt("Shortages", "Cash shortages / overs account (close)")],
             Run = async (c, i) =>
             {
@@ -196,7 +196,7 @@ public static partial class OperationCatalogue
                     Currency = i.Optional("Currency") is string paidIn ? Core.Accounting.CurrencyCode.Parse(paidIn) : null,
                     Tenders = [new ReceiptTenderRequest(Enum.Parse<TenderType>(i.Text("Tender")), amount, i.Optional("Reference"))],
                 }).ConfigureAwait(true));
-                return $"Receipt {receipt.ReceiptNumber}: {M(receipt.Total)} — {M(receipt.AllocatedToDebt)} to the account, {M(receipt.CreditOnAccount)} credit on account.";
+                return $"Receipt {receipt.ReceiptNumber}: {M(receipt.Total)} - {M(receipt.AllocatedToDebt)} to the account, {M(receipt.CreditOnAccount)} credit on account.";
             },
             List = async c =>
             {
@@ -435,7 +435,7 @@ public static partial class OperationCatalogue
     private static Operation CashierRelatedAccounts() => new()
     {
         Module = "Receipting", Title = "Cashiers' own and related accounts", ListTitle = "Accounts cashiers may not receipt",
-        Description = "The accounts a cashier may not take payments on — their own, a spouse's or relative's, a business they have an interest in. Another cashier must "
+        Description = "The accounts a cashier may not take payments on - their own, a spouse's or relative's, a business they have an interest in. Another cashier must "
             + "take those payments; an attempt is refused and shows on RC23.",
         Fields = [Pick("Step", "Step", ["Add", "Remove"]), Req("Cashier", "Cashier (user name)"), Req("Customer", "Account (customer code)"),
             Pick("Relationship", "Relationship", ["Own", "Spouse", "Relative", "Business"])],

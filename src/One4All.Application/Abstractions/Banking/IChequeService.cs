@@ -50,7 +50,7 @@ public interface IChequeService
     /// <returns>Success, or an error.</returns>
     Task<Result> CancelAsync(long companyId, long chequeId, DateOnly date, string reason, CancellationToken ct = default);
 
-    /// <summary>Captures a supplier's statement — the balance they show and the items they list as open — for reconciliation.</summary>
+    /// <summary>Captures a supplier's statement - the balance they show and the items they list as open - for reconciliation.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="supplierId">The supplier.</param>
     /// <param name="statementDate">The statement date.</param>

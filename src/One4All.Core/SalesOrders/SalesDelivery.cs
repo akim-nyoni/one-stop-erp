@@ -4,7 +4,7 @@ namespace One4All.Core.SalesOrders;
 
 /// <summary>
 /// A delivery note raised when goods are despatched against a sales order (<c>sop.delivery</c>): what went, on which vehicle and route,
-/// and — once signed for — when it arrived and who received it (proof of delivery).
+/// and - once signed for - when it arrived and who received it (proof of delivery).
 /// </summary>
 public sealed class SalesDelivery : AuditableEntity, ICompanyScoped
 {

@@ -13,7 +13,7 @@ Goal: show that properties, services and meters, billing, clearances, licences a
 6. Open **Meter reading routes**. Creates a reading route for a meter reader (meter serials in walking order, comma-separated); Sheet prints it with the last readings; Import loads a CSV of readings taken on the round (each checked like a keyed reading). Fill in: Step. Press OK and point out the result line and the list on the right.
 
 ## Billing
-7. Open **Billing run**. Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve to post the bills — someone other than the proposer approves. Fill in: Step, Service, Bill date, Billing cycle. Press OK and point out the result line and the list on the right.
+7. Open **Billing run**. Propose a run for a service (limited to a ward, a meter-reading route or a billing cycle if you like), review its exceptions, include or exclude stands, then approve to post the bills - someone other than the proposer approves. Fill in: Step, Service, Bill date, Billing cycle. Press OK and point out the result line and the list on the right.
 8. Open **Tariffs**. Lists a service's tariffs in force on a date, or resolves which tariff applies to a consumer category in a ward. Fill in: Step, Service, Consumer category (resolve), Date. Press OK and point out the result line and the list on the right.
 9. Open **Tariff billing cycle**. How often a tariff is billed: monthly, quarterly, half-yearly or annually from a start month (e.g. Fill in: Tariff code, Cycle, Start month (1–12), Instalments per period. Press OK and point out the result line and the list on the right.
 
@@ -24,7 +24,7 @@ Goal: show that properties, services and meters, billing, clearances, licences a
 
 ## Faults
 13. Open **Fault desk**. Log, assign and close faults reported by the public.
-14. Open **Fault ticket categories**. The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times — the clocks the fault desk measures every ticket against. Fill in: Category code, Name, Service, Respond within (hours), Resolve within (hours). Press OK and point out the result line and the list on the right.
+14. Open **Fault ticket categories**. The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times - the clocks the fault desk measures every ticket against. Fill in: Category code, Name, Service, Respond within (hours), Resolve within (hours). Press OK and point out the result line and the list on the right.
 
 ## Reports to end on
 - DB256 Municipal Executive Dashboard: Billed and collected this year, collection rate, debtors and over-90s, indigent households, disconnections, open faults and licences due; water bought in bulk against water metered to consumers this year (the loss), and ratepayer arrears at each of the last six month-ends. Show the drill-through by clicking a document or account.

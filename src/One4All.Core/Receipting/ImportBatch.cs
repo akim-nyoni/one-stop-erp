@@ -28,13 +28,13 @@ public enum ImportLineStatus
     /// <summary>Matched to exactly one account and receipted against it.</summary>
     Matched = 1,
 
-    /// <summary>Not matched — parked in the suspense control for the workbench.</summary>
+    /// <summary>Not matched - parked in the suspense control for the workbench.</summary>
     Unmatched = 2,
 }
 
 /// <summary>
 /// An import batch of bulk/file-based receipts (brief §RCP-8, <c>rcp.import_batch</c>). Money councils
-/// receive without the payer visiting a counter — matched by the account in the payment reference, with
+/// receive without the payer visiting a counter - matched by the account in the payment reference, with
 /// unmatched money parked in suspense. Duplicate files are detected by hash and rejected.
 /// </summary>
 public sealed class ImportBatch : AuditableEntity, ICompanyScoped

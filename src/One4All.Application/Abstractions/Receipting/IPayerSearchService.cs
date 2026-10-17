@@ -10,7 +10,7 @@ public sealed record PayerHit(long CustomerId, string Code, string Name, string 
 
 /// <summary>
 /// The teller's live payer search across the registers (brief §RCP-3): an account by code or name, a stand by number (its ratepayer), a student by
-/// admission number or name (whoever pays the fees) — each with what the account owes.
+/// admission number or name (whoever pays the fees) - each with what the account owes.
 /// </summary>
 public interface IPayerSearchService
 {

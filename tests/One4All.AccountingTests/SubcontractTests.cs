@@ -76,7 +76,7 @@ public sealed class SubcontractTests
 
         string ledger = await Render("JC192");
         ledger.Should().Contain("CC-2,Subbie Ltd,SC-1,C1,2026-03-10,\"4,000.00\",400.00,\"7,000.00 / 10,000.00 · held 0.00\",3600")
-            .And.Contain("CC-2,Subbie Ltd,SC-1,C2,2026-03-31,\"3,000.00\",300.00,").And.Contain("SC-1,Release,—,—,-700.00,");
+            .And.Contain("CC-2,Subbie Ltd,SC-1,C2,2026-03-31,\"3,000.00\",300.00,").And.Contain("SC-1,Release,-,-,-700.00,");
         (await Render("JC194")).Should().Contain("EXC1,Excavator,18,176,10.2%,900.00,300.00,16.67,600");
     }
 }

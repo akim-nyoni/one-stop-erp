@@ -141,7 +141,7 @@ The list beside the form shows: Message batches.
 
 ### Language and terminology
 
-The company's locale (screen language where translated, and the date and number formats of its reports — e.g. en-ZW, pt-MZ) and its own words for standard terms (Stand → Erf) on screens and report labels. Sign in again to see the screens change.
+The company's locale (screen language where translated, and the date and number formats of its reports - e.g. en-ZW, pt-MZ) and its own words for standard terms (Stand → Erf) on screens and report labels. Sign in again to see the screens change.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -232,7 +232,7 @@ The list beside the form shows: Report subscriptions.
 
 ### Email a report to each customer or supplier
 
-Run a report once, split it by a field (e.g. Customer code) and email each part as its own PDF — to the address in a field of the rows, or to the contacts of the customer or supplier the key names. Parameters as Name=value; ... (dates as yyyy-MM-dd). Parts with nobody to send to are listed.
+Run a report once, split it by a field (e.g. Customer code) and email each part as its own PDF - to the address in a field of the rows, or to the contacts of the customer or supplier the key names. Parameters as Name=value; ... (dates as yyyy-MM-dd). Parts with nobody to send to are listed.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -329,7 +329,7 @@ What each role and user may do, ticked on a grid.
 
 ### Compare roles or change many at once
 
-Compare shows where two roles differ, permission by permission. Bulk change adds, removes or sets operations (View, Create, Edit, Delete, Print, Export, Post, Approve, VoidReverse — comma separated) on a permission code or a pattern such as Payroll.* across several roles (comma separated) at once. System roles are left alone.
+Compare shows where two roles differ, permission by permission. Bulk change adds, removes or sets operations (View, Create, Edit, Delete, Print, Export, Post, Approve, VoidReverse - comma separated) on a permission code or a pattern such as Payroll.* across several roles (comma separated) at once. System roles are left alone.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -366,7 +366,7 @@ The list beside the form shows: Users and their roles.
 
 ### API keys for integrations
 
-An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). The key is shown once — copy it then; rotating issues a new one and the old stops working; revoking stops the client.
+An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). The key is shown once - copy it then; rotating issues a new one and the old stops working; revoking stops the client.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -428,7 +428,7 @@ The list beside the form shows: Aged debt (snapshot).
 
 ### Back up or restore the database
 
-Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database (type RESTORE <name> to confirm) — the live database is never overwritten. Restore a file: an off-site copy or another server's backup with no record here, into a new database. Switch over: the restored database takes the live name and the old live one is kept as <live>_retired_<stamp> (type SWITCH TO <name>); restart the server and every desktop afterwards.
+Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database (type RESTORE <name> to confirm) - the live database is never overwritten. Restore a file: an off-site copy or another server's backup with no record here, into a new database. Switch over: the restored database takes the live name and the old live one is kept as <live>_retired_<stamp> (type SWITCH TO <name>); restart the server and every desktop afterwards.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -474,7 +474,7 @@ How complete and tidy the data is.
 
 ### Review direct database changes
 
-Database triggers record every change to users, roles, permissions, prices, tariffs, meters and the licence — including changes made with SQL tools, listed here.
+Database triggers record every change to users, roles, permissions, prices, tariffs, meters and the licence - including changes made with SQL tools, listed here.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -541,11 +541,11 @@ The list beside the form shows: Webhook deliveries (latest 200).
 | --- | --- | --- |
 | DB251 | Executive Dashboard | Year to date at the date: revenue, expenses, profit, cash, debtors, creditors, stock, working capital and the cash cycle. |
 | DB252 | Daily Flash Report | The day's sales, receipts and payments against the same day last week and the month to date, with cash at close. |
-| DB253 | KPI Scorecard | This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle — with the direction of travel. |
+| DB253 | KPI Scorecard | This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle - with the direction of travel. |
 | DB254 | Branch Comparison League Table | Branches ranked by POS net sales in the period, with transactions, average basket and share. |
 | DB255 | Trend & Seasonality Analysis | Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before. |
-| SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) — a month-end close aid. |
-| SYS235 | Audit Trail Report | Every audit-logged action in the period — who, when, what record, which fields and why — optionally for one record type or user. |
+| SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) - a month-end close aid. |
+| SYS235 | Audit Trail Report | Every audit-logged action in the period - who, when, what record, which fields and why - optionally for one record type or user. |
 | SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run. |
 | SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. |
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. |
@@ -556,7 +556,7 @@ The list beside the form shows: Webhook deliveries (latest 200).
 | SYS243 | Deleted & Voided Documents | Records deleted or retired in the period, and journals reversed or cancelled, with who and why. |
 | SYS244 | Document Numbering Gaps | Missing runs in each year's journal numbering. |
 | SYS245 | Unposted & Deferred Batches | Journals still draft, deferred or awaiting approval, with who prepared them. |
-| SYS246 | Data Integrity & System Health | The data-health checks at a date — orphan records, unbalanced batches, control-account variances, negative stock and the rest — each with its status, count, value and first findings. |
+| SYS246 | Data Integrity & System Health | The data-health checks at a date - orphan records, unbalanced batches, control-account variances, negative stock and the rest - each with its status, count, value and first findings. |
 | SYS247 | Audit Trail Hash-Chain Verification | Recomputes the audit trail's hash chain for the company and for system-wide entries and says whether it is intact or where it first breaks. |
 | SYS248 | Licence Installation History | Licences installed, when and by whom, and which is active (token fingerprint only). |
 | SYS249 | Login Session & Concurrency Report | Every session opened in the period: user, terminal, start, end and duration, flagging sessions open at the same time as another of the same user on a different terminal. |
@@ -565,5 +565,5 @@ The list beside the form shows: Webhook deliveries (latest 200).
 | SYS259 | Exchange Rate History | Every exchange rate captured, by currency pair and type, with its effective date. |
 | SYS260 | Number Sequence Status | Every document sequence: prefix, padding, yearly reset, gapless flag and the next number per year. |
 | SYS261 | Company Configuration Listing | Every setting of the company record. |
-| SYS262 | Report Definition Inventory | Every report definition held — system and custom — with scope, version and last change. |
+| SYS262 | Report Definition Inventory | Every report definition held - system and custom - with scope, version and last change. |
 | SYS263 | Scheduled Job Status & Delivery Log | Each scheduled job's state and last result, then report deliveries in the period. |

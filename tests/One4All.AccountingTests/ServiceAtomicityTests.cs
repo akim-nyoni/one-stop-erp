@@ -14,7 +14,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers two of the services now run as single units of work: registering an asset into a closed period leaves no
 /// asset in the register (it would otherwise depreciate with no cost in the GL), and gift-card breakage refused by a
-/// closed period leaves the card's balance intact — each even after a save in the same scope.
+/// closed period leaves the card's balance intact - each even after a save in the same scope.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class ServiceAtomicityTests
@@ -70,7 +70,7 @@ public sealed class ServiceAtomicityTests
             (await scope.ServiceProvider.GetRequiredService<IVoucherService>().GetBalanceAsync(companyId, "SA-GC-1")).Value.Balance.Should().Be(100m);
             (await scope.ServiceProvider.GetRequiredService<ILedgerIntegrityService>().CheckAsync(companyId)).Value.Issues.Should().BeEmpty();
 
-            // Reopened, both go through — the closed period was the only obstacle.
+            // Reopened, both go through - the closed period was the only obstacle.
             IPeriodService periods = scope.ServiceProvider.GetRequiredService<IPeriodService>();
             (await periods.SetStatusAsync(companyId, yearId, 5, "GL", PeriodStatus.Open)).IsSuccess.Should().BeTrue();
             (await periods.SetStatusAsync(companyId, yearId, 5, "VOU", PeriodStatus.Open)).IsSuccess.Should().BeTrue();

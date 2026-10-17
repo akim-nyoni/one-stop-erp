@@ -130,7 +130,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>Gets the line under the heading: plain instructions for one screen, the console's own line otherwise.</summary>
     public string Subtitle => IsSingle
-        ? (SingleContext is null ? string.Empty : SingleContext + "  —  ") + "Fill in the boxes (those marked * must be filled) and press OK. Cancel closes without saving."
+        ? (SingleContext is null ? string.Empty : SingleContext + "  -  ") + "Fill in the boxes (those marked * must be filled) and press OK. Cancel closes without saving."
         : Localization.UiText.T("Choose an action, fill the form and run it. Records are looked up by their codes; every rule is enforced by the posting services.");
 
     /// <summary>Gets the line under the list window's title: where the screen sits.</summary>
@@ -223,7 +223,7 @@ public sealed partial class OperationsViewModel : ObservableObject
 
     /// <summary>Gets the console's heading: the module, and the menu area when one was chosen.</summary>
     public string Heading => IsSingle ? SingleTitle! : Area is Application.Navigation.MenuArea area
-        ? $"{Localization.UiText.T(Module)} — {Localization.UiText.T(area.ToString())}"
+        ? $"{Localization.UiText.T(Module)} - {Localization.UiText.T(area.ToString())}"
         : Localization.UiText.T(Module);
 
     /// <summary>Gets the module's operations.</summary>
@@ -381,7 +381,7 @@ public sealed partial class OperationsViewModel : ObservableObject
         {
             Result = ex.Message;
             Failed = true;
-            StatusMessage = "Not done — see the message.";
+            StatusMessage = "Not done - see the message.";
         }
 #pragma warning disable CA1031 // The console reports any failure to the user rather than crashing.
         catch (Exception ex)

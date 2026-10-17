@@ -6,7 +6,7 @@ namespace One4All.Application.Abstractions.Offline;
 /// <summary>
 /// Replays one kind of captured offline operation against the central database. A handler <b>must be
 /// idempotent</b>: replaying the same operation (same natural key, e.g. a sale number) more than once must
-/// not apply the effect twice — the outbox guarantees at-least-once delivery, not exactly-once, so a
+/// not apply the effect twice - the outbox guarantees at-least-once delivery, not exactly-once, so a
 /// handler that already sees its effect present should return success without repeating it.
 /// </summary>
 public interface IOfflineOperationHandler

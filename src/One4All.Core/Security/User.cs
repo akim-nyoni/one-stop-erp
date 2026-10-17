@@ -4,7 +4,7 @@ namespace One4All.Core.Security;
 
 /// <summary>
 /// A named user of the system (<c>sec.user</c>). Holds authentication material (password/PIN hashes are
-/// computed by the infrastructure with Argon2id — the entity stores only the resulting hash), lockout
+/// computed by the infrastructure with Argon2id - the entity stores only the resulting hash), lockout
 /// state, and the assignment/override/group collections that feed permission resolution.
 /// </summary>
 public sealed class User : SoftDeletableEntity

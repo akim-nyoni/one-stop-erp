@@ -18,7 +18,7 @@ public enum LeaseUse
 /// <summary>
 /// A lease of a council stand (<c>hse.stand_lease</c>, brief §4.10.5: leases of stands, including long 99-year leases
 /// with rent reviews): the lessee, use, term from the first of a month, first-year rent and fixed escalation at each
-/// review, and the accounts it posts to — contractual rent billed through AR, income straight-lined against an accrued
+/// review, and the accounts it posts to - contractual rent billed through AR, income straight-lined against an accrued
 /// lease income account (IFRS 16 lessor, operating lease).
 /// </summary>
 public sealed class StandLease : AuditableEntity, ICompanyScoped

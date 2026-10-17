@@ -21,7 +21,7 @@ public sealed record CaseWriteOff(string CaseNumber, int InvoicesWrittenOff, dec
 
 /// <summary>
 /// Legal handover of debts, the summons register and write-off approval (brief §4.9): an overdue debtor is handed over
-/// to a collector, a summons is recorded, and a case is either closed (settled or withdrawn) or written off — requested
+/// to a collector, a summons is recorded, and a case is either closed (settled or withdrawn) or written off - requested
 /// by one user, approved by a different one, which writes off every outstanding invoice of the debtor in one unit.
 /// </summary>
 public interface IDebtCollectionService
@@ -67,7 +67,7 @@ public interface IDebtCollectionService
     /// </summary>
     Task<Result> RequestWriteOffAsync(long companyId, string caseNumber, long userId, string reason, string badDebtAccountCode, CancellationToken ct = default);
 
-    /// <summary>Approves a requested write-off — never by the requester — writing off the debtor's outstanding invoices.</summary>
+    /// <summary>Approves a requested write-off - never by the requester - writing off the debtor's outstanding invoices.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="caseNumber">The case.</param>
     /// <param name="approverUserId">The approver.</param>

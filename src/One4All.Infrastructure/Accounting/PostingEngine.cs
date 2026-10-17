@@ -114,7 +114,7 @@ public sealed class PostingEngine : IPostingEngine
 
         (JournalEntry journal, decimal totalBaseDebit) = built.Value;
 
-        // A bank account reconciled and signed off to a date takes no more entries on or before it — except a valuation entry, which restates base amounts only.
+        // A bank account reconciled and signed off to a date takes no more entries on or before it - except a valuation entry, which restates base amounts only.
         List<string> lineAccounts = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
         string? lockedBank = request.ValuationOnly ? null : await _db.Set<Core.Banking.BankAccount>()
             .Where(b => b.CompanyId == request.CompanyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= request.PostingDate)
@@ -241,7 +241,7 @@ public sealed class PostingEngine : IPostingEngine
                 $"Journal does not balance in base currency ({baseCurrency}): debits {totalBaseDebit:0.0000} vs credits {totalBaseCredit:0.0000}.");
         }
 
-        // Rule 1 (continued): Dr = Cr per transaction currency — for a journal in one currency. A multi-currency journal (a till's euros against a
+        // Rule 1 (continued): Dr = Cr per transaction currency - for a journal in one currency. A multi-currency journal (a till's euros against a
         // base-currency sale) balances in base, which rule 1 already holds it to.
         foreach ((string currency, (decimal debit, decimal credit)) in perCurrency.Count == 1 ? perCurrency : [])
         {

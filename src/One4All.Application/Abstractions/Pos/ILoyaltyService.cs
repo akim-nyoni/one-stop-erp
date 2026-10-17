@@ -30,8 +30,8 @@ public readonly record struct LoyaltyEarned(decimal Points, string? Tier, decima
 public sealed record LoyaltyStatement(string MemberNumber, string Name, string? Tier, decimal Balance, decimal BalanceValue, IReadOnlyList<LoyaltyMovement> Movements);
 
 /// <summary>
-/// The loyalty programme (brief §4.1): members earn points on what they spend (times their tier's multiplier), redeem them — the value is
-/// tendered at the till on the scheme's liability account — and lose them at expiry, oldest first. The value of points issued is kept as
+/// The loyalty programme (brief §4.1): members earn points on what they spend (times their tier's multiplier), redeem them - the value is
+/// tendered at the till on the scheme's liability account - and lose them at expiry, oldest first. The value of points issued is kept as
 /// a liability (Dr loyalty cost, Cr liability on earning; reversed on expiry). Member pricing is a member-only promotion.
 /// </summary>
 public interface ILoyaltyService

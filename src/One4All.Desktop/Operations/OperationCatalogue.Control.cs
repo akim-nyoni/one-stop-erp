@@ -81,7 +81,7 @@ public static partial class OperationCatalogue
         {
             Module = budgeting, Title = "Budget methods and forecasts", ListTitle = "Budgets",
             Description = "Builds a draft budget incrementally from a prior year's actuals or budget with an uplift (accounts the draft already has are left alone); reforecasts a budget "
-                + "with the actuals to a period and the budget for the rest (a new Reforecast version); and shows its cash budget — each line turned into cash by its timing "
+                + "with the actuals to a period and the budget for the rest (a new Reforecast version); and shows its cash budget - each line turned into cash by its timing "
                 + "(prefix:p0/p1/…; e.g. 4:50/30/20 collects sales over three months) from the opening cash.",
             Fields = [Pick("Step", "Step", ["Build from prior-year actuals", "Build from prior-year budget", "Reforecast", "Cash budget"]), Num("Budget", "Budget id"),
                 OptNum("SourceYear", "Prior fiscal year id (build)"), Num("Uplift", "Uplift % (build)", "0"), Opt("Prefix", "Accounts starting (build; blank: all)"),
@@ -121,7 +121,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = budgeting, Title = "Virements", ListTitle = "Virements",
-            Description = "Moves budget from one vote to another — between cost centres, or to another department's budget of the same year — requested with a justification, approved "
+            Description = "Moves budget from one vote to another - between cost centres, or to another department's budget of the same year - requested with a justification, approved "
                 + "or rejected by another user whose authorisation level covers the amount's band (Bands: limit:level; …, blank limit for the top band); the register shows each "
                 + "vote's original, virements in and out, and current amount.",
             Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Register", "Bands"]), OptNum("Budget", "Budget id (request, register)"), Opt("From", "From account"), Opt("To", "To account"),
@@ -191,7 +191,7 @@ public static partial class OperationCatalogue
                         : throw new OperationException($"\"{t}\" is not a percentage."))];
                 IReadOnlyList<UtilisationAlert> alerts = await control.UtilisationAlertsAsync(c.CompanyId, year, i.Whole("Period"), thresholds).ConfigureAwait(true);
                 return alerts.Count == 0 ? "No vote is past a threshold." : string.Join(Environment.NewLine, alerts.Select(a => $"{a.AccountCode,-10} {a.Name,-24} {a.PercentUsed,6:0.0}% used "
-                    + $"({M(a.Used)} of {M(a.Appropriation)}) — past {a.ThresholdCrossed:0.##}%"));
+                    + $"({M(a.Used)} of {M(a.Appropriation)}) - past {a.ThresholdCrossed:0.##}%"));
             },
         };
         yield return new Operation

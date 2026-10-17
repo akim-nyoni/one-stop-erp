@@ -49,7 +49,7 @@ public sealed class HrAlertService : IHrAlertService
             Add(e, $"{e.EmploymentType} contract ends", e.ContractEndDate);
             if (e.ProbationEndDate is DateOnly probation && probation >= asAt.AddDays(-30))
             {
-                Add(e, "Probation ends — confirm or extend", probation);
+                Add(e, "Probation ends - confirm or extend", probation);
             }
         }
 

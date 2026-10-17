@@ -27,7 +27,7 @@ public sealed record NavItemSpec(string? ConsoleModule, string? Operation, strin
 
 /// <summary>
 /// The desktop's navigation (redesigned for people who are not accountants or IT staff): each business module holds only its own screens, grouped
-/// the way the work is done — set up, day-to-day, look up, period end — with plain names. Every operations-console action is placed in exactly one
+/// the way the work is done - set up, day-to-day, look up, period end - with plain names. Every operations-console action is placed in exactly one
 /// module; one this map does not name falls into its module's "More" group, so nothing is ever unreachable.
 /// </summary>
 public static class NavigationMap

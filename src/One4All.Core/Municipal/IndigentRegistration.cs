@@ -14,7 +14,7 @@ public enum IndigentStatus
 
 /// <summary>
 /// An entry on the indigent / social-tariff register (<c>mun.indigent_registration</c>, brief §4.9): a household found,
-/// on a means test, to qualify for a subsidy on its property's bills — a share of what is billed each month — until the
+/// on a means test, to qualify for a subsidy on its property's bills - a share of what is billed each month - until the
 /// date its means test must be reviewed. Past that date no subsidy is given until it is reviewed again.
 /// </summary>
 public sealed class IndigentRegistration : AuditableEntity, ICompanyScoped

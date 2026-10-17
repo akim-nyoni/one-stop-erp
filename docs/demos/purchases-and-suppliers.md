@@ -14,7 +14,7 @@ Goal: show that suppliers, requisitions and orders, receiving goods, supplier in
 
 ## Receiving goods
 7. Open **Receive goods**. Books a goods received note against an order into a warehouse (stock in, goods-received-not-invoiced accrued). Fill in: Order number, Warehouse, GRN number, Date. Press OK and point out the result line and the list on the right.
-8. Open **Quality inspection of a receipt**. Inspects goods received on a GRN held for quality: per item, what passed (released to the warehouse) and what was rejected (returned, with a credit note) — "ITEM:passed:rejected:reason; …". Fill in: GRN number, Results: ITEM:passed:rejected[:reason]; …, Release to warehouse, Date. Press OK and point out the result line and the list on the right.
+8. Open **Quality inspection of a receipt**. Inspects goods received on a GRN held for quality: per item, what passed (released to the warehouse) and what was rejected (returned, with a credit note) - "ITEM:passed:rejected:reason; …". Fill in: GRN number, Results: ITEM:passed:rejected[:reason]; …, Release to warehouse, Date. Press OK and point out the result line and the list on the right.
 9. Open **Return stock to a supplier**. Sends accepted stock back to the supplier: the stock leaves the warehouse at average cost and the supplier's account is debited at the agreed return price (a debit note), any difference to the price variance account. Fill in: Supplier, Product, Warehouse, Quantity, Return unit price, Date, Return document number, Price variance account. Press OK and point out the result line and the list on the right.
 
 ## Invoices and payments

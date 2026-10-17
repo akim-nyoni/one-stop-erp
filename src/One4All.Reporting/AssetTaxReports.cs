@@ -58,7 +58,7 @@ public static class AssetTaxReports
         yield return Listing("TX224", "Annual Financial Statements Pack", "Tax", "Statement of financial position and profit or loss by report category for the year to the date, with the prior year's comparatives and the note each line is disclosed in.",
             "FatxAfs", [new Column("Statement", "Statement", 150), new Column("Line", "Line", 200), new Column("Note", "Note", 50), new Column("Prior", "Prior year", 110), new Column("Current", "Current year", 110, true)],
             [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("TX225", "Audit File Export (SAF-T style)", "Tax", "Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit — the GL audit file.",
+        yield return Listing("TX225", "Audit File Export (SAF-T style)", "Tax", "Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit - the GL audit file.",
             "FatxAuditFile", [new Column("Journal", "Journal", 95), new Column("Date", "Date", 75), new Column("Period", "Period", 55), new Column("Source", "Source", 50), new Column("Document", "Document", 130),
              new Column("Account", "Account", 65), new Column("TaxCode", "Tax", 50), new Column("Party", "Party", 90), new Column("Currency", "Ccy", 40), new Column("Transaction", "Transaction", 95),
              new Column("Debit", "Debit", 95), new Column("Credit", "Credit", 95), new Column("Narrative", "Narrative", 180)], Period);

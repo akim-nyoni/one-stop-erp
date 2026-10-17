@@ -130,7 +130,7 @@ public readonly record struct RevaluationResult(decimal Delta, decimal NewCarryi
 
 /// <summary>
 /// Fixed Assets (brief §4.14). Registers assets, runs monthly depreciation posting to the GL, and disposes
-/// assets recognising the profit or loss — all through the central posting engine.
+/// assets recognising the profit or loss - all through the central posting engine.
 /// </summary>
 public interface IFixedAssetService
 {
@@ -142,7 +142,7 @@ public interface IFixedAssetService
 
     /// <summary>
     /// Capitalises an asset from a posted supplier invoice (brief §4.14: "acquisition from AP invoice"): the invoice's amount on the account it was coded to
-    /// becomes the asset's cost — moved to the class's cost account when coded elsewhere (a clearing or expense account) — and never more than is left uncapitalised.
+    /// becomes the asset's cost - moved to the class's cost account when coded elsewhere (a clearing or expense account) - and never more than is left uncapitalised.
     /// </summary>
     /// <param name="request">The request.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -160,7 +160,7 @@ public interface IFixedAssetService
 
     /// <summary>
     /// Tests an asset for impairment (IAS 36): a recoverable amount below the carrying amount books the loss (Dr impairment, Cr accumulated
-    /// depreciation and impairment); above it, an earlier loss is reversed — never beyond the loss held, nor above what the carrying amount
+    /// depreciation and impairment); above it, an earlier loss is reversed - never beyond the loss held, nor above what the carrying amount
     /// would have been with no impairment. Straight-line depreciation then spreads the new carrying amount over the life left.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -222,7 +222,7 @@ public interface IFixedAssetService
     Task<Result<RevaluationResult>> RevalueAsync(long companyId, long assetId, decimal newCarryingAmount, DateOnly date, string revaluationReserveAccountCode, string impairmentExpenseAccountCode, string documentNumber, CancellationToken ct = default);
 
     /// <summary>
-    /// Transfers an asset to a new location and/or custodian (an asset-register movement — operational, no GL).
+    /// Transfers an asset to a new location and/or custodian (an asset-register movement - operational, no GL).
     /// A null location or custodian leaves that attribute unchanged. Refuses a disposed asset.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -280,7 +280,7 @@ public interface IFixedAssetService
     Task<Result<long>> RecordUsageAsync(long companyId, long assetId, DateOnly date, decimal units, string reference, CancellationToken ct = default);
 
     /// <summary>
-    /// Logs a maintenance/service event against an asset (operational history — no GL posting; the spend is
+    /// Logs a maintenance/service event against an asset (operational history - no GL posting; the spend is
     /// captured separately through the supplier invoice or expense claim that pays for it). Refuses an unknown
     /// or disposed asset, an empty description, or a negative cost.
     /// </summary>

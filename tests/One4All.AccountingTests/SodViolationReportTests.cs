@@ -42,7 +42,7 @@ public sealed class SodViolationReportTests
             IReceiptingService rcp = scope.ServiceProvider.GetRequiredService<IReceiptingService>();
             long sessionId = (await rcp.OpenSessionAsync(companyId, stationId, Cashier, new DateOnly(2026, 3, 1), [new FloatDeclaration(Scenario.Usd, 0m)])).Value;
             await rcp.CloseSessionAsync(companyId, sessionId, new DateOnly(2026, 3, 1), [new FloatDeclaration(Scenario.Usd, 0m)], "1000", "7500");
-            // The cashier tries to verify their own cash-up — refused and logged.
+            // The cashier tries to verify their own cash-up - refused and logged.
             var self = await rcp.VerifySessionAsync(companyId, sessionId, Cashier);
             self.IsFailure.Should().BeTrue();
             self.Error.Code.Should().Be("Rcp.SelfVerify");

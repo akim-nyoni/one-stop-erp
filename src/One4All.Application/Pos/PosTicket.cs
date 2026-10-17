@@ -6,7 +6,7 @@ using One4All.Core.Pos;
 namespace One4All.Application.Pos;
 
 /// <summary>
-/// The context needed to turn a <see cref="PosTicket"/> into a <see cref="CompleteSaleRequest"/> — the
+/// The context needed to turn a <see cref="PosTicket"/> into a <see cref="CompleteSaleRequest"/> - the
 /// surrounding session and the GL accounts each tender posts to. Supplied by the terminal when the sale
 /// is paid.
 /// </summary>
@@ -650,7 +650,7 @@ public sealed class PosTicket
         };
     }
 
-    /// <summary>The ticket's lines as a sale with no tenders yet — the basket a split bill shares out among its payers.</summary>
+    /// <summary>The ticket's lines as a sale with no tenders yet - the basket a split bill shares out among its payers.</summary>
     /// <param name="context">The surrounding session and account mapping.</param>
     /// <returns>The basket, or an error when the ticket is empty or a discounted line has no discount account.</returns>
     public Result<CompleteSaleRequest> BuildBasket(PosSaleContext context)

@@ -5,7 +5,7 @@ namespace One4All.Core.Receipting;
 /// <summary>
 /// A dishonoured cheque / reversed payment (brief §RCP-7, <c>rcp.dishonoured_payment</c>). When a cheque
 /// bounces the original receipt is reversed (restoring the debt), a penalty may be raised, and the event is
-/// recorded — the original receipt is never deleted — for the dishonour register (RC34).
+/// recorded - the original receipt is never deleted - for the dishonour register (RC34).
 /// </summary>
 public sealed class DishonouredPayment : AuditableEntity, ICompanyScoped
 {

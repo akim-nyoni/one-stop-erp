@@ -22,7 +22,7 @@ public enum SchemeType
 }
 
 /// <summary>
-/// A housing scheme / project (brief §4.10.8, <c>hse.scheme</c>) — the organising unit that groups stands,
+/// A housing scheme / project (brief §4.10.8, <c>hse.scheme</c>) - the organising unit that groups stands,
 /// budgets and delivery milestones. Separately licensable from Municipality (brief §4.10).
 /// </summary>
 public sealed class HousingScheme : SoftDeletableEntity, ICompanyScoped
@@ -247,7 +247,7 @@ public sealed class HousingApplicant : SoftDeletableEntity, ICompanyScoped
     }
 
     /// <summary>
-    /// Changes the registration date — the date that sets seniority — under an approved dual-authorised change only.
+    /// Changes the registration date - the date that sets seniority - under an approved dual-authorised change only.
     /// </summary>
     /// <param name="change">The approved change.</param>
     public void ChangeRegistrationDate(RegistrationDateChange change)

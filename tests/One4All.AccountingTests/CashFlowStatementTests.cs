@@ -11,7 +11,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers the Statement of Cash Flows (movement method): movements on tagged accounts are classified into
-/// operating, investing and financing activities, and — because every journal balances — their sum equals
+/// operating, investing and financing activities, and - because every journal balances - their sum equals
 /// the change in cash.
 /// </summary>
 [Collection(AccountingCollection.Name)]

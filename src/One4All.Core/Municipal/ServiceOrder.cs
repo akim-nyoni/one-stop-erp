@@ -27,7 +27,7 @@ public enum ServiceOrderStatus
 
 /// <summary>
 /// A disconnection or reconnection order for a property's service (<c>mun.service_order</c>, brief §4.9 debt management):
-/// raised when arrears pass the council's threshold, carried out by the field team, and — for a reconnection — charged a
+/// raised when arrears pass the council's threshold, carried out by the field team, and - for a reconnection - charged a
 /// fee. The arrears when it was raised are kept for the record.
 /// </summary>
 public sealed class ServiceOrder : AuditableEntity, ICompanyScoped

@@ -10,7 +10,7 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// A cycle count takes only the items due a count — never-counted first, A items more often than C — and posts like a stocktake;
+/// A cycle count takes only the items due a count - never-counted first, A items more often than C - and posts like a stocktake;
 /// the next cycle count judges each item by its last posted count.
 /// </summary>
 [Collection(AccountingCollection.Name)]

@@ -20,7 +20,7 @@ public enum KitchenTicketStatus
 
 /// <summary>
 /// A kitchen order ticket (KOT, <c>res.kitchen_ticket</c>): the items fired from a table order to the
-/// kitchen for preparation. Operational only — no GL effect. Advances Sent → Preparing → Ready → Served.
+/// kitchen for preparation. Operational only - no GL effect. Advances Sent → Preparing → Ready → Served.
 /// </summary>
 public sealed class KitchenTicket : AuditableEntity, ICompanyScoped
 {

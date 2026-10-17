@@ -287,7 +287,7 @@ public sealed class OutboundMessage : Entity, ICompanyScoped
     }
 }
 
-/// <summary>An in-app notification for a user (<c>msg.notification</c>) — the notification centre.</summary>
+/// <summary>An in-app notification for a user (<c>msg.notification</c>) - the notification centre.</summary>
 public sealed class UserNotification : Entity, ICompanyScoped
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>

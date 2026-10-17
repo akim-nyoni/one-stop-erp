@@ -38,7 +38,7 @@ public interface IWorkflowService
 {
     /// <summary>
     /// Lists the in-progress workflows waiting on a user: those whose current stage the user is eligible to
-    /// act on (the stage names them, or names nobody) and has not already approved — the approver's inbox.
+    /// act on (the stage names them, or names nobody) and has not already approved - the approver's inbox.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="userId">The approver.</param>

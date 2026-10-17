@@ -384,7 +384,7 @@ public sealed class ProcurementService : IProcurementService
         var companyRules = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => new { c.InvoicePriceTolerancePercent, c.InvoiceQuantityTolerancePercent }).FirstAsync(ct).ConfigureAwait(false);
         decimal priceTolerance = supplierRules.InvoicePriceTolerancePercent ?? companyRules.InvoicePriceTolerancePercent;
         decimal quantityTolerance = supplierRules.InvoiceQuantityTolerancePercent ?? companyRules.InvoiceQuantityTolerancePercent;
-        if (request.TolerancePercent is decimal asked)
+        if (!request.PriceAcceptedThroughDispute && request.TolerancePercent is decimal asked)
         {
             if (asked > priceTolerance + 0.0001m)
             {
@@ -416,7 +416,7 @@ public sealed class ProcurementService : IProcurementService
 
             // Three-way price check within tolerance.
             decimal tolerance = line.UnitPrice * priceTolerance / 100m;
-            if (Math.Abs(invLine.UnitPrice - line.UnitPrice) > tolerance + 0.0001m)
+            if (!request.PriceAcceptedThroughDispute && Math.Abs(invLine.UnitPrice - line.UnitPrice) > tolerance + 0.0001m)
             {
                 return Error.Rule("Pop.PriceMismatch",
                     $"PO line {line.Id}: invoice price {invLine.UnitPrice} is outside {priceTolerance}% of PO price {line.UnitPrice}.");

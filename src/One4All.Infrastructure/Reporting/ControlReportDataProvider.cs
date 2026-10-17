@@ -31,9 +31,9 @@ public sealed class ControlReportDataProvider : IReportDataProvider
             double hours = ok.Where(l => l.EndedOnUtc is not null).Sum(l => (l.EndedOnUtc!.Value - l.OccurredOnUtc).TotalHours);
             long? userId = g.Select(l => l.UserId).FirstOrDefault(id => id is not null);
             return Row(("User", g.Key), ("Logins", ok.Count), ("Failed", g.Count(l => l.Outcome == "InvalidCredentials")), ("Lockouts", g.Count(l => l.Outcome == "LockedOut")),
-                ("First", ok.Count == 0 ? "—" : ok.Min(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
-                ("Last", ok.Count == 0 ? "—" : ok.Max(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Hours", hours.ToString("0.0", CultureInfo.InvariantCulture)),
-                ("Terminals", string.Join(", ", g.Select(l => l.Terminal ?? "—").Distinct().Order(StringComparer.Ordinal))), ("Reports", userId is long u ? reportRuns.GetValueOrDefault(u) : 0));
+                ("First", ok.Count == 0 ? "-" : ok.Min(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
+                ("Last", ok.Count == 0 ? "-" : ok.Max(l => l.OccurredOnUtc).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Hours", hours.ToString("0.0", CultureInfo.InvariantCulture)),
+                ("Terminals", string.Join(", ", g.Select(l => l.Terminal ?? "-").Distinct().Order(StringComparer.Ordinal))), ("Reports", userId is long u ? reportRuns.GetValueOrDefault(u) : 0));
         })];
     }
 
@@ -46,17 +46,17 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         return [.. sessions.Select(s =>
         {
             List<string> overlapping = [.. sessions.Where(o => o.Id != s.Id && o.UserId == s.UserId && !string.Equals(o.Terminal, s.Terminal, StringComparison.OrdinalIgnoreCase)
-                    && o.OccurredOnUtc < Finish(s) && s.OccurredOnUtc < Finish(o)).Select(o => o.Terminal ?? "—").Distinct()];
-            return Row(("User", s.Username), ("Terminal", s.Terminal ?? "—"), ("Method", s.Method), ("Start", s.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
+                    && o.OccurredOnUtc < Finish(s) && s.OccurredOnUtc < Finish(o)).Select(o => o.Terminal ?? "-").Distinct()];
+            return Row(("User", s.Username), ("Terminal", s.Terminal ?? "-"), ("Method", s.Method), ("Start", s.OccurredOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)),
                 ("End", s.EndedOnUtc?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "open"),
-                ("Minutes", s.EndedOnUtc is DateTimeOffset e ? ((int)(e - s.OccurredOnUtc).TotalMinutes).ToString(CultureInfo.InvariantCulture) : "—"), ("Concurrent", overlapping.Count == 0 ? "—" : string.Join(", ", overlapping)));
+                ("Minutes", s.EndedOnUtc is DateTimeOffset e ? ((int)(e - s.OccurredOnUtc).TotalMinutes).ToString(CultureInfo.InvariantCulture) : "-"), ("Concurrent", overlapping.Count == 0 ? "-" : string.Join(", ", overlapping)));
         })];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> OverridesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
-        string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "—";
+        string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "-";
         List<(DateTimeOffset When, IReadOnlyDictionary<string, object?> Row)> rows = [];
         Core.Pos.PosEventKind[] kinds = [Core.Pos.PosEventKind.PriceOverride, Core.Pos.PosEventKind.Refund, Core.Pos.PosEventKind.NoSale];
         foreach (Core.Pos.PosEvent e in await _db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && kinds.Contains(e.Kind) && e.AuthorisedByUserId != null && e.EventDate >= fromDate && e.EventDate <= toDate)
@@ -89,7 +89,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         foreach ((string scope, long? id) in new (string, long?)[] { ("This company", companyId), ("System-wide", null) })
         {
             AuditChainVerification check = await _audit.VerifyChainAsync(id, ct).ConfigureAwait(false);
-            rows.Add(Row(("Scope", scope), ("Checked", check.EntriesChecked), ("Intact", check.IsIntact ? "Yes" : "NO"), ("FirstBroken", check.FirstBrokenEntryId?.ToString(CultureInfo.InvariantCulture) ?? "—"),
+            rows.Add(Row(("Scope", scope), ("Checked", check.EntriesChecked), ("Intact", check.IsIntact ? "Yes" : "NO"), ("FirstBroken", check.FirstBrokenEntryId?.ToString(CultureInfo.InvariantCulture) ?? "-"),
                 ("Message", check.Message)));
         }
 
@@ -165,7 +165,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         return [.. grants.OrderBy(g => g.Role, StringComparer.Ordinal).ThenBy(g => g.PermissionCode, StringComparer.Ordinal).Select(g =>
         {
             Permission? permission = permissions.GetValueOrDefault(g.PermissionCode);
-            return Row(("Role", g.Role), ("Module", permission?.Module ?? "?"), ("Permission", g.PermissionCode), ("Name", permission?.Name ?? "—"), ("Operations", g.Operations.ToString()));
+            return Row(("Role", g.Role), ("Module", permission?.Module ?? "?"), ("Permission", g.PermissionCode), ("Name", permission?.Name ?? "-"), ("Operations", g.Operations.ToString()));
         })];
     }
 
@@ -178,7 +178,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         ILookup<long, long> userGroups = (await _db.Set<UserGroupMember>().AsNoTracking().ToListAsync(ct).ConfigureAwait(false)).ToLookup(x => x.UserId, x => x.GroupId);
         ILookup<long, long> groupRoles = (await _db.Set<GroupRole>().AsNoTracking().ToListAsync(ct).ConfigureAwait(false)).ToLookup(x => x.GroupId, x => x.RoleId);
         Dictionary<long, int> overrides = (await _db.Set<UserPermissionOverrideEntity>().AsNoTracking().ToListAsync(ct).ConfigureAwait(false)).GroupBy(o => o.UserId).ToDictionary(g => g.Key, g => g.Count());
-        static string List(IEnumerable<string> names) => string.Join(", ", names.Distinct().Order(StringComparer.Ordinal).DefaultIfEmpty("—"));
+        static string List(IEnumerable<string> names) => string.Join(", ", names.Distinct().Order(StringComparer.Ordinal).DefaultIfEmpty("-"));
         return [.. users.Select(u => Row(("User", u.Username), ("Name", u.DisplayName), ("Status", u.IsSystemAdministrator ? "Administrator" : u.IsActive ? "Active" : "Inactive"),
             ("Roles", List(userRoles[u.Id].Select(r => roles.GetValueOrDefault(r, "?")))), ("Groups", List(userGroups[u.Id].Select(g => groups.GetValueOrDefault(g, "?")))),
             ("GroupRoles", List(userGroups[u.Id].SelectMany(g => groupRoles[g]).Select(r => roles.GetValueOrDefault(r, "?")))), ("Overrides", overrides.GetValueOrDefault(u.Id))))];
@@ -200,8 +200,8 @@ public sealed class ControlReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MasterChangesAsync(long companyId, DateTimeOffset start, DateTimeOffset end, CancellationToken ct)
         => [.. (await _db.ChangeLog.AsNoTracking().Where(c => (c.CompanyId == companyId || c.CompanyId == null) && MasterData.Contains(c.EntityType) && c.OccurredOnUtc >= start && c.OccurredOnUtc <= end)
                 .OrderBy(c => c.Id).Take(10000).ToListAsync(ct).ConfigureAwait(false))
-            .Select(c => Row(("When", Stamp(c.OccurredOnUtc)), ("User", c.UserName), ("Entity", c.EntityType), ("Id", c.EntityId ?? "—"), ("Action", c.Action.ToString()),
-                ("Changed", c.ChangedFields.Count == 0 ? "—" : string.Join(", ", c.ChangedFields))))];
+            .Select(c => Row(("When", Stamp(c.OccurredOnUtc)), ("User", c.UserName), ("Entity", c.EntityType), ("Id", c.EntityId ?? "-"), ("Action", c.Action.ToString()),
+                ("Changed", c.ChangedFields.Count == 0 ? "-" : string.Join(", ", c.ChangedFields))))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BackdatedAsync(long companyId, DateTimeOffset start, DateTimeOffset end, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
@@ -211,7 +211,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         return [.. journals.Select(j => (Journal: j, Entered: DateOnly.FromDateTime(j.CreatedOnUtc.UtcDateTime))).Where(x => x.Entered.DayNumber - x.Journal.PostingDate.DayNumber > days)
             .OrderBy(x => x.Entered).ThenBy(x => x.Journal.JournalNumber)
             .Select(x => Row(("Journal", x.Journal.JournalNumber), ("Posting", Date(x.Journal.PostingDate)), ("Entered", Date(x.Entered)), ("DaysBack", x.Entered.DayNumber - x.Journal.PostingDate.DayNumber),
-                ("Source", x.Journal.SourceModule), ("Document", x.Journal.DocumentNumber ?? "—"),
+                ("Source", x.Journal.SourceModule), ("Document", x.Journal.DocumentNumber ?? "-"),
                 ("PreparedBy", users.GetValueOrDefault(x.Journal.PreparedByUserId ?? x.Journal.CreatedByUserId, "?")), ("Narrative", x.Journal.Narrative ?? string.Empty)))];
     }
 
@@ -221,12 +221,12 @@ public sealed class ControlReportDataProvider : IReportDataProvider
                 .Where(c => (c.CompanyId == companyId || c.CompanyId == null) && c.OccurredOnUtc >= start && c.OccurredOnUtc <= end
                     && (c.Action == AuditAction.Delete || (c.NewValues != null && c.NewValues.Contains("\"IsDeleted\":true"))))
                 .OrderBy(c => c.Id).Take(5000).ToListAsync(ct).ConfigureAwait(false))
-            .Select(c => (c.OccurredOnUtc, c.Action == AuditAction.Delete ? "Deleted" : "Retired", c.EntityType, c.EntityId ?? "—", c.UserName, c.Reason ?? "—"))];
+            .Select(c => (c.OccurredOnUtc, c.Action == AuditAction.Delete ? "Deleted" : "Retired", c.EntityType, c.EntityId ?? "-", c.UserName, c.Reason ?? "-"))];
         Dictionary<long, string> users = await UsersAsync(ct).ConfigureAwait(false);
         rows.AddRange((await _db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && (j.Status == JournalStatus.Reversed || j.Status == JournalStatus.Cancelled)
                 && j.ModifiedOnUtc >= start && j.ModifiedOnUtc <= end).ToListAsync(ct).ConfigureAwait(false))
             .Select(j => (j.ModifiedOnUtc!.Value, j.Status == JournalStatus.Reversed ? "Journal reversed" : "Journal cancelled", "JournalEntry", j.JournalNumber,
-                j.ModifiedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "—", j.RejectionReason ?? "—")));
+                j.ModifiedByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "-", j.RejectionReason ?? "-")));
         return [.. rows.OrderBy(r => r.When).Select(r => Row(("When", Stamp(r.When)), ("Kind", r.Kind), ("Entity", r.Entity), ("Id", r.Id), ("User", r.User), ("Reason", r.Reason)))];
     }
 
@@ -243,14 +243,14 @@ public sealed class ControlReportDataProvider : IReportDataProvider
             .Where(j => j.CompanyId == companyId && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred || j.AwaitingApproval))
             .OrderBy(j => j.PostingDate).ThenBy(j => j.JournalNumber).ToListAsync(ct).ConfigureAwait(false);
         return [.. journals.Select(j => Row(("Journal", j.JournalNumber), ("Posting", Date(j.PostingDate)), ("Status", j.AwaitingApproval ? "Awaiting approval" : j.Status.ToString()),
-            ("Source", j.SourceModule), ("Document", j.DocumentNumber ?? "—"), ("PreparedBy", users.GetValueOrDefault(j.PreparedByUserId ?? j.CreatedByUserId, "?")), ("Narrative", j.Narrative ?? string.Empty)))];
+            ("Source", j.SourceModule), ("Document", j.DocumentNumber ?? "-"), ("PreparedBy", users.GetValueOrDefault(j.PreparedByUserId ?? j.CreatedByUserId, "?")), ("Narrative", j.Narrative ?? string.Empty)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LicencesAsync(CancellationToken ct)
     {
         Dictionary<long, string> users = await UsersAsync(ct).ConfigureAwait(false);
         return [.. (await _db.InstalledLicences.AsNoTracking().OrderBy(l => l.InstalledOnUtc).ToListAsync(ct).ConfigureAwait(false))
-            .Select(l => Row(("Installed", Stamp(l.InstalledOnUtc)), ("By", l.InstalledByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "—"), ("Active", l.IsActive ? "Yes" : "No"),
+            .Select(l => Row(("Installed", Stamp(l.InstalledOnUtc)), ("By", l.InstalledByUserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "-"), ("Active", l.IsActive ? "Yes" : "No"),
                 ("Fingerprint", Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(l.Token)))[..16])))];
     }
 
@@ -259,7 +259,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         Dictionary<long, string> users = await UsersAsync(ct).ConfigureAwait(false);
         return [.. (await _db.Set<ReportRun>().AsNoTracking().Where(r => r.CompanyId == companyId && r.RunAt >= start && r.RunAt <= end).OrderBy(r => r.RunAt).Take(10000).ToListAsync(ct).ConfigureAwait(false))
             .Select(r => Row(("When", Stamp(r.RunAt)), ("Report", r.ReportCode), ("User", r.UserId is long u ? users.GetValueOrDefault(u, $"user {u}") : "system"), ("Purpose", r.Purpose.ToString()),
-                ("Format", r.Format), ("Bytes", r.Bytes), ("Copy", r.CopyNumber?.ToString(CultureInfo.InvariantCulture) ?? "—"), ("Parameters", r.Parameters)))];
+                ("Format", r.Format), ("Bytes", r.Bytes), ("Copy", r.CopyNumber?.ToString(CultureInfo.InvariantCulture) ?? "-"), ("Parameters", r.Parameters)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RatesAsync(CancellationToken ct)
@@ -270,7 +270,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> SequencesAsync(long companyId, CancellationToken ct)
         => [.. (await _db.NumberSequences.AsNoTracking().Include(s => s.Years).Where(s => s.CompanyId == companyId).OrderBy(s => s.DocumentType).ThenBy(s => s.BranchId).ToListAsync(ct).ConfigureAwait(false))
-            .Select(s => Row(("Document", s.DocumentType), ("Prefix", s.Prefix), ("Branch", s.BranchId?.ToString(CultureInfo.InvariantCulture) ?? "—"), ("Padding", s.Padding),
+            .Select(s => Row(("Document", s.DocumentType), ("Prefix", s.Prefix), ("Branch", s.BranchId?.ToString(CultureInfo.InvariantCulture) ?? "-"), ("Padding", s.Padding),
                 ("Yearly", s.ResetYearly ? "Yes" : "No"), ("Gapless", s.Gapless ? "Yes" : "No"),
                 ("Next", s.ResetYearly && s.Years.Count > 0 ? string.Join(", ", s.Years.OrderBy(y => y.Year).Select(y => $"{y.Year}: {y.NextValue}")) : s.NextValue.ToString(CultureInfo.InvariantCulture))))];
 
@@ -291,13 +291,13 @@ public sealed class ControlReportDataProvider : IReportDataProvider
 
         return [.. typeof(Company).GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.GetIndexParameters().Length == 0 && Simple(p.PropertyType))
             .OrderBy(p => p.Name, StringComparer.Ordinal)
-            .Select(p => Row(("Setting", p.Name), ("Value", Convert.ToString(p.GetValue(company), CultureInfo.InvariantCulture) ?? "—")))];
+            .Select(p => Row(("Setting", p.Name), ("Value", Convert.ToString(p.GetValue(company), CultureInfo.InvariantCulture) ?? "-")))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ReportInventoryAsync(long companyId, CancellationToken ct)
         => [.. (await _db.Set<ReportDefinitionRecord>().AsNoTracking().Where(r => r.CompanyId == null || r.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
             .OrderBy(r => r.Scope).ThenBy(r => r.Code, StringComparer.Ordinal)
-            .Select(r => Row(("Code", r.Code), ("Name", r.Name), ("Module", r.Module ?? "—"), ("Scope", r.Scope.ToString()), ("Version", r.Version), ("Changed", Stamp(r.ModifiedOnUtc ?? r.CreatedOnUtc))))];
+            .Select(r => Row(("Code", r.Code), ("Name", r.Name), ("Module", r.Module ?? "-"), ("Scope", r.Scope.ToString()), ("Version", r.Version), ("Changed", Stamp(r.ModifiedOnUtc ?? r.CreatedOnUtc))))];
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> JobsAsync(long companyId, DateTimeOffset start, DateTimeOffset end, CancellationToken ct)
     {

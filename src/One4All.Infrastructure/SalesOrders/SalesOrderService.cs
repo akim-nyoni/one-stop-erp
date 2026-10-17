@@ -488,7 +488,7 @@ public sealed class SalesOrderService : ISalesOrderService
         => _db.AtomicAsync(() => InvoiceCoreAsync(request, ct), ct);
 
     // Every line is checked first; the lines are marked invoiced only once the AR invoice has posted, and both are
-    // committed together — a refused invoice (customer on hold, over the credit limit) leaves the order untouched.
+    // committed together - a refused invoice (customer on hold, over the credit limit) leaves the order untouched.
     private async Task<Result<InvoiceOrderResult>> InvoiceCoreAsync(InvoiceOrderRequest request, CancellationToken ct)
     {
         SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)

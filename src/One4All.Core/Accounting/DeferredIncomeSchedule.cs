@@ -4,7 +4,7 @@ namespace One4All.Core.Accounting;
 
 /// <summary>
 /// Income billed in advance and earned evenly over a service period (<c>gl.deferred_income_schedule</c>; IFRS 15 over-time
-/// recognition — school fees for a term, annual licences). The billing credits <see cref="DeferredAccountCode"/>; the
+/// recognition - school fees for a term, annual licences). The billing credits <see cref="DeferredAccountCode"/>; the
 /// recognition run moves the earned share to <see cref="RevenueAccountCode"/> day by day.
 /// </summary>
 public sealed class DeferredIncomeSchedule : AuditableEntity, ICompanyScoped

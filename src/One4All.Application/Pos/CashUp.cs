@@ -3,7 +3,7 @@ namespace One4All.Application.Pos;
 /// <summary>
 /// The cash reconciliation for a till session at close (cash-up). The drawer should hold the opening float
 /// plus the net cash taken (cash tendered less change given); the variance is what was counted minus that
-/// expectation — positive is an overage, negative a shortage. Kept as a pure value so the arithmetic is
+/// expectation - positive is an overage, negative a shortage. Kept as a pure value so the arithmetic is
 /// unit-tested; the POS service supplies the figures from the session's sales and posts the variance.
 /// </summary>
 /// <param name="OpeningFloat">The float the drawer opened with.</param>

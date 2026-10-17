@@ -4,19 +4,19 @@ namespace One4All.Core.Accounting;
 /// whether the account belongs to the balance sheet or the income statement.</summary>
 public enum AccountType
 {
-    /// <summary>Asset — normal debit balance, balance sheet.</summary>
+    /// <summary>Asset - normal debit balance, balance sheet.</summary>
     Asset = 1,
 
-    /// <summary>Liability — normal credit balance, balance sheet.</summary>
+    /// <summary>Liability - normal credit balance, balance sheet.</summary>
     Liability = 2,
 
-    /// <summary>Equity — normal credit balance, balance sheet.</summary>
+    /// <summary>Equity - normal credit balance, balance sheet.</summary>
     Equity = 3,
 
-    /// <summary>Income — normal credit balance, income statement.</summary>
+    /// <summary>Income - normal credit balance, income statement.</summary>
     Income = 4,
 
-    /// <summary>Expense — normal debit balance, income statement.</summary>
+    /// <summary>Expense - normal debit balance, income statement.</summary>
     Expense = 5,
 }
 
@@ -26,7 +26,7 @@ public enum AccountType
 /// </summary>
 public enum CashFlowCategory
 {
-    /// <summary>Not classified — its movement falls into the statement's unclassified bucket.</summary>
+    /// <summary>Not classified - its movement falls into the statement's unclassified bucket.</summary>
     None = 0,
 
     /// <summary>Operating activities (trading income/expense and working capital).</summary>

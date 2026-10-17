@@ -20,7 +20,7 @@ public enum CompensationStatus
 
 /// <summary>
 /// A claim for compensation on the compulsory acquisition of land (<c>hse.compensation_claim</c>, brief §4.10.9 / IAS
-/// 37): provided for once the obligation is probable and measurable — capitalised into the land under development —
+/// 37): provided for once the obligation is probable and measurable - capitalised into the land under development -
 /// remeasured as the estimate changes, and settled or withdrawn.
 /// </summary>
 public sealed class CompensationClaim : AuditableEntity, ICompanyScoped

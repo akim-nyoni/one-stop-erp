@@ -9,7 +9,7 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers forecast timing: an asset bought later in the window is only forecast from its acquisition month,
-/// and a month the run has already charged is not forecast again — so the forecast agrees with what the runs
+/// and a month the run has already charged is not forecast again - so the forecast agrees with what the runs
 /// will actually post.
 /// </summary>
 [Collection(AccountingCollection.Name)]

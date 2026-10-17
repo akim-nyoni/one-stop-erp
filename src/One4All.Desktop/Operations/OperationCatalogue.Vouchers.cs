@@ -15,7 +15,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = ledger, Title = "Accounting vouchers", ListTitle = "Vouchers",
-            Description = "Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … — for a journal, debits positive and credits negative), "
+            Description = "Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … - for a journal, debits positive and credits negative), "
                 + "checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, "
                 + "and printed with prepared / checked / approved signature blocks. Supporting documents attach under Attachments (target AccountingVoucher, key the voucher number).",
             Fields = [Pick("Step", "Step", ["Prepare", "Check", "Approve", "Cancel", "Print"]), Pick("Type", "Type (prepare)", Enum.GetNames<AccountingVoucherType>()), Opt("Number", "Voucher number"),
@@ -58,7 +58,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = suppliers, Title = "Allowance vouchers", ListTitle = "Outstanding allowance vouchers",
-            Description = "Numbered fuel and meal vouchers issued to staff or a department, then reconciled against the supplier's invoice (serial@date; … as billed) — "
+            Description = "Numbered fuel and meal vouchers issued to staff or a department, then reconciled against the supplier's invoice (serial@date; … as billed) - "
                 + "showing any difference between the vouchers' value and the amount invoiced.",
             Fields = [Pick("Step", "Step", ["Issue", "Reconcile invoice"]), Opt("Prefix", "Serial prefix (issue)"), OptNum("First", "First number (issue)"), OptNum("Count", "How many (issue)"),
                 Pick("Kind", "Kind", Enum.GetNames<AllowanceKind>()), Num("Face", "Face value", "0"), Opt("IssuedTo", "Issued to (issue)"), Today("Expires", "Expires on (issue)"),

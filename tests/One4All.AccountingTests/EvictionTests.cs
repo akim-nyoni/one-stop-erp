@@ -14,8 +14,8 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers the eviction workflow: a tenant owing March and April rent gets a case opened with a reminder (a paid-up
 /// tenancy and a second case are refused); demand and notice follow; legal handover waits out the 30-day notice; the
-/// court order needs its reference; eviction on 1 August ends the tenancy — rent billed to that day, the deposit applied
-/// — and returns the unit as void. A second tenant's case is withdrawn once the arrears are paid.
+/// court order needs its reference; eviction on 1 August ends the tenancy - rent billed to that day, the deposit applied
+/// - and returns the unit as void. A second tenant's case is withdrawn once the arrears are paid.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class EvictionTests

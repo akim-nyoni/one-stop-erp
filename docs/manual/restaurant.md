@@ -48,7 +48,7 @@ The list beside the form shows: Open orders.
 
 ### Bill an order
 
-Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), across several tenders (ACCOUNT:amount; …), to a gift card or to a customer's house account — with service charge, tip and discount — issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill.
+Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), across several tenders (ACCOUNT:amount; …), to a gift card or to a customer's house account - with service charge, tip and discount - issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -183,7 +183,7 @@ The list beside the form shows: Waiting.
 
 ### Menu items
 
-Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed), sets a price for a price level (happy hour, staff…), marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) — fired orders give each station its own ticket — and shows a station's queue.
+Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed), sets a price for a price level (happy hour, staff…), marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) - fired orders give each station its own ticket - and shows a station's queue.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -239,21 +239,21 @@ The list beside the form shows: Floor plan.
 
 | Code | Report | What it shows |
 | --- | --- | --- |
-| RES-BILLS | Bills | Every restaurant bill over a period — net, tax, service charge, tip, discount and gross. |
+| RES-BILLS | Bills | Every restaurant bill over a period - net, tax, service charge, tip, discount and gross. |
 | RES-CAT | Category Sales | Billed sales by menu category (starters, mains, drinks…) over a period. |
-| RES-COMB | Combined Tables | Active table groups — the combined tables, their primary and total seats. |
+| RES-COMB | Combined Tables | Active table groups - the combined tables, their primary and total seats. |
 | RES-COST | Menu Cost Card | Every menu item's price, recipe cost (from ingredient average cost), gross margin and food-cost %. |
-| RES-DELIV | Active Deliveries | Delivery orders still in progress — customer, address, driver and dispatch state. |
+| RES-DELIV | Active Deliveries | Delivery orders still in progress - customer, address, driver and dispatch state. |
 | RES-KOT | Kitchen Order Tickets | Open kitchen tickets (not yet served) with their status and item count. |
 | RES-MENU | Menu | Menu items with category, price, recipe ingredient count and availability. |
-| RES-MIX | Menu Engineering | Sales mix by menu item — quantity, revenue, recipe cost, margin and menu-engineering class. |
+| RES-MIX | Menu Engineering | Sales mix by menu item - quantity, revenue, recipe cost, margin and menu-engineering class. |
 | RES-OTYPE | Sales by Order Type | Billed sales split by fulfilment type (dine-in / takeaway / delivery) over a period. |
-| RES-RESV | Table Reservations | Upcoming table bookings — when, table, guest, party size and contact. |
+| RES-RESV | Table Reservations | Upcoming table bookings - when, table, guest, party size and contact. |
 | RES-SECT | Floor Plan | Floor-plan sections with their tables, seats, live occupancy and assigned server. |
-| RES-SERVER | Server Sales | Billed sales by waiter over a period — orders, net, tax and gross (for tip-out and performance). |
-| RES-SSALES | Section Sales | Billed sales by floor-plan section over a period — orders, net, tax and gross. |
+| RES-SERVER | Server Sales | Billed sales by waiter over a period - orders, net, tax and gross (for tip-out and performance). |
+| RES-SSALES | Section Sales | Billed sales by floor-plan section over a period - orders, net, tax and gross. |
 | RES-TBL | Table Status | Tables with seats and current status. |
 | RES-TIPS | Tip Allocations | Pooled tips allocated to staff, with amount and payment status. |
-| RES-VOID | Voids &amp; Comps | Voided and comped order lines over a period, with reasons and the authorising manager — for oversight. |
+| RES-VOID | Voids &amp; Comps | Voided and comped order lines over a period, with reasons and the authorising manager - for oversight. |
 | RES-WAIT | Waitlist | Walk-in parties currently queued for a table, in the order they joined. |
 | RES-WASTE | Stock Wastage | Spoilage / waste of stock ingredients over a period, with reasons and value written off. |

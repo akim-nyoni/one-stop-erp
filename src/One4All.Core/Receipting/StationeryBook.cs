@@ -8,14 +8,14 @@ public enum StationeryBookStatus
     /// <summary>Issued to a named cashier, in use.</summary>
     Issued = 1,
 
-    /// <summary>Returned — accounted for.</summary>
+    /// <summary>Returned - accounted for.</summary>
     Returned = 2,
 }
 
 /// <summary>
 /// A pre-numbered manual receipt book (brief §RCP-11, <c>rcp.stationery_book</c>). Because the power goes
 /// out and someone writes a manual receipt, books are registered by serial range, issued to a named
-/// cashier, and every manual receipt must be captured with its original serial — so gaps and unreturned
+/// cashier, and every manual receipt must be captured with its original serial - so gaps and unreturned
 /// books are provable. Real auditors test this.
 /// </summary>
 public sealed class StationeryBook : SoftDeletableEntity, ICompanyScoped

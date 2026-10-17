@@ -75,7 +75,7 @@ public interface IReportingTreeService
     /// <summary>Rolls posted amounts (debit-positive, shown credit-positive where the heading says) up through the tree for a date range.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="treeCode">The tree.</param>
-    /// <param name="from">The first day (null: from the beginning — a balance).</param>
+    /// <param name="from">The first day (null: from the beginning - a balance).</param>
     /// <param name="to">The last day.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The lines in tree order, or why not.</returns>

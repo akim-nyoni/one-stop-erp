@@ -15,10 +15,10 @@ public static class LedgerReports
     /// <returns>The definitions, in brief order.</returns>
     public static IEnumerable<ReportDefinition> All()
     {
-        yield return Listing("GL2", "Trial Balance — Multi-currency", "GeneralLedger", "Posted balances as at the date per account and transaction currency, in transaction and base.",
+        yield return Listing("GL2", "Trial Balance - Multi-currency", "GeneralLedger", "Posted balances as at the date per account and transaction currency, in transaction and base.",
             "GledMultiCurrencyTb", [new Column("Account", "Account", 70), new Column("Name", "Name", 180), new Column("Currency", "Currency", 55), new Column("Transaction", "Transaction balance", 110),
              new Column("Base", "Base balance", 110, true)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("GL2R", "Trial Balance — Reporting Currency", "GeneralLedger", "Posted balances as at the date per account in base and in the company's reporting currency, each "
+        yield return Listing("GL2R", "Trial Balance - Reporting Currency", "GeneralLedger", "Posted balances as at the date per account in base and in the company's reporting currency, each "
             + "posting carried at the rate of its day.",
             "GledReportingTb", [new Column("Account", "Account", 70), new Column("Name", "Name", 180), new Column("Base", "Base balance", 110), new Column("Currency", "Reporting currency", 60),
              new Column("Reporting", "Reporting balance", 110, true)], [("AsAtDate", ParameterType.Date)]);
@@ -50,7 +50,7 @@ public static class LedgerReports
         yield return Listing("GL17", "Suspense & Unallocated Items Review", "GeneralLedger", "Balances on suspense accounts and unallocated receipts and payments on the trading ledgers at the date.",
             "GledSuspense", [new Column("Item", "Item", 180), new Column("Reference", "Account / ledger", 120), new Column("Count", "Items", 50), new Column("Oldest", "Oldest", 75), new Column("Balance", "Balance", 100, true)],
             [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("GL18", "Control Reconciliation — VAT and Bank", "GeneralLedger", "Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap.",
+        yield return Listing("GL18", "Control Reconciliation - VAT and Bank", "GeneralLedger", "Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap.",
             "GledControlLegs", [new Column("Control", "Control", 110), new Column("Account", "Account", 90), new Column("Ledger", "Ledger", 100), new Column("Other", "Sub-ledger / statement", 120), new Column("Explained", "Explained by", 220),
              new Column("Difference", "Difference", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("GL19", "Period Close Checklist & Status", "GeneralLedger", "Each period of the year to the date: its status per module, whether it is ready to close, and every "

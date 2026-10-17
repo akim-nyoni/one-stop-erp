@@ -23,7 +23,7 @@ public enum JournalStatus
 
 /// <summary>
 /// A single balanced double-entry transaction in the nominal ledger (<c>gl.journal</c>). Every posting
-/// path in the system produces one of these through the central posting engine — the engine guarantees
+/// path in the system produces one of these through the central posting engine - the engine guarantees
 /// Dr = Cr in base currency (and per transaction currency), an open period, valid accounts, a gapless
 /// number and an audit trail. A posted journal is never edited or deleted; corrections are reversals.
 /// </summary>
@@ -86,7 +86,7 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
     public string? IdempotencyKey { get; set; }
 
     /// <summary>
-    /// Whether this is a manual (user-keyed) journal. Manual journals may not touch control accounts — checked by the
+    /// Whether this is a manual (user-keyed) journal. Manual journals may not touch control accounts - checked by the
     /// posting engine and, independently, by a database trigger on the journal lines (brief §3.1).
     /// </summary>
     public bool IsManual { get; set; }

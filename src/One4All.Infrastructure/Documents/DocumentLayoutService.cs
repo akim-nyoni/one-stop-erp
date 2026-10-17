@@ -80,7 +80,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         return new BusinessDocument
         {
             Title = "Order Confirmation", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyName = await CustomerAsync(order.CustomerId, ct).ConfigureAwait(false),
-            Fields = [("Order", order.OrderNumber), ("Date", D(order.OrderDate)), ("Delivery wanted", order.RequestedDeliveryDate is DateOnly r ? D(r) : "—"), ("Status", order.Status.ToString())],
+            Fields = [("Order", order.OrderNumber), ("Date", D(order.OrderDate)), ("Delivery wanted", order.RequestedDeliveryDate is DateOnly r ? D(r) : "-"), ("Status", order.Status.ToString())],
             Lines = lines, Totals = [($"ORDER TOTAL ({order.Currency}) excl. tax", lines.Sum(l => l.Amount ?? 0m))],
             Notes = ["Thank you for your order. Goods remain ours until paid for in full."],
         };
@@ -106,14 +106,14 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         List<string> notes = packing ? [$"Total weight: {weight.ToString("0.##", CultureInfo.InvariantCulture)} kg. Check the goods against this note before signing."] : ["Received in good order and condition."];
         if (delivery.DeliveredOn is DateOnly delivered)
         {
-            notes.Add($"Signed for on {D(delivered)} by {delivery.ReceivedBy} (POD {delivery.PodReference ?? "—"}).");
+            notes.Add($"Signed for on {D(delivered)} by {delivery.ReceivedBy} (POD {delivery.PodReference ?? "-"}).");
         }
 
         return new BusinessDocument
         {
             Title = packing ? "Packing Note" : "Delivery Note", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Deliver to",
             PartyName = await CustomerAsync(order.CustomerId, ct).ConfigureAwait(false),
-            Fields = [("Delivery", delivery.Reference), ("Order", order.OrderNumber), ("Despatched", D(delivery.DespatchedOn)), ("Vehicle", delivery.Vehicle ?? "—"), ("Route", delivery.Route ?? "—"), ("Driver", delivery.Driver ?? "—")],
+            Fields = [("Delivery", delivery.Reference), ("Order", order.OrderNumber), ("Despatched", D(delivery.DespatchedOn)), ("Vehicle", delivery.Vehicle ?? "-"), ("Route", delivery.Route ?? "-"), ("Driver", delivery.Driver ?? "-")],
             ShowPrices = false,
             Lines = [.. delivery.Lines.Select(l => new BusinessDocumentLine(items.GetValueOrDefault(l.ItemId)?.Code ?? string.Empty, descriptions.GetValueOrDefault(l.SalesOrderLineId, string.Empty), l.Quantity))],
             Notes = notes, Signatures = packing ? ["Packed by", "Checked by"] : ["Delivered by", "Received by"],
@@ -288,12 +288,12 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
                              join j in _db.Journals.AsNoTracking() on o.JournalEntryId equals j.Id
                              where o.CompanyId == companyId && o.Ledger == Core.Trading.TradingLedger.AccountsReceivable && o.DocumentNumber == invoiceNumber && o.ItemType == Core.Trading.OpenItemType.Invoice
                              select new { o.TraderId, o.DocumentDate, o.DueDate, o.Currency, o.OriginalTransaction, j.Narrative }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (invoice?.Narrative is not string narrative || !narrative.Contains(" fees — ", StringComparison.Ordinal))
+        if (invoice?.Narrative is not string narrative || !narrative.Contains(" fees - ", StringComparison.Ordinal))
         {
             return Error.NotFound("Doc.FeeInvoiceNotFound", $"No fee invoice {invoiceNumber}.");
         }
 
-        string term = narrative[..narrative.IndexOf(" fees — ", StringComparison.Ordinal)];
+        string term = narrative[..narrative.IndexOf(" fees - ", StringComparison.Ordinal)];
         int open = narrative.LastIndexOf('('), close = narrative.LastIndexOf(')');
         string admission = open >= 0 && close > open ? narrative[(open + 1)..close] : string.Empty;
         Core.Schools.Student? student = await _db.Students.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).FirstOrDefaultAsync(s => s.CompanyId == companyId && s.AdmissionNumber == admission, ct).ConfigureAwait(false);
@@ -319,7 +319,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         return new BusinessDocument
         {
             Title = "Fee Invoice", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Bill to", PartyName = await CustomerAsync(invoice.TraderId, ct).ConfigureAwait(false),
-            Fields = [("Invoice", invoiceNumber), ("Date", D(invoice.DocumentDate)), ("Student", student is null ? admission : $"{student.FullName} ({student.AdmissionNumber})"), ("Grade", student?.Grade ?? "—"),
+            Fields = [("Invoice", invoiceNumber), ("Date", D(invoice.DocumentDate)), ("Student", student is null ? admission : $"{student.FullName} ({student.AdmissionNumber})"), ("Grade", student?.Grade ?? "-"),
                 ("Term", term), ("Due by", D(invoice.DueDate))],
             Lines = lines, Totals = [($"AMOUNT DUE ({invoice.Currency})", invoice.OriginalTransaction)], Notes = ["Please quote the student's admission number with every payment."],
         };

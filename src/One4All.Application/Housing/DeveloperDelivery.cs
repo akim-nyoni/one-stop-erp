@@ -2,7 +2,7 @@ namespace One4All.Application.Housing;
 
 /// <summary>
 /// Late-delivery penalties on a developer agreement (brief §4.10.8): each council stand the developer must deliver attracts
-/// the penalty for every month or part month between the deadline and its hand-over — or, while still outstanding, the
+/// the penalty for every month or part month between the deadline and its hand-over - or, while still outstanding, the
 /// assessment date. Pure and unit-tested.
 /// </summary>
 public static class DeveloperDelivery

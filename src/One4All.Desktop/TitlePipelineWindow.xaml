@@ -12,7 +12,7 @@
             </StackPanel>
             <StackPanel>
                 <TextBlock Text="Title Deed Pipeline" FontSize="20" FontWeight="Bold" Foreground="#1E3A2E" />
-                <TextBlock Text="How long every open title application has been at its stage — conveyancer, registry, custody, hand-over." Foreground="#667" FontSize="12" />
+                <TextBlock Text="How long every open title application has been at its stage - conveyancer, registry, custody, hand-over." Foreground="#667" FontSize="12" />
             </StackPanel>
         </DockPanel>
 

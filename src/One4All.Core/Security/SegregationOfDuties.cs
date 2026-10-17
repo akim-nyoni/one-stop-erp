@@ -3,10 +3,10 @@ namespace One4All.Core.Security;
 /// <summary>Severity of a segregation-of-duties conflict.</summary>
 public enum SodSeverity
 {
-    /// <summary>Advisory conflict — warn on assignment, allow with justification.</summary>
+    /// <summary>Advisory conflict - warn on assignment, allow with justification.</summary>
     Medium = 1,
 
-    /// <summary>Serious conflict — a classic fraud vector; warn prominently and report to auditors.</summary>
+    /// <summary>Serious conflict - a classic fraud vector; warn prominently and report to auditors.</summary>
     High = 2,
 }
 

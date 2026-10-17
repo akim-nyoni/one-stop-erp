@@ -18,7 +18,7 @@ public static class DashboardReports
         yield return Listing("DB252", "Daily Flash Report", "System", "The day's sales, receipts and payments against the same day last week and the month to date, with cash at close.",
             "DashFlash", [new Column("Measure", "Measure", 180), new Column("Today", "Today", 110), new Column("LastWeek", "Same day last week", 120), new Column("MonthToDate", "Month to date", 120)],
             [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("DB253", "KPI Scorecard", "System", "This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle — with the direction of travel.",
+        yield return Listing("DB253", "KPI Scorecard", "System", "This month against last: revenue, profit, gross margin, debtor, creditor and stock days, cash cycle - with the direction of travel.",
             "DashKpi", [new Column("Kpi", "KPI", 200), new Column("ThisMonth", "This month", 110), new Column("LastMonth", "Last month", 110), new Column("Trend", "Trend", 70)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("DB254", "Branch Comparison League Table", "System", "Branches ranked by POS net sales in the period, with transactions, average basket and share.",
             "DashBranches", [new Column("Rank", "Rank", 40), new Column("Branch", "Branch", 150), new Column("Transactions", "Transactions", 80), new Column("AverageBasket", "Avg basket", 85),

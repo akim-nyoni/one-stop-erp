@@ -25,4 +25,4 @@ if ($null -eq $iscc) {
 $env:ONE4ALL_VERSION = $Version
 & $iscc (Join-Path $PSScriptRoot "One4All.iss")
 Write-Host "Installer: $(Join-Path $root "artifacts/installer/One4All-$Version-setup.exe")"
-Write-Host "Server (service): $(Join-Path $publish "server") — run server-install.ps1 there as administrator; licensing tool: $(Join-Path $publish "licensing")"
+Write-Host "Server (service): $(Join-Path $publish "server") - run server-install.ps1 there as administrator; licensing tool: $(Join-Path $publish "licensing")"

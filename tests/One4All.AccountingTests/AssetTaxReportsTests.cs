@@ -76,7 +76,7 @@ public sealed class AssetTaxReportsTests
 
         string reverse = await Render("TX219");
         reverse.Should().Contain("2026-02-10,").And.Contain(",Journal RC-1,RC15,2200,Output,150").And.Contain(",Journal RC-1,RC15,1415,Input,-150").And.Contain(",Journal RC-1,RC15,6000,Base,0");
-        (await Render("TX224")).Should().Contain("Financial position — assets,").And.Contain("Profit or loss,Profit for the year,—,0.00,-3000");
+        (await Render("TX224")).Should().Contain("Financial position - assets,").And.Contain("Profit or loss,Profit for the year,-,0.00,-3000");
         (await Render("TX225")).Should().Contain(",GL,Journal RC-1,2200,RC15,,USD,-150.00,0.00,150.00,").And.Contain(",1600,,,USD,12000.00,12000.00,0.00,");
 
         foreach (string code in AssetTaxReports.All().Select(r => r.Code))

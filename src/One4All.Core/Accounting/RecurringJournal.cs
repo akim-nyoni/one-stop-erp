@@ -4,7 +4,7 @@ namespace One4All.Core.Accounting;
 
 /// <summary>
 /// A saved recurring-journal template (<c>gl.recurring_journal</c>): a balanced set of lines that can be
-/// posted repeatedly (rent, standing charges, provisions) — each post generates a real journal through the
+/// posted repeatedly (rent, standing charges, provisions) - each post generates a real journal through the
 /// central posting engine. The template itself never touches the ledger.
 /// </summary>
 public sealed class RecurringJournal : AuditableEntity, ICompanyScoped

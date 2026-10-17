@@ -14,8 +14,8 @@ namespace One4All.Infrastructure.Reporting;
 
 /// <summary>
 /// Supplies live rows for the vertical-module reports (inventory, fixed assets, payroll, municipality and
-/// budgeting) from their read-side services and registers, so the whole system — not just the ledgers and
-/// receipting — renders live figures through the generic report runner.
+/// budgeting) from their read-side services and registers, so the whole system - not just the ledgers and
+/// receipting - renders live figures through the generic report runner.
 /// </summary>
 public sealed class VerticalReportDataProvider : IReportDataProvider
 {
@@ -307,7 +307,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
                 .OrderBy(h => itemById[h.ItemId].Code, StringComparer.Ordinal).ThenBy(h => warehouses.GetValueOrDefault(h.WarehouseId), StringComparer.Ordinal)
                 .Select(h => Row(new()
                 {
-                    ["ItemCode"] = itemById[h.ItemId].Code, ["Description"] = itemById[h.ItemId].Description, ["Category"] = itemById[h.ItemId].Category ?? "—",
+                    ["ItemCode"] = itemById[h.ItemId].Code, ["Description"] = itemById[h.ItemId].Description, ["Category"] = itemById[h.ItemId].Category ?? "-",
                     ["Costing"] = itemById[h.ItemId].CostingMethod.ToString(), ["WarehouseCode"] = warehouses.GetValueOrDefault(h.WarehouseId, "?"), ["Quantity"] = h.Quantity,
                     ["AverageCost"] = Math.Round(h.Value / h.Quantity, 4, MidpointRounding.AwayFromZero), ["Value"] = Math.Round(h.Value, 2, MidpointRounding.AwayFromZero),
                 }))];
@@ -318,8 +318,8 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
         {
             ["ItemCode"] = l.ItemCode,
             ["Description"] = l.Description,
-            ["Category"] = byCode.TryGetValue(l.ItemCode, out var known) ? known.Category ?? "—" : "—",
-            ["Costing"] = byCode.TryGetValue(l.ItemCode, out var method) ? method.Costing : "—",
+            ["Category"] = byCode.TryGetValue(l.ItemCode, out var known) ? known.Category ?? "-" : "-",
+            ["Costing"] = byCode.TryGetValue(l.ItemCode, out var method) ? method.Costing : "-",
             ["WarehouseCode"] = l.WarehouseCode,
             ["Quantity"] = l.Quantity,
             ["AverageCost"] = l.AverageCost,
@@ -535,7 +535,7 @@ public sealed class VerticalReportDataProvider : IReportDataProvider
             .ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, string> employees = await _db.Set<Employee>()
             .Where(e => e.CompanyId == companyId)
-            .ToDictionaryAsync(e => e.Id, e => $"{e.EmployeeNumber} — {e.FullName}", ct).ConfigureAwait(false);
+            .ToDictionaryAsync(e => e.Id, e => $"{e.EmployeeNumber} - {e.FullName}", ct).ConfigureAwait(false);
 
         return payslips
             .OrderBy(p => employees.GetValueOrDefault(p.EmployeeId, string.Empty))

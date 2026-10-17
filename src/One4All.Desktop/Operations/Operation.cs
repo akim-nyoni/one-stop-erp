@@ -461,7 +461,7 @@ public static class Ops
         return rows.FirstOrDefault(x => string.Equals(key(x), code.Trim(), StringComparison.OrdinalIgnoreCase));
     }
 
-    /// <summary>The code part of a lookup choice ("C001 — Tendai Moyo" → "C001"); other text as it is.</summary>
+    /// <summary>The code part of a lookup choice ("C001 - Tendai Moyo" → "C001"); other text as it is.</summary>
     /// <param name="value">The chosen or typed value.</param>
     /// <returns>The code.</returns>
     public static string? CodeOf(string? value)
@@ -471,12 +471,12 @@ public static class Ops
             return null;
         }
 
-        int dash = value.IndexOf(" — ", StringComparison.Ordinal);
+        int dash = value.IndexOf(" - ", StringComparison.Ordinal);
         return dash > 0 ? value[..dash].Trim() : value;
     }
 
     /// <summary>
-    /// A lookup: the company's records listed as "CODE — Name" to pick from (or the code typed), so nobody has to remember codes. The operation
+    /// A lookup: the company's records listed as "CODE - Name" to pick from (or the code typed), so nobody has to remember codes. The operation
     /// receives the code alone. Optional lookups offer a blank first.
     /// </summary>
     /// <param name="name">The field name.</param>
@@ -488,11 +488,11 @@ public static class Ops
         => new(name, label, FieldKind.Choice, Required: required, Choices: [], ChoicesFrom: async c =>
         {
             List<(string Code, string Name)> found = await rows(c).ConfigureAwait(true);
-            IEnumerable<string> shown = found.Select(r => string.IsNullOrWhiteSpace(r.Name) || r.Name == r.Code ? r.Code : $"{r.Code} — {r.Name}");
+            IEnumerable<string> shown = found.Select(r => string.IsNullOrWhiteSpace(r.Name) || r.Name == r.Code ? r.Code : $"{r.Code} - {r.Name}");
             return required ? [.. shown] : [string.Empty, .. shown];
         });
 
-    /// <summary>A customer lookup (code — name).</summary>
+    /// <summary>A customer lookup (code - name).</summary>
     /// <param name="name">The field name.</param>
     /// <param name="label">The label.</param>
     /// <param name="required">Whether one must be chosen.</param>
@@ -501,7 +501,7 @@ public static class Ops
         async c => (await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(2000).Select(x => new { x.Code, x.Name }).ToListAsync().ConfigureAwait(true))
             .Select(x => (x.Code, x.Name)).ToList());
 
-    /// <summary>A supplier lookup (code — name).</summary>
+    /// <summary>A supplier lookup (code - name).</summary>
     /// <param name="name">The field name.</param>
     /// <param name="label">The label.</param>
     /// <param name="required">Whether one must be chosen.</param>
@@ -510,7 +510,7 @@ public static class Ops
         async c => (await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(2000).Select(x => new { x.Code, x.Name }).ToListAsync().ConfigureAwait(true))
             .Select(x => (x.Code, x.Name)).ToList());
 
-    /// <summary>A product / item lookup (code — description).</summary>
+    /// <summary>A product / item lookup (code - description).</summary>
     /// <param name="name">The field name.</param>
     /// <param name="label">The label.</param>
     /// <param name="required">Whether one must be chosen.</param>
@@ -519,7 +519,7 @@ public static class Ops
         async c => (await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.Code).Take(2000).Select(x => new { x.Code, x.Description }).ToListAsync().ConfigureAwait(true))
             .Select(x => (x.Code, x.Description)).ToList());
 
-    /// <summary>A warehouse / store lookup (code — name).</summary>
+    /// <summary>A warehouse / store lookup (code - name).</summary>
     /// <param name="name">The field name.</param>
     /// <param name="label">The label.</param>
     /// <param name="required">Whether one must be chosen.</param>
@@ -528,7 +528,7 @@ public static class Ops
         async c => (await c.Db.Warehouses.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Select(x => new { x.Code, x.Name }).ToListAsync().ConfigureAwait(true))
             .Select(x => (x.Code, x.Name)).ToList());
 
-    /// <summary>An employee lookup (number — name).</summary>
+    /// <summary>An employee lookup (number - name).</summary>
     /// <param name="name">The field name.</param>
     /// <param name="label">The label.</param>
     /// <param name="required">Whether one must be chosen.</param>

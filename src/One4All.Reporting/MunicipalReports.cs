@@ -102,7 +102,7 @@ public static class MunicipalReports
             [("AsAtDate", ParameterType.Date)]);
         yield return Listing("M170", "Ward Councillor Pack", "Municipal", "One ward: properties, billing, debtors, arrangements, disconnections, indigent households, open faults and licences.",
             "MuniWardPack", [new Column("Section", "Section", 100), new Column("Item", "Item", 220), new Column("Value", "Value", 140)], [("Ward", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
-        yield return Listing("M171", "Statutory Debtors Age Analysis", "Municipal", "Debtors by consumer category aged 30/60/90/120+ as at the date, with a grand total — the statutory return layout.",
+        yield return Listing("M171", "Statutory Debtors Age Analysis", "Municipal", "Debtors by consumer category aged 30/60/90/120+ as at the date, with a grand total - the statutory return layout.",
             "MuniStatutoryAgeing", [new Column("Category", "Category", 100), new Column("Accounts", "Accounts", 60), new Column("Current", "Current", 90), new Column("D30", "1–30", 90),
              new Column("D60", "31–60", 90), new Column("D90", "61–90", 90), new Column("D120", "91–120", 90), new Column("Over120", "120+", 90), new Column("Total", "Total", 100, true)],
             [("AsAtDate", ParameterType.Date)]);

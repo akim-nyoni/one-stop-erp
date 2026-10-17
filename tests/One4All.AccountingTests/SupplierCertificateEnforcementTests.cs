@@ -12,7 +12,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers certificates on the supplier side: an exempt purchase needs the supplier's exemption certificate and a certified supply carries
 /// no tax; a supplier's tax clearance certificate (not only its clearance date) frees its payments from withholding, until revoked; and
-/// the company's default withholding code is deducted from payments to uncleared suppliers that name none — single payments and payment
+/// the company's default withholding code is deducted from payments to uncleared suppliers that name none - single payments and payment
 /// runs alike.
 /// </summary>
 [Collection(AccountingCollection.Name)]

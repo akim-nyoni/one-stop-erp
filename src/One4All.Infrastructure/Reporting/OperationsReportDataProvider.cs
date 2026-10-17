@@ -73,17 +73,17 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
 
     private sealed record FeeInvoice(long OpenItemId, string Admission, string Term, DateOnly Date);
 
-    // School bills are AR invoices whose journal narrative reads "{term} fees — {name} ({admission number})".
+    // School bills are AR invoices whose journal narrative reads "{term} fees - {name} ({admission number})".
     private async Task<List<FeeInvoice>> FeeInvoicesAsync(long companyId, CancellationToken ct)
     {
         var bills = await (from i in _db.OpenItems.AsNoTracking() join j in _db.Journals.AsNoTracking() on i.JournalEntryId equals j.Id
-                           where i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.ItemType == OpenItemType.Invoice && j.Narrative != null && j.Narrative.Contains(" fees — ")
+                           where i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.ItemType == OpenItemType.Invoice && j.Narrative != null && j.Narrative.Contains(" fees - ")
                            select new { i.Id, j.Narrative, i.DocumentDate }).ToListAsync(ct).ConfigureAwait(false);
         return [.. bills.Select(b =>
         {
             int open = b.Narrative!.LastIndexOf('('), close = b.Narrative.LastIndexOf(')');
             string admission = open >= 0 && close > open ? b.Narrative[(open + 1)..close] : string.Empty;
-            string term = b.Narrative[..b.Narrative.IndexOf(" fees — ", StringComparison.Ordinal)];
+            string term = b.Narrative[..b.Narrative.IndexOf(" fees - ", StringComparison.Ordinal)];
             return new FeeInvoice(b.Id, admission, term, b.DocumentDate);
         }).Where(f => f.Admission.Length > 0)];
     }
@@ -221,9 +221,9 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         {
             decimal total = g.Sum(h => h.Value.Cost);
             return g.OrderByDescending(h => h.Value.Cost).ThenBy(h => h.Key.Head, StringComparer.Ordinal).Select(h => Row(("Contract", contracts[g.Key].ContractNumber),
-                ("Name", contracts[g.Key].Name), ("CostHead", h.Key.Head), ("Sources", h.Value.Sources.Count == 0 ? "—" : string.Join(", ", h.Value.Sources)),
+                ("Name", contracts[g.Key].Name), ("CostHead", h.Key.Head), ("Sources", h.Value.Sources.Count == 0 ? "-" : string.Join(", ", h.Value.Sources)),
                 ("Budget", Money(h.Value.Budget)), ("Committed", Money(h.Value.Committed)), ("Cost", Money(h.Value.Cost)),
-                ("Share", total == 0m ? "—" : (h.Value.Cost * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
+                ("Share", total == 0m ? "-" : (h.Value.Cost * 100m / total).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Variance", h.Value.Budget - h.Value.Committed - h.Value.Cost)));
         })];
     }
@@ -251,7 +251,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
                 .ToListAsync(ct).ConfigureAwait(false))
             .Select(c => Row(("Contract", c.ContractNumber), ("Name", c.Name), ("Customer", customers.GetValueOrDefault(c.CustomerId, "?")), ("Status", c.Status.ToString()),
                 ("Rate", c.RetentionPercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Certified", Money(c.CertifiedToDate)), ("Released", Money(c.RetentionReleased)),
-                ("Completed", c.PracticalCompletionDate is DateOnly done ? Date(done) : "—"), ("DefectsEnd", c.DefectsLiabilityEnds is DateOnly end ? Date(end) : "—"),
+                ("Completed", c.PracticalCompletionDate is DateOnly done ? Date(done) : "-"), ("DefectsEnd", c.DefectsLiabilityEnds is DateOnly end ? Date(end) : "-"),
                 ("Releasable", Money(c.RetentionReleasable(asAt))), ("Retention", c.RetentionHeld)))];
     }
 
@@ -265,7 +265,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             .ToListAsync(ct).ConfigureAwait(false);
         return [.. variations.OrderBy(v => contracts.GetValueOrDefault(v.JobContractId), StringComparer.Ordinal).ThenBy(v => v.Number, StringComparer.Ordinal)
             .Select(v => Row(("Contract", contracts.GetValueOrDefault(v.JobContractId, "?")), ("Number", v.Number), ("Description", v.Description), ("Submitted", Date(v.SubmittedOn)), ("Status", v.Status.ToString()),
-                ("Decided", v.DecidedOn is DateOnly d ? Date(d) : "—"), ("CostImpact", Money(v.CostImpact)), ("ValueImpact", v.ValueImpact)))];
+                ("Decided", v.DecidedOn is DateOnly d ? Date(d) : "-"), ("CostImpact", Money(v.CostImpact)), ("ValueImpact", v.ValueImpact)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TimesheetsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -279,7 +279,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             {
                 decimal hours = g.Sum(t => t.Hours), cost = g.Sum(t => t.Cost);
                 return Row(("Contract", contracts.GetValueOrDefault(g.Key.JobContractId, "?")), ("Employee", employees.GetValueOrDefault(g.Key.EmployeeId, "?")), ("CostHead", g.Key.CostHead),
-                    ("Days", g.Select(t => t.Date).Distinct().Count()), ("Hours", hours.ToString("0.##", CultureInfo.InvariantCulture)), ("Rate", hours == 0m ? "—" : Money(cost / hours)), ("Cost", cost));
+                    ("Days", g.Select(t => t.Date).Distinct().Count()), ("Hours", hours.ToString("0.##", CultureInfo.InvariantCulture)), ("Rate", hours == 0m ? "-" : Money(cost / hours)), ("Cost", cost));
             })];
     }
 
@@ -302,7 +302,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             if (s.RetentionReleased != 0m)
             {
                 rows.Add(Row(("Contract", contracts.GetValueOrDefault(s.JobContractId, "?")), ("Subcontractor", suppliers.GetValueOrDefault(s.SupplierId, "?")), ("Subcontract", s.Reference), ("Document", "Release"),
-                    ("Date", "—"), ("Gross", "—"), ("Retention", Money(-s.RetentionReleased)), ("Position", position), ("Payable", s.RetentionReleased)));
+                    ("Date", "-"), ("Gross", "-"), ("Retention", Money(-s.RetentionReleased)), ("Position", position), ("Payable", s.RetentionReleased)));
             }
         }
 
@@ -321,8 +321,8 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             List<Core.JobCosting.PlantLog> own = [.. logs.Where(l => l.PlantItemId == p.Id)];
             decimal hours = own.Sum(l => l.Hours), recovered = own.Sum(l => l.HireCharge), running = own.Sum(l => l.RunningCost);
             return Row(("Plant", p.Code), ("Name", p.Name), ("Hours", hours.ToString("0.##", CultureInfo.InvariantCulture)), ("Available", available.ToString("0.##", CultureInfo.InvariantCulture)),
-                ("Utilisation", available == 0m ? "—" : (hours * 100m / available).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Recovered", Money(recovered)), ("Running", Money(running)),
-                ("PerHour", hours == 0m ? "—" : Money(running / hours)), ("Net", recovered - running));
+                ("Utilisation", available == 0m ? "-" : (hours * 100m / available).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Recovered", Money(recovered)), ("Running", Money(running)),
+                ("PerHour", hours == 0m ? "-" : Money(running / hours)), ("Net", recovered - running));
         })];
     }
 
@@ -437,7 +437,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
                             where i.CompanyId == companyId && i.ItemType == OpenItemType.Invoice && i.DocumentDate >= fromDate && i.DocumentDate <= toDate && j.Narrative != null && j.Narrative.Contains(tag)
                             select new { j.Narrative, i.OriginalBase }).ToListAsync(ct).ConfigureAwait(false);
         decimal Billed(string code) => billed.Where(b => b.Narrative!.Contains($"{tag}{code}]", StringComparison.Ordinal)).Sum(b => b.OriginalBase);
-        static string Share(int used, int capacity) => capacity == 0 ? "—" : (used * 100m / capacity).ToString("0.0", CultureInfo.InvariantCulture) + "%";
+        static string Share(int used, int capacity) => capacity == 0 ? "-" : (used * 100m / capacity).ToString("0.0", CultureInfo.InvariantCulture) + "%";
         if (transport)
         {
             return [.. (await _db.TransportRoutes.AsNoTracking().Where(r => r.CompanyId == companyId).OrderBy(r => r.Code).ToListAsync(ct).ConfigureAwait(false)).Select(r =>
@@ -484,7 +484,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
             decimal ordered = o.Lines.Sum(l => l.OrderedQuantity), byDue = own.Where(d => d.DeliveredOn <= due).SelectMany(d => d.Lines).Sum(l => l.Quantity);
             bool onTime = own.Count > 0 && own.All(d => d.DeliveredOn <= due), inFull = byDue >= ordered;
             return Row(("Order", o.OrderNumber), ("Customer", customers.GetValueOrDefault(o.CustomerId, "?")), ("Requested", Date(due)), ("Ordered", Qty(ordered)), ("OnTimeQty", Qty(byDue)),
-                ("LastDelivered", own.Count == 0 ? "—" : Date(own.Max(d => d.DeliveredOn!.Value))), ("OnTime", onTime ? "Yes" : "No"), ("InFull", inFull ? "Yes" : "No"), ("Otif", onTime && inFull ? "Yes" : "No"));
+                ("LastDelivered", own.Count == 0 ? "-" : Date(own.Max(d => d.DeliveredOn!.Value))), ("OnTime", onTime ? "Yes" : "No"), ("InFull", inFull ? "Yes" : "No"), ("Otif", onTime && inFull ? "Yes" : "No"));
         })];
     }
 
@@ -495,7 +495,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<long, (string Number, long CustomerId)> orders = await _db.SalesOrders.AsNoTracking().Where(o => o.CompanyId == companyId).ToDictionaryAsync(o => o.Id, o => (o.OrderNumber, o.CustomerId), ct).ConfigureAwait(false);
         Dictionary<long, string> customers = await GuardiansAsync(companyId, ct).ConfigureAwait(false);
         return [.. open.Select(d => Row(("Delivery", d.Reference), ("Order", orders.GetValueOrDefault(d.SalesOrderId).Number ?? "?"), ("Customer", customers.GetValueOrDefault(orders.GetValueOrDefault(d.SalesOrderId).CustomerId, "?")),
-            ("Despatched", Date(d.DespatchedOn)), ("Days", asAt.DayNumber - d.DespatchedOn.DayNumber), ("Vehicle", d.Vehicle ?? "—"), ("Driver", d.Driver ?? "—"), ("Quantity", Qty(d.Lines.Sum(l => l.Quantity)))))];
+            ("Despatched", Date(d.DespatchedOn)), ("Days", asAt.DayNumber - d.DespatchedOn.DayNumber), ("Vehicle", d.Vehicle ?? "-"), ("Driver", d.Driver ?? "-"), ("Quantity", Qty(d.Lines.Sum(l => l.Quantity)))))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> LoadSheetAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
@@ -507,7 +507,7 @@ public sealed class OperationsReportDataProvider : IReportDataProvider
         Dictionary<long, (string Code, decimal? Weight)> items = await _db.Items.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(i => i.CompanyId == companyId).ToDictionaryAsync(i => i.Id, i => (i.Code, i.UnitWeightKg), ct).ConfigureAwait(false);
         return [.. planned.OrderBy(d => d.PlannedFor).ThenBy(d => d.Vehicle ?? "~", StringComparer.Ordinal).ThenBy(d => d.StopSequence ?? int.MaxValue)
             .ThenBy(d => d.Route ?? string.Empty, StringComparer.Ordinal).ThenBy(d => d.Reference, StringComparer.Ordinal)
-            .Select(d => Row(("Date", Date(d.PlannedFor!.Value)), ("Vehicle", d.Vehicle ?? "Unassigned"), ("Route", d.Route ?? "—"), ("Driver", d.Driver ?? "—"), ("Delivery", d.Reference),
+            .Select(d => Row(("Date", Date(d.PlannedFor!.Value)), ("Vehicle", d.Vehicle ?? "Unassigned"), ("Route", d.Route ?? "-"), ("Driver", d.Driver ?? "-"), ("Delivery", d.Reference),
                 ("Order", orders.GetValueOrDefault(d.SalesOrderId).Number ?? "?"), ("Customer", customers.GetValueOrDefault(orders.GetValueOrDefault(d.SalesOrderId).CustomerId, "?")),
                 ("Items", string.Join(", ", d.Lines.Select(l => $"{Qty(l.Quantity)} × {items.GetValueOrDefault(l.ItemId).Code ?? "?"}"))),
                 ("Weight", d.Lines.Sum(l => l.Quantity * (items.GetValueOrDefault(l.ItemId).Weight ?? 0m)))))];

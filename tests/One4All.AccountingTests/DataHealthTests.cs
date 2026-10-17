@@ -14,8 +14,8 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers the Data Health dashboard: a clean company is all OK; then a deferred journal shows as unposted (warning), a
 /// system journal into the receivables control account shows as a control variance (error), a deleted customer still owing
-/// shows as an orphan (warning), and a stock balance below zero shows as negative stock (error) — which the integrity check
-/// also catches — and the dashboard is graded by its worst indicator.
+/// shows as an orphan (warning), and a stock balance below zero shows as negative stock (error) - which the integrity check
+/// also catches - and the dashboard is graded by its worst indicator.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class DataHealthTests

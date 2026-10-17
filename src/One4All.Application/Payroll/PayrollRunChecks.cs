@@ -105,7 +105,7 @@ public static class PayrollRunChecks
 
             if (e.BankDetailsChangedOn is DateTimeOffset changed)
             {
-                Add($"bank details changed on {changed:yyyy-MM-dd} since the last run — confirm before paying");
+                Add($"bank details changed on {changed:yyyy-MM-dd} since the last run - confirm before paying");
             }
         }
 

@@ -41,7 +41,7 @@ public sealed class JournalDaybookReportTests
             });
             inMarch.IsSuccess.Should().BeTrue(inMarch.IsFailure ? inMarch.Error.ToString() : null);
 
-            // Outside the reporting window (April) — must be excluded.
+            // Outside the reporting window (April) - must be excluded.
             var inApril = await engine.PostAsync(new JournalRequest
             {
                 CompanyId = companyId, SourceModule = "GL", PostingDate = new DateOnly(2026, 4, 2), TransactionCurrency = Scenario.Usd,

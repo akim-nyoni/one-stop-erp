@@ -22,6 +22,6 @@ Goal: show that the asset register, depreciation, counts, maintenance and capita
 11. Open **Capitalise a capital project**. Registers the asset at the project's whole cost, clearing CWIP. Fill in: Project code, New asset number, Asset description, Asset class, In use from, Useful life (months), Asset cost account, Accumulated depreciation account, Depreciation expense account. Press OK and point out the result line and the list on the right.
 
 ## Reports to end on
-- FA-DISP Asset Disposals: Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal — newest first. Show the drill-through by clicking a document or account.
+- FA-DISP Asset Disposals: Disposed assets with proceeds, net book value at disposal, the gain or loss, and the journal - newest first. Show the drill-through by clicking a document or account.
 - FA-FCST Depreciation Forecast: Projected monthly depreciation across active assets and the aggregate closing net book value. Show the drill-through by clicking a document or account.
 - FA-MAINT Asset Maintenance Log: Maintenance and service events logged against assets, newest first, with the informational cost. Show the drill-through by clicking a document or account.

@@ -223,7 +223,7 @@ public sealed partial class ReportDesignerViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(_command))
         {
-            return Result.Failure(Error.Rule("Design.NoSource", "Open a source report first — a designed report reuses its data source."));
+            return Result.Failure(Error.Rule("Design.NoSource", "Open a source report first - a designed report reuses its data source."));
         }
 
         SystemReports.Column[] columns = Columns.Select(c => new SystemReports.Column(c.Field.Trim(), c.Header, c.Width, c.Money)).ToArray();

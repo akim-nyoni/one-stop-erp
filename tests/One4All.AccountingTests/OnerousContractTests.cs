@@ -13,7 +13,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers budget revision and the onerous-contract provision: a profitable contract provides nothing, a
 /// revised forecast above the contract value provides the whole loss at once, a further revision posts only
-/// the movement, and an improved forecast releases the provision — with the ledger balancing throughout.
+/// the movement, and an improved forecast releases the provision - with the ledger balancing throughout.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class OnerousContractTests

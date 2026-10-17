@@ -10,7 +10,7 @@ namespace One4All.Infrastructure.Receipting;
 
 /// <summary>
 /// Banking &amp; treasury (brief §RCP-10). Moves counted takings into a cash-in-transit control account and
-/// clears it to the bank when the statement confirms — cash-in-transit is its own control that must clear.
+/// clears it to the bank when the statement confirms - cash-in-transit is its own control that must clear.
 /// </summary>
 public sealed class BankingService : IBankingService
 {

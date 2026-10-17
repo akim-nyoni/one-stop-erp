@@ -11,8 +11,8 @@ namespace One4All.Application.Abstractions.Accounting;
 public readonly record struct PostingReceipt(long JournalId, string JournalNumber, DateOnly PostingDate, decimal TotalBase, bool Deferred);
 
 /// <summary>
-/// The single, central, non-bypassable posting engine (brief §3.2). Every posting in the system —
-/// manual journals, POS sales, invoices, payroll, billing runs — goes through here, inside one database
+/// The single, central, non-bypassable posting engine (brief §3.2). Every posting in the system -
+/// manual journals, POS sales, invoices, payroll, billing runs - goes through here, inside one database
 /// transaction that enforces: Dr = Cr in base currency and per transaction currency; an open period for
 /// the posting module; valid, active, permitted accounts; control-account manual-journal rules; gapless
 /// numbering; the audit trail; and the period-balance update. There is no other way to write to the ledger.
@@ -51,7 +51,7 @@ public interface IPostingEngine
     /// Posts several journals as one all-or-nothing batch (a billing run's bills): the company, periods and accounts are read once, the journal
     /// numbers are allocated under one lock, period balances are updated once per account and one save writes the lot. Refused with
     /// <c>Posting.BatchUnsupported</c> when a journal needs the single path's own checks (deferred, submitted, manual, adjustment period, keyed,
-    /// budget override, fund control) — the caller then posts one by one.
+    /// budget override, fund control) - the caller then posts one by one.
     /// </summary>
     /// <param name="requests">The journals, all of one company.</param>
     /// <param name="ct">Cancellation token.</param>

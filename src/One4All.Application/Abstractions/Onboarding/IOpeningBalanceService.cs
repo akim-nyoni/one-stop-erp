@@ -39,7 +39,7 @@ public sealed record OpeningBalanceReconciliation(string SuspenseAccountCode, de
 
 /// <summary>
 /// The opening balance wizard and master data import (brief §10): customers, suppliers and items from CSV templates; opening stock
-/// (quantity and cost); open receivable and payable items; and the legacy trial balance — sub-ledgers and stock against the migration
+/// (quantity and cost); open receivable and payable items; and the legacy trial balance - sub-ledgers and stock against the migration
 /// suspense account, the trial balance's other accounts with the suspense taking the control balances, so the suspense nets to zero
 /// when the legacy sub-ledgers agree with their controls. Every import validates first: <c>commit = false</c> previews; any error writes
 /// nothing. Columns are named in the header row (dates yyyy-MM-dd, numbers with a dot).
@@ -70,7 +70,7 @@ public interface IOpeningBalanceService
     /// <returns>The report.</returns>
     Task<ImportReport> ImportItemsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
-    /// <summary>Opening stock: item, warehouse, quantity, unit_cost — received on the date against the suspense account.</summary>
+    /// <summary>Opening stock: item, warehouse, quantity, unit_cost - received on the date against the suspense account.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="csv">The file.</param>
     /// <param name="date">The opening date.</param>
@@ -81,7 +81,7 @@ public interface IOpeningBalanceService
     Task<ImportReport> ImportStockAsync(long companyId, string csv, DateOnly date, string suspenseAccountCode, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// Open items: trader, document, date, amount (positive for an invoice, negative for a credit) — posted to the ledger against the
+    /// Open items: trader, document, date, amount (positive for an invoice, negative for a credit) - posted to the ledger against the
     /// suspense account at their own dates and numbers.
     /// </summary>
     /// <param name="companyId">The company.</param>
@@ -94,7 +94,7 @@ public interface IOpeningBalanceService
     Task<ImportReport> ImportOpenItemsAsync(long companyId, TradingLedger ledger, string csv, string suspenseAccountCode, bool commit, CancellationToken ct = default);
 
     /// <summary>
-    /// The legacy trial balance: account, debit, credit — must balance. Non-control accounts are posted as at the date in one opening
+    /// The legacy trial balance: account, debit, credit - must balance. Non-control accounts are posted as at the date in one opening
     /// journal; control accounts are brought in by the sub-ledger imports, so the suspense account takes their trial balance figures.
     /// Loaded once (<c>Migration.TrialBalanceLoaded</c>).
     /// </summary>

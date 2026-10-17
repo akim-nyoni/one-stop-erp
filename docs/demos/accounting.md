@@ -5,7 +5,7 @@ Goal: show that journals, the chart of accounts, tax, currencies and closing the
 ## Journals
 1. Open **Enter a journal**. Lines separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch= and a narrative after '#'; e.g. Fill in: Posting date, Narrative, Lines. Press OK and point out the result line and the list on the right.
 2. Open **Journals awaiting approval**. Approve or reject journals others have entered.
-3. Open **Accounting vouchers**. Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … — for a journal, debits positive and credits negative), checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, and printed with prepared / checked / approved signature blocks. Fill in: Step, Type (prepare), Date. Press OK and point out the result line and the list on the right.
+3. Open **Accounting vouchers**. Payment, receipt, journal and petty cash vouchers: prepared by one user (lines ACCOUNT:amount; … - for a journal, debits positive and credits negative), checked by a second, approved and posted by another (or through the approvals inbox when an AccountingVoucher workflow is defined), cancelled while a draft, and printed with prepared / checked / approved signature blocks. Fill in: Step, Type (prepare), Date. Press OK and point out the result line and the list on the right.
 
 ## Look up
 4. Open **Account enquiry**. An account's postings and balance, and the document behind each one.
@@ -15,11 +15,11 @@ Goal: show that journals, the chart of accounts, tax, currencies and closing the
 ## Chart of accounts
 7. Open **Add an account**. A ledger account; a control account is posted only by its own ledger. Fill in: Account code (up to 8), Name, Type, Control account. Press OK and point out the result line and the list on the right.
 8. Open **Add a cost centre or department**. GL analysis codes of up to three characters. Fill in: Kind, Code (up to 3), Name. Press OK and point out the result line and the list on the right.
-9. Open **Funds, projects and fund accounting**. Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund — the default fund fills sub-ledger postings — and each fund must balance within each journal. Fill in: What. Press OK and point out the result line and the list on the right.
+9. Open **Funds, projects and fund accounting**. Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund - the default fund fills sub-ledger postings - and each fund must balance within each journal. Fill in: What. Press OK and point out the result line and the list on the right.
 
 ## Tax
 10. Open **Add a tax code**. A tax code with its first rate and the accounts it posts to. Fill in: Code, Name, Type, Rate %, Rate from. Press OK and point out the result line and the list on the right.
-11. Open **VAT return**. The VAT due for a period on the company's basis — invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it is paid) — with every adjustment off the ledger listed. Fill in: To, Basis. Press OK and point out the result line and the list on the right.
+11. Open **VAT return**. The VAT due for a period on the company's basis - invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it is paid) - with every adjustment off the ledger listed. Fill in: To, Basis. Press OK and point out the result line and the list on the right.
 12. Open **Pay or settle VAT**. Clears the period's output and input VAT accounts into the VAT payable (or refundable) account and shows output, input and the net. Fill in: From, To, VAT payable account, Document number. Press OK and point out the result line and the list on the right.
 
 ## Currencies
@@ -30,9 +30,9 @@ Goal: show that journals, the chart of accounts, tax, currencies and closing the
 ## Period end
 16. Open **Period close checklist**. Everything to do before a month is closed, ticked off.
 17. Open **Close or reopen a period**. Sets one period's status for one posting module (GL, AR, AP, INV, POS…): Closed stops postings (a soft close can be reopened), PermanentlyClosed can never take another posting (draft or deferred journals dated in it must be posted or deleted first), Open reopens it. Fill in: Fiscal year code, Period number, Posting module, Status. Press OK and point out the result line and the list on the right.
-18. Open **Create a fiscal year**. Monthly periods from the start date (any month — e.g. Fill in: Year code, First day, Periods (monthly), Calendar. Press OK and point out the result line and the list on the right.
+18. Open **Create a fiscal year**. Monthly periods from the start date (any month - e.g. Fill in: Year code, First day, Periods (monthly), Calendar. Press OK and point out the result line and the list on the right.
 
 ## Reports to end on
-- GL-BS Balance Sheet: Assets, liabilities and equity as at a date; assets equal liabilities plus equity — beside the position a year earlier and the change. Show the drill-through by clicking a document or account.
+- GL-BS Balance Sheet: Assets, liabilities and equity as at a date; assets equal liabilities plus equity - beside the position a year earlier and the change. Show the drill-through by clicking a document or account.
 - GL-CF Statement of Cash Flows: Cash generated by operating, investing and financing activities for a period, reconciled to the change in cash. Show the drill-through by clicking a document or account.
 - GL-COA Chart of Accounts: Every ledger account with its type, report category, control flag and active status. Show the drill-through by clicking a document or account.

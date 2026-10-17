@@ -17,8 +17,8 @@ namespace One4All.Desktop;
 
 /// <summary>
 /// The teller's screen (brief §RCP-3), laid out like the till: a guide strip on top (open the session there), the payer on the left (find as you
-/// type, see what they owe), the money on the right (currency, amount with a keypad, reference, the tender buttons) — one receipt per tender,
-/// or a split across several — posting against the teller's open session.
+/// type, see what they owe), the money on the right (currency, amount with a keypad, reference, the tender buttons) - one receipt per tender,
+/// or a split across several - posting against the teller's open session.
 /// </summary>
 public sealed class TellerWindow : Window
 {
@@ -67,7 +67,7 @@ public sealed class TellerWindow : Window
     {
         _services = services;
         _userId = userId;
-        Title = "Teller — take a payment";
+        Title = "Teller - take a payment";
         Width = 1100;
         Height = 760;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -83,7 +83,7 @@ public sealed class TellerWindow : Window
         DockPanel.SetDock(close, Dock.Right);
         header.Children.Add(close);
         StackPanel titles = new();
-        titles.Children.Add(new TextBlock { Text = "💵  Teller — take a payment", FontSize = 18, FontWeight = FontWeights.Bold, Foreground = Ink });
+        titles.Children.Add(new TextBlock { Text = "💵  Teller - take a payment", FontSize = 18, FontWeight = FontWeights.Bold, Foreground = Ink });
         titles.Children.Add(new TextBlock { Text = "Find the payer, choose the currency, type the amount, press the tender. One receipt per tender, or tick Split for several.", FontSize = 12, Foreground = Muted });
         header.Children.Add(titles);
         DockPanel.SetDock(header, Dock.Top);
@@ -124,7 +124,7 @@ public sealed class TellerWindow : Window
         searchBox.Child = searchRow;
         DockPanel.SetDock(searchBox, Dock.Top);
         payerPanel.Children.Add(searchBox);
-        TextBlock hint = new() { Text = "Type an account code or name, a stand number, a student's name or admission number — matches appear as you type.", Foreground = Muted, FontSize = 12, Margin = new Thickness(6, 0, 0, 8), TextWrapping = TextWrapping.Wrap };
+        TextBlock hint = new() { Text = "Type an account code or name, a stand number, a student's name or admission number - matches appear as you type.", Foreground = Muted, FontSize = 12, Margin = new Thickness(6, 0, 0, 8), TextWrapping = TextWrapping.Wrap };
         DockPanel.SetDock(hint, Dock.Top);
         payerPanel.Children.Add(hint);
 
@@ -272,7 +272,7 @@ public sealed class TellerWindow : Window
         {
             foreach (var station in await db.CashierStations.AsNoTracking().Where(s => s.CompanyId == _companyId).OrderBy(s => s.Code).Select(s => new { s.Id, s.Code, s.Name }).ToListAsync().ConfigureAwait(true))
             {
-                _station.Items.Add(new ComboBoxItem { Content = $"{station.Code} — {station.Name}", Tag = station.Id });
+                _station.Items.Add(new ComboBoxItem { Content = $"{station.Code} - {station.Name}", Tag = station.Id });
             }
 
             _station.SelectedIndex = _station.Items.Count > 0 ? 0 : -1;
@@ -290,13 +290,13 @@ public sealed class TellerWindow : Window
         {
             _openRow.Visibility = _station.Items.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
             Guide(_station.Items.Count == 0 ? "No cashier station is set up yet: add one under Cashiering › Setup, then open your session here."
-                : "Step 1 of 3 — choose your counter, type the cash you start with, and press Open my session.", Amber);
+                : "Step 1 of 3 - choose your counter, type the cash you start with, and press Open my session.", Amber);
             return;
         }
 
         _openRow.Visibility = Visibility.Collapsed;
-        Guide(_selected is null ? "Step 2 of 3 — find the payer: type their account, name or stand number and pick them from the list."
-            : "Step 3 of 3 — type the amount (or press Full balance) and press the tender: CASH, CARD, MOBILE MONEY or CHEQUE. The receipt posts at once.", Green);
+        Guide(_selected is null ? "Step 2 of 3 - find the payer: type their account, name or stand number and pick them from the list."
+            : "Step 3 of 3 - type the amount (or press Full balance) and press the tender: CASH, CARD, MOBILE MONEY or CHEQUE. The receipt posts at once.", Green);
     }
 
     private void Guide(string text, Brush brush)
@@ -509,7 +509,7 @@ public sealed class TellerWindow : Window
         decimal total = Application.Receipting.TenderSplit.Total(_taken);
         string code = _currency?.Code.Value ?? _base.Value;
         decimal left = _currency is null ? 0m : DueIn(_currency) - total;
-        _takeSplit.Content = _taken.Count == 0 ? "Take split payment" : $"Take split payment — {total.ToString("N2", CultureInfo.CurrentCulture)} {code}";
+        _takeSplit.Content = _taken.Count == 0 ? "Take split payment" : $"Take split payment - {total.ToString("N2", CultureInfo.CurrentCulture)} {code}";
         if (on)
         {
             _status.Text = _taken.Count == 0 ? "Type each part's amount and press its tender; then Take split payment."
@@ -556,7 +556,7 @@ public sealed class TellerWindow : Window
 
         ReceiptResult receipt = posted.Value;
         string how = string.Join(" + ", tenders.Select(t => tenders.Count == 1 ? t.Type.ToString() : $"{t.Type} {t.Amount.ToString("N2", CultureInfo.CurrentCulture)}"));
-        _status.Text = $"Receipt {receipt.ReceiptNumber}: {amount.ToString("N2", CultureInfo.CurrentCulture)} {_currency.Code.Value} ({how}) from {_selected.Name} — "
+        _status.Text = $"Receipt {receipt.ReceiptNumber}: {amount.ToString("N2", CultureInfo.CurrentCulture)} {_currency.Code.Value} ({how}) from {_selected.Name} - "
             + $"{receipt.AllocatedToDebt.ToString("N2", CultureInfo.CurrentCulture)} to the account, {receipt.CreditOnAccount.ToString("N2", CultureInfo.CurrentCulture)} credit on account. Next payer?";
         _amount.Text = string.Empty;
         _reference.Text = string.Empty;

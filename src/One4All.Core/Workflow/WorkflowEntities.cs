@@ -11,7 +11,7 @@ public enum WorkflowStatus
     /// <summary>Fully approved.</summary>
     Approved = 1,
 
-    /// <summary>Rejected — the document is refused.</summary>
+    /// <summary>Rejected - the document is refused.</summary>
     Rejected = 2,
 
     /// <summary>Returned to the originator for amendment.</summary>

@@ -71,7 +71,7 @@ public sealed class ReportBurstService : IReportBurstService
             }
 
             Result<long> batch = await _messages.QueueDirectAsync(request.CompanyId, $"{request.ReportCode.Trim().ToUpperInvariant()} {slice.Key}", MessageChannel.Email, recipients,
-                $"{request.ReportCode.Trim().ToUpperInvariant()} — {slice.Key}", $"Please find attached your {request.ReportCode.Trim().ToUpperInvariant()} ({slice.Key}).",
+                $"{request.ReportCode.Trim().ToUpperInvariant()} - {slice.Key}", $"Please find attached your {request.ReportCode.Trim().ToUpperInvariant()} ({slice.Key}).",
                 new MessageAttachment(slice.Document.FileName, slice.Document.ContentType, slice.Document.Content), ct).ConfigureAwait(false);
             if (batch.IsFailure)
             {

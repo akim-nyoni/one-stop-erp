@@ -44,7 +44,7 @@ public sealed class ReportVersioningTests
         // The company changes its title: version 2; the same again changes nothing; broken JSON is refused.
         JsonObject definition = JsonNode.Parse(system.DefinitionJson)!.AsObject();
         string nameKey = definition.ContainsKey("name") ? "name" : "Name";
-        definition[nameKey] = "Trial Balance — Council format";
+        definition[nameKey] = "Trial Balance - Council format";
         string changed = definition.ToJsonString();
         (await reports.SaveAsync(companyId, SystemReports.TrialBalanceCode, "Trial Balance (council)", "GL", changed, 8, "House style")).Value.Should().Be(2);
         (await reports.SaveAsync(companyId, SystemReports.TrialBalanceCode, "Trial Balance (council)", "GL", changed, 8, null)).Error.Code.Should().Be("Rpt.NoChange");
@@ -52,7 +52,7 @@ public sealed class ReportVersioningTests
 
         IReadOnlyList<JsonChange> diff = (await reports.DiffAsync(companyId, SystemReports.TrialBalanceCode, 1, 2)).Value;
         diff.Should().ContainSingle();
-        (diff[0].Path, diff[0].Kind, diff[0].After).Should().Be(($"$.{nameKey}", JsonChangeKind.Changed, JsonValue.Create("Trial Balance — Council format").ToJsonString()));
+        (diff[0].Path, diff[0].Kind, diff[0].After).Should().Be(($"$.{nameKey}", JsonChangeKind.Changed, JsonValue.Create("Trial Balance - Council format").ToJsonString()));
         (await reports.DiffAsync(companyId, SystemReports.TrialBalanceCode, 1, 9)).Error.Code.Should().Be("Rpt.VersionNotFound");
 
         // Rolled back to version 1: saved as version 3, identical to version 1, with the history intact.

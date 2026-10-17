@@ -79,8 +79,8 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
                                 where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate <= asAt && controls.Contains(l.AccountCode)
                                 select l.BaseDebit - l.BaseCredit).SumAsync(ct).ConfigureAwait(false);
         // The ledger lines carry their amounts in the text, so the footer (the sum of the warehouse values) stays the register total.
-        rows.Add(Row(("Line", $"Stock control account(s) {string.Join(", ", controls)}: {Money(ledger)}"), ("Items", "—"), ("Quantity", "—"), ("Value", 0m)));
-        rows.Add(Row(("Line", $"Difference (register − ledger): {Money(registerValue - ledger)}"), ("Items", "—"), ("Quantity", "—"), ("Value", 0m)));
+        rows.Add(Row(("Line", $"Stock control account(s) {string.Join(", ", controls)}: {Money(ledger)}"), ("Items", "-"), ("Quantity", "-"), ("Value", 0m)));
+        rows.Add(Row(("Line", $"Difference (register − ledger): {Money(registerValue - ledger)}"), ("Items", "-"), ("Quantity", "-"), ("Value", 0m)));
         return rows;
     }
 
@@ -113,7 +113,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             decimal? variance = l.CountedQuantity - l.SystemQuantity;
             return Row(("Stocktake", s.Reference), ("Date", Date(s.StocktakeDate)), ("Warehouse", warehouses.GetValueOrDefault(s.WarehouseId, "?")), ("Status", s.Status.ToString()),
                 ("Item", items.GetValueOrDefault(l.ItemId, "?")), ("System", Qty(l.SystemQuantity)), ("Counted", l.CountedQuantity is decimal c ? Qty(c) : "not counted"),
-                ("Variance", variance is decimal v ? Qty(v) : "—"), ("Value", variance is decimal w ? Math.Round(w * l.AverageCost, 2, MidpointRounding.AwayFromZero) : 0m));
+                ("Variance", variance is decimal v ? Qty(v) : "-"), ("Value", variance is decimal w ? Math.Round(w * l.AverageCost, 2, MidpointRounding.AwayFromZero) : 0m));
         }))];
     }
 
@@ -160,7 +160,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         return [.. closing.Keys.Union(issued.Keys).OrderBy(id => items.GetValueOrDefault(id), StringComparer.Ordinal).Select(id =>
         {
             decimal cost = issued.GetValueOrDefault(id), average = (opening.GetValueOrDefault(id) + closing.GetValueOrDefault(id)) / 2m, close = closing.GetValueOrDefault(id);
-            return Row(("Item", items.GetValueOrDefault(id, "?")), ("Issued", Money(cost)), ("AverageStock", Money(average)), ("Turns", average == 0m ? "—" : (cost / average).ToString("0.0", CultureInfo.InvariantCulture)),
+            return Row(("Item", items.GetValueOrDefault(id, "?")), ("Issued", Money(cost)), ("AverageStock", Money(average)), ("Turns", average == 0m ? "-" : (cost / average).ToString("0.0", CultureInfo.InvariantCulture)),
                 ("DaysCover", cost == 0m ? "no issues" : Math.Round(close / (cost / days)).ToString(CultureInfo.InvariantCulture)), ("Value", close));
         })];
     }
@@ -180,8 +180,8 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         return [.. pos.Select(p => (p.ItemId, p.Quantity, p.LineNet)).Concat(orders.Select(o => (o.ItemId, o.Quantity, o.LineNet))).GroupBy(x => x.ItemId)
             .Select(g => (Id: g.Key, Quantity: g.Sum(x => x.Quantity), Sales: g.Sum(x => x.LineNet), Cost: cost.GetValueOrDefault(g.Key)))
             .OrderByDescending(x => x.Sales - x.Cost)
-            .Select(x => Row(("Item", items.TryGetValue(x.Id, out Item? i) ? $"{i.Code} {i.Description}" : "?"), ("Category", items.GetValueOrDefault(x.Id)?.Category ?? "—"), ("Quantity", Qty(x.Quantity)),
-                ("Sales", Money(x.Sales)), ("Cost", Money(x.Cost)), ("MarginPercent", x.Sales == 0m ? "—" : ((x.Sales - x.Cost) * 100m / x.Sales).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
+            .Select(x => Row(("Item", items.TryGetValue(x.Id, out Item? i) ? $"{i.Code} {i.Description}" : "?"), ("Category", items.GetValueOrDefault(x.Id)?.Category ?? "-"), ("Quantity", Qty(x.Quantity)),
+                ("Sales", Money(x.Sales)), ("Cost", Money(x.Cost)), ("MarginPercent", x.Sales == 0m ? "-" : ((x.Sales - x.Cost) * 100m / x.Sales).ToString("0.0", CultureInfo.InvariantCulture) + "%"),
                 ("Margin", x.Sales - x.Cost)))];
     }
 
@@ -206,7 +206,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
                 decimal value = -g.Sum(m => m.Value), departmentSales = sales.GetValueOrDefault(g.Key.Department);
                 return Row(("Department", g.Key.Department), ("Reason", g.Key.Reason.Length == 0 ? "Unspecified / stocktake" : $"{g.Key.Reason} {reasons.GetValueOrDefault(g.Key.Reason, string.Empty)}".Trim()),
                     ("Units", Qty(-g.Sum(m => m.Quantity))), ("Sales", Money(departmentSales)),
-                    ("Share", departmentSales == 0m ? "—" : (value * 100m / departmentSales).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Value", Math.Round(value, 2)));
+                    ("Share", departmentSales == 0m ? "-" : (value * 100m / departmentSales).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Value", Math.Round(value, 2)));
             })];
     }
 
@@ -221,8 +221,8 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         {
             if (receipt.Date >= fromDate && last.TryGetValue(receipt.ItemId, out decimal previous) && previous != receipt.UnitCost)
             {
-                rows.Add(Row(("Item", items.GetValueOrDefault(receipt.ItemId, "?")), ("Date", Date(receipt.Date)), ("Reference", receipt.Reference ?? "—"), ("Previous", Money(previous)), ("Cost", Money(receipt.UnitCost)),
-                    ("Change", previous == 0m ? "—" : ((receipt.UnitCost - previous) * 100m / previous).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Quantity", Qty(receipt.Quantity))));
+                rows.Add(Row(("Item", items.GetValueOrDefault(receipt.ItemId, "?")), ("Date", Date(receipt.Date)), ("Reference", receipt.Reference ?? "-"), ("Previous", Money(previous)), ("Cost", Money(receipt.UnitCost)),
+                    ("Change", previous == 0m ? "-" : ((receipt.UnitCost - previous) * 100m / previous).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Quantity", Qty(receipt.Quantity))));
             }
 
             last[receipt.ItemId] = receipt.UnitCost;
@@ -243,8 +243,8 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         return [.. landed.Select(m =>
         {
             decimal goods = receipts.Where(r => r.ItemId == m.ItemId && r.Date <= m.Date).OrderByDescending(r => r.Date).ThenByDescending(r => r.Id).Select(r => r.Value).FirstOrDefault();
-            return Row(("Date", Date(m.Date)), ("Reference", m.Reference ?? "—"), ("Item", items.GetValueOrDefault(m.ItemId, "?")), ("Goods", Money(goods)),
-                ("Uplift", goods == 0m ? "—" : (m.Value * 100m / goods).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Landed", m.Value));
+            return Row(("Date", Date(m.Date)), ("Reference", m.Reference ?? "-"), ("Item", items.GetValueOrDefault(m.ItemId, "?")), ("Goods", Money(goods)),
+                ("Uplift", goods == 0m ? "-" : (m.Value * 100m / goods).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Landed", m.Value));
         })];
     }
 
@@ -254,7 +254,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
             .Where(m => m.CompanyId == companyId && m.Type == StockMovementType.Adjustment && m.Date >= fromDate && m.Date <= toDate).ToListAsync(ct).ConfigureAwait(false);
         Dictionary<string, string> names = await _db.StockReasonCodes.AsNoTracking().Where(r => r.CompanyId == companyId).ToDictionaryAsync(r => r.Code, r => r.Name, ct).ConfigureAwait(false);
         return [.. adjustments.GroupBy(m => m.ReasonCode ?? string.Empty).OrderBy(g => g.Key.Length == 0).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => Row(
-            ("Reason", g.Key.Length == 0 ? "—" : g.Key), ("Name", g.Key.Length == 0 ? "No reason (stocktake / unspecified)" : names.GetValueOrDefault(g.Key, "?")), ("Count", g.Count()),
+            ("Reason", g.Key.Length == 0 ? "-" : g.Key), ("Name", g.Key.Length == 0 ? "No reason (stocktake / unspecified)" : names.GetValueOrDefault(g.Key, "?")), ("Count", g.Count()),
             ("Gained", Qty(g.Where(m => m.Quantity > 0m).Sum(m => m.Quantity))), ("Lost", Qty(-g.Where(m => m.Quantity < 0m).Sum(m => m.Quantity))), ("Value", g.Sum(m => m.Value))))];
     }
 
@@ -285,7 +285,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         return [.. lots.Where(l => l.OnHand != 0m).OrderBy(l => items.GetValueOrDefault(l.ItemId), StringComparer.Ordinal).ThenBy(l => warehouses.GetValueOrDefault(l.WarehouseId), StringComparer.Ordinal)
             .ThenBy(l => l.Expiry ?? DateOnly.MaxValue).ThenBy(l => l.Lot, StringComparer.Ordinal)
             .Select(l => Row(("Item", items.GetValueOrDefault(l.ItemId, "?")), ("Warehouse", warehouses.GetValueOrDefault(l.WarehouseId, "?")), ("Batch", l.Lot), ("Received", Date(l.First)),
-                ("Expiry", l.Expiry is DateOnly e ? Date(e) : "—"), ("OnHand", Qty(l.OnHand)), ("Value", Math.Round(l.OnHand * costs.GetValueOrDefault((l.ItemId, l.WarehouseId)), 2))))];
+                ("Expiry", l.Expiry is DateOnly e ? Date(e) : "-"), ("OnHand", Qty(l.OnHand)), ("Value", Math.Round(l.OnHand * costs.GetValueOrDefault((l.ItemId, l.WarehouseId)), 2))))];
     }
 
     // A serial is in stock where its lot quantity nets to one; otherwise it last left from the warehouse of its latest movement.
@@ -355,7 +355,7 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
         {
             decimal unit = l.ActualQuantity == 0m ? 0m : l.Cost / l.ActualQuantity, standardCost = Math.Round(l.StandardQuantity * unit, 2);
             return Row(("Run", r.RunNumber), ("Date", Date(r.Date)), ("Item", items.GetValueOrDefault(r.ParentItemId, "?")),
-                ("Yield", $"{Qty(r.PlannedOutput)} → {Qty(r.ActualOutput)} ({BomRules.Yield(r.PlannedOutput, r.ActualOutput)?.ToString("0.0", CultureInfo.InvariantCulture) ?? "—"}%)"),
+                ("Yield", $"{Qty(r.PlannedOutput)} → {Qty(r.ActualOutput)} ({BomRules.Yield(r.PlannedOutput, r.ActualOutput)?.ToString("0.0", CultureInfo.InvariantCulture) ?? "-"}%)"),
                 ("Component", items.GetValueOrDefault(l.ComponentItemId, "?")), ("Standard", Qty(l.StandardQuantity)), ("Actual", Qty(l.ActualQuantity)), ("StandardCost", Money(standardCost)),
                 ("ActualCost", Money(l.Cost)), ("Variance", Math.Round(l.Cost, 2) - standardCost));
         }))];
@@ -432,11 +432,11 @@ public sealed class InventoryReportDataProvider : IReportDataProvider
                 continue;
             }
 
-            List<string> colours = [.. children.Select(v => v.Colour ?? "—").Distinct().Order(StringComparer.Ordinal)];
-            foreach (IGrouping<string, Item> size in children.GroupBy(v => v.Size ?? "—").OrderBy(g => g.Key, StringComparer.Ordinal))
+            List<string> colours = [.. children.Select(v => v.Colour ?? "-").Distinct().Order(StringComparer.Ordinal)];
+            foreach (IGrouping<string, Item> size in children.GroupBy(v => v.Size ?? "-").OrderBy(g => g.Key, StringComparer.Ordinal))
             {
-                string matrix = string.Join("  ", colours.Select(c => $"{c}: {size.FirstOrDefault(v => (v.Colour ?? "—") == c)?.Code ?? "·"}"));
-                rows.Add(Row(("Code", string.Empty), ("Description", $"Matrix — size {size.Key}: {matrix}"), ("Parent", item.Code), ("Size", size.Key), ("Colour", string.Empty), ("Type", string.Empty),
+                string matrix = string.Join("  ", colours.Select(c => $"{c}: {size.FirstOrDefault(v => (v.Colour ?? "-") == c)?.Code ?? "·"}"));
+                rows.Add(Row(("Code", string.Empty), ("Description", $"Matrix - size {size.Key}: {matrix}"), ("Parent", item.Code), ("Size", size.Key), ("Colour", string.Empty), ("Type", string.Empty),
                     ("Unit", string.Empty), ("Category", string.Empty), ("Brand", string.Empty), ("Barcode", string.Empty), ("Tax", string.Empty), ("Costing", string.Empty), ("Tracking", string.Empty),
                     ("Reorder", string.Empty), ("Active", string.Empty)));
             }

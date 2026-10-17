@@ -131,7 +131,7 @@ public sealed partial class BankRulesViewModel : ObservableObject
                 Banks.Add(new BankChoiceVm(0, "All bank accounts"));
                 foreach (var b in banks)
                 {
-                    Banks.Add(new BankChoiceVm(b.Id, $"{b.Code} — {b.Name}"));
+                    Banks.Add(new BankChoiceVm(b.Id, $"{b.Code} - {b.Name}"));
                 }
 
                 NewBank = Banks[0];
@@ -139,7 +139,7 @@ public sealed partial class BankRulesViewModel : ObservableObject
                 Accounts.Clear();
                 foreach (var a in await db.Accounts.Where(a => a.CompanyId == _companyId).OrderBy(a => a.AccountCode).Select(a => new { a.AccountCode, a.Name }).ToListAsync(ct).ConfigureAwait(true))
                 {
-                    Accounts.Add(new PostTargetVm(a.AccountCode, $"{a.AccountCode} — {a.Name}"));
+                    Accounts.Add(new PostTargetVm(a.AccountCode, $"{a.AccountCode} - {a.Name}"));
                 }
             }
 

@@ -8,7 +8,7 @@ public sealed record FinancingDiscount(decimal PresentValue, decimal Discount, I
 
 /// <summary>
 /// The significant financing component of a long instalment sale (brief §4.10, IFRS 15.60–65): when a sale is paid over more than a year at a rate below
-/// the market's, the revenue is the cash-selling price the instalments are worth today — their present value at the market rate — and the rest is
+/// the market's, the revenue is the cash-selling price the instalments are worth today - their present value at the market rate - and the rest is
 /// interest, earned over the term by the effective-interest method on top of any interest the plan itself charges.
 /// </summary>
 public static class FinancingComponent
