@@ -34,6 +34,8 @@ file describes and in the gitignored `appsettings.Development.json`).
 - Console screens snapshot: after adding a screen, copy `src/One4All.Desktop/bin/Debug/net10.0-windows/*` to `<scratchpad>/deskbuild/`,
   run `<scratchpad>/opsdump2` (`dotnet run > <scratchpad>/ops.tsv`), and rewrite `tests/One4All.UnitTests/Security/console-screens.tsv`
   (sorted rows, columns 0,1,2,4). Report catalogue doc: `ONE4ALL_WRITE_CATALOGUE=1 dotnet test tests/One4All.UnitTests --no-build --filter ReportCatalogueDocumentTests`.
+- Generated documentation: `dotnet run --project tools/One4All.DocGen -- .` rewrites `docs/manual/`, `docs/demos/`, `docs/acceptance/ACCEPTANCE-PACK.md`
+  and `docs/TRAINING-DATA.md` from the screens, reports and test sources; run it after adding screens, reports or tests and commit the result.
 - Migrations: scaffold only from freshly built DLLs, and only after the previous increment (with its own migration) is committed: the model
   snapshot is shared, so two uncommitted features end up in one migration. `dotnet ef migrations add/remove` need the connection env var.
 - Unit tests pin counts: `ImportTemplatesTests` pins the number of import kinds; `ListingColumnRoundTripTests` and
