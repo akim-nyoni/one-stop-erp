@@ -293,7 +293,7 @@ public static partial class OperationCatalogue
                     case "Show exceptions":
                         IReadOnlyList<BillingRunLineView> lines = Check(await runs.LinesAsync(c.CompanyId, i.Text("Run"), exceptionsOnly: true).ConfigureAwait(true));
                         return lines.Count == 0 ? "No exceptions." : string.Join(Environment.NewLine, lines.Select(l =>
-                            $"{l.StandNumber,-12} {M(l.Charge),12} (was {(l.PreviousCharge is decimal p ? M(p) : "-")}) {l.Exceptions} {l.Message} {(l.Included ? string.Empty : "[excluded]")}"));
+                            $"{l.StandNumber,-12} {M(l.Charge),12} (was {(l.PreviousCharge is decimal p ? M(p) : "-")}){(l.Consumption > 0 ? $" {l.Consumption:0.##} units" : string.Empty)} {l.Exceptions} {l.Message} {(l.Included ? string.Empty : "[excluded]")}"));
                     case "Exclude a stand":
                     case "Include a stand":
                         return Summary(Check(await runs.SetIncludedAsync(c.CompanyId, i.Text("Run"), await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true), i.Text("Step") == "Include a stand")

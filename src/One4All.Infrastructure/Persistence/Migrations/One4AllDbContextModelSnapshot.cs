@@ -16518,6 +16518,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("charge");
 
+                    b.Property<decimal>("Consumption")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("consumption");
+
                     b.Property<int>("Exceptions")
                         .HasColumnType("integer")
                         .HasColumnName("exceptions");
@@ -16563,6 +16568,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("RatepayerCustomerId")
                         .HasColumnType("bigint")
                         .HasColumnName("ratepayer_customer_id");
+
+                    b.Property<string>("ReadingIds")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("reading_ids");
 
                     b.Property<string>("RevenueAccountCode")
                         .IsRequired()
@@ -17433,6 +17443,14 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("billed_consumption");
+
+                    b.Property<DateOnly?>("BilledOn")
+                        .HasColumnType("date")
+                        .HasColumnName("billed_on");
+
+                    b.Property<long?>("BillingRunId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("billing_run_id");
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")

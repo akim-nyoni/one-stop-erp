@@ -213,6 +213,25 @@ public sealed class BillingRunLine : Entity
     /// <summary>What the review found.</summary>
     public BillingExceptions Exceptions { get; private set; }
 
+    /// <summary>Gets the metered consumption the charge covers (0 for an unmetered service).</summary>
+    public decimal Consumption { get; private set; }
+
+    /// <summary>Gets the ids of the meter readings billed by this line, comma-separated (marked billed when the bill posts).</summary>
+    public string? ReadingIds { get; private set; }
+
+    /// <summary>Gets the ids of the meter readings billed by this line.</summary>
+    public IReadOnlyList<long> ReadingIdList => string.IsNullOrEmpty(ReadingIds) ? [] : [.. ReadingIds.Split(',').Select(s => long.Parse(s, global::System.Globalization.CultureInfo.InvariantCulture))];
+
+    /// <summary>Records the consumption billed and the readings it came from.</summary>
+    /// <param name="consumption">The consumption.</param>
+    /// <param name="readingIds">The readings.</param>
+    public void SetConsumption(decimal consumption, IEnumerable<long> readingIds)
+    {
+        Consumption = consumption;
+        string ids = string.Join(",", readingIds.Select(id => id.ToString(global::System.Globalization.CultureInfo.InvariantCulture)));
+        ReadingIds = ids.Length == 0 ? null : ids;
+    }
+
     /// <summary>Why it was left out, when it was.</summary>
     public string? Message { get; private set; }
 

@@ -393,4 +393,19 @@ public sealed class MeterReading : AuditableEntity, ICompanyScoped
 
     /// <summary>Whether it was accepted.</summary>
     public bool Accepted { get; private set; }
+
+    /// <summary>Gets the bill date of the billing run that billed this reading, or null while it is still to be billed.</summary>
+    public DateOnly? BilledOn { get; private set; }
+
+    /// <summary>Gets the billing run that billed this reading.</summary>
+    public long? BillingRunId { get; private set; }
+
+    /// <summary>Marks the reading billed by a run.</summary>
+    /// <param name="billDate">The bill date.</param>
+    /// <param name="billingRunId">The run.</param>
+    public void MarkBilled(DateOnly billDate, long? billingRunId)
+    {
+        BilledOn = billDate;
+        BillingRunId = billingRunId;
+    }
 }

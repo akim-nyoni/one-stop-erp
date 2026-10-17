@@ -81,7 +81,8 @@ public sealed record BillingPostOptions
 /// <param name="Exceptions">What the review found.</param>
 /// <param name="Message">Why it was left out, when it was.</param>
 /// <param name="Included">Whether it will be posted on approval.</param>
-public sealed record BillingRunLineView(long PropertyId, string StandNumber, string InvoiceNumber, decimal Charge, decimal? PreviousCharge, BillingExceptions Exceptions, string? Message, bool Included);
+public sealed record BillingRunLineView(long PropertyId, string StandNumber, string InvoiceNumber, decimal Charge, decimal? PreviousCharge, BillingExceptions Exceptions, string? Message, bool Included,
+    decimal Consumption = 0m);
 
 /// <summary>
 /// The reviewed billing run (brief §4.9): propose bills for a service, month and ward without posting, with an exception

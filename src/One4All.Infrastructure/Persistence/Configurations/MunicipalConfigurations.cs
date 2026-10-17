@@ -169,7 +169,10 @@ internal sealed class BillingRunLineConfiguration : IEntityTypeConfiguration<Bil
         b.Property(x => x.Narrative).HasMaxLength(256);
         b.Property(x => x.Exceptions).HasConversion<int>();
         b.Property(x => x.Message).HasMaxLength(500);
+        b.Property(x => x.Consumption).HasPrecision(19, 4);
+        b.Property(x => x.ReadingIds).HasMaxLength(4000);
         b.Ignore(x => x.IsBlocked);
+        b.Ignore(x => x.ReadingIdList);
         b.HasIndex(x => new { x.BillingRunId, x.PropertyId }).IsUnique();
     }
 }

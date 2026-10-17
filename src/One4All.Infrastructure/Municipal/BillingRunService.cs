@@ -229,7 +229,8 @@ public sealed class BillingRunService : IBillingRunService
         foreach (long propertyId in propertyIds)
         {
             string invoice = numbers[propertyId];
-            Result<ComputedCharge> computed = await MunicipalCharges.ComputeAsync(_db, proposal.CompanyId, propertyId, proposal.ServiceType, 0m, proposal.BillDate, prorate: true, ct, serviceCode).ConfigureAwait(false);
+            (decimal consumption, List<long> readingIds) = await UnbilledConsumptionAsync(proposal.CompanyId, propertyId, proposal.ServiceType, serviceCode, proposal.BillDate, ct).ConfigureAwait(false);
+            Result<ComputedCharge> computed = await MunicipalCharges.ComputeAsync(_db, proposal.CompanyId, propertyId, proposal.ServiceType, consumption, proposal.BillDate, prorate: true, ct, serviceCode).ConfigureAwait(false);
             if (computed.IsFailure && computed.Error.Code == "Mun.NotDueThisCycle")
             {
                 continue;
@@ -270,8 +271,10 @@ public sealed class BillingRunService : IBillingRunService
                 message ??= $"{bill.Charge:0.00} against {last:0.00} last time.";
             }
 
-            run.AddLine(new BillingRunLine(propertyId, bill.Property.StandNumber, bill.Property.RatepayerCustomerId, invoice, bill.Charge, previous,
-                bill.Tariff.RevenueAccountCode, bill.Narrative, exceptions, message ?? bill.CycleNote));
+            BillingRunLine added = new(propertyId, bill.Property.StandNumber, bill.Property.RatepayerCustomerId, invoice, bill.Charge, previous,
+                bill.Tariff.RevenueAccountCode, bill.Narrative, exceptions, message ?? bill.CycleNote);
+            added.SetConsumption(consumption, readingIds);
+            run.AddLine(added);
         }
 
         _db.Set<BillingRun>().Add(run);
@@ -295,7 +298,7 @@ public sealed class BillingRunService : IBillingRunService
         List<BillingRunLineView> lines = [.. found.Value.Lines
             .Where(l => !exceptionsOnly || l.Exceptions != BillingExceptions.None)
             .OrderBy(l => l.PropertyId)
-            .Select(l => new BillingRunLineView(l.PropertyId, l.StandNumber, l.InvoiceNumber, l.Charge, l.PreviousCharge, l.Exceptions, l.Message, l.Included))];
+            .Select(l => new BillingRunLineView(l.PropertyId, l.StandNumber, l.InvoiceNumber, l.Charge, l.PreviousCharge, l.Exceptions, l.Message, l.Included, l.Consumption))];
         return Result<IReadOnlyList<BillingRunLineView>>.Success(lines);
     }
 
@@ -518,6 +521,7 @@ public sealed class BillingRunService : IBillingRunService
                     }
                 }
 
+                await MarkReadingsBilledAsync(_db, outcomes.Where(o => o.Posted is null || o.Posted.IsSuccess).Select(o => o.Line), header.BillDate, runId, ct).ConfigureAwait(false);
                 await _db.SaveChangesAsync(ct).ConfigureAwait(false);
                 _db.ChangeTracker.Clear();
                 await transaction.CommitAsync(ct).ConfigureAwait(false);
@@ -588,7 +592,42 @@ public sealed class BillingRunService : IBillingRunService
             line.MarkFailed(posted.Error.Message);
         }
 
+        if (posted is null || posted.IsSuccess)
+        {
+            await MarkReadingsBilledAsync(db, [line], billDate, line.BillingRunId, ct).ConfigureAwait(false);
+        }
+
         await db.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    // The consumption to bill: every accepted reading on the stand's meters for the service that no run has billed yet, up to the bill date.
+    private async Task<(decimal Consumption, List<long> ReadingIds)> UnbilledConsumptionAsync(long companyId, long propertyId, ServiceType serviceType, string? serviceCode, DateOnly billDate, CancellationToken ct)
+    {
+        List<long> meters = await _db.Properties.AsNoTracking().Where(p => p.Id == propertyId).SelectMany(p => p.Services)
+            .Where(s => s.ServiceType == serviceType && s.ServiceCode == serviceCode && s.MeterId != null).Select(s => s.MeterId!.Value).ToListAsync(ct).ConfigureAwait(false);
+        if (meters.Count == 0)
+        {
+            return (0m, []);
+        }
+
+        var readings = await _db.Set<MeterReading>().AsNoTracking().Where(r => r.CompanyId == companyId && meters.Contains(r.MeterId) && r.Accepted && r.BilledOn == null && r.ReadingDate <= billDate)
+            .Select(r => new { r.Id, r.BilledConsumption }).ToListAsync(ct).ConfigureAwait(false);
+        return (readings.Sum(r => r.BilledConsumption), [.. readings.Select(r => r.Id)]);
+    }
+
+    // The readings behind the bills that posted are marked billed, so the next run bills only what was read since.
+    private static async Task MarkReadingsBilledAsync(One4AllDbContext db, IEnumerable<BillingRunLine> lines, DateOnly billDate, long runId, CancellationToken ct)
+    {
+        List<long> ids = [.. lines.SelectMany(l => l.ReadingIdList)];
+        if (ids.Count == 0)
+        {
+            return;
+        }
+
+        foreach (MeterReading reading in await db.Set<MeterReading>().Where(r => ids.Contains(r.Id)).ToListAsync(ct).ConfigureAwait(false))
+        {
+            reading.MarkBilled(billDate, runId);
+        }
     }
 
     private async Task<(int Posted, int Failed)> CountsAsync(long runId, CancellationToken ct)
