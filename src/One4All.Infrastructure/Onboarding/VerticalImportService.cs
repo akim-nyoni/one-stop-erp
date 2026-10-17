@@ -9,6 +9,7 @@ using One4All.Core.FixedAssets;
 using One4All.Core.Municipal;
 using One4All.Core.Payroll;
 using One4All.Core.Schools;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Onboarding;
@@ -22,14 +23,17 @@ public sealed class VerticalImportService : IVerticalImportService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="engine">Posts the opening journals.</param>
-    public VerticalImportService(One4AllDbContext db, IPostingEngine engine, Application.Abstractions.Budgeting.IBudgetingService? budgeting = null)
+    public VerticalImportService(One4AllDbContext db, IPostingEngine engine, Application.Abstractions.Budgeting.IBudgetingService? budgeting = null,
+        Application.Abstractions.Trading.ISalesLedgerService? sales = null)
     {
         _db = db;
         _engine = engine;
         _budgeting = budgeting;
+        _sales = sales;
     }
 
     private readonly Application.Abstractions.Budgeting.IBudgetingService? _budgeting;
+    private readonly Application.Abstractions.Trading.ISalesLedgerService? _sales;
 
     /// <inheritdoc />
     public async Task<ImportReport> ImportStandsAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
@@ -1336,6 +1340,234 @@ public sealed class VerticalImportService : IVerticalImportService
     }
 
     private static bool Flag(string? value) => value is not null && (value.Equals("yes", StringComparison.OrdinalIgnoreCase) || value.Equals("true", StringComparison.OrdinalIgnoreCase) || value == "1");
+
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportInstalmentAgreementsAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "agreement", "stand", "buyer", "cash_price", "deposit", "rate", "method", "term_months", "signed", "first_due", "interest_account");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        string suspense = Code(suspenseAccountCode);
+        if (!await _db.Accounts.AnyAsync(a => a.CompanyId == companyId && a.AccountCode == suspense, ct).ConfigureAwait(false))
+        {
+            return new ImportReport(rows.Count, 0, 0, [new ImportError(1, $"Migration suspense account {suspense} is not on the chart.")], false);
+        }
+
+        Dictionary<string, Customer> customers = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Code, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+        List<Core.Housing.HousingStand> stands = await _db.HousingStands.Include(s => s.Ownership).Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, Core.Housing.HousingStand> byNumber = stands.ToDictionary(s => s.StandNumber, StringComparer.OrdinalIgnoreCase);
+        HashSet<string> existing = [.. await _db.Set<Core.Housing.InstalmentAgreement>().AsNoTracking().Where(a => a.CompanyId == companyId).Select(a => a.AgreementNumber).ToListAsync(ct).ConfigureAwait(false)];
+        HashSet<string> accounts = [.. await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false)];
+        List<ImportError> errors = [];
+        List<(string Number, string Stand, Customer Buyer, decimal CashPrice, decimal Deposit, decimal Rate, Core.Housing.InterestMethod Method, int Term, DateOnly Signed, DateOnly FirstDue,
+            Core.Housing.InstalmentTenure Tenure, decimal Escalation, string InterestAccount, decimal Arrears)> agreements = [];
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string number = Code(row.Text("agreement")), stand = Code(row.Text("stand")), buyer = Code(row.Text("buyer")), interestAccount = Code(row.Text("interest_account"));
+                decimal cashPrice = row.Number("cash_price") ?? 0m, deposit = row.Number("deposit") ?? 0m, rate = row.Number("rate") ?? 0m, escalation = row.Number("escalation") ?? 0m, arrears = row.Number("arrears") ?? 0m;
+                int term = (int)(row.Number("term_months") ?? 0m);
+                DateOnly? signed = row.Date("signed"), firstDue = row.Date("first_due");
+                if (number.Length == 0 || stand.Length == 0 || buyer.Length == 0 || cashPrice <= 0m || deposit < 0m || deposit > cashPrice || rate < 0m || term <= 0 || signed is null || firstDue is null
+                    || !Enum.TryParse(row.Text("method"), true, out Core.Housing.InterestMethod method) || arrears < 0m || escalation is < 0m or > 50m)
+                {
+                    return "An agreement needs its number, stand, buyer, cash price, a deposit within it, a rate, a method (Zero, Flat, ReducingBalance), a term in months, the signed and first due dates, and arrears not below zero.";
+                }
+
+                Core.Housing.InstalmentTenure tenure = Core.Housing.InstalmentTenure.InstalmentSale;
+                if (row.Text("tenure") is string tenureText && !Enum.TryParse(tenureText, true, out tenure))
+                {
+                    return $"'{tenureText}' is not a tenure (InstalmentSale, RentToBuy, LeaseWithOption).";
+                }
+
+                if (interestAccount.Length == 0 || !accounts.Contains(interestAccount))
+                {
+                    return $"Interest account '{interestAccount}' is not on the chart.";
+                }
+
+                if (!byNumber.TryGetValue(stand, out Core.Housing.HousingStand? known))
+                {
+                    return $"Stand {stand} is not on the register.";
+                }
+
+                if (!customers.TryGetValue(buyer, out Customer? customer))
+                {
+                    return $"Customer {buyer} is not on file.";
+                }
+
+                if (known.CurrentHolderCustomerId is long holder && holder != customer.Id)
+                {
+                    return $"Stand {stand} is held by another customer on the register.";
+                }
+
+                if (existing.Contains(number) || agreements.Any(a => a.Number == number))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                agreements.Add((number, stand, customer, cashPrice, deposit, rate, method, term, signed.Value, firstDue.Value, tenure, escalation, interestAccount, arrears));
+                return null;
+            });
+        }
+
+        if (agreements.Any(a => a.Arrears > 0m) && _sales is null)
+        {
+            errors.Add(new ImportError(0, "Arrears cannot be posted: the sales ledger is not available."));
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            int written = 0;
+            foreach (var a in agreements)
+            {
+                Core.Housing.HousingStand stand = byNumber[a.Stand];
+                if (stand.CurrentHolderCustomerId != a.Buyer.Id)
+                {
+                    stand.Sell(a.Buyer.Id, a.Buyer.Name, a.CashPrice, a.Signed);
+                }
+
+                Result onControl = await Trading.ReceivableControlService.ApplyTenureAsync(_db, companyId, a.Buyer.Id, a.Tenure, ct).ConfigureAwait(false);
+                if (onControl.IsFailure)
+                {
+                    return onControl.Error;
+                }
+
+                Core.Housing.InstalmentAgreement agreement = new(companyId, a.Number, stand.Id, a.Buyer.Id, a.CashPrice, a.Deposit, a.Rate, a.Method, a.Term, a.Signed, a.InterestAccount)
+                {
+                    Tenure = a.Tenure,
+                    EscalationPercent = a.Escalation,
+                };
+                foreach (Application.Housing.PlannedInstalment planned in Application.Housing.InstalmentPlan.Build(a.CashPrice - a.Deposit, a.Rate, a.Term, a.Method, a.FirstDue, a.Escalation))
+                {
+                    Core.Housing.InstalmentScheduleLine line = new(planned.Number, planned.DueDate, planned.Amount, planned.Interest, planned.Principal, planned.BalanceAfter);
+                    if (planned.DueDate <= asAt)
+                    {
+                        line.MarkRaised(); // history: raised and (but for the arrears) paid before take-on
+                    }
+
+                    agreement.AddLine(line);
+                }
+
+                _db.Set<Core.Housing.InstalmentAgreement>().Add(agreement);
+                if (a.Arrears > 0m)
+                {
+                    Result<Application.Abstractions.Trading.TradingPostingResult> posted = await _sales!.PostInvoiceAsync(new Application.Abstractions.Trading.SalesInvoiceRequest
+                    {
+                        CompanyId = companyId, CustomerId = a.Buyer.Id, DocumentNumber = $"{a.Number}-OB", DocumentDate = asAt, Currency = a.Buyer.Currency, NetAmount = a.Arrears, SalesAccountCode = suspense,
+                        Narrative = $"Opening arrears on instalment agreement {a.Number} ({a.Stand})",
+                    }, ct).ConfigureAwait(false);
+                    if (posted.IsFailure)
+                    {
+                        return posted.Error;
+                    }
+                }
+
+                written++;
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return written;
+        }).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<ImportReport> ImportMunicipalArrearsAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default)
+    {
+        (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "stand", "service", "invoice", "amount");
+        if (missing.Count > 0)
+        {
+            return Missing(missing);
+        }
+
+        string suspense = Code(suspenseAccountCode);
+        if (!await _db.Accounts.AnyAsync(a => a.CompanyId == companyId && a.AccountCode == suspense, ct).ConfigureAwait(false))
+        {
+            return new ImportReport(rows.Count, 0, 0, [new ImportError(1, $"Migration suspense account {suspense} is not on the chart.")], false);
+        }
+
+        if (_sales is null)
+        {
+            return new ImportReport(rows.Count, 0, 0, [new ImportError(0, "Arrears cannot be posted: the sales ledger is not available.")], false);
+        }
+
+        Dictionary<string, Core.Municipal.Property> properties = (await _db.Properties.AsNoTracking().Where(p => p.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(p => p.StandNumber, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+        Dictionary<long, Customer> ratepayers = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
+        HashSet<string> raised = await Municipal.MunicipalCharges.AlreadyRaisedAsync(_db, companyId, [.. rows.Select(r => Code(r.Text("invoice"))).Where(i => i.Length > 0).Distinct()], ct).ConfigureAwait(false);
+        List<ImportError> errors = [];
+        List<(Core.Municipal.Property Property, Core.Municipal.ServiceType Service, string Invoice, decimal Amount, DateOnly Date, string Narrative)> bills = [];
+        int skipped = 0;
+        foreach (CsvRow row in rows)
+        {
+            Parse(row, errors, () =>
+            {
+                string stand = Code(row.Text("stand")), invoice = Code(row.Text("invoice"));
+                decimal amount = row.Number("amount") ?? 0m;
+                if (stand.Length == 0 || invoice.Length == 0 || amount <= 0m || !Enum.TryParse(row.Text("service"), true, out Core.Municipal.ServiceType service))
+                {
+                    return "An arrears row needs a stand, a service (Rates, Water, Sewer, Refuse…), an invoice number and an amount above zero.";
+                }
+
+                if (!properties.TryGetValue(stand, out Core.Municipal.Property? property))
+                {
+                    return $"Stand {stand} is not on the property register.";
+                }
+
+                if (!ratepayers.ContainsKey(property.RatepayerCustomerId))
+                {
+                    return $"Stand {stand} has no ratepayer on file.";
+                }
+
+                if (raised.Contains(invoice) || bills.Any(b => b.Invoice == invoice))
+                {
+                    skipped++;
+                    return null;
+                }
+
+                bills.Add((property, service, invoice, amount, row.Date("date") ?? asAt, row.Text("narrative") ?? $"Opening {service} arrears on {stand}"));
+                return null;
+            });
+        }
+
+        return await CommitAsync(rows.Count, skipped, errors, commit, ct, async () =>
+        {
+            int written = 0;
+            int sequence = 0;
+            foreach (IGrouping<Core.Municipal.ServiceType, (Core.Municipal.Property Property, Core.Municipal.ServiceType Service, string Invoice, decimal Amount, DateOnly Date, string Narrative)> group
+                in bills.GroupBy(b => b.Service))
+            {
+                Core.Municipal.BillingRun run = new(companyId, $"OB-{group.Key.ToString().ToUpperInvariant()}-{asAt:yyyyMMdd}-{++sequence}", group.Key, asAt, null, "OB", 0);
+                foreach ((Core.Municipal.Property property, _, string invoice, decimal amount, DateOnly date, string narrative) in group)
+                {
+                    run.AddLine(new Core.Municipal.BillingRunLine(property.Id, property.StandNumber, property.RatepayerCustomerId, invoice, amount, null, suspense, narrative, Core.Municipal.BillingExceptions.None, null));
+                    Customer ratepayer = ratepayers[property.RatepayerCustomerId];
+                    Result<Application.Abstractions.Trading.TradingPostingResult> posted = await _sales!.PostInvoiceAsync(new Application.Abstractions.Trading.SalesInvoiceRequest
+                    {
+                        CompanyId = companyId, CustomerId = ratepayer.Id, DocumentNumber = invoice, DocumentDate = date, Currency = ratepayer.Currency, NetAmount = amount, SalesAccountCode = suspense, Narrative = narrative,
+                    }, ct).ConfigureAwait(false);
+                    if (posted.IsFailure)
+                    {
+                        return posted.Error;
+                    }
+
+                    written++;
+                }
+
+                run.FinishPosting();
+                _db.Set<Core.Municipal.BillingRun>().Add(run);
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return written;
+        }).ConfigureAwait(false);
+    }
 
     private static string Code(string? value) => (value ?? string.Empty).Trim().ToUpperInvariant();
 

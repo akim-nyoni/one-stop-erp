@@ -124,6 +124,22 @@ public interface IVerticalImportService
     Task<ImportReport> ImportApplicantsAsync(long companyId, string csv, bool commit, CancellationToken ct = default);
 
     /// <summary>
+    /// Housing sale and instalment agreements in force at take-on (brief §4.10): <c>agreement, stand, buyer, cash_price, deposit, rate, method, term_months, signed, first_due,
+    /// interest_account</c> (optional <c>tenure, escalation, arrears</c>); method is Zero, Flat or ReducingBalance, tenure InstalmentSale, RentToBuy or LeaseWithOption. The stand is
+    /// recorded sold to the buyer (unless the register already shows it), the buyer goes onto the tenure's receivables control, the schedule is rebuilt and every instalment due on or
+    /// before the opening date is marked raised (history), and the arrears — what of those instalments is still unpaid — becomes an open item on the buyer against the migration suspense
+    /// account. An agreement number already on file is skipped.
+    /// </summary>
+    Task<ImportReport> ImportInstalmentAgreementsAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Municipal arrears at take-on by property and service (brief §4.9): <c>stand, service, invoice, amount</c> (optional <c>date, narrative</c>); service is Rates, Water, Sewer, Refuse…
+    /// Each row becomes an unpaid bill on the ratepayer against the migration suspense account and a line of an opening billing run for its service, so arrears age, statements and the
+    /// revenue-by-service figures show the take-on balances by service. An invoice number already in the ledger is skipped.
+    /// </summary>
+    Task<ImportReport> ImportMunicipalArrearsAsync(long companyId, string csv, DateOnly asAt, string suspenseAccountCode, bool commit, CancellationToken ct = default);
+
+    /// <summary>
     /// Municipal tariffs: <c>code, name, service, type, effective, revenue_account</c> (optional <c>fixed, rate, minimum, rate_per_valuation_cents, rate_per_sqm, category, ward,
     /// blocks</c> as <c>0-10:0.5;10-30:0.8;30-:1.2</c> for stepped tariffs). A code already on the register is skipped.
     /// </summary>

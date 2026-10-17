@@ -147,7 +147,7 @@ public static partial class OperationCatalogue
                 ("Uploaded", a => a.UploadedOnUtc.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)), ("Description", a => a.Description)),
         };
         string[] imports = ["Accounts", "Warehouses", "Customers", "Suppliers", "Items", "Stock", "Receivables", "Payables", "TrialBalance", "FixedAssets", "Employees", "StaffLoans", "PayrollYtd", "LeaveBalances", "CostCentres", "Departments", "TaxCodes",
-            "Properties", "Meters", "Students", "Stands", "OwnershipHistory", "Applicants", "Tariffs", "PriceLists", "RentalUnits", "Budget"];
+            "Properties", "Meters", "Students", "Stands", "OwnershipHistory", "Applicants", "Tariffs", "PriceLists", "RentalUnits", "Budget", "InstalmentAgreements", "MunicipalArrears"];
         yield return new Operation
         {
             Module = module, Title = "Company email and SMS settings", ListTitle = "Import templates",
@@ -290,6 +290,8 @@ public static partial class OperationCatalogue
                 + "Applicants: id_number,name,number,registered[,category,date_of_birth,resident_since,dependants,disability,income,tenure,status,marital,regime,spouse_id,spouse_name,verified] (legacy waiting-list numbers kept). "
                 + "Tariffs: code,name,service,type,effective,revenue_account[,fixed,rate,minimum,rate_per_valuation_cents,rate_per_sqm,category,ward,blocks e.g. 0-10:0.5;10-30:0.8;30-:1.2]. "
                 + "PriceLists: price_list,item,price[,name,currency,min_qty,effective] (a list not yet on file is created). Budget: account,period,amount[,cost_centre,quantity] for the year of the date. "
+                + "InstalmentAgreements: agreement,stand,buyer,cash_price,deposit,rate,method,term_months,signed,first_due,interest_account[,tenure,escalation,arrears] (instalments due by the opening date are history; arrears become an open item against the suspense account). "
+                + "MunicipalArrears: stand,service,invoice,amount[,date,narrative] (an unpaid bill per property and service against the suspense account, on an opening billing run for the service). "
                 + "The list also shows the fixed asset and staff loan registers against their accounts.",
             Fields = [Pick("Kind", "What", imports), Req("File", "CSV or Excel (.xlsx, first sheet) file path"), Today("Date", "Opening date"), Req("Suspense", "Migration suspense account", "2900"),
                 Opt("Label", "Budget label (budget)"), Pick("BudgetType", "Budget type (budget)", Enum.GetNames<BudgetType>()), Opt("Department", "Budget department (budget; blank: whole company)"),
@@ -328,6 +330,8 @@ public static partial class OperationCatalogue
                     "Applicants" => await registers.ImportApplicantsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "Tariffs" => await registers.ImportTariffsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
                     "PriceLists" => await registers.ImportPriceListsAsync(c.CompanyId, csv, commit).ConfigureAwait(true),
+                    "InstalmentAgreements" => await registers.ImportInstalmentAgreementsAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
+                    "MunicipalArrears" => await registers.ImportMunicipalArrearsAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),
                     "Budget" => await registers.ImportBudgetAsync(c.CompanyId, csv, i.Date("Date"), i.Optional("Label") ?? string.Empty, Enum.Parse<BudgetType>(i.Text("BudgetType")),
                         i.Optional("Department"), commit).ConfigureAwait(true),
                     _ => await ob.ImportTrialBalanceAsync(c.CompanyId, csv, i.Date("Date"), i.Text("Suspense"), commit).ConfigureAwait(true),

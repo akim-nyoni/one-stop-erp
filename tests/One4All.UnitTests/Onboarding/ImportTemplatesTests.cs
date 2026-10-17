@@ -10,7 +10,7 @@ public sealed class ImportTemplatesTests
     [Fact]
     public void Every_import_has_a_template_and_values_are_quoted_when_needed()
     {
-        ImportTemplates.Kinds.Should().HaveCount(19);
+        ImportTemplates.Kinds.Should().HaveCount(21);
         ImportTemplates.For("customers").Should().StartWith("code,name,currency,credit_limit\r\nCUST001,");
         ImportTemplates.For("Nonsense").Should().BeNull();
         foreach (string kind in ImportTemplates.Kinds)

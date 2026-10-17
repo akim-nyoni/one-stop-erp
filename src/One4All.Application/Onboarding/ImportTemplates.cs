@@ -31,6 +31,9 @@ public static class ImportTemplates
         ["Stands"] = ("stand,parcel,size,cost,scheme,status", "ST-0001,PARCEL-A,300,1500,Scheme 1,Available"),
         ["RentalUnits"] = ("code,description,type,rooms,rent,rent_account,vacant_since,suburb,max_occupants", "FLAT-12,Flat 12 Block C,Flat,2,180,4110,,Mabvuku,4"),
         ["Budget"] = ("account,period,amount,cost_centre,quantity", "6100,1,2500,ADM,"),
+        ["InstalmentAgreements"] = ("agreement,stand,buyer,cash_price,deposit,rate,method,term_months,signed,first_due,interest_account,tenure,escalation,arrears",
+            "IA-0001,ST-0001,CUST001,12000,1200,12,ReducingBalance,60,2025-03-01,2025-04-01,4950,InstalmentSale,0,350.00"),
+        ["MunicipalArrears"] = ("stand,service,invoice,amount,date,narrative", "STD-1001,Water,OB-W-1001,420.00,2026-02-28,Water arrears at take-on"),
     };
 
     /// <summary>Gets the import kinds there are templates for.</summary>
