@@ -132,6 +132,7 @@ public sealed class ControlReportDataProvider : IReportDataProvider
         return command.ToUpperInvariant() switch
         {
             "SYSRPERMISSIONMATRIX" => await PermissionMatrixAsync(ct).ConfigureAwait(false),
+            "SYSRUSERPERMISSIONMATRIX" => await UserPermissionMatrixAsync(ct).ConfigureAwait(false),
             "SYSRAUDITTRAIL" => await AuditTrailAsync(companyId, fromDate, toDate, parameters, ct).ConfigureAwait(false),
             "SYSRHEALTH" => await HealthAsync(companyId, DateParameter(parameters, "AsAtDate") ?? today, ct).ConfigureAwait(false),
             "SYSRMEMBERSHIP" => await MembershipAsync(ct).ConfigureAwait(false),
@@ -167,6 +168,32 @@ public sealed class ControlReportDataProvider : IReportDataProvider
             Permission? permission = permissions.GetValueOrDefault(g.PermissionCode);
             return Row(("Role", g.Role), ("Module", permission?.Module ?? "?"), ("Permission", g.PermissionCode), ("Name", permission?.Name ?? "-"), ("Operations", g.Operations.ToString()));
         })];
+    }
+
+    // SYS237-U: users by permissions, as resolved through roles, groups and overrides (brief §14 report 237).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> UserPermissionMatrixAsync(CancellationToken ct)
+    {
+        Dictionary<string, Permission> catalogue = await _db.Permissions.AsNoTracking().ToDictionaryAsync(p => p.Code, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+        List<User> users = await _db.Users.AsNoTracking().Where(u => u.IsActive).OrderBy(u => u.Username).ToListAsync(ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (User user in users)
+        {
+            EffectivePermissions effective = await _permissions.ResolveAsync(user.Id, ct).ConfigureAwait(false);
+            if (user.IsSystemAdministrator || effective.IsSuperAdministrator)
+            {
+                rows.Add(Row(("User", user.Username), ("Name", user.DisplayName), ("Module", "(all)"), ("Permission", "*"), ("PermissionName", "System administrator"), ("Operations", "All")));
+                continue;
+            }
+
+            foreach (string code in effective.Codes.Order(StringComparer.Ordinal))
+            {
+                Permission? permission = catalogue.GetValueOrDefault(code);
+                rows.Add(Row(("User", user.Username), ("Name", user.DisplayName), ("Module", permission?.Module ?? "?"), ("Permission", code), ("PermissionName", permission?.Name ?? "-"),
+                    ("Operations", effective.OperationsFor(code).ToString())));
+            }
+        }
+
+        return rows;
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MembershipAsync(CancellationToken ct)

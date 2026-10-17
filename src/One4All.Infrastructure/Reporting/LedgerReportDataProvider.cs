@@ -45,6 +45,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             "GLEDMULTICURRENCYTB" => await MultiCurrencyTbAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDREPORTINGTB" => await ReportingTbAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDJOURNALS" => await JournalsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDNOMINALACTIVITY" => await NominalActivityAsync(companyId, parameters.TryGetValue("AccountCode", out object? account) ? account?.ToString() : null, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDEQUITY" => await EquityAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDBUDGETCOMMITMENT" => await BudgetCommitmentAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDFXREVALUATION" => await DocumentLinesAsync(companyId, fromDate, toDate, d => d.StartsWith("FxRevaluation", StringComparison.Ordinal) || d.StartsWith("TradingRevaluation", StringComparison.Ordinal), true, ct).ConfigureAwait(false),
@@ -493,6 +494,25 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
+
+    // GL3: one account's opening balance, lines with running balance, and closing balance (brief §14 report 3).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NominalActivityAsync(long companyId, string? accountCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        string code = (accountCode ?? string.Empty).Trim();
+        if (code.Length == 0 || !await _db.Accounts.AsNoTracking().AnyAsync(a => a.CompanyId == companyId && a.AccountCode == code, ct).ConfigureAwait(false))
+        {
+            return [];
+        }
+
+        NominalActivityReport report = await _services.GetRequiredService<IGeneralLedgerReports>().NominalActivityAsync(companyId, code, fromDate, toDate, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [Row(("Date", fromDate), ("Journal", string.Empty), ("Narrative", $"Opening balance {report.AccountCode} {report.AccountName}"),
+            ("Debit", null), ("Credit", null), ("Balance", report.OpeningBalance))];
+        rows.AddRange(report.Lines.Select(l => (IReadOnlyDictionary<string, object?>)Row(("Date", l.Date), ("Journal", l.JournalNumber), ("Narrative", l.Narrative ?? string.Empty),
+            ("Debit", l.Debit == 0m ? null : l.Debit), ("Credit", l.Credit == 0m ? null : l.Credit), ("Balance", l.RunningBalance))));
+        rows.Add(Row(("Date", toDate), ("Journal", string.Empty), ("Narrative", "Closing balance"), ("Debit", report.Lines.Sum(l => l.Debit)), ("Credit", report.Lines.Sum(l => l.Credit)),
+            ("Balance", report.ClosingBalance)));
+        return rows;
+    }
 
     private static Dictionary<string, object?> Row(params (string Key, object? Value)[] cells)
     {

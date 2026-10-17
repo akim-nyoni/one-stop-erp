@@ -57,11 +57,15 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="scorecard">The supplier scorecard.</param>
-    public PayablesReportDataProvider(One4AllDbContext db, ISupplierScorecardService scorecard)
+    /// <param name="services">The scoped services (the payment run proposal).</param>
+    public PayablesReportDataProvider(One4AllDbContext db, ISupplierScorecardService scorecard, IServiceProvider services)
     {
         _db = db;
         _scorecard = scorecard;
+        _services = services;
     }
+
+    private readonly IServiceProvider _services;
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Payb", StringComparison.OrdinalIgnoreCase);
@@ -80,6 +84,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
             "PAYBDAYBOOK" => await DayBookAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PAYBPURCHASEANALYSIS" => await PurchaseAnalysisAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PAYBPAYMENTS" => await PaymentsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PAYBRUNPROPOSAL" => await RunProposalAsync(companyId, parameters, today, ct).ConfigureAwait(false),
             "PAYBGRNI" => await GrniAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PAYBDISPUTES" => await DisputesAsync(companyId, ct).ConfigureAwait(false),
             "PAYBWITHHOLDING" => await WithholdingAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -268,6 +273,29 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
+
+    // AP57: what a payment run would pay (brief §14 report 57), from the same proposal the payment run screen uses.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RunProposalAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly today, CancellationToken ct)
+    {
+        DateOnly paymentDate = DateParameter(parameters, "PaymentDate") ?? today;
+        DateOnly dueBy = DateParameter(parameters, "DueOnOrBefore") ?? paymentDate;
+        string? currency = parameters.TryGetValue("Currency", out object? c) && !string.IsNullOrWhiteSpace(c?.ToString()) ? c!.ToString()!.Trim().ToUpperInvariant() : null;
+        decimal? funds = parameters.TryGetValue("FundsAvailable", out object? f) && f is not null && decimal.TryParse(Convert.ToString(f, CultureInfo.InvariantCulture), NumberStyles.Number, CultureInfo.InvariantCulture, out decimal given) ? given : null;
+        Core.Common.Result<Application.Abstractions.Trading.PaymentRunProposal> proposal = await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetRequiredService<Application.Abstractions.Trading.IPaymentRunService>(_services).ProposeAsync(new Application.Abstractions.Trading.PaymentRunRequest
+            {
+                CompanyId = companyId, PaymentDate = paymentDate, DueOnOrBefore = dueBy, Currency = currency, FundsAvailable = funds,
+            }, ct).ConfigureAwait(false);
+        if (proposal.IsFailure)
+        {
+            return [];
+        }
+
+        return [.. proposal.Value.Lines.OrderBy(l => l.Priority).ThenBy(l => l.SupplierCode, StringComparer.Ordinal).Select(l => (IReadOnlyDictionary<string, object?>)Row(
+            ("Supplier", l.SupplierCode), ("Name", l.SupplierName), ("Currency", l.Currency), ("Priority", l.Priority), ("Invoices", l.InvoicesDue), ("Due", l.AmountDue),
+            ("Credits", l.CreditsToApply), ("Withholding", l.Withholding), ("Status", l.OnHold ? "On hold" : l.BankChangePending ? "Bank change pending" : "Pay"),
+            ("Deferred", l.Deferred), ("ToPay", l.ToPay)))];
+    }
 
     private static Dictionary<string, object?> Row(params (string Key, object? Value)[] cells)
     {

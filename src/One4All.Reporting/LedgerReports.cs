@@ -22,6 +22,10 @@ public static class LedgerReports
             + "posting carried at the rate of its day.",
             "GledReportingTb", [new Column("Account", "Account", 70), new Column("Name", "Name", 180), new Column("Base", "Base balance", 110), new Column("Currency", "Reporting currency", 60),
              new Column("Reporting", "Reporting balance", 110, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("GL3", "Nominal Activity / Account Ledger Detail", "GeneralLedger", "One account over the period: the opening balance, every posted line with its journal, "
+            + "date and narrative and the running balance, then the closing balance (each journal drills through to its source document).",
+            "GledNominalActivity", [new Column("Date", "Date", 75), new Column("Journal", "Journal", 100), new Column("Narrative", "Narrative", 260), new Column("Debit", "Debit", 90),
+             new Column("Credit", "Credit", 90), new Column("Balance", "Balance", 95, true)], [("AccountCode", ParameterType.String), .. Period]);
         yield return Listing("GL5", "Journal Listing & Journal Audit", "GeneralLedger", "Every journal in the period with status, source, manual flag, who prepared and approved it, reversals and value.",
             "GledJournals", [new Column("Journal", "Journal", 100), new Column("Date", "Date", 75), new Column("Status", "Status", 85), new Column("Source", "Source", 55), new Column("Document", "Document", 140),
              new Column("Manual", "Manual", 50), new Column("PreparedBy", "Prepared by", 85), new Column("ApprovedBy", "Approved by", 85), new Column("Reversal", "Reversal", 100),

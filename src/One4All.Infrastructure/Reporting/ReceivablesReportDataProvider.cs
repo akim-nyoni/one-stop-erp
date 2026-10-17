@@ -16,7 +16,14 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
-    public ReceivablesReportDataProvider(One4AllDbContext db) => _db = db;
+    /// <param name="services">The scoped services (the expected-credit-loss assessment).</param>
+    public ReceivablesReportDataProvider(One4AllDbContext db, IServiceProvider services)
+    {
+        _db = db;
+        _services = services;
+    }
+
+    private readonly IServiceProvider _services;
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Recv", StringComparison.OrdinalIgnoreCase);
@@ -45,6 +52,7 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
             "RECVDSO" => await DsoAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVPROMISES" => await PromisesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVWRITEOFFS" => await WriteOffsAsync(companyId, from, to, ct).ConfigureAwait(false),
+            "RECVECLMATRIX" => await EclMatrixAsync(companyId, asAt, parameters.TryGetValue("AllowanceAccount", out object? allowance) ? allowance?.ToString() : null, ct).ConfigureAwait(false),
             "RECVLAYBYS" => await LaybysAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVEXPOSURE" => await ExposureAsync(companyId, asAt, ct).ConfigureAwait(false),
             "RECVNEWDORMANT" => await NewDormantAsync(companyId, from, to, ct).ConfigureAwait(false),
@@ -345,6 +353,26 @@ public sealed class ReceivablesReportDataProvider : IReportDataProvider
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
+
+    // AR43-ECL: the standard provision matrix over receivables at the date (brief §14 report 43; IFRS 9 simplified approach).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> EclMatrixAsync(long companyId, DateOnly asAt, string? allowanceAccount, CancellationToken ct)
+    {
+        string account = string.IsNullOrWhiteSpace(allowanceAccount) ? "-" : allowanceAccount.Trim();
+        Core.Common.Result<Application.Abstractions.Trading.EclReport> assessed = await Microsoft.Extensions.DependencyInjection.ServiceProviderServiceExtensions
+            .GetRequiredService<Application.Abstractions.Trading.IExpectedCreditLossService>(_services).AssessAsync(companyId, asAt, Application.Trading.EclMatrix.Default, account, ct).ConfigureAwait(false);
+        if (assessed.IsFailure)
+        {
+            return [];
+        }
+
+        Application.Abstractions.Trading.EclReport report = assessed.Value;
+        List<IReadOnlyDictionary<string, object?>> rows = [.. report.Bands.Select(b => (IReadOnlyDictionary<string, object?>)Row(("Band", b.Band.Label), ("FromDays", b.Band.FromDaysPastDue),
+            ("Rate", b.Band.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)), ("Exposure", b.Exposure), ("Provision", b.Provision)))];
+        rows.Add(Row(("Band", "Total provision required"), ("FromDays", null), ("Rate", null), ("Exposure", report.TotalExposure), ("Provision", report.TargetAllowance)));
+        rows.Add(Row(("Band", account == "-" ? "Allowance booked (no account given)" : $"Allowance booked on {account}"), ("FromDays", null), ("Rate", null), ("Exposure", null), ("Provision", report.BookedAllowance)));
+        rows.Add(Row(("Band", "Adjustment to post"), ("FromDays", null), ("Rate", null), ("Exposure", null), ("Provision", report.Adjustment)));
+        return rows;
+    }
 
     private static Dictionary<string, object?> Row(params (string Key, object? Value)[] cells)
     {

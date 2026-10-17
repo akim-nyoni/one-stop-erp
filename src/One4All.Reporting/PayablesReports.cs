@@ -24,6 +24,12 @@ public static class PayablesReports
         yield return Listing("AP55", "Purchase Analysis by Supplier and Item", "Purchasing", "Order lines placed in the period (cancelled orders excluded) by supplier and item: quantity, average price and value.",
             "PaybPurchaseAnalysis", [new Column("Supplier", "Supplier", 150), new Column("Item", "Item", 150), new Column("Orders", "Orders", 50), new Column("Quantity", "Qty", 65), new Column("AveragePrice", "Avg price", 85),
              new Column("Currency", "Currency", 55), new Column("Value", "Value", 100, true)], Period);
+        yield return Listing("AP57", "Payment Run Proposal", "Purchasing", "What a payment run on the date would pay: per supplier and currency the invoices due by the cut-off, the amount "
+            + "due, credits applied, tax withheld, suppliers on hold or with a bank-detail change pending, and what is deferred when the funds given do not cover everything.",
+            "PaybRunProposal", [new Column("Supplier", "Supplier", 80), new Column("Name", "Name", 150), new Column("Currency", "Ccy", 45), new Column("Priority", "Priority", 50),
+             new Column("Invoices", "Invoices", 55), new Column("Due", "Due", 90), new Column("Credits", "Credits applied", 90), new Column("Withholding", "Withheld", 80),
+             new Column("Status", "Status", 110), new Column("Deferred", "Deferred", 85), new Column("ToPay", "To pay", 95, true)],
+            [("PaymentDate", ParameterType.Date), ("DueOnOrBefore", ParameterType.Date), ("Currency", ParameterType.String), ("FundsAvailable", ParameterType.Decimal)]);
         yield return Listing("AP58", "Payments Made", "Purchasing", "Payments to suppliers in the period (payment runs and single payments) with tax withheld.",
             "PaybPayments", [new Column("Date", "Date", 75), new Column("Document", "Document", 120), new Column("Supplier", "Supplier", 150), new Column("Currency", "Currency", 55),
              new Column("Transaction", "Transaction", 95), new Column("Withheld", "Tax withheld", 85), new Column("Base", "Base", 95, true)], Period);

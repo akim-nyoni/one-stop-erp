@@ -27,6 +27,10 @@ public static class ControlReports
         yield return Listing("SYS237", "Permission Matrix", "System", "Every role with each permission it grants and the operations allowed.",
             "SysrPermissionMatrix", [new Column("Role", "Role", 120), new Column("Module", "Module", 90), new Column("Permission", "Permission", 170), new Column("Name", "Name", 180),
              new Column("Operations", "Operations", 200)], []);
+        yield return Listing("SYS237-U", "Permission Matrix by User", "System", "Every active user with each permission they hold through their roles, groups and individual overrides, and "
+            + "the operations allowed; system administrators are shown as holding everything. The auditor's users-by-permissions view.",
+            "SysrUserPermissionMatrix", [new Column("User", "User", 110), new Column("Name", "Name", 140), new Column("Module", "Module", 90), new Column("Permission", "Permission", 170),
+             new Column("PermissionName", "Permission name", 170), new Column("Operations", "Operations", 200)], []);
         yield return Listing("SYS238", "User, Role & Group Membership", "System", "Every user with direct roles, groups, roles held through groups and individual overrides.",
             "SysrMembership", [new Column("User", "User", 100), new Column("Name", "Name", 140), new Column("Status", "Status", 80), new Column("Roles", "Direct roles", 160), new Column("Groups", "Groups", 140),
              new Column("GroupRoles", "Roles via groups", 160), new Column("Overrides", "Overrides", 60)], []);

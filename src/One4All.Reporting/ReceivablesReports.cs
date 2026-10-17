@@ -58,6 +58,10 @@ public static class ReceivablesReports
         yield return Listing("AR43", "Bad Debt Write-off Listing", "Sales", "Write-offs in the period with the customer, document and the debt case that approved it.",
             "RecvWriteOffs", [new Column("Date", "Date", 75), new Column("Customer", "Customer", 150), new Column("Document", "Document", 110), new Column("Case", "Debt case", 170), new Column("Amount", "Amount", 90, true)],
             Period);
+        yield return Listing("AR43-ECL", "Expected Credit Loss Provision Matrix (IFRS 9)", "Sales", "Receivables at the date by days past due, each band's expected loss rate and the "
+            + "provision it calls for, then the total against the allowance already booked on the allowance account and the adjustment to post (the standard matrix; post it from Credit control).",
+            "RecvEclMatrix", [new Column("Band", "Band", 120), new Column("FromDays", "From day", 60), new Column("Rate", "Loss rate %", 70), new Column("Exposure", "Exposure", 100),
+             new Column("Provision", "Provision", 100, true)], [("AsAtDate", ParameterType.Date), ("AllowanceAccount", ParameterType.String)]);
         yield return Listing("AR44", "Customer Deposits & Advance Payments Held", "Receivables", "Money received from customers and not yet applied to an invoice at the date - deposits, "
             + "advances and payments on account - with how long each has been held, in transaction currency and base.", "RecvDeposits",
             [new Column("Customer", "Customer", 160), new Column("Document", "Document", 110), new Column("Date", "Received", 75), new Column("Type", "Type", 80), new Column("Currency", "Currency", 55),
