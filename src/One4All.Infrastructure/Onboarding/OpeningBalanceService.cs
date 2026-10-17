@@ -47,14 +47,14 @@ public sealed class OpeningBalanceService : IOpeningBalanceService
     {
         HashSet<string> existing = [.. await _db.Customers.Where(c => c.CompanyId == companyId).Select(c => c.Code).ToListAsync(ct).ConfigureAwait(false)];
         return await TradersAsync(csv, existing, commit, ct, (code, name, currency, row) =>
-            _master.CreateCustomerAsync(companyId, code, name, currency, row.Number("credit_limit") ?? 0m, ct)).ConfigureAwait(false);
+            _master.CreateCustomerAsync(companyId, code, name, currency, row.Number("credit_limit") ?? 0m, ct), customers: true).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<ImportReport> ImportSuppliersAsync(long companyId, string csv, bool commit, CancellationToken ct = default)
     {
         HashSet<string> existing = [.. await _db.Suppliers.Where(s => s.CompanyId == companyId).Select(s => s.Code).ToListAsync(ct).ConfigureAwait(false)];
-        return await TradersAsync(csv, existing, commit, ct, (code, name, currency, _) => _master.CreateSupplierAsync(companyId, code, name, currency, ct)).ConfigureAwait(false);
+        return await TradersAsync(csv, existing, commit, ct, (code, name, currency, _) => _master.CreateSupplierAsync(companyId, code, name, currency, ct), customers: false).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -382,7 +382,7 @@ public sealed class OpeningBalanceService : IOpeningBalanceService
 
     private static ImportReport Missing(IReadOnlyList<string> columns) => new(0, 0, 0, [new ImportError(1, $"Missing columns: {string.Join(", ", columns)}.")], false);
 
-    private async Task<ImportReport> TradersAsync(string csv, HashSet<string> existing, bool commit, CancellationToken ct, Func<string, string, CurrencyCode, CsvRow, Task<Result<long>>> create)
+    private async Task<ImportReport> TradersAsync(string csv, HashSet<string> existing, bool commit, CancellationToken ct, Func<string, string, CurrencyCode, CsvRow, Task<Result<long>>> create, bool customers)
     {
         (IReadOnlyList<CsvRow> rows, IReadOnlyList<string> missing) = CsvTable.Read(csv, "code", "name", "currency");
         if (missing.Count > 0)
@@ -433,6 +433,22 @@ public sealed class OpeningBalanceService : IOpeningBalanceService
                 if (created.IsFailure)
                 {
                     return created.Error;
+                }
+
+                // Optional analysis1..analysis3 columns: the account's transaction analysis codes.
+                if ((row.Text("analysis1") ?? row.Text("analysis2") ?? row.Text("analysis3")) is not null)
+                {
+                    static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+                    if (customers && await _db.Customers.FirstOrDefaultAsync(c => c.Id == created.Value, ct).ConfigureAwait(false) is Customer customer)
+                    {
+                        (customer.AnalysisCode1, customer.AnalysisCode2, customer.AnalysisCode3) = (Code(row.Text("analysis1")), Code(row.Text("analysis2")), Code(row.Text("analysis3")));
+                    }
+                    else if (!customers && await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == created.Value, ct).ConfigureAwait(false) is Supplier supplier)
+                    {
+                        (supplier.AnalysisCode1, supplier.AnalysisCode2, supplier.AnalysisCode3) = (Code(row.Text("analysis1")), Code(row.Text("analysis2")), Code(row.Text("analysis3")));
+                    }
+
+                    await _db.SaveChangesAsync(ct).ConfigureAwait(false);
                 }
             }
 

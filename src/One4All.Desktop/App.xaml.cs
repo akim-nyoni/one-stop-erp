@@ -8,6 +8,7 @@ using One4All.Application.Abstractions.Security;
 using One4All.Desktop.ViewModels;
 using One4All.Infrastructure;
 using One4All.Infrastructure.Licensing;
+using One4All.Infrastructure.Logging;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
 using One4All.Licensing.Core;
@@ -55,6 +56,7 @@ public partial class App : System.Windows.Application
             config.GetSection("Updates").Bind(updates);
             services.AddSingleton(updates);
             services.AddOne4AllInfrastructure(connectionString, licensing);
+            services.AddOne4AllLogging(connectionString, "Desktop", config, config["Logging:Directory"]);
             services.AddSingleton(PosDevices());
             services.AddTransient<ViewModels.LoginViewModel>();
             services.AddSingleton<DesktopSession>();

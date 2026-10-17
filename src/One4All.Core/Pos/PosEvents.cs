@@ -40,6 +40,9 @@ public enum PosEventKind
 
     /// <summary>Loyalty points redeemed against a sale.</summary>
     LoyaltyRedeemed = 12,
+
+    /// <summary>The till passed to another cashier mid-shift without a cash-up (the drawer stays shared until the hand-over or Z-read).</summary>
+    CashierSwitch = 13,
 }
 
 /// <summary>

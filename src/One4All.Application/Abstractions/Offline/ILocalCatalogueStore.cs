@@ -27,6 +27,14 @@ public sealed record OfflineCustomer(long Id, string Code, string Name);
 /// <param name="Rate">Its rate to the base currency.</param>
 public sealed record OfflineTenderCurrency(string Code, decimal Rate);
 
+/// <summary>A supervisor who can authorise a void or refund while the till is offline: their PIN hash is verified on the terminal.</summary>
+/// <param name="UserId">The user.</param>
+/// <param name="Username">The sign-in name.</param>
+/// <param name="PinHash">The PIN hash.</param>
+/// <param name="CanVoid">Holds Pos.Void with void/reverse.</param>
+/// <param name="CanRefund">Holds Pos.Refund with authorise level 1.</param>
+public sealed record OfflineSupervisor(long UserId, string Username, string PinHash, bool CanVoid, bool CanRefund);
+
 /// <summary>
 /// What a POS terminal needs to keep selling when the database is unreachable (brief §6B): the company, store and terminal, the priced
 /// catalogue and its tax rates, the posting accounts, tender currencies, customers, and the till session open when it was taken.
@@ -71,6 +79,9 @@ public sealed record PosOfflineSnapshot
 
     /// <summary>Gets the terminal's branch (for branch promotions).</summary>
     public long? BranchId { get; init; }
+
+    /// <summary>Gets the supervisors who may authorise a void or refund while offline.</summary>
+    public IReadOnlyList<OfflineSupervisor> Supervisors { get; init; } = [];
 
     /// <summary>Finds the tile a scanned or typed code names: its barcode, PLU or item code (any case).</summary>
     /// <param name="code">The code.</param>

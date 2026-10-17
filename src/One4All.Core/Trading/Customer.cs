@@ -101,6 +101,15 @@ public sealed class Customer : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the account is on hold (blocks new sales on credit).</summary>
     public bool OnHold { get; set; }
 
+    /// <summary>Gets or sets the first transaction analysis code (brief §4.5: how this account's transactions are analysed, e.g. region, salesperson, sector).</summary>
+    public string? AnalysisCode1 { get; set; }
+
+    /// <summary>Gets or sets the second analysis code.</summary>
+    public string? AnalysisCode2 { get; set; }
+
+    /// <summary>Gets or sets the third analysis code.</summary>
+    public string? AnalysisCode3 { get; set; }
+
     /// <summary>What happens when an invoice would take the balance over the credit limit (brief §4.5 "credit limit &amp; credit-limit check policy").</summary>
     public CreditLimitPolicy CreditLimitPolicy { get; set; }
 

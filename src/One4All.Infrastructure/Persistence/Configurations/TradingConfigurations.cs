@@ -12,6 +12,9 @@ internal sealed class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.CreditLimitPolicy).HasConversion<int>();
         b.Property(x => x.ReceivableControlAccountCode).HasMaxLength(20);
         b.Property(x => x.CustomerType).HasMaxLength(30);
+        b.Property(x => x.AnalysisCode1).HasMaxLength(30);
+        b.Property(x => x.AnalysisCode2).HasMaxLength(30);
+        b.Property(x => x.AnalysisCode3).HasMaxLength(30);
         b.Property(x => x.DunningGroupCode).HasMaxLength(20);
         b.ToTable("customer", Schemas.AccountsReceivable);
         b.HasKey(x => x.Id);
@@ -43,6 +46,9 @@ internal sealed class SupplierConfiguration : IEntityTypeConfiguration<Supplier>
         b.Property(x => x.OverReceiptTolerancePercent).HasPrecision(9, 4);
         b.Property(x => x.Code).HasMaxLength(20);
         b.Property(x => x.Name).HasMaxLength(200);
+        b.Property(x => x.AnalysisCode1).HasMaxLength(30);
+        b.Property(x => x.AnalysisCode2).HasMaxLength(30);
+        b.Property(x => x.AnalysisCode3).HasMaxLength(30);
         b.Property(x => x.Currency).HasMaxLength(3);
         b.Property(x => x.AgeingBasis).HasConversion<int>();
         b.Property(x => x.Category).HasMaxLength(60);

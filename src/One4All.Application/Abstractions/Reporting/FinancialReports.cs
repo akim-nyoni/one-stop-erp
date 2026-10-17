@@ -337,6 +337,14 @@ public interface IGeneralLedgerReports
     /// <returns>The financial snapshot.</returns>
     Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
 
+    /// <summary>The financial snapshot with the common options (unposted journals, reporting currency, branch, cost centre, department).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The date.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The report.</returns>
+    Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default);
+
     /// <summary>Produces the chart-of-accounts listing (reference report), ordered by account code.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -353,6 +361,15 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The trial-balance movement report.</returns>
     Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>The trial balance movement with the common options.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">The period start.</param>
+    /// <param name="toDate">The period end.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The report.</returns>
+    Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>Produces the trial balance as at a date.</summary>
     /// <param name="companyId">The company.</param>
@@ -379,6 +396,14 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The by-type summary.</returns>
     Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default);
+
+    /// <summary>The trial balance by type with the common options.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAtDate">The date.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The report.</returns>
+    Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>Produces the statement of profit or loss for a date range.</summary>
     /// <param name="companyId">The company.</param>
@@ -444,6 +469,15 @@ public interface IGeneralLedgerReports
     /// <returns>The cash flow statement.</returns>
     Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 
+    /// <summary>The statement of cash flows with the common options.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">The period start.</param>
+    /// <param name="toDate">The period end.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The statement.</returns>
+    Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default);
+
     /// <summary>Produces the nominal activity for one account over a date range.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="accountCode">The account code.</param>
@@ -453,6 +487,16 @@ public interface IGeneralLedgerReports
     /// <returns>The nominal activity report.</returns>
     Task<NominalActivityReport> NominalActivityAsync(long companyId, string accountCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
 
+    /// <summary>An account's activity with the common options.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="accountCode">The account.</param>
+    /// <param name="fromDate">The period start.</param>
+    /// <param name="toDate">The period end.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The report.</returns>
+    Task<NominalActivityReport> NominalActivityAsync(long companyId, string accountCode, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default);
+
     /// <summary>Produces the journal daybook (posted journals) for a date range.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="fromDate">Start of the range.</param>
@@ -460,6 +504,15 @@ public interface IGeneralLedgerReports
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The journal daybook report.</returns>
     Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default);
+
+    /// <summary>The daybook with the common options: draft and deferred journals too when asked, only the lines of a branch, cost centre or department, in the reporting currency.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="fromDate">The period start.</param>
+    /// <param name="toDate">The period end.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The report.</returns>
+    Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default);
 
     /// <summary>
     /// Returns one journal with every line (account names, dimensions, base and transaction amounts) and its
@@ -482,7 +535,8 @@ public interface IGeneralLedgerReports
 /// <param name="Rate">Reporting-currency units per unit of base currency (1 for the base currency).</param>
 /// <param name="CostCentre">Only lines analysed to this cost centre (a trial balance or statement for one cost centre).</param>
 /// <param name="Department">Only lines analysed to this department.</param>
-public sealed record LedgerReportOptions(bool IncludeUnposted = false, string? ReportingCurrency = null, decimal Rate = 1m, string? CostCentre = null, string? Department = null)
+/// <param name="Branch">Only lines posted for this branch.</param>
+public sealed record LedgerReportOptions(bool IncludeUnposted = false, string? ReportingCurrency = null, decimal Rate = 1m, string? CostCentre = null, string? Department = null, string? Branch = null)
 {
     /// <summary>Posted journals in the base currency.</summary>
     public static LedgerReportOptions Default { get; } = new();

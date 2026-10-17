@@ -79,6 +79,31 @@ public sealed class DocumentLayoutTests
         (await documents.GoodsReceivedNoteAsync(companyId, "DL-GRN1")).Value.Should().Contain("GOODS RECEIVED NOTE").And.Contain("Purchase order: DL-PO1").And.Contain("500.00");
         (await documents.ShelfLabelsAsync(companyId, "RETAIL")).Value.Should().Contain("Face brick").And.Contain("USD 0.95").And.Contain("*6001234*");
         (await documents.QuotationAsync(companyId, "NOPE")).Error.Code.Should().Be("Doc.QuotationNotFound");
+
+        // The designable reports give the same documents as rows for a company's own layout; a layout named for the kind prints through it as a PDF.
+        One4All.Application.Abstractions.Reporting.IReportRunner runner = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IReportRunner>();
+        async Task<string> Csv(string code, string number)
+        {
+            var rendered = await runner.RenderAsync(companyId, code, new Dictionary<string, object?> { ["Number"] = number }, One4All.Application.Abstractions.Reporting.ReportFormat.Csv);
+            rendered.IsSuccess.Should().BeTrue(rendered.IsFailure ? $"{code}: {rendered.Error.Message}" : null);
+            return System.Text.Encoding.UTF8.GetString(rendered.Value.Content);
+        }
+
+        string quotation = await Csv("DOC01", "DL-Q1");
+        quotation.Should().Contain("Quotation").And.Contain("Builder Ltd (DL-C)").And.Contain("DL-Q1").And.Contain("2026-04-03").And.Contain("DL-BRK").And.Contain("Face brick").And.Contain("360");
+        quotation.Should().Contain("TOTAL (USD) excl. tax", "the last total and its label ride on every row");
+        (await Csv("DOC03", "DL-D1")).Should().Contain("Delivery Note").And.Contain("Deliver to").And.Contain("DL-D1").And.Contain("DL-SO1").And.Contain("TRK1").And.Contain("Face brick");
+        (await Csv("DOC12", "DL-PO1")).Should().Contain("Brick Co").And.Contain("DL-PO1").And.Contain("Face brick");
+        (await Csv("DOC01", "NOPE")).Should().NotContain("DL-Q1");
+
+        One4All.Application.Documents.DocumentLayoutSettings settings = One4All.Application.Documents.DocumentLayoutSettings.Parse(null);
+        settings.Set(One4All.Application.Documents.DocumentKinds.Quotation, "doc01");
+        settings = One4All.Application.Documents.DocumentLayoutSettings.Parse(settings.ToJson());
+        (settings.LayoutFor(One4All.Application.Documents.DocumentKinds.Quotation), settings.LayoutFor(One4All.Application.Documents.DocumentKinds.DeliveryNote)).Should().Be(("DOC01", null));
+        var pdf = await runner.RenderAsync(companyId, settings.LayoutFor(One4All.Application.Documents.DocumentKinds.Quotation)!, new Dictionary<string, object?> { ["Number"] = "DL-Q1" },
+            One4All.Application.Abstractions.Reporting.ReportFormat.Pdf);
+        pdf.IsSuccess.Should().BeTrue(pdf.IsFailure ? pdf.Error.Message : null);
+        pdf.Value.Content.Take(4).Should().Equal("%PDF"u8.ToArray());
     }
 
     [SkippableFact]

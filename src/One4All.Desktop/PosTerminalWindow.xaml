@@ -421,6 +421,7 @@
                             <Button Content="📊 X-read" Style="{StaticResource FunctionButton}" Width="90" Command="{Binding XReadCommand}" />
                             <Button Content="🔒 Z / Close till" Style="{StaticResource FunctionButton}" Width="112" Background="#F5D6D3" Command="{Binding CloseTillCommand}" ToolTip="Count the drawer under More (counted cash), then close" />
                             <Button Content="🔄 Hand over" Style="{StaticResource FunctionButton}" Width="104" Command="{Binding HandOverCommand}" ToolTip="Count the drawer; the next cashier enters their name and PIN under More" />
+                            <Button Content="👤 Switch" Style="{StaticResource FunctionButton}" Width="86" Command="{Binding SwitchCashierCommand}" ToolTip="Quick switch, no count: the next cashier enters their name and PIN under More and takes the till as it is" />
                             <Button Content="☁ Sync offline" Style="{StaticResource FunctionButton}" Width="104" Command="{Binding FlushOfflineCommand}" Visibility="{Binding PendingOfflineCount, Converter={StaticResource CountToVis}}" />
                         </WrapPanel>
                         <Expander Header="More: discounts, loyalty, coupons, parked sales, account settings" Foreground="{DynamicResource Muted}" FontSize="12" Margin="3,4,3,0">

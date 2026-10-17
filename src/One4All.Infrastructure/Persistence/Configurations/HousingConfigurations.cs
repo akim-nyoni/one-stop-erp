@@ -149,9 +149,9 @@ internal sealed class AllocationRunConfiguration : IEntityTypeConfiguration<Allo
         b.Property(x => x.Category).HasConversion<int>();
         b.Property(x => x.Method).HasConversion<int>();
         b.Property(x => x.Status).HasConversion<int>();
-        b.Property(x => x.InputCandidates).HasMaxLength(100_000);
+        b.Property(x => x.InputCandidates).HasColumnType("text"); // unbounded: a 100,000-row waiting list is kept in full for the draw to be re-verified
         b.Property(x => x.CommitteeResolution).HasMaxLength(120);
-        b.Property(x => x.InputStands).HasMaxLength(100_000);
+        b.Property(x => x.InputStands).HasColumnType("text");
         b.Property(x => x.InputHash).HasMaxLength(64);
         b.HasMany(x => x.Allocations).WithOne().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Restrict);
         b.Navigation(x => x.Allocations).UsePropertyAccessMode(PropertyAccessMode.Field);

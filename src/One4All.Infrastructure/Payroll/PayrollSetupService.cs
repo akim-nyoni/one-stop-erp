@@ -109,6 +109,25 @@ public sealed class PayrollSetupService : IPayrollSetupService
         employee.Notch = update.Notch ?? employee.Notch;
         employee.NationalIdNumber = update.NationalIdNumber is null ? employee.NationalIdNumber : Clean(update.NationalIdNumber);
         employee.TaxNumber = update.TaxNumber is null ? employee.TaxNumber : Clean(update.TaxNumber);
+        if (update.HousingTenancyNumber is string tenancyNumber)
+        {
+            if (Clean(tenancyNumber) is not string wanted)
+            {
+                employee.HousingTenancyId = null;
+            }
+            else
+            {
+                string number = wanted.ToUpperInvariant();
+                long? tenancy = await _db.Set<Core.Housing.Tenancy>().Where(t => t.CompanyId == companyId && t.TenancyNumber == number).Select(t => (long?)t.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                if (tenancy is null)
+                {
+                    return Result.Failure(Error.NotFound("Payroll.TenancyNotFound", $"No housing tenancy {number}."));
+                }
+
+                employee.HousingTenancyId = tenancy;
+            }
+        }
+
         employee.ContractEndDate = update.ContractEndDate ?? employee.ContractEndDate;
         employee.ProbationEndDate = update.ProbationEndDate ?? employee.ProbationEndDate;
         employee.WorkPermitExpiry = update.WorkPermitExpiry ?? employee.WorkPermitExpiry;
@@ -253,6 +272,12 @@ public sealed class PayrollSetupService : IPayrollSetupService
             RoundTo = element.RoundTo, Rounding = element.Rounding, DepartmentAccounts = Clean(element.DepartmentAccounts),
             LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant(), LookupBands = Clean(element.LookupBands),
         };
+        Result options = Apply(created, new PayElementOptions(element.Recovers, element.BenefitCategory, element.PaidInCurrency, element.CumulativeTax, element.SplitCurrencyTax, element.IsAnnualPayment));
+        if (options.IsFailure)
+        {
+            return options.Error;
+        }
+
         _db.PayElements.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return created.Id;
@@ -295,6 +320,49 @@ public sealed class PayrollSetupService : IPayrollSetupService
         {
             return Error.Validation("Payroll.FormulaError", $"The formula fails: {ex.Message}");
         }
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetPayElementOptionsAsync(long companyId, string code, PayElementOptions options, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        string key = (code ?? string.Empty).Trim().ToUpperInvariant();
+        PayElement? element = await _db.PayElements.FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == key, ct).ConfigureAwait(false);
+        if (element is null)
+        {
+            return Result.Failure(Error.NotFound("Payroll.ElementNotFound", $"Pay element {key} not found."));
+        }
+
+        Result applied = Apply(element, options);
+        if (applied.IsFailure)
+        {
+            return applied;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // The options as the element keeps them; a recovery or a benefit category only makes sense on the right element type.
+    private static Result Apply(PayElement element, PayElementOptions options)
+    {
+        if (options.Recovers != PayRecovery.None && element.Type != PayElementType.Deduction)
+        {
+            return Result.Failure(Error.Validation("Payroll.RecoveryType", "Only a deduction recovers staff purchases or housing rent."));
+        }
+
+        if (options.PaidInCurrency is string given && !CurrencyCode.TryParse(given, out _))
+        {
+            return Result.Failure(Error.Validation("Payroll.PaidInCurrency", $"{given} is not a currency code."));
+        }
+
+        element.Recovers = options.Recovers;
+        element.BenefitCategory = Clean(options.BenefitCategory);
+        element.PaidInCurrency = Clean(options.PaidInCurrency) is string currency ? CurrencyCode.Parse(currency.ToUpperInvariant()) : null;
+        element.CumulativeTax = options.CumulativeTax;
+        element.SplitCurrencyTax = options.SplitCurrencyTax;
+        element.IsAnnualPayment = options.IsAnnualPayment;
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -477,8 +545,8 @@ public sealed class PayrollSetupService : IPayrollSetupService
         [
             Earn("BASIC", "Basic salary", CalculationBasis.Formula, 1) with { Formula = "BASIC", Pensionable = true, SubjectToSocialSecurity = true, OvertimeBase = true, LeavePayBase = true },
             Earn("OVERTIME", "Overtime", CalculationBasis.RatePerUnit, 2),
-            Earn("HOUSING", "Housing allowance", CalculationBasis.FixedAmount, 3),
-            Earn("TRANSPORT", "Transport allowance", CalculationBasis.FixedAmount, 4),
+            Earn("HOUSING", "Housing allowance", CalculationBasis.FixedAmount, 3) with { BenefitCategory = "Housing" },
+            Earn("TRANSPORT", "Transport allowance", CalculationBasis.FixedAmount, 4) with { BenefitCategory = "Transport" },
             Deduct("PAYE", "PAYE", CalculationBasis.TaxTable, 50) with { TaxTableCode = taxTableCode },
             Earn("OVERTIME2", "Overtime at double time", CalculationBasis.RatePerUnit, 5),
             Earn("OVERTIMEPH", "Public-holiday overtime", CalculationBasis.RatePerUnit, 6),
@@ -503,8 +571,8 @@ public sealed class PayrollSetupService : IPayrollSetupService
             Deduct("GARNISHEE", "Garnishee and court orders", CalculationBasis.FixedAmount, 56),
             Deduct("FUNERAL", "Funeral scheme", CalculationBasis.FixedAmount, 57),
             Deduct("SAVINGS", "Savings scheme", CalculationBasis.FixedAmount, 58),
-            Deduct("STAFFPURCH", "Staff purchases", CalculationBasis.Formula, 59) with { Formula = "STAFFPURCHASES" },
-            Deduct("HOUSERENT", "Housing rent", CalculationBasis.Formula, 60) with { Formula = "HOUSINGRENT" },
+            Deduct("STAFFPURCH", "Staff purchases", CalculationBasis.Formula, 59) with { Formula = "STAFFPURCHASES", Recovers = PayRecovery.StaffPurchases },
+            Deduct("HOUSERENT", "Housing rent", CalculationBasis.Formula, 60) with { Formula = "HOUSINGRENT", Recovers = PayRecovery.HousingRent },
             Deduct("OVERPAYMENT", "Salary overpayment recovery", CalculationBasis.FixedAmount, 61),
             Deduct("LEAVEADV", "Leave pay advance recovery", CalculationBasis.FixedAmount, 62),
         ];

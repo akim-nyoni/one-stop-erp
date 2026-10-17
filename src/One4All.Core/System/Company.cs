@@ -127,6 +127,12 @@ public sealed class Company : SoftDeletableEntity
     public string? PayslipLayoutCode { get; set; }
 
     /// <summary>
+    /// Gets or sets which report lays out each business document (JSON: document kind → report code, the company's own designs in the report designer,
+    /// e.g. a copy of DOC11 for the tax invoice); a kind without an entry prints the standard text document.
+    /// </summary>
+    public string? DocumentLayoutsJson { get; set; }
+
+    /// <summary>
     /// Gets or sets the smallest cash amount the tills deal in (e.g. 0.05) when coins are scarce: a cash sale may be tendered up to half of
     /// it away from the exact total, the difference posted to <see cref="CashRoundingAccountCode"/> (brief §4.1). Null: no rounding.
     /// </summary>

@@ -176,6 +176,18 @@ public sealed class TillSession : AuditableEntity, ICompanyScoped
     /// <summary>The status.</summary>
     public TillSessionStatus Status { get; private set; }
 
+    /// <summary>Passes the open session to another cashier without closing it (the quick switch; the drawer stays shared).</summary>
+    /// <param name="cashierUserId">The incoming cashier.</param>
+    public void Reassign(long cashierUserId)
+    {
+        if (Status != TillSessionStatus.Open)
+        {
+            throw new InvalidOperationException("Only an open till session can pass to another cashier.");
+        }
+
+        CashierUserId = cashierUserId;
+    }
+
     /// <summary>Closes the session with a Z-read number.</summary>
     /// <param name="closedOnUtc">When closed.</param>
     /// <param name="zReadNumber">The sequential Z number.</param>

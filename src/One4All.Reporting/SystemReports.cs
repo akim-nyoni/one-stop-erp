@@ -28,6 +28,7 @@ public static class SystemReports
         def.Parameters.Add(new ReportParameter { Name = "ReportingCurrency", Type = ParameterType.String, Prompt = "Reporting currency (blank: base)", Required = false });
         def.Parameters.Add(new ReportParameter { Name = "CostCentre", Type = ParameterType.String, Prompt = "Cost centre (blank: all)", Required = false });
         def.Parameters.Add(new ReportParameter { Name = "Department", Type = ParameterType.String, Prompt = "Department (blank: all)", Required = false });
+        def.Parameters.Add(new ReportParameter { Name = "Branch", Type = ParameterType.String, Prompt = "Branch (blank: all)", Required = false });
 
         def.Bands.Add(new ReportBand
         {
@@ -222,8 +223,7 @@ public static class SystemReports
         "Income and expenses for a period; the difference is the net profit — beside the same period a year earlier and the change.", "IncomeStatement",
         [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This period", 95, true), new Column("PriorAmount", "Prior year", 95, true),
             new Column("Change", "Change", 90, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String),
-            ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>The Income Statement by Function report code.</summary>
     public const string IncomeStatementByFunctionCode = "GL-IS-FN";
@@ -235,7 +235,7 @@ public static class SystemReports
             + "profit for the period, beside the same period a year earlier. Expenses fall to a function by their account's report category (\"Distribution\", "
             + "\"Administrative\", \"Finance\"…); the accounts items post cost of sales to are cost of sales.", "IncomeStatementByFunction",
         [new Column("Line", "", 260), new Column("Amount", "This period", 100, true), new Column("PriorAmount", "Prior year", 100, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>The code of the statement laid out by a reporting tree.</summary>
     public const string TreeStatementCode = "GL-TREE";
@@ -260,9 +260,9 @@ public static class SystemReports
     /// <summary>Builds the Journal Daybook definition (audit journal listing).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition JournalDaybook() => Listing(JournalDaybookCode, "Journal Daybook", "GeneralLedger",
-        "Every posted journal over a period — date, number, source module, document, narrative and base total.", "JournalDaybook",
+        "Every journal over a period — date, number, source module, document, narrative and base total (draft and deferred too when asked; a branch, cost centre or department narrows the lines counted).", "JournalDaybook",
         [new Column("Date", "Date", 95), new Column("JournalNumber", "Journal", 110), new Column("SourceModule", "Module", 70), new Column("DocumentType", "Doc type", 90), new Column("DocumentNumber", "Doc no.", 100), new Column("Narrative", "Narrative", 200), new Column("Amount", "Amount", 100, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the VAT Return by Code definition (multi-rate breakdown).</summary>
     /// <returns>The definition.</returns>
@@ -290,7 +290,7 @@ public static class SystemReports
     public static ReportDefinition FinancialSnapshot() => Listing(FinancialSnapshotCode, "Financial Snapshot", "GeneralLedger",
         "Headline figures as at a date: assets, liabilities, equity and year-to-date income, expenses and net profit.", "FinancialSnapshot",
         [new Column("Metric", "Metric", 220), new Column("Amount", "Amount", 130, true)],
-        [("AsAtDate", ParameterType.Date)]);
+        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the Chart of Accounts definition (reference listing).</summary>
     /// <returns>The definition.</returns>
@@ -304,7 +304,7 @@ public static class SystemReports
     public static ReportDefinition TrialBalanceMovement() => Listing(TrialBalanceMovementCode, "Trial Balance Movement", "GeneralLedger",
         "Per account: opening balance brought forward, debits and credits in the period, and the closing balance.", "TrialBalanceMovement",
         [new Column("AccountCode", "Account", 90), new Column("AccountName", "Name", 200), new Column("Opening", "Opening", 100, true), new Column("Debit", "Debit", 90, true), new Column("Credit", "Credit", 90, true), new Column("Closing", "Closing", 100, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the Balance Sheet definition (brief §14 report 6).</summary>
     /// <returns>The definition.</returns>
@@ -312,42 +312,44 @@ public static class SystemReports
         "Assets, liabilities and equity as at a date; assets equal liabilities plus equity — beside the position a year earlier and the change.", "BalanceSheet",
         [new Column("Category", "Section", 110), new Column("AccountName", "Account", 220), new Column("Amount", "This year", 95, true), new Column("PriorAmount", "Prior year", 95, true),
             new Column("Change", "Change", 90, true)],
-        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("CostCentre", ParameterType.String),
-            ("Department", ParameterType.String)]);
+        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the Statement of Cash Flows definition (IAS 7, movement method).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition CashFlow() => Listing(CashFlowCode, "Statement of Cash Flows", "GeneralLedger",
         "Cash generated by operating, investing and financing activities for a period, reconciled to the change in cash.", "CashFlow",
         [new Column("Activity", "Activity", 280), new Column("Amount", "Amount", 120, true)],
-        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the Departmental Income Statement definition (P&amp;L for one department).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition DepartmentalIncomeStatement() => Listing(DepartmentalIncomeStatementCode, "Departmental Income Statement", "GeneralLedger",
         "Income and expenses for a period restricted to one department; the difference is the department's net profit.", "DepartmentalIncomeStatement",
         [new Column("Category", "Section", 120), new Column("AccountName", "Account", 250), new Column("Amount", "Amount", 100, true)],
-        [("Department", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
+        [("Department", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String),
+            ("Branch", ParameterType.String), ("CostCentre", ParameterType.String)]);
 
     /// <summary>Builds the Trial Balance by Type definition (summary trial balance grouped by account type).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition TrialBalanceByType() => Listing(TrialBalanceByTypeCode, "Trial Balance by Type", "GeneralLedger",
         "The trial balance summarised to one line per account type, with debit and credit totals that balance.", "TrialBalanceByType",
         [new Column("Type", "Account type", 200), new Column("Debit", "Debit", 120, true), new Column("Credit", "Credit", 120, true)],
-        [("AsAtDate", ParameterType.Date)]);
+        [("AsAtDate", ParameterType.Date), ("IncludeUnposted", ParameterType.Boolean), ("ReportingCurrency", ParameterType.String), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String), ("Department", ParameterType.String)]);
 
     /// <summary>Builds the Customer Register definition (AR master listing).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition CustomerRegister() => Listing(CustomerRegisterCode, "Customer Register", "Sales",
-        "Customer master: code, name, currency, credit limit, payment terms and on-hold flag.", "CustomerRegister",
-        [new Column("Code", "Account", 90), new Column("Name", "Name", 200), new Column("Currency", "Ccy", 55), new Column("CreditLimit", "Credit limit", 100, true), new Column("TermsDays", "Terms", 60, true), new Column("OnHold", "On hold", 70)],
+        "Customer master: code, name, currency, credit limit, payment terms, on-hold flag and analysis codes.", "CustomerRegister",
+        [new Column("Code", "Account", 90), new Column("Name", "Name", 200), new Column("Currency", "Ccy", 55), new Column("CreditLimit", "Credit limit", 100, true), new Column("TermsDays", "Terms", 60, true), new Column("OnHold", "On hold", 70),
+            new Column("Analysis1", "Analysis 1", 70), new Column("Analysis2", "Analysis 2", 70), new Column("Analysis3", "Analysis 3", 70)],
         []);
 
     /// <summary>Builds the Supplier Register definition (AP master listing).</summary>
     /// <returns>The definition.</returns>
     public static ReportDefinition SupplierRegister() => Listing(SupplierRegisterCode, "Supplier Register", "Purchasing",
-        "Supplier master: code, name, currency, payment terms and on-hold flag.", "SupplierRegister",
-        [new Column("Code", "Account", 90), new Column("Name", "Name", 200), new Column("Currency", "Ccy", 55), new Column("TermsDays", "Terms", 60, true), new Column("OnHold", "On hold", 70)],
+        "Supplier master: code, name, currency, payment terms, on-hold flag and analysis codes.", "SupplierRegister",
+        [new Column("Code", "Account", 90), new Column("Name", "Name", 200), new Column("Currency", "Ccy", 55), new Column("TermsDays", "Terms", 60, true), new Column("OnHold", "On hold", 70),
+            new Column("Analysis1", "Analysis 1", 70), new Column("Analysis2", "Analysis 2", 70), new Column("Analysis3", "Analysis 3", 70)],
         []);
 
     /// <summary>Builds the Aged Debtors definition (brief §14 report 29).</summary>

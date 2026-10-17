@@ -59,6 +59,15 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <summary>Whether the account is on hold (blocks payment).</summary>
     public bool OnHold { get; set; }
 
+    /// <summary>Gets or sets the first transaction analysis code (brief §4.5: how this account's transactions are analysed, e.g. region, buyer, commodity).</summary>
+    public string? AnalysisCode1 { get; set; }
+
+    /// <summary>Gets or sets the second analysis code.</summary>
+    public string? AnalysisCode2 { get; set; }
+
+    /// <summary>Gets or sets the third analysis code.</summary>
+    public string? AnalysisCode3 { get; set; }
+
     /// <summary>Optional supplier category.</summary>
     public string? Category { get; set; }
 

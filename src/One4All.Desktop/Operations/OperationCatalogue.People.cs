@@ -7,6 +7,7 @@ using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Abstractions.SalesOrders;
 using One4All.Application.Abstractions.Schools;
 using One4All.Core.Banking;
+using One4All.Core.Accounting;
 using One4All.Core.Payroll;
 using One4All.Core.System;
 using static One4All.Desktop.Operations.Ops;
@@ -225,7 +226,7 @@ public static partial class OperationCatalogue
                 Pick("Frequency", "Paid", Enum.GetNames<PayFrequency>()), Opt("WorkBranch", "Works at branch (code)"), Opt("Project", "Charged to project"), Opt("Fund", "Charged to fund"),
                 Opt("ReportsTo", "Reports to (employee number)"), Pick("Marital", "Marital status", Enum.GetNames<MaritalStatus>()), Opt("Nationality", "Nationality"),
                 Opt("SocialSecurity", "Social security number"), Opt("Union", "Trade union"), Opt("KinName", "Next of kin"), Opt("KinPhone", "Next of kin's phone"),
-                Opt("KinRelationship", "Next of kin is (relationship)")],
+                Opt("KinRelationship", "Next of kin is (relationship)"), Opt("Tenancy", "Housing tenancy number (update; rent recovered from pay; '-' clears)")],
             Run = async (c, i) =>
             {
                 IPayrollSetupService setup = c.Get<IPayrollSetupService>();
@@ -242,6 +243,7 @@ public static partial class OperationCatalogue
                         Project = i.Optional("Project"), Fund = i.Optional("Fund"), ReportsTo = i.Optional("ReportsTo"), MaritalStatus = Enum.Parse<MaritalStatus>(i.Text("Marital")),
                         Nationality = i.Optional("Nationality"), SocialSecurityNumber = i.Optional("SocialSecurity"), UnionMembership = i.Optional("Union"), NextOfKinName = i.Optional("KinName"),
                         NextOfKinPhone = i.Optional("KinPhone"), NextOfKinRelationship = i.Optional("KinRelationship"),
+                        HousingTenancyNumber = i.Optional("Tenancy") is string tenancy ? (tenancy.Trim() == "-" ? string.Empty : tenancy) : null,
                     }).ConfigureAwait(true), string.Empty);
                     return $"Employee {i.Text("Number").ToUpperInvariant()} updated.";
                 }
@@ -268,7 +270,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Pay elements and tax tables", ListTitle = "Pay elements",
             Description = "Create a pay element, assign one to (or end one for) an employee, create a tax table — bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
                 + "'0-100:0; 100-300:20; 300-:30' — or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
-            Fields = [Pick("Step", "Step", ["Create element", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]), Opt("Code", "Element / table code"),
+            Fields = [Pick("Step", "Step", ["Create element", "Set element options", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]), Opt("Code", "Element / table code"),
                 Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
                 Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
                 OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
@@ -276,6 +278,9 @@ public static partial class OperationCatalogue
                 Tick("SocialSecurity", "Subject to social security"), Tick("OvertimeBase", "In the overtime base"), Tick("LeaveBase", "In the leave-pay base"), Opt("Group", "Adds to group"),
                 Tick("ProRated", "Pro-rated for a part period"), Tick("NoArrears", "Never goes into arrears (deduction)"), Tick("Terminal", "Counts towards terminal benefits"), Tick("Union", "Subject to union dues"),
                 OptNum("Balance", "Balance to recover (assign; balance-driven element)"),
+                Pick("Recovers", "Recovers (deduction)", Enum.GetNames<PayRecovery>()), Opt("BenefitCategory", "Taxable-benefit category (PR34), e.g. Housing"), Opt("PaidIn", "Paid in currency (blank: base)"),
+                Tick("CumulativeTax", "Cumulative tax (year to date)"), Tick("SplitTax", "Tax per currency (split-currency pay)"), Tick("Annual", "Annual payment (bonus tax spread)"),
+                Opt("TableCurrency", "Tax table currency (blank: base; one table per currency for split-currency tax)"),
                 Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
                 Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …"),
                 Opt("LookupVariable", "Lookup variable (table lookup; blank: BASIC)"), Opt("LookupBands", "Lookup bands from-to:amount or rate%; … (table lookup)"),
@@ -307,8 +312,15 @@ public static partial class OperationCatalogue
                                 decimal.Parse(parts[1], CultureInfo.InvariantCulture)));
                         }
 
-                        long table = Check(await setup.CreateTaxTableAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Date("From"), null, bands).ConfigureAwait(true));
-                        return $"Tax table created (id {table}).";
+                        CurrencyCode? tableCurrency = i.Optional("TableCurrency") is string tc && tc.Trim().Length > 0
+                            ? CurrencyCode.TryParse(tc.Trim(), out CurrencyCode parsedCurrency) ? parsedCurrency : throw new OperationException($"{tc} is not a currency code.")
+                            : null;
+                        long table = Check(await setup.CreateTaxTableAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Date("From"), tableCurrency, bands).ConfigureAwait(true));
+                        return $"Tax table created (id {table}){(tableCurrency is null ? string.Empty : $" in {tableCurrency}")}.";
+                    case "Set element options":
+                        _ = Check(await setup.SetPayElementOptionsAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, new PayElementOptions(Enum.Parse<PayRecovery>(i.Text("Recovers")),
+                            i.Optional("BenefitCategory"), i.Optional("PaidIn"), i.Flag("CumulativeTax"), i.Flag("SplitTax"), i.Flag("Annual"))).ConfigureAwait(true), string.Empty);
+                        return $"Options set on {i.Optional("Code")?.ToUpperInvariant()}.";
                     case "Preview formula":
                         Dictionary<string, decimal> values = new(StringComparer.OrdinalIgnoreCase);
                         foreach (string pair in (i.Optional("Values") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -334,13 +346,18 @@ public static partial class OperationCatalogue
                             Group = i.Optional("Group"), BasisGroup = i.Optional("BasisGroup"), Floor = i.OptionalNumber("Floor"), Ceiling = i.OptionalNumber("Ceiling"), RoundTo = i.OptionalNumber("RoundTo"),
                             Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
                             LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
+                            Recovers = Enum.Parse<PayRecovery>(i.Text("Recovers")), BenefitCategory = i.Optional("BenefitCategory"), PaidInCurrency = i.Optional("PaidIn"),
+                            CumulativeTax = i.Flag("CumulativeTax"), SplitCurrencyTax = i.Flag("SplitTax"), IsAnnualPayment = i.Flag("Annual"),
                         }).ConfigureAwait(true));
                         return $"Pay element created (id {element}).";
                 }
             },
             List = async c => Table(await c.Db.PayElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.Sequence).ThenBy(e => e.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", e => e.Code), ("Name", e => e.Name), ("Type", e => e.Type), ("Basis", e => e.Basis), ("Sequence", e => e.Sequence), ("Account", e => e.AccountCode),
-                ("Taxable", e => e.Taxable), ("Formula / table", e => e.Formula ?? e.TaxTableCode ?? string.Empty)),
+                ("Taxable", e => e.Taxable), ("Formula / table", e => e.Formula ?? e.TaxTableCode ?? string.Empty),
+                ("Options", e => string.Join(", ", new[] { e.Recovers == PayRecovery.None ? null : $"recovers {e.Recovers}", e.BenefitCategory is null ? null : $"benefit {e.BenefitCategory}",
+                    e.PaidInCurrency is null ? null : $"paid in {e.PaidInCurrency}", e.CumulativeTax ? "cumulative tax" : null, e.SplitCurrencyTax ? "tax per currency" : null, e.IsAnnualPayment ? "annual" : null }
+                    .Where(o => o is not null)))),
         };
         yield return new Operation
         {
@@ -1946,27 +1963,72 @@ public static partial class OperationCatalogue
     private static IEnumerable<Operation> Documents()
     {
         const string module = "Documents";
-        Operation Doc(string title, string label, Func<IDocumentLayoutService, long, string, Task<One4All.Core.Common.Result<string>>> print) => new()
+        // A document prints as its standard text, or — when the company has named a layout for it under System Manager › Document layouts — through that
+        // report, saved as a PDF at the path given (the layout runs with the document's number and date).
+        async Task<string> PrintAsync(OperationContext c, OperationInput i, string kind, string number, DateOnly? date, Func<Task<One4All.Core.Common.Result<string>>> text)
         {
-            Module = module, Title = title, Description = $"Prints the {title.ToLowerInvariant()} in the standard business document layout.", IsDocument = true,
-            Fields = [Req("Number", label)],
-            Run = async (c, i) => Check(await print(c.Get<IDocumentLayoutService>(), c.CompanyId, i.Text("Number")).ConfigureAwait(true)),
+            string? json = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.DocumentLayoutsJson).FirstOrDefaultAsync().ConfigureAwait(true);
+            if (Application.Documents.DocumentLayoutSettings.Parse(json).LayoutFor(kind) is not string layout)
+            {
+                return Check(await text().ConfigureAwait(true));
+            }
+
+            string path = i.Optional("SaveTo") ?? throw new OperationException($"This document prints through report {layout}: give the PDF file path to save it to (or open {layout} in the report viewer).");
+            Dictionary<string, object?> parameters = new(StringComparer.OrdinalIgnoreCase) { ["Number"] = number, ["Date"] = date };
+            Application.Abstractions.Reporting.RenderedDocument pdf = Check(await c.Get<Application.Abstractions.Reporting.IReportRunner>()
+                .RenderAsync(c.CompanyId, layout, parameters, Application.Abstractions.Reporting.ReportFormat.Pdf).ConfigureAwait(true));
+            await System.IO.File.WriteAllBytesAsync(path, pdf.Content).ConfigureAwait(true);
+            return $"{Application.Documents.DocumentKinds.Find(kind)?.Name ?? kind} {number} printed through layout {layout} to {path}.";
+        }
+
+        Operation Doc(string kind, string title, string label, Func<IDocumentLayoutService, long, string, Task<One4All.Core.Common.Result<string>>> print) => new()
+        {
+            Module = module, Title = title, IsDocument = true,
+            Description = $"Prints the {title.ToLowerInvariant()} in the standard business document layout, or through the company's own layout (System Manager › Document layouts) as a PDF.",
+            Fields = [Req("Number", label), Opt("SaveTo", "PDF file path (when a layout is set)")],
+            Run = (c, i) => PrintAsync(c, i, kind, i.Text("Number"), null, () => print(c.Get<IDocumentLayoutService>(), c.CompanyId, i.Text("Number"))),
         };
 
-        yield return Doc("Quotation", "Quote number", (s, co, n) => s.QuotationAsync(co, n));
-        yield return Doc("Order confirmation", "Sales order number", (s, co, n) => s.OrderConfirmationAsync(co, n));
-        yield return Doc("Delivery note", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n));
-        yield return Doc("Packing slip", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n, packing: true));
-        yield return Doc("Purchase requisition", "Requisition number", (s, co, n) => s.RequisitionAsync(co, n));
-        yield return Doc("Goods received note", "GRN number", (s, co, n) => s.GoodsReceivedNoteAsync(co, n));
-        yield return Doc("Supplier debit note", "Debit note number", (s, co, n) => s.SupplierDebitNoteAsync(co, n));
-        yield return Doc("Fee invoice", "Invoice number", (s, co, n) => s.FeeInvoiceAsync(co, n));
-        yield return Doc("Payment certificate", "Certificate number", (s, co, n) => s.PaymentCertificateAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.Quotation, "Quotation", "Quote number", (s, co, n) => s.QuotationAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.OrderConfirmation, "Order confirmation", "Sales order number", (s, co, n) => s.OrderConfirmationAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.DeliveryNote, "Delivery note", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.PackingSlip, "Packing slip", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n, packing: true));
+        yield return Doc(Application.Documents.DocumentKinds.Requisition, "Purchase requisition", "Requisition number", (s, co, n) => s.RequisitionAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.GoodsReceivedNote, "Goods received note", "GRN number", (s, co, n) => s.GoodsReceivedNoteAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.SupplierDebitNote, "Supplier debit note", "Debit note number", (s, co, n) => s.SupplierDebitNoteAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.FeeInvoice, "Fee invoice", "Invoice number", (s, co, n) => s.FeeInvoiceAsync(co, n));
+        yield return Doc(Application.Documents.DocumentKinds.PaymentCertificate, "Payment certificate", "Certificate number", (s, co, n) => s.PaymentCertificateAsync(co, n));
         yield return new Operation
         {
-            Module = module, Title = "Municipal bill", Description = "Prints a stand's monthly municipal bill.", IsDocument = true,
-            Fields = [Req("Stand", "Stand number"), Today("Month", "Any day in the month")],
-            Run = async (c, i) => Check(await c.Get<IDocumentLayoutService>().MunicipalBillAsync(c.CompanyId, i.Text("Stand"), i.Date("Month")).ConfigureAwait(true)),
+            Module = module, Title = "Municipal bill", Description = "Prints a stand's monthly municipal bill, in the standard layout or through the company's own (as a PDF).", IsDocument = true,
+            Fields = [Req("Stand", "Stand number"), Today("Month", "Any day in the month"), Opt("SaveTo", "PDF file path (when a layout is set)")],
+            Run = (c, i) => PrintAsync(c, i, Application.Documents.DocumentKinds.MunicipalBill, i.Text("Stand"), i.Date("Month"),
+                () => c.Get<IDocumentLayoutService>().MunicipalBillAsync(c.CompanyId, i.Text("Stand"), i.Date("Month"))),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Tax invoice or credit note", Description = "Prints a customer tax invoice or credit note by its number, in the standard layout or through the company's own (as a PDF).",
+            IsDocument = true, Fields = [Req("Number", "Invoice or credit note number"), Opt("SaveTo", "PDF file path (when a layout is set)")],
+            Run = (c, i) => PrintAsync(c, i, Application.Documents.DocumentKinds.TaxInvoice, i.Text("Number"), null, async () =>
+            {
+                string number = i.Text("Number").Trim();
+                long? item = await c.Db.OpenItems.AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Ledger == Core.Trading.TradingLedger.AccountsReceivable && o.DocumentNumber == number)
+                    .Select(o => (long?)o.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+                return item is null ? One4All.Core.Common.Error.NotFound("Doc.InvoiceNotFound", $"No invoice or credit note {number}.")
+                    : await c.Get<Application.Abstractions.Trading.IInvoiceDocumentService>().RenderTextAsync(c.CompanyId, item.Value).ConfigureAwait(true);
+            }),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Purchase order document", Description = "Prints a purchase order by its number, in the standard layout or through the company's own (as a PDF).",
+            IsDocument = true, Fields = [Req("Number", "Order number"), Opt("SaveTo", "PDF file path (when a layout is set)")],
+            Run = (c, i) => PrintAsync(c, i, Application.Documents.DocumentKinds.PurchaseOrder, i.Text("Number"), null, async () =>
+            {
+                string number = i.Text("Number").Trim();
+                long? order = await c.Db.PurchaseOrders.AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.OrderNumber == number).Select(o => (long?)o.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+                return order is null ? One4All.Core.Common.Error.NotFound("Doc.OrderNotFound", $"No purchase order {number}.")
+                    : await c.Get<Application.Abstractions.Procurement.IPurchaseOrderDocumentService>().RenderTextAsync(c.CompanyId, order.Value).ConfigureAwait(true);
+            }),
         };
         yield return new Operation
         {

@@ -144,6 +144,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the sign-in attempts and sessions.</summary>
     public DbSet<LoginEvent> LoginEvents => Set<LoginEvent>();
 
+    /// <summary>Gets the application log (<c>sys.app_log</c>).</summary>
+    public DbSet<Core.System.AppLogEntry> AppLog => Set<Core.System.AppLogEntry>();
+
     /// <summary>Roles.</summary>
     public DbSet<Role> Roles => Set<Role>();
 

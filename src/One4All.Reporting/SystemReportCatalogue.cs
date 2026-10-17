@@ -197,5 +197,11 @@ public static class SystemReportCatalogue
         {
             yield return definition;
         }
+
+        // Designable business documents (brief §S, DOC + number).
+        foreach (ReportDefinition definition in DocumentReports.All())
+        {
+            yield return definition;
+        }
     }
 }

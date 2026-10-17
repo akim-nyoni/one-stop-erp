@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Payroll;
+using One4All.Core.Accounting;
 using One4All.Core.Payroll;
 using One4All.Infrastructure.Persistence;
 using Xunit;
@@ -58,6 +59,21 @@ public sealed class PayrollSetupTests
         (await setup.SeedStandardElementsAsync(companyId, "6100", "2400", "PAYE")).Value.Should().BeEmpty();
         (await setup.CreatePayElementAsync(companyId, new NewPayElement("BAD", "Bad", PayElementType.Earning, CalculationBasis.Formula, 9, "6100"))).Error.Code.Should().Be("Payroll.FormulaRequired");
         (await setup.UpdatePayElementAsync(companyId, "HOUSING", 0m, null, null, null)).IsSuccess.Should().BeTrue();
+
+        // The seeded recoveries recover (so what was deducted before is netted off), the allowances report as benefits, and options can be set later.
+        Dictionary<string, PayElement> elements = await db.PayElements.AsNoTracking().Where(p => p.CompanyId == companyId).ToDictionaryAsync(p => p.Code);
+        (elements["STAFFPURCH"].Recovers, elements["HOUSERENT"].Recovers, elements["HOUSING"].BenefitCategory).Should().Be((PayRecovery.StaffPurchases, PayRecovery.HousingRent, "Housing"));
+        (await setup.SetPayElementOptionsAsync(companyId, "HOUSING", new PayElementOptions(PayRecovery.HousingRent))).Error.Code.Should().Be("Payroll.RecoveryType");
+        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(PaidInCurrency: "XX"))).Error.Code.Should().Be("Payroll.PaidInCurrency");
+        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(CumulativeTax: true, SplitCurrencyTax: true))).IsSuccess.Should().BeTrue();
+        (await setup.SetPayElementOptionsAsync(companyId, "TRANSPORT", new PayElementOptions(BenefitCategory: "Travel", PaidInCurrency: "eur", IsAnnualPayment: true))).IsSuccess.Should().BeTrue();
+        PayElement paye = await db.PayElements.AsNoTracking().SingleAsync(p => p.CompanyId == companyId && p.Code == "PAYE");
+        (paye.CumulativeTax, paye.SplitCurrencyTax).Should().Be((true, true));
+        PayElement transport = await db.PayElements.AsNoTracking().SingleAsync(p => p.CompanyId == companyId && p.Code == "TRANSPORT");
+        (transport.BenefitCategory, transport.PaidInCurrency?.Value, transport.IsAnnualPayment).Should().Be(("Travel", "EUR", true));
+        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions())).IsSuccess.Should().BeTrue("the run below expects the standard options");
+        (await setup.SetPayElementOptionsAsync(companyId, "TRANSPORT", new PayElementOptions(BenefitCategory: "Transport"))).IsSuccess.Should().BeTrue();
+        (await setup.CreateTaxTableAsync(companyId, "PAYE-EUR", new DateOnly(2026, 1, 1), CurrencyCode.Parse("EUR"), [new TaxBandInput(0m, 50m, 0m), new TaxBandInput(50m, null, 25m)])).IsSuccess.Should().BeTrue();
 
         (await setup.AssignElementAsync(companyId, "PS-001", "BASIC")).IsSuccess.Should().BeTrue();
         (await setup.AssignElementAsync(companyId, "PS-001", "HOUSING", overrideAmount: 100m)).IsSuccess.Should().BeTrue();

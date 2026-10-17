@@ -96,4 +96,16 @@ public interface IDocumentLayoutService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The label sheet, or an error.</returns>
     Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, CancellationToken ct = default);
+
+    /// <summary>
+    /// Builds one of the business documents (the kinds in <see cref="DocumentKinds"/> except the tax invoice and purchase order, which have their own
+    /// services) as the model a layout prints from.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="kind">The document kind.</param>
+    /// <param name="number">The document's number (the stand number for a municipal bill).</param>
+    /// <param name="date">The date that goes with it (any day in the month for a municipal bill).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The document, or why there is none.</returns>
+    Task<Result<BusinessDocument>> BuildAsync(long companyId, string kind, string number, DateOnly? date = null, CancellationToken ct = default);
 }

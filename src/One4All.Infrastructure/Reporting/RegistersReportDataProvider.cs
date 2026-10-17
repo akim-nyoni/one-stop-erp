@@ -751,6 +751,9 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
                 ["CreditLimit"] = c.CreditLimit,
                 ["TermsDays"] = c.PaymentTermsDays,
                 ["OnHold"] = c.OnHold ? "Yes" : string.Empty,
+                ["Analysis1"] = c.AnalysisCode1 ?? string.Empty,
+                ["Analysis2"] = c.AnalysisCode2 ?? string.Empty,
+                ["Analysis3"] = c.AnalysisCode3 ?? string.Empty,
             })).ToList();
     }
 
@@ -769,6 +772,9 @@ public sealed class RegistersReportDataProvider : IReportDataProvider
                 ["Currency"] = s.Currency.Value,
                 ["TermsDays"] = s.PaymentTermsDays,
                 ["OnHold"] = s.OnHold ? "Yes" : string.Empty,
+                ["Analysis1"] = s.AnalysisCode1 ?? string.Empty,
+                ["Analysis2"] = s.AnalysisCode2 ?? string.Empty,
+                ["Analysis3"] = s.AnalysisCode3 ?? string.Empty,
             })).ToList();
     }
 

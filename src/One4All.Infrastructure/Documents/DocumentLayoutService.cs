@@ -38,6 +38,9 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
 
     /// <inheritdoc />
     public async Task<Result<string>> QuotationAsync(long companyId, string quoteNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildQuotationAsync(companyId, quoteNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildQuotationAsync(long companyId, string quoteNumber, CancellationToken ct)
     {
         Quotation? quote = await _db.Quotations.AsNoTracking().Include(q => q.Lines).FirstOrDefaultAsync(q => q.CompanyId == companyId && q.QuoteNumber == quoteNumber, ct).ConfigureAwait(false);
         if (quote is null)
@@ -49,17 +52,20 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         Dictionary<long, Item> items = await ItemsAsync(quote.Lines.Select(l => l.ItemId), ct).ConfigureAwait(false);
         List<BusinessDocumentLine> lines = [.. quote.Lines.Select(l => new BusinessDocumentLine(items.GetValueOrDefault(l.ItemId)?.Code ?? string.Empty, l.Description, l.Quantity, l.UnitPrice,
             Math.Round(l.Quantity * l.UnitPrice, 2)))];
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Quotation", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyName = await CustomerAsync(quote.CustomerId, ct).ConfigureAwait(false),
             Fields = [("Quotation", quote.QuoteNumber), ("Date", D(quote.QuoteDate)), ("Valid until", D(quote.ValidUntil)), ("Currency", quote.Currency.ToString())],
             Lines = lines, Totals = [($"TOTAL ({quote.Currency}) excl. tax", lines.Sum(l => l.Amount ?? 0m))],
             Notes = [$"Prices are valid until {D(quote.ValidUntil)}. Please quote {quote.QuoteNumber} when ordering."], Signatures = ["Accepted by"],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> OrderConfirmationAsync(long companyId, string orderNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildOrderConfirmationAsync(companyId, orderNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildOrderConfirmationAsync(long companyId, string orderNumber, CancellationToken ct)
     {
         SalesOrder? order = await _db.SalesOrders.AsNoTracking().Include(o => o.Lines).FirstOrDefaultAsync(o => o.CompanyId == companyId && o.OrderNumber == orderNumber, ct).ConfigureAwait(false);
         if (order is null)
@@ -71,17 +77,20 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         Dictionary<long, Item> items = await ItemsAsync(order.Lines.Select(l => l.ItemId), ct).ConfigureAwait(false);
         List<BusinessDocumentLine> lines = [.. order.Lines.Select(l => new BusinessDocumentLine(items.GetValueOrDefault(l.ItemId)?.Code ?? string.Empty, l.Description, l.OrderedQuantity, l.UnitPrice,
             Math.Round(l.OrderedQuantity * l.UnitPrice, 2)))];
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Order Confirmation", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyName = await CustomerAsync(order.CustomerId, ct).ConfigureAwait(false),
             Fields = [("Order", order.OrderNumber), ("Date", D(order.OrderDate)), ("Delivery wanted", order.RequestedDeliveryDate is DateOnly r ? D(r) : "—"), ("Status", order.Status.ToString())],
             Lines = lines, Totals = [($"ORDER TOTAL ({order.Currency}) excl. tax", lines.Sum(l => l.Amount ?? 0m))],
             Notes = ["Thank you for your order. Goods remain ours until paid for in full."],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> DeliveryNoteAsync(long companyId, string deliveryReference, bool packing = false, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildDeliveryNoteAsync(companyId, deliveryReference, packing, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildDeliveryNoteAsync(long companyId, string deliveryReference, bool packing, CancellationToken ct)
     {
         SalesDelivery? delivery = await _db.SalesDeliveries.AsNoTracking().Include(d => d.Lines).FirstOrDefaultAsync(d => d.CompanyId == companyId && d.Reference == deliveryReference, ct).ConfigureAwait(false);
         if (delivery is null)
@@ -100,7 +109,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
             notes.Add($"Signed for on {D(delivered)} by {delivery.ReceivedBy} (POD {delivery.PodReference ?? "—"}).");
         }
 
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = packing ? "Packing Note" : "Delivery Note", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Deliver to",
             PartyName = await CustomerAsync(order.CustomerId, ct).ConfigureAwait(false),
@@ -108,11 +117,14 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
             ShowPrices = false,
             Lines = [.. delivery.Lines.Select(l => new BusinessDocumentLine(items.GetValueOrDefault(l.ItemId)?.Code ?? string.Empty, descriptions.GetValueOrDefault(l.SalesOrderLineId, string.Empty), l.Quantity))],
             Notes = notes, Signatures = packing ? ["Packed by", "Checked by"] : ["Delivered by", "Received by"],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> RequisitionAsync(long companyId, string requisitionNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildRequisitionAsync(companyId, requisitionNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildRequisitionAsync(long companyId, string requisitionNumber, CancellationToken ct)
     {
         PurchaseRequisition? requisition = await _db.PurchaseRequisitions.AsNoTracking().Include(r => r.Lines)
             .FirstOrDefaultAsync(r => r.CompanyId == companyId && r.RequisitionNumber == requisitionNumber, ct).ConfigureAwait(false);
@@ -125,17 +137,20 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         Dictionary<long, Item> items = await ItemsAsync(requisition.Lines.Select(l => l.ItemId), ct).ConfigureAwait(false);
         List<BusinessDocumentLine> lines = [.. requisition.Lines.Select(l => new BusinessDocumentLine(items.GetValueOrDefault(l.ItemId)?.Code ?? string.Empty,
             l.Description + (l.ExpenseAccountCode is null ? string.Empty : $" [{l.ExpenseAccountCode}]"), l.Quantity, l.UnitPrice, Math.Round(l.Quantity * l.UnitPrice, 2)))];
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Purchase Requisition", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Suggested supplier",
             PartyName = await SupplierAsync(requisition.SupplierId, ct).ConfigureAwait(false),
             Fields = [("Requisition", requisition.RequisitionNumber), ("Date", D(requisition.RequestedDate)), ("Currency", requisition.Currency.ToString()), ("Status", requisition.Status.ToString())],
             Lines = lines, Totals = [($"ESTIMATED TOTAL ({requisition.Currency})", lines.Sum(l => l.Amount ?? 0m))], Signatures = ["Requested by", "Budget checked by", "Approved by"],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> GoodsReceivedNoteAsync(long companyId, string grnNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildGoodsReceivedNoteAsync(companyId, grnNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildGoodsReceivedNoteAsync(long companyId, string grnNumber, CancellationToken ct)
     {
         GoodsReceivedNote? grn = await _db.GoodsReceivedNotes.AsNoTracking().Include(g => g.Lines).FirstOrDefaultAsync(g => g.CompanyId == companyId && g.GrnNumber == grnNumber, ct).ConfigureAwait(false);
         if (grn is null)
@@ -148,17 +163,20 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         Dictionary<long, Item> items = await ItemsAsync(grn.Lines.Select(l => l.ItemId), ct).ConfigureAwait(false);
         List<BusinessDocumentLine> lines = [.. grn.Lines.Select(l => new BusinessDocumentLine(items.GetValueOrDefault(l.ItemId)?.Code ?? string.Empty, items.GetValueOrDefault(l.ItemId)?.Description ?? string.Empty,
             l.Quantity, l.UnitPrice, Math.Round(l.Quantity * l.UnitPrice, 2)))];
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Goods Received Note", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Supplier", PartyName = await SupplierAsync(grn.SupplierId, ct).ConfigureAwait(false),
             Fields = [("GRN", grn.GrnNumber), ("Received", D(grn.Date)), ("Purchase order", orderNumber)],
             Lines = lines, Totals = [("VALUE RECEIVED", lines.Sum(l => l.Amount ?? 0m))], Notes = ["Quantities counted on receipt; quality inspection follows where required."],
             Signatures = ["Received by", "Store checked by"],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> SupplierDebitNoteAsync(long companyId, string documentNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildSupplierDebitNoteAsync(companyId, documentNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildSupplierDebitNoteAsync(long companyId, string documentNumber, CancellationToken ct)
     {
         List<StockMovement> returned = await _db.StockMovements.AsNoTracking()
             .Where(m => m.CompanyId == companyId && m.Type == StockMovementType.SupplierReturn && m.Reference == documentNumber).ToListAsync(ct).ConfigureAwait(false);
@@ -172,14 +190,14 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, Item> items = await ItemsAsync(returned.Select(m => m.ItemId), ct).ConfigureAwait(false);
         decimal units = -returned.Sum(m => m.Quantity), claimed = Math.Abs(credit.OriginalTransaction), price = units == 0m ? 0m : Math.Round(claimed / units, 4);
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Debit Note", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Supplier", PartyName = await SupplierAsync(credit.TraderId, ct).ConfigureAwait(false),
             Fields = [("Debit note", documentNumber), ("Date", D(credit.DocumentDate)), ("Currency", credit.Currency.ToString())],
             Lines = [.. returned.Select(m => new BusinessDocumentLine(items.GetValueOrDefault(m.ItemId)?.Code ?? string.Empty, items.GetValueOrDefault(m.ItemId)?.Description ?? string.Empty, -m.Quantity, price,
                 Math.Round(-m.Quantity * price, 2)))],
             Totals = [($"CREDIT CLAIMED ({credit.Currency})", claimed)], Notes = ["Goods returned to you as above. Please credit our account and confirm."], Signatures = ["Returned by", "Supplier acknowledgement"],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
@@ -229,6 +247,9 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
 
     /// <inheritdoc />
     public async Task<Result<string>> MunicipalBillAsync(long companyId, string standNumber, DateOnly month, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildMunicipalBillAsync(companyId, standNumber, month, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildMunicipalBillAsync(long companyId, string standNumber, DateOnly month, CancellationToken ct)
     {
         DateOnly first = new(month.Year, month.Month, 1), last = first.AddMonths(1).AddDays(-1);
         var lines = await (from l in _db.Set<Core.Municipal.BillingRunLine>().AsNoTracking()
@@ -247,18 +268,21 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
             .Where(o => o.Item.TraderId == ratepayer && !invoices.Contains(o.Item.DocumentNumber)).Sum(o => o.Signed(Core.Trading.LedgerSign.Debit));
         decimal current = lines.Sum(l => l.Charge);
         Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Municipal Account", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Ratepayer", PartyName = await CustomerAsync(ratepayer, ct).ConfigureAwait(false),
             Fields = [("Stand", standNumber), ("Billing month", first.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Bill date", D(billDate)), ("Due by", D(billDate.AddDays(30)))],
             Lines = [.. lines.OrderBy(l => l.ServiceType).Select(l => new BusinessDocumentLine(l.ServiceType.ToString(), l.Narrative, 1m, l.Charge, l.Charge))],
             Totals = [("Balance brought forward", broughtForward), ("Current charges", current), ("TOTAL DUE", broughtForward + current)],
             Notes = ["Pay by the due date to avoid interest and restriction of services. Quote your stand number with every payment."],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> FeeInvoiceAsync(long companyId, string invoiceNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildFeeInvoiceAsync(companyId, invoiceNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildFeeInvoiceAsync(long companyId, string invoiceNumber, CancellationToken ct)
     {
         var invoice = await (from o in _db.OpenItems.AsNoTracking()
                              join j in _db.Journals.AsNoTracking() on o.JournalEntryId equals j.Id
@@ -292,17 +316,20 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
             }
         }
 
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Fee Invoice", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Bill to", PartyName = await CustomerAsync(invoice.TraderId, ct).ConfigureAwait(false),
             Fields = [("Invoice", invoiceNumber), ("Date", D(invoice.DocumentDate)), ("Student", student is null ? admission : $"{student.FullName} ({student.AdmissionNumber})"), ("Grade", student?.Grade ?? "—"),
                 ("Term", term), ("Due by", D(invoice.DueDate))],
             Lines = lines, Totals = [($"AMOUNT DUE ({invoice.Currency})", invoice.OriginalTransaction)], Notes = ["Please quote the student's admission number with every payment."],
-        }, width);
+        };
     }
 
     /// <inheritdoc />
     public async Task<Result<string>> PaymentCertificateAsync(long companyId, string certificateNumber, int width = BusinessDocumentFormatter.DefaultWidth, CancellationToken ct = default)
+        => Text(await BuildPaymentCertificateAsync(companyId, certificateNumber, ct).ConfigureAwait(false), width);
+
+    private async Task<Result<BusinessDocument>> BuildPaymentCertificateAsync(long companyId, string certificateNumber, CancellationToken ct)
     {
         Core.JobCosting.ProgressCertificate? certificate = await _db.ProgressCertificates.AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.CertificateNumber == certificateNumber, ct).ConfigureAwait(false);
         if (certificate is null)
@@ -313,7 +340,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         Core.JobCosting.JobContract contract = await _db.JobContracts.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).FirstAsync(c => c.Id == certificate.JobContractId, ct).ConfigureAwait(false);
         Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
         decimal valuation = certificate.WorkDoneToDate + certificate.MaterialsOnSite;
-        return BusinessDocumentFormatter.ToPlainText(new BusinessDocument
+        return new BusinessDocument
         {
             Title = "Interim Payment Certificate", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Employer", PartyName = await CustomerAsync(contract.CustomerId, ct).ConfigureAwait(false),
             Fields = [("Certificate", certificate.CertificateNumber), ("Date", D(certificate.Date)), ("Contract", $"{contract.ContractNumber} {contract.Name}"), ("Contract value", contract.ContractValue.ToString("N2", CultureInfo.InvariantCulture))],
@@ -322,8 +349,30 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
                 ("Gross this certificate", certificate.GrossThisCertificate), ($"Less retention ({contract.RetentionPercent.ToString("0.##", CultureInfo.InvariantCulture)}%)", -certificate.RetentionThisCertificate),
                 ("NET AMOUNT DUE", certificate.NetPayable)],
             Notes = [$"Retention held to date: {contract.RetentionHeld.ToString("N2", CultureInfo.InvariantCulture)}."], Signatures = ["Certified by (quantity surveyor)", "Approved by (employer)"],
-        }, width);
+        };
     }
+
+    /// <inheritdoc />
+    public Task<Result<BusinessDocument>> BuildAsync(long companyId, string kind, string number, DateOnly? date = null, CancellationToken ct = default)
+    {
+        string key = DocumentKinds.Find(kind)?.Kind ?? kind?.Trim() ?? string.Empty;
+        return key switch
+        {
+            DocumentKinds.Quotation => BuildQuotationAsync(companyId, number, ct),
+            DocumentKinds.OrderConfirmation => BuildOrderConfirmationAsync(companyId, number, ct),
+            DocumentKinds.DeliveryNote => BuildDeliveryNoteAsync(companyId, number, false, ct),
+            DocumentKinds.PackingSlip => BuildDeliveryNoteAsync(companyId, number, true, ct),
+            DocumentKinds.Requisition => BuildRequisitionAsync(companyId, number, ct),
+            DocumentKinds.GoodsReceivedNote => BuildGoodsReceivedNoteAsync(companyId, number, ct),
+            DocumentKinds.SupplierDebitNote => BuildSupplierDebitNoteAsync(companyId, number, ct),
+            DocumentKinds.FeeInvoice => BuildFeeInvoiceAsync(companyId, number, ct),
+            DocumentKinds.PaymentCertificate => BuildPaymentCertificateAsync(companyId, number, ct),
+            DocumentKinds.MunicipalBill => BuildMunicipalBillAsync(companyId, number, date ?? DateOnly.FromDateTime(DateTime.Today), ct),
+            _ => Task.FromResult<Result<BusinessDocument>>(Error.Validation("Doc.Kind", $"No business document of kind {kind}; the kinds are {string.Join(", ", DocumentKinds.All.Select(k => k.Kind))}.")),
+        };
+    }
+
+    private static Result<string> Text(Result<BusinessDocument> built, int width) => built.IsSuccess ? BusinessDocumentFormatter.ToPlainText(built.Value, width) : built.Error;
 
     /// <inheritdoc />
     public async Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, CancellationToken ct = default)

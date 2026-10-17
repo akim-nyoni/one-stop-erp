@@ -40,8 +40,9 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         bool unposted = options.IncludeUnposted;
         string? costCentre = string.IsNullOrWhiteSpace(options.CostCentre) ? null : options.CostCentre.Trim().ToUpperInvariant();
         string? department = string.IsNullOrWhiteSpace(options.Department) ? null : options.Department.Trim().ToUpperInvariant();
+        string? branch = string.IsNullOrWhiteSpace(options.Branch) ? null : options.Branch.Trim().ToUpperInvariant();
         var totals = await _db.Set<JournalLine>()
-            .Where(l => (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department))
+            .Where(l => (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department) && (branch == null || l.Branch == branch))
             .Where(l => _db.Journals.Any(j =>
                 j.Id == l.JournalEntryId && j.CompanyId == companyId
                 && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred))) &&
@@ -127,10 +128,14 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    public Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+        => TrialBalanceByTypeAsync(companyId, asAtDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<TrialBalanceByTypeReport> TrialBalanceByTypeAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> sums = await SumByAccountAsync(companyId, null, asAtDate, options, ct).ConfigureAwait(false);
 
         // Net each account, then net all accounts of a type together so the type shows on one side.
         Dictionary<AccountType, decimal> netByType = [];
@@ -276,26 +281,35 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<NominalActivityReport> NominalActivityAsync(long companyId, string accountCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    public Task<NominalActivityReport> NominalActivityAsync(long companyId, string accountCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+        => NominalActivityAsync(companyId, accountCode, fromDate, toDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<NominalActivityReport> NominalActivityAsync(long companyId, string accountCode, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         string code = accountCode.Trim().ToUpperInvariant();
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
         string name = accounts.TryGetValue(code, out AccountMeta? meta) ? meta.Name : code;
+        (bool unposted, string? costCentre, string? department, string? branch) = Filters(options);
+        decimal At(decimal amount) => options.Rate == 1m ? amount : decimal.Round(amount * options.Rate, 2, MidpointRounding.AwayFromZero);
 
         // Opening balance: everything strictly before the range start.
         var before = await (
             from l in _db.Set<JournalLine>()
             join j in _db.Journals on l.JournalEntryId equals j.Id
-            where j.CompanyId == companyId && j.Status == JournalStatus.Posted && l.AccountCode == code && j.PostingDate < fromDate
+            where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred)))
+                && l.AccountCode == code && j.PostingDate < fromDate
+                && (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department) && (branch == null || l.Branch == branch)
             select new { l.BaseDebit, l.BaseCredit })
             .ToListAsync(ct).ConfigureAwait(false);
-        decimal opening = before.Sum(l => l.BaseDebit) - before.Sum(l => l.BaseCredit);
+        decimal opening = At(before.Sum(l => l.BaseDebit) - before.Sum(l => l.BaseCredit));
 
         var inRange = await (
             from l in _db.Set<JournalLine>()
             join j in _db.Journals on l.JournalEntryId equals j.Id
-            where j.CompanyId == companyId && j.Status == JournalStatus.Posted && l.AccountCode == code &&
-                  j.PostingDate >= fromDate && j.PostingDate <= toDate
+            where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred)))
+                && l.AccountCode == code && j.PostingDate >= fromDate && j.PostingDate <= toDate
+                && (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department) && (branch == null || l.Branch == branch)
             orderby j.PostingDate, j.JournalNumber
             select new { j.PostingDate, j.JournalNumber, l.Narrative, l.BaseDebit, l.BaseCredit })
             .ToListAsync(ct).ConfigureAwait(false);
@@ -304,20 +318,34 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         decimal running = opening;
         foreach (var l in inRange)
         {
-            running += l.BaseDebit - l.BaseCredit;
-            lines.Add(new NominalActivityLine(l.PostingDate, l.JournalNumber, l.Narrative, l.BaseDebit, l.BaseCredit, running));
+            running += At(l.BaseDebit) - At(l.BaseCredit);
+            lines.Add(new NominalActivityLine(l.PostingDate, l.JournalNumber, l.Narrative, At(l.BaseDebit), At(l.BaseCredit), running));
         }
 
         return new NominalActivityReport(companyId, code, name, opening, lines, running);
     }
 
+    // The common filters as the queries use them: unposted journals too, and only the lines of a cost centre, department or branch.
+    private static (bool Unposted, string? CostCentre, string? Department, string? Branch) Filters(LedgerReportOptions options)
+        => (options.IncludeUnposted,
+            string.IsNullOrWhiteSpace(options.CostCentre) ? null : options.CostCentre.Trim().ToUpperInvariant(),
+            string.IsNullOrWhiteSpace(options.Department) ? null : options.Department.Trim().ToUpperInvariant(),
+            string.IsNullOrWhiteSpace(options.Branch) ? null : options.Branch.Trim().ToUpperInvariant());
+
     /// <inheritdoc />
-    public async Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    public Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+        => JournalDaybookAsync(companyId, fromDate, toDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<JournalDaybookReport> JournalDaybookAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default)
     {
-        // One row per posted journal in the range, with its base total (sum of debit lines = sum of credits).
+        // One row per journal in the range (posted, or draft and deferred too when asked), with its base total (sum of debit lines = sum of credits);
+        // with a branch, cost centre or department only those lines count, and a journal with none of them is left out.
+        (bool unposted, string? costCentre, string? department, string? branch) = Filters(options);
+        bool narrowed = costCentre is not null || department is not null || branch is not null;
         var journals = await (
             from j in _db.Journals
-            where j.CompanyId == companyId && j.Status == JournalStatus.Posted &&
+            where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred))) &&
                   j.PostingDate >= fromDate && j.PostingDate <= toDate
             orderby j.PostingDate descending, j.JournalNumber descending
             select new
@@ -328,12 +356,16 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
                 j.DocumentType,
                 j.DocumentNumber,
                 j.Narrative,
-                Amount = _db.Set<JournalLine>().Where(l => l.JournalEntryId == j.Id).Sum(l => (decimal?)l.BaseDebit) ?? 0m,
+                Amount = _db.Set<JournalLine>().Where(l => l.JournalEntryId == j.Id
+                    && (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department) && (branch == null || l.Branch == branch))
+                    .Sum(l => (decimal?)l.BaseDebit) ?? 0m,
             })
             .ToListAsync(ct).ConfigureAwait(false);
 
         List<JournalDaybookLine> lines = journals
-            .Select(j => new JournalDaybookLine(j.PostingDate, j.JournalNumber, j.SourceModule, j.DocumentType, j.DocumentNumber, j.Narrative, j.Amount))
+            .Where(j => !narrowed || j.Amount != 0m)
+            .Select(j => new JournalDaybookLine(j.PostingDate, j.JournalNumber, j.SourceModule, j.DocumentType, j.DocumentNumber, j.Narrative,
+                options.Rate == 1m ? j.Amount : decimal.Round(j.Amount * options.Rate, 2, MidpointRounding.AwayFromZero)))
             .ToList();
 
         return new JournalDaybookReport(companyId, fromDate, toDate, lines, lines.Sum(l => l.Amount));
@@ -379,11 +411,15 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    public Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+        => TrialBalanceMovementAsync(companyId, fromDate, toDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<TrialBalanceMovementReport> TrialBalanceMovementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> opening = await SumByAccountAsync(companyId, null, fromDate.AddDays(-1), ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> opening = await SumByAccountAsync(companyId, null, fromDate.AddDays(-1), options, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, options, ct).ConfigureAwait(false);
 
         List<TrialBalanceMovementRow> rows = [];
         foreach (string code in opening.Keys.Union(movement.Keys).OrderBy(k => k, StringComparer.Ordinal))
@@ -406,11 +442,15 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+    public Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct = default)
+        => CashFlowStatementAsync(companyId, fromDate, toDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<CashFlowStatement> CashFlowStatementAsync(long companyId, DateOnly fromDate, DateOnly toDate, LedgerReportOptions options, CancellationToken ct = default)
     {
         Dictionary<string, AccountMeta> accounts = await LoadAccountsAsync(companyId, ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> opening = await SumByAccountAsync(companyId, null, fromDate.AddDays(-1), ct).ConfigureAwait(false);
-        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> opening = await SumByAccountAsync(companyId, null, fromDate.AddDays(-1), options, ct).ConfigureAwait(false);
+        Dictionary<string, (decimal debit, decimal credit)> movement = await SumByAccountAsync(companyId, fromDate, toDate, options, ct).ConfigureAwait(false);
 
         decimal openingCash = 0m;
         decimal closingCash = 0m;
@@ -501,10 +541,14 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     }
 
     /// <inheritdoc />
-    public async Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+    public Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, CancellationToken ct = default)
+        => FinancialSnapshotAsync(companyId, asAtDate, LedgerReportOptions.Default, ct);
+
+    /// <inheritdoc />
+    public async Task<FinancialSnapshotReport> FinancialSnapshotAsync(long companyId, DateOnly asAtDate, LedgerReportOptions options, CancellationToken ct = default)
     {
-        BalanceSheet bs = await BalanceSheetAsync(companyId, asAtDate, ct).ConfigureAwait(false);
-        IncomeStatement pl = await IncomeStatementAsync(companyId, new DateOnly(asAtDate.Year, 1, 1), asAtDate, ct).ConfigureAwait(false);
+        BalanceSheet bs = await BalanceSheetAsync(companyId, asAtDate, options, ct).ConfigureAwait(false);
+        IncomeStatement pl = await IncomeStatementAsync(companyId, new DateOnly(asAtDate.Year, 1, 1), asAtDate, options, ct).ConfigureAwait(false);
 
         List<FinancialSnapshotRow> rows =
         [

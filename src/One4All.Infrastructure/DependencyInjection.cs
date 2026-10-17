@@ -284,6 +284,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.OperationsReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.BudgetingReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.PayrollReportDataProvider>();
+        services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.DocumentReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.VerticalReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.PosJobReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.RegistersReportDataProvider>();
@@ -489,6 +490,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Offline.IOfflineOutbox, Offline.EfOfflineOutbox>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosSaleOfflineHandler>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosOpenTillOfflineHandler>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosVoidOfflineHandler>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosRefundOfflineHandler>();
+        services.AddScoped<Application.Abstractions.Offline.IOfflineOperationHandler, Offline.PosCashUpOfflineHandler>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineSyncService, Application.Offline.OfflineSyncService>();
         services.AddScoped<Application.Abstractions.Offline.IOfflineAdminService, Application.Offline.OfflineAdminService>();
 

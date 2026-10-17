@@ -663,6 +663,33 @@ public sealed class PosService : IPosService
         => _db.AtomicAsync(() => CashUpAndCloseCoreAsync(request, ct), ct);
 
     /// <inheritdoc />
+    public async Task<Result> SwitchCashierAsync(long tillSessionId, long incomingCashierUserId, DateOnly date, CancellationToken ct = default)
+    {
+        TillSession? session = await _db.TillSessions.FirstOrDefaultAsync(s => s.Id == tillSessionId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Result.Failure(Error.NotFound("Pos.SessionNotFound", $"Till session {tillSessionId} not found."));
+        }
+
+        if (session.Status != TillSessionStatus.Open)
+        {
+            return Result.Failure(Error.Rule("Pos.SessionClosed", "The till session is already closed."));
+        }
+
+        if (session.CashierUserId == incomingCashierUserId)
+        {
+            return Result.Failure(Error.Rule("Pos.SameCashier", "The till is already in that cashier's name."));
+        }
+
+        long outgoing = session.CashierUserId;
+        session.Reassign(incomingCashierUserId);
+        _db.PosEvents.Add(new PosEvent(session.CompanyId, session.TerminalId, incomingCashierUserId, PosEventKind.CashierSwitch, _clock.UtcNow, date,
+            $"Till passed from user {outgoing} to user {incomingCashierUserId} without a cash-up", 0m) { TillSessionId = session.Id });
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public Task<Result<CashierHandover>> HandOverAsync(CashierHandoverRequest request, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(request);

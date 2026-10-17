@@ -419,6 +419,56 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Application log", ListTitle = "Application log (latest 300)",
+            Description = "What the desktop, server and scheduler logged (information and above) — one table for every machine, beside each host's daily log file. "
+                + "The list shows the latest 300 lines, newest first; Run removes lines older than the days kept.",
+            Fields = [Num("Keep", "Keep (days)", "90")],
+            Run = async (c, i) =>
+            {
+                DateTimeOffset cutoff = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, i.Whole("Keep")));
+                int removed = await c.Db.AppLog.Where(l => l.LoggedOnUtc < cutoff).ExecuteDeleteAsync().ConfigureAwait(true);
+                return $"{removed} log line(s) older than {i.Whole("Keep")} days removed.";
+            },
+            List = async c =>
+            {
+                return Table(await c.Db.AppLog.AsNoTracking().OrderByDescending(l => l.Id).Take(300).ToListAsync().ConfigureAwait(true),
+                    ("When", l => l.LoggedOnUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)), ("Level", l => l.Level), ("Host", l => l.Host), ("Machine", l => l.Machine),
+                    ("Source", l => l.Source.Contains('.') ? l.Source[(l.Source.LastIndexOf('.') + 1)..] : l.Source), ("Message", l => l.Message.Length > 200 ? l.Message[..200] + "…" : l.Message),
+                    ("Exception", l => l.Exception is null ? string.Empty : l.Exception.Split('\n')[0]));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Document layouts", ListTitle = "Document layouts",
+            Description = "Which report lays out each business document. Copy the document's designable report (DOC01–DOC12, listed here) in the report designer, lay it out as your own, "
+                + "and name your copy's code here; a document with no layout prints as the standard text document. A blank code clears the layout.",
+            Fields = [Pick("Document", "Document", [.. Application.Documents.DocumentKinds.All.Select(k => k.Name)]), Opt("Layout", "Layout report code (blank: standard text document)")],
+            Run = async (c, i) =>
+            {
+                Application.Documents.DocumentKind kind = Application.Documents.DocumentKinds.Find(i.Text("Document")) ?? throw new OperationException("Choose a document.");
+                string? layout = i.Optional("Layout")?.Trim().ToUpperInvariant();
+                if (layout is not null && !await c.Db.ReportDefinitions.AnyAsync(r => r.Code == layout).ConfigureAwait(true) && One4All.Reporting.SystemReportCatalogue.All().All(r => r.Code != layout))
+                {
+                    throw new OperationException($"No report {layout}. Design the {kind.Name.ToLowerInvariant()} in the report designer (start from {kind.DesignableReportCode}) and give its code here.");
+                }
+
+                Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                Application.Documents.DocumentLayoutSettings settings = Application.Documents.DocumentLayoutSettings.Parse(company.DocumentLayoutsJson);
+                settings.Set(kind.Kind, layout);
+                company.DocumentLayoutsJson = settings.ToJson();
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return layout is null ? $"{kind.Name}: prints as the standard text document." : $"{kind.Name}: prints through report {layout}.";
+            },
+            List = async c =>
+            {
+                string? json = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.DocumentLayoutsJson).FirstOrDefaultAsync().ConfigureAwait(true);
+                Application.Documents.DocumentLayoutSettings settings = Application.Documents.DocumentLayoutSettings.Parse(json);
+                return Table(Application.Documents.DocumentKinds.All, ("Document", k => k.Name), ("Layout", k => settings.LayoutFor(k.Kind) ?? "(standard text)"),
+                    ("Start from", k => k.DesignableReportCode), ("Identified by", k => k.NumberLabel));
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Report house style", ListTitle = "House style",
             Description = "The company's house style for every report in one click: the font and size for standard text, the colour of report titles, the colour of column-heading strips, "
                 + "the colour of lines, a footer line on every page, and whether the logo is placed top-right on reports that do not place it themselves. Colours are #RRGGBB. "
@@ -611,42 +661,57 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Add a customer", ListTitle = "Customers", Delete = SoftDelete<Core.Trading.Customer>(x => x.Code, "customer"),
-            Description = "A customer account; raise the credit limit later through approval. An existing code changes that customer's name (the currency and limit stay).",
-            Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD"), Num("Limit", "Credit limit", "0")],
+            Description = "A customer account; raise the credit limit later through approval. An existing code changes that customer's name and analysis codes (the currency and limit stay). "
+                + "The three analysis codes (e.g. region, salesperson, sector) are how the account's transactions are analysed in reports.",
+            Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD"), Num("Limit", "Credit limit", "0"), Opt("Analysis1", "Analysis code 1"),
+                Opt("Analysis2", "Analysis code 2"), Opt("Analysis3", "Analysis code 3")],
             Run = async (c, i) =>
             {
+                static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
                 if (await ExistingAsync<Core.Trading.Customer>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
                 {
                     existing.Name = i.Text("Name");
+                    (existing.AnalysisCode1, existing.AnalysisCode2, existing.AnalysisCode3) = (Code(i.Optional("Analysis1")), Code(i.Optional("Analysis2")), Code(i.Optional("Analysis3")));
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
                     return $"Customer {existing.Code} changed.";
                 }
 
-                return Check(await c.Get<IMasterDataService>().CreateCustomerAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Number("Limit"))
-                    .ConfigureAwait(true), id => "Customer added.");
+                long id = Check(await c.Get<IMasterDataService>().CreateCustomerAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Number("Limit")).ConfigureAwait(true));
+                Core.Trading.Customer added = await c.Db.Customers.SingleAsync(x => x.Id == id).ConfigureAwait(true);
+                (added.AnalysisCode1, added.AnalysisCode2, added.AnalysisCode3) = (Code(i.Optional("Analysis1")), Code(i.Optional("Analysis2")), Code(i.Optional("Analysis3")));
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return "Customer added.";
             },
             List = async c => Table(await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value), ("Credit limit", x => M(x.CreditLimit))),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value), ("Credit limit", x => M(x.CreditLimit)),
+                ("Analysis", x => string.Join(" / ", new[] { x.AnalysisCode1, x.AnalysisCode2, x.AnalysisCode3 }.Where(a => !string.IsNullOrEmpty(a))))),
         };
         yield return new Operation
         {
             Module = module, Title = "Add a supplier", ListTitle = "Suppliers", Delete = SoftDelete<Core.Trading.Supplier>(x => x.Code, "supplier"),
-            Description = "A supplier account. An existing code changes that supplier's name (the currency stays).",
-            Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD")],
+            Description = "A supplier account. An existing code changes that supplier's name and analysis codes (the currency stays). The three analysis codes (e.g. region, buyer, commodity) "
+                + "are how the account's transactions are analysed in reports.",
+            Fields = [Req("Code", "Account code"), Req("Name", "Name"), Req("Currency", "Currency", "USD"), Opt("Analysis1", "Analysis code 1"), Opt("Analysis2", "Analysis code 2"), Opt("Analysis3", "Analysis code 3")],
             Run = async (c, i) =>
             {
+                static string? Code(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
                 if (await ExistingAsync<Core.Trading.Supplier>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
                 {
                     existing.Name = i.Text("Name");
+                    (existing.AnalysisCode1, existing.AnalysisCode2, existing.AnalysisCode3) = (Code(i.Optional("Analysis1")), Code(i.Optional("Analysis2")), Code(i.Optional("Analysis3")));
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
                     return $"Supplier {existing.Code} changed.";
                 }
 
-                return Check(await c.Get<IMasterDataService>().CreateSupplierAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency"))).ConfigureAwait(true),
-                    id => "Supplier added.");
+                long id = Check(await c.Get<IMasterDataService>().CreateSupplierAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency"))).ConfigureAwait(true));
+                Core.Trading.Supplier added = await c.Db.Suppliers.SingleAsync(x => x.Id == id).ConfigureAwait(true);
+                (added.AnalysisCode1, added.AnalysisCode2, added.AnalysisCode3) = (Code(i.Optional("Analysis1")), Code(i.Optional("Analysis2")), Code(i.Optional("Analysis3")));
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return "Supplier added.";
             },
             List = async c => Table(await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value)),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value),
+                ("Analysis", x => string.Join(" / ", new[] { x.AnalysisCode1, x.AnalysisCode2, x.AnalysisCode3 }.Where(a => !string.IsNullOrEmpty(a))))),
         };
         yield return new Operation
         {

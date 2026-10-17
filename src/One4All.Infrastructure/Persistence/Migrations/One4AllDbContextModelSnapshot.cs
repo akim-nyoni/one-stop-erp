@@ -6087,8 +6087,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("InputCandidates")
                         .IsRequired()
-                        .HasMaxLength(100000)
-                        .HasColumnType("character varying(100000)")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
                         .HasColumnName("input_candidates");
 
                     b.Property<string>("InputHash")
@@ -6099,8 +6099,8 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("InputStands")
                         .IsRequired()
-                        .HasMaxLength(100000)
-                        .HasColumnType("character varying(100000)")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
                         .HasColumnName("input_stands");
 
                     b.Property<int>("Method")
@@ -31075,6 +31075,74 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("user_role", "sec");
                 });
 
+            modelBuilder.Entity("One4All.Core.System.AppLogEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Exception")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("exception");
+
+                    b.Property<string>("Host")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("host");
+
+                    b.Property<string>("Level")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("level");
+
+                    b.Property<DateTimeOffset>("LoggedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("logged_on_utc");
+
+                    b.Property<string>("Machine")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("machine");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("message");
+
+                    b.Property<string>("Properties")
+                        .HasMaxLength(256)
+                        .HasColumnType("text")
+                        .HasColumnName("properties");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source");
+
+                    b.HasKey("Id")
+                        .HasName("pk_app_log");
+
+                    b.HasIndex("LoggedOnUtc")
+                        .HasDatabaseName("ix_app_log_logged_on_utc");
+
+                    b.ToTable("app_log", "sys");
+                });
+
             modelBuilder.Entity("One4All.Core.System.Attachment", b =>
                 {
                     b.Property<long>("Id")
@@ -31416,6 +31484,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DeletedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_on_utc");
+
+                    b.Property<string>("DocumentLayoutsJson")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("document_layouts_json");
 
                     b.Property<bool>("EnforceLotTracking")
                         .HasColumnType("boolean")
@@ -32832,6 +32905,21 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("ageing_basis");
 
+                    b.Property<string>("AnalysisCode1")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("analysis_code1");
+
+                    b.Property<string>("AnalysisCode2")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("analysis_code2");
+
+                    b.Property<string>("AnalysisCode3")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("analysis_code3");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -34239,6 +34327,21 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("AgeingBasis")
                         .HasColumnType("integer")
                         .HasColumnName("ageing_basis");
+
+                    b.Property<string>("AnalysisCode1")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("analysis_code1");
+
+                    b.Property<string>("AnalysisCode2")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("analysis_code2");
+
+                    b.Property<string>("AnalysisCode3")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("analysis_code3");
 
                     b.Property<string>("BankAccountName")
                         .HasMaxLength(120)

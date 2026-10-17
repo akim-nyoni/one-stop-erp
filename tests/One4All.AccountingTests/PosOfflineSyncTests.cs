@@ -165,4 +165,69 @@ public sealed class PosOfflineSyncTests
         (await db.Set<Sale>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.SaleNumber == $"OFFS-{companyId}")).TillSessionId.Should().Be(session.Id);
         (await scope.ServiceProvider.GetRequiredService<IPosService>().OpenTillOfflineAsync(companyId, terminal.Id, 1, 50m, opened, key)).Value.Should().Be(session.Id);
     }
+
+    [SkippableFact]
+    public async Task A_void_a_refund_and_the_cash_up_captured_offline_replay_after_their_sales()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Branch branch = new(companyId, "HO", "Head Office");
+        db.Branches.Add(branch);
+        await db.SaveChangesAsync();
+        PosTerminal terminal = new(companyId, branch.Id, "OFFTILL2", "Offline Till 2");
+        Item item = new(companyId, "OFFTEA", "Tea") { CostOfSalesAccountCode = "5000", RevenueAccountCode = "4000" };
+        Warehouse wh = new(companyId, "OFFWH2", "Shop");
+        db.AddRange(terminal, item, wh);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IInventoryService>().ReceiveAsync(new ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = item.Id, WarehouseId = wh.Id, Date = new DateOnly(2026, 3, 1), Quantity = 10m, UnitCost = 1m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+
+        string key = $"OFF2-{companyId}";
+        DateOnly day = new(2026, 3, 2);
+        DateTimeOffset opened = new(2026, 3, 2, 7, 0, 0, TimeSpan.Zero);
+        PosSaleEnvelope SaleOf(string number) => new(companyId, terminal.Id, 0, 1, number, day, wh.Id, "USD", "2200",
+            [new PosSaleLineEnvelope(item.Id, "Tea", 2m, 3m, 6m, 0m, "4000")], [new PosTenderEnvelope(TenderType.Cash, "USD", 6m, "1000", IsChange: false)], OfflineSessionKey: key);
+        string kept = $"OFFK-{companyId}", voided = $"OFFV-{companyId}", refunded = $"OFFR-{companyId}";
+        string reason = "Refund at the till (offline OFR-TEST)";
+        IOfflineOutbox outbox = scope.ServiceProvider.GetRequiredService<IOfflineOutbox>();
+        IOfflineSyncService sync = scope.ServiceProvider.GetRequiredService<IOfflineSyncService>();
+        async Task Enqueue(string kind, object payload, int minute)
+            => (await outbox.EnqueueAsync(new OfflineOperation(companyId, Guid.NewGuid(), kind, JsonSerializer.Serialize(payload), opened.AddMinutes(minute)))).Should().BeTrue();
+
+        // The terminal's day, as queued: till opened, three sales, one voided, one refunded, the count declared and the till closed.
+        await Enqueue(PosOpenTillEnvelope.Kind, new PosOpenTillEnvelope(companyId, terminal.Id, 1, 50m, opened, key), 0);
+        await Enqueue(PosSaleEnvelope.Kind, SaleOf(kept), 1);
+        await Enqueue(PosSaleEnvelope.Kind, SaleOf(voided), 2);
+        await Enqueue(PosSaleEnvelope.Kind, SaleOf(refunded), 3);
+        await Enqueue(PosVoidEnvelope.Kind, new PosVoidEnvelope(companyId, voided, day, "Voided at till (offline)", "2200", 2), 4);
+        await Enqueue(PosRefundEnvelope.Kind, new PosRefundEnvelope(companyId, refunded, terminal.Id, 1, 2, day, "1000", "2200", reason, 0, key), 5);
+        await Enqueue(PosCashUpEnvelope.Kind, new PosCashUpEnvelope(companyId, 0, key, [new PosCashCountEnvelope("USD", 56m)], 1, day, "1000", "6900"), 6);
+
+        OfflineSyncReport first = await sync.SyncPendingAsync();
+        first.DeadLettered.Should().Be(0, "everything replays in order");
+        while ((await sync.SyncPendingAsync()).Retryable > 0)
+        {
+            // Operations that depend on an earlier one retry on the next drain.
+        }
+
+        TillSession session = await db.Set<TillSession>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.OfflineKey == key);
+        (session.Status, session.ZReadNumber.HasValue).Should().Be((TillSessionStatus.Closed, true), "the till cashed up and closed after its sales");
+        (await db.Set<Sale>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.SaleNumber == voided)).Status.Should().Be(SaleStatus.Voided);
+        (await db.Set<Sale>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.SaleNumber == kept)).Status.Should().Be(SaleStatus.Completed);
+        (await db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && e.SaleNumber == refunded && e.Kind == PosEventKind.Refund).ToListAsync())
+            .Should().ContainSingle().Which.Reason.Should().Be(reason);
+        (await db.OfflineOperations.AsNoTracking().Where(o => o.CompanyId == companyId).ToListAsync()).Should().OnlyContain(o => o.Status == OfflineOperationStatus.Synced);
+
+        // Redelivered, each is a no-op: no second void, refund or close.
+        await Enqueue(PosVoidEnvelope.Kind, new PosVoidEnvelope(companyId, voided, day, "Voided at till (offline)", "2200", 2), 7);
+        await Enqueue(PosRefundEnvelope.Kind, new PosRefundEnvelope(companyId, refunded, terminal.Id, 1, 2, day, "1000", "2200", reason, 0, key), 8);
+        await Enqueue(PosCashUpEnvelope.Kind, new PosCashUpEnvelope(companyId, 0, key, [new PosCashCountEnvelope("USD", 56m)], 1, day, "1000", "6900"), 9);
+        (await sync.SyncPendingAsync()).Synced.Should().Be(3);
+        (await db.PosEvents.AsNoTracking().CountAsync(e => e.CompanyId == companyId && e.SaleNumber == refunded && e.Kind == PosEventKind.Refund)).Should().Be(1);
+    }
 }

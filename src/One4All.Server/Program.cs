@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using One4All.Application.Abstractions.Security;
 using One4All.Core.Common;
 using One4All.Infrastructure;
+using One4All.Infrastructure.Logging;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
 using One4All.Infrastructure.Security;
@@ -38,6 +39,9 @@ builder.Configuration.GetSection(One4All.Infrastructure.Backup.BackupOptions.Sec
 One4All.Infrastructure.Security.FieldEncryptionOptions fieldEncryption = new();
 builder.Configuration.GetSection(One4All.Infrastructure.Security.FieldEncryptionOptions.SectionName).Bind(fieldEncryption);
 builder.Services.AddOne4AllInfrastructure(connectionString, licensing, messaging, backup, fieldEncryption);
+
+// Logging (brief §2.2): Serilog to a daily rolling file and the sys.app_log table; a Serilog section in appsettings adds Seq or console.
+builder.Services.AddOne4AllLogging(connectionString, "Server", builder.Configuration, builder.Configuration["Logging:Directory"] ?? Path.Combine(AppContext.BaseDirectory, "logs"));
 
 // Report API data sources (brief §13.1): the web APIs reports may read, from Reporting:Apis (name -> base URL and auth header).
 One4All.Infrastructure.Reporting.ReportApiOptions reportApis = new();

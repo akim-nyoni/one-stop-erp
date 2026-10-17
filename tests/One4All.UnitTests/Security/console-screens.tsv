@@ -100,10 +100,12 @@ Documents	Municipal bill	True
 Documents	Order confirmation	True	
 Documents	Packing slip	True	
 Documents	Payment certificate	True	
+Documents	Purchase order document	True	
 Documents	Purchase requisition	True	
 Documents	Quotation	True	
 Documents	Shelf labels	True	
 Documents	Supplier debit note	True	
+Documents	Tax invoice or credit note	True	
 Fixed Assets	Add a cost to a capital project	False	
 Fixed Assets	Asset classes and impairment	False	
 Fixed Assets	Asset insurance and warranty	False	
@@ -394,6 +396,7 @@ System Manager	Add a tax code	False
 System Manager	Add a warehouse	False	
 System Manager	Add an industry to this company	False	
 System Manager	Add an item	False	
+System Manager	Application log	False	
 System Manager	Archive an audit year	False	
 System Manager	Assign a role	False	
 System Manager	Attachments	False	
@@ -407,6 +410,7 @@ System Manager	Create a fiscal year	False
 System Manager	Create a group or add a role to it	False	
 System Manager	Create a role	False	
 System Manager	Create a user	False	
+System Manager	Document layouts	False	
 System Manager	Failed offline operations	False	
 System Manager	Import master data or opening balances	False	
 System Manager	Import templates and master data export	False	
@@ -419,6 +423,7 @@ System Manager	Payroll encryption	False
 System Manager	Printers per workstation	False	
 System Manager	Quick search	False	
 System Manager	Refresh reporting snapshots	False	
+System Manager	Report house style	False	
 System Manager	Report subscription	False	
 System Manager	Report version history	False	
 System Manager	Reset a password	False	
@@ -432,4 +437,3 @@ Weighbridge	Concrete slump and strength tests	False
 Weighbridge	First weigh (open a ticket)	False	
 Weighbridge	Invoice weighbridge loads	False	
 Weighbridge	Second weigh (complete a ticket)	False	
-System Manager	Report house style	False	Maintenance

@@ -99,8 +99,21 @@ public sealed record NewEmployee(string EmployeeNumber, string FullName, decimal
 }
 
 /// <summary>Changes to an employee's record (a null leaves the field as it is). Bank details are not here: they change through an approved request.</summary>
+/// <summary>An element's options (see <see cref="NewPayElement"/> for each).</summary>
+/// <param name="Recovers">What the deduction recovers.</param>
+/// <param name="BenefitCategory">The taxable-benefit category, or null.</param>
+/// <param name="PaidInCurrency">The currency paid in, or null for the base currency.</param>
+/// <param name="CumulativeTax">Cumulative tax.</param>
+/// <param name="SplitCurrencyTax">Tax per currency.</param>
+/// <param name="IsAnnualPayment">An annual payment.</param>
+public sealed record PayElementOptions(PayRecovery Recovers = PayRecovery.None, string? BenefitCategory = null, string? PaidInCurrency = null, bool CumulativeTax = false, bool SplitCurrencyTax = false,
+    bool IsAnnualPayment = false);
+
 public sealed record EmployeeUpdate
 {
+    /// <summary>The employee's council / employer housing tenancy by its number (rent is recovered from pay); empty string clears it.</summary>
+    public string? HousingTenancyNumber { get; init; }
+
     /// <summary>Full name.</summary>
     public string? FullName { get; init; }
 
@@ -234,6 +247,24 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
     /// <summary>Subject to union dues (the UNIONBASE formula variable).</summary>
     public bool UnionDues { get; init; }
 
+    /// <summary>What the deduction recovers (staff purchases at the till, housing rent on the employee's tenancy): the run nets off what was recovered before.</summary>
+    public PayRecovery Recovers { get; init; }
+
+    /// <summary>The taxable-benefit category this element reports under (PR34), e.g. Housing, Vehicle; null: not a benefit.</summary>
+    public string? BenefitCategory { get; init; }
+
+    /// <summary>The currency the element is paid in when not the base currency (its own bank file at the pay date's rate).</summary>
+    public string? PaidInCurrency { get; init; }
+
+    /// <summary>Tax computed cumulatively over the tax year (year-to-date earnings and tax).</summary>
+    public bool CumulativeTax { get; init; }
+
+    /// <summary>Tax computed per currency on the apportioned threshold and bands (brief §4.15.2).</summary>
+    public bool SplitCurrencyTax { get; init; }
+
+    /// <summary>An annual payment (bonus) whose tax is spread over the year.</summary>
+    public bool IsAnnualPayment { get; init; }
+
     /// <summary>The element group an earning adds to.</summary>
     public string? Group { get; init; }
 
@@ -291,6 +322,14 @@ public interface IPayrollSetupService
 
     /// <summary>Changes a pay element's amount, rate, formula or taxability.</summary>
     Task<Result> UpdatePayElementAsync(long companyId, string code, decimal? fixedAmount, decimal? rate, string? formula, bool? taxable, CancellationToken ct = default);
+
+    /// <summary>Sets an element's options after it exists: what it recovers, its benefit category, the currency it is paid in, and how its tax is computed.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="code">The element.</param>
+    /// <param name="options">The options (every one is applied).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetPayElementOptionsAsync(long companyId, string code, PayElementOptions options, CancellationToken ct = default);
 
     /// <summary>Saves a tax credit (brief §4.15.3): fixed a month, or a percentage of a pay element; for everyone or only those given it; optionally from an age.</summary>
     /// <param name="companyId">The company.</param>

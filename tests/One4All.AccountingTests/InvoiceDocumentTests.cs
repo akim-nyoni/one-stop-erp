@@ -68,6 +68,15 @@ public sealed class InvoiceDocumentTests
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
+            // The designable tax invoice gives the invoice as rows for a company's own layout.
+            var rows = await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IReportRunner>().RenderAsync(companyId, "DOC11",
+                new Dictionary<string, object?> { ["Number"] = "DOC-INV1" }, One4All.Application.Abstractions.Reporting.ReportFormat.Csv);
+            rows.IsSuccess.Should().BeTrue(rows.IsFailure ? rows.Error.Message : null);
+            System.Text.Encoding.UTF8.GetString(rows.Value.Content).Should().Contain("Tax invoice").And.Contain("Document Buyer").And.Contain("DOC-INV1");
+        }
+
+        await using (AsyncServiceScope scope = provider.CreateAsyncScope())
+        {
             IInvoiceDocumentService documents = scope.ServiceProvider.GetRequiredService<IInvoiceDocumentService>();
 
             var built = await documents.BuildAsync(companyId, invoiceItemId);

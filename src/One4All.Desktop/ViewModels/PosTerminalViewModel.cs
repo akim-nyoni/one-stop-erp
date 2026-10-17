@@ -208,6 +208,55 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         StatusMessage = $"{outgoing} handed over: expected {r.ExpectedCash:N2}, counted {r.CountedCash:N2}. {CashierName} now has the till (session {TillSessionId}).";
     }
 
+    /// <summary>
+    /// The quick switch: the next cashier enters their name and PIN (or swipes their card) and takes the till as it is — the sale on the screen
+    /// stays, nothing is counted; the drawer is shared until a hand-over or the Z-read. Needs the connection.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [RelayCommand]
+    private async Task SwitchCashierAsync()
+    {
+        if (!IsSessionOpen)
+        {
+            StatusMessage = "Open the till first.";
+            return;
+        }
+
+        if (!_online || TillSessionId == 0)
+        {
+            StatusMessage = "Offline: a cashier switch needs the connection (hand over with a count when it returns).";
+            return;
+        }
+
+        try
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            AuthenticationResult incoming = await IdentifyPersonAsync(scope).ConfigureAwait(true);
+            if (!incoming.Succeeded)
+            {
+                StatusMessage = incoming.Message;
+                return;
+            }
+
+            Result switched = await scope.ServiceProvider.GetRequiredService<IPosService>().SwitchCashierAsync(TillSessionId, incoming.UserId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true);
+            if (switched.IsFailure)
+            {
+                StatusMessage = switched.Error.Message;
+                return;
+            }
+
+            string outgoing = CashierName;
+            _cashierUserId = incoming.UserId;
+            CashierName = incoming.DisplayName;
+            SupervisorName = string.Empty;
+            StatusMessage = $"{CashierName} has taken the till from {outgoing} (no cash-up; the sale on the screen stays).";
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            StatusMessage = "Offline: a cashier switch needs the connection.";
+        }
+    }
+
     // Who is at the till: a name and PIN; a card swiped or scanned into the name box (no PIN); or, with nothing typed, the fingerprint reader.
     private async Task<AuthenticationResult> IdentifyPersonAsync(AsyncServiceScope scope)
     {
@@ -629,13 +678,29 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         IReadOnlyList<One4All.Application.Pos.PromotionDefinition> promotions = _snapshot?.Promotions ?? [];
+        IReadOnlyList<OfflineSupervisor> supervisors = _snapshot?.Supervisors ?? [];
         try
         {
             await using AsyncServiceScope scope = _services.CreateAsyncScope();
             promotions = await scope.ServiceProvider.GetRequiredService<IPromotionService>().DefinitionsAsync(_companyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true);
             long terminal = _terminalId;
-            _branchId ??= await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().PosTerminals.AsNoTracking().Where(t => t.Id == terminal)
-                .Select(t => (long?)t.BranchId).FirstOrDefaultAsync().ConfigureAwait(true);
+            One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            _branchId ??= await db.PosTerminals.AsNoTracking().Where(t => t.Id == terminal).Select(t => (long?)t.BranchId).FirstOrDefaultAsync().ConfigureAwait(true);
+
+            // Who may authorise a void or refund while offline: every active user with a PIN and the permission, their PIN hash sealed with the rest.
+            IPermissionService permissionService = scope.ServiceProvider.GetRequiredService<IPermissionService>();
+            List<OfflineSupervisor> found = [];
+            foreach (var user in await db.Users.AsNoTracking().Where(u => u.IsActive && u.PinHash != null).Select(u => new { u.Id, u.Username, u.PinHash }).ToListAsync().ConfigureAwait(true))
+            {
+                EffectivePermissions permissions = await permissionService.ResolveAsync(user.Id).ConfigureAwait(true);
+                bool canVoid = permissions.Has("Pos.Void", OperationFlags.VoidReverse), canRefund = permissions.Has("Pos.Refund", OperationFlags.AuthoriseLevel1);
+                if (canVoid || canRefund)
+                {
+                    found.Add(new OfflineSupervisor(user.Id, user.Username, user.PinHash!, canVoid, canRefund));
+                }
+            }
+
+            supervisors = found;
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
@@ -654,6 +719,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             },
             TenderCurrencies = [.. TenderCurrencies.Select(t => new OfflineTenderCurrency(t.Code.Value, t.Rate))],
             Customers = _customers.Count > 0 ? _customers : _snapshot?.Customers ?? [],
+            Supervisors = supervisors,
         };
         try
         {
@@ -2164,7 +2230,13 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [RelayCommand]
     private async Task VoidSaleAsync()
     {
-        if (await CompletedSaleAsync().ConfigureAwait(true) is not Sale sale || await SupervisorAsync("Pos.Void", OperationFlags.VoidReverse).ConfigureAwait(true) is not long)
+        if (!_online)
+        {
+            await VoidOfflineAsync().ConfigureAwait(true);
+            return;
+        }
+
+        if (await CompletedSaleAsync().ConfigureAwait(true) is not Sale sale || await SupervisorAsync("Pos.Void", OperationFlags.VoidReverse).ConfigureAwait(true) is not long supervisor)
         {
             return;
         }
@@ -2179,14 +2251,106 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
-            StatusMessage = "Offline: a sale can be voided when the connection returns.";
+            // The connection went while voiding: queue it, like a sale.
+            await QueueVoidAsync(sale.SaleNumber, supervisor).ConfigureAwait(true);
         }
+    }
+
+    // Offline: only a sale rung up on this terminal while offline (still in its queue) can be voided here; the void follows it to the server.
+    private async Task VoidOfflineAsync()
+    {
+        if (await QueuedSaleAsync().ConfigureAwait(true) is not PosSaleEnvelope sale || await OfflineSupervisorAsync(s => s.CanVoid, "void").ConfigureAwait(true) is not long supervisor)
+        {
+            return;
+        }
+
+        await QueueVoidAsync(sale.SaleNumber, supervisor).ConfigureAwait(true);
+    }
+
+    private async Task QueueVoidAsync(string saleNumber, long supervisor)
+    {
+        PosVoidEnvelope envelope = new(_companyId, saleNumber, DateOnly.FromDateTime(DateTime.Today), $"Voided at till {_terminalId} (offline)", TaxAccountCode.Length > 0 ? TaxAccountCode : null, supervisor);
+        await LocalQueue.EnqueueAsync(new LocalOfflineEntry(Guid.NewGuid(), _companyId, PosVoidEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow)).ConfigureAwait(true);
+        PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+        UpdateSyncState();
+        ScanEntry = string.Empty;
+        StatusMessage = $"Offline: the void of sale {saleNumber} is queued ({PendingOfflineCount} queued) and posts when the connection returns.";
+    }
+
+    // The sale whose number is in the scan box, from this terminal's offline queue.
+    private async Task<PosSaleEnvelope?> QueuedSaleAsync()
+    {
+        string number = (ScanEntry ?? string.Empty).Trim();
+        if (number.Length == 0)
+        {
+            StatusMessage = "Type (or scan) the sale number from the receipt in the scan box first.";
+            return null;
+        }
+
+        foreach (LocalOfflineEntry entry in await LocalQueue.ListAsync().ConfigureAwait(true))
+        {
+            if (entry.Kind == PosSaleEnvelope.Kind && JsonSerializer.Deserialize<PosSaleEnvelope>(entry.PayloadJson) is PosSaleEnvelope sale
+                && string.Equals(sale.SaleNumber, number, StringComparison.OrdinalIgnoreCase))
+            {
+                return sale;
+            }
+        }
+
+        StatusMessage = $"Offline: sale {number} was not rung up on this terminal while offline, so it waits for the connection.";
+        return null;
+    }
+
+    // A supervisor verified against the sealed snapshot (name and PIN only; cards and fingerprints need the connection).
+    private async Task<long?> OfflineSupervisorAsync(Func<OfflineSupervisor, bool> allowed, string what)
+    {
+        string name = SupervisorName?.Trim() ?? string.Empty;
+        string pin = SupervisorPin ?? string.Empty;
+        SupervisorPin = string.Empty;
+        SupervisorPinCleared?.Invoke();
+        if (name.Length == 0 || pin.Length == 0)
+        {
+            StatusMessage = $"Offline: a supervisor's name and PIN authorise a {what} here.";
+            return null;
+        }
+
+        IPasswordHasher hasher = _services.GetRequiredService<IPasswordHasher>();
+        OfflineSupervisor? supervisor = (_snapshot?.Supervisors ?? []).FirstOrDefault(s => string.Equals(s.Username, name, StringComparison.OrdinalIgnoreCase));
+        if (supervisor is null || !hasher.Verify(supervisor.PinHash, pin))
+        {
+            StatusMessage = "Supervisor not recognised.";
+            return null;
+        }
+
+        if (supervisor.UserId == _cashierUserId)
+        {
+            StatusMessage = "A cashier cannot authorise their own override.";
+            return null;
+        }
+
+        if (!allowed(supervisor))
+        {
+            StatusMessage = "That supervisor may not authorise this.";
+            return null;
+        }
+
+        await Task.CompletedTask.ConfigureAwait(true);
+        return supervisor.UserId;
     }
 
     /// <summary>Refunds a completed sale in full (its number typed in the scan box) in cash, with a supervisor's authority.</summary>
     [RelayCommand]
     private async Task RefundSaleAsync()
     {
+        if (!_online)
+        {
+            if (await QueuedSaleAsync().ConfigureAwait(true) is PosSaleEnvelope queued && await OfflineSupervisorAsync(s => s.CanRefund, "refund").ConfigureAwait(true) is long authoriser)
+            {
+                await QueueRefundAsync(queued.SaleNumber, authoriser).ConfigureAwait(true);
+            }
+
+            return;
+        }
+
         if (await CompletedSaleAsync().ConfigureAwait(true) is not Sale sale || await SupervisorAsync("Pos.Refund", OperationFlags.AuthoriseLevel1).ConfigureAwait(true) is not long supervisor)
         {
             return;
@@ -2206,8 +2370,20 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
         {
-            StatusMessage = "Offline: refunds need the connection.";
+            await QueueRefundAsync(sale.SaleNumber, supervisor).ConfigureAwait(true);
         }
+    }
+
+    private async Task QueueRefundAsync(string saleNumber, long supervisor)
+    {
+        string reference = $"OFR-{Guid.NewGuid():N}"[..16];
+        PosRefundEnvelope envelope = new(_companyId, saleNumber, _terminalId, _cashierUserId, supervisor, DateOnly.FromDateTime(DateTime.Today), CashAccountCode,
+            TaxAccountCode.Length > 0 ? TaxAccountCode : null, $"Refund at the till (offline {reference})", TillSessionId, TillSessionId == 0 ? _offlineSessionKey : null);
+        await LocalQueue.EnqueueAsync(new LocalOfflineEntry(Guid.NewGuid(), _companyId, PosRefundEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow)).ConfigureAwait(true);
+        PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+        UpdateSyncState();
+        ScanEntry = string.Empty;
+        StatusMessage = $"Offline: the cash refund of sale {saleNumber} is queued ({PendingOfflineCount} queued); pay it out and it posts when the connection returns.";
     }
 
     // The completed sale whose number is in the scan box.
@@ -2277,19 +2453,58 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             && !string.IsNullOrWhiteSpace(CashAccountCode)
             && !string.IsNullOrWhiteSpace(OverShortAccountCode);
 
-        if (doCashUp)
+        IReadOnlyList<CashCount> counts = [];
+        if (doCashUp && !CashCounts.TryParse(CountedCash, _currency.Value, out counts))
         {
-            if (!CashCounts.TryParse(CountedCash, _currency.Value, out IReadOnlyList<CashCount> counts))
+            StatusMessage = "Type the count as an amount, or per currency: 120; ZAR 500; EUR 20.";
+            return;
+        }
+
+        try
+        {
+            if (!_online)
             {
-                StatusMessage = "Type the count as an amount, or per currency: 120; ZAR 500; EUR 20.";
-                return;
+                throw new TimeoutException("The terminal is offline.");
             }
 
+            if (!await CloseTillOnlineAsync(pos, doCashUp, counts).ConfigureAwait(true))
+            {
+                return;
+            }
+        }
+        catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))
+        {
+            PosCashUpEnvelope envelope = new(_companyId, TillSessionId, TillSessionId == 0 ? _offlineSessionKey : null, doCashUp ? [.. counts.Select(c => new PosCashCountEnvelope(c.Currency, c.Amount))] : [],
+                _cashierUserId, DateOnly.FromDateTime(DateTime.Today), CashAccountCode.Trim(), OverShortAccountCode.Trim());
+            await LocalQueue.EnqueueAsync(new LocalOfflineEntry(Guid.NewGuid(), _companyId, PosCashUpEnvelope.Kind, JsonSerializer.Serialize(envelope), DateTimeOffset.UtcNow)).ConfigureAwait(true);
+            PendingOfflineCount = await LocalQueue.CountAsync().ConfigureAwait(true);
+            _offlineSessionKey = null;
+            StatusMessage = doCashUp
+                ? $"Offline: the count is declared here; the till cashes up and closes centrally when the connection returns ({PendingOfflineCount} queued)."
+                : $"Offline: the till closes centrally with its Z-read when the connection returns ({PendingOfflineCount} queued).";
+        }
+
+        _ticket.Clear();
+        AgeVerified = false;
+        PrescriptionReference = string.Empty;
+        RebuildCart();
+        IsSessionOpen = false;
+        TillSessionId = 0;
+        CountedCash = string.Empty;
+        UpdateSyncState();
+        await SaveSnapshotAsync(null).ConfigureAwait(true);
+    }
+
+    // Closes the till centrally; false when it stayed open (the message says why).
+    private async Task<bool> CloseTillOnlineAsync(IPosService pos, bool doCashUp, IReadOnlyList<CashCount> counts)
+    {
+        if (doCashUp)
+        {
             Result declared = await pos.DeclareCountAsync(TillSessionId, counts, _cashierUserId).ConfigureAwait(true);
             if (declared.IsFailure && declared.Error.Code != "Pos.CountDeclared")
             {
                 StatusMessage = declared.Error.Message;
-                return;
+                return false;
             }
 
             Result<CashUpResult> cashUp = await pos.CashUpAndCloseAsync(new CashUpRequest
@@ -2302,7 +2517,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             if (cashUp.IsFailure)
             {
                 StatusMessage = cashUp.Error.Message;
-                return;
+                return false;
             }
 
             CashUpResult r = cashUp.Value;
@@ -2320,20 +2535,13 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             if (result.IsFailure)
             {
                 StatusMessage = result.Error.Message;
-                return;
+                return false;
             }
 
             StatusMessage = $"Z-read #{result.Value.ZReadNumber}: {result.Value.SaleCount} sale(s), gross {result.Value.TotalGross:N2}. Till closed.";
         }
 
-        _ticket.Clear();
-        AgeVerified = false;
-        PrescriptionReference = string.Empty;
-        RebuildCart();
-        IsSessionOpen = false;
-        TillSessionId = 0;
-        CountedCash = string.Empty;
-        await SaveSnapshotAsync(null).ConfigureAwait(true);
+        return true;
     }
 
     // Promotions are re-priced whenever the basket changes, until payment starts (a tender fixes the total).

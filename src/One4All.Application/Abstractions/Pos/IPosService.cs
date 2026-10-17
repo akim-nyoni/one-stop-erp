@@ -260,6 +260,18 @@ public interface IPosService
     /// <returns>The outgoing cash-up and the incoming session, or why not.</returns>
     Task<Result<CashierHandover>> HandOverAsync(CashierHandoverRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// The quick switch (brief §4.1 "fast cashier switch without closing the sale"): the open session passes to the incoming cashier with no count and
+    /// no cash-up, the sale on the screen stays, and the switch is recorded as a till event. The drawer is then shared by both until the next
+    /// hand-over or Z-read, which is why the hand-over with a count is the way to end a shift.
+    /// </summary>
+    /// <param name="tillSessionId">The open session.</param>
+    /// <param name="incomingCashierUserId">The cashier taking over.</param>
+    /// <param name="date">The date, for the event.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SwitchCashierAsync(long tillSessionId, long incomingCashierUserId, DateOnly date, CancellationToken ct = default);
+
     /// <summary>Declares a till's cash count before the expected cash is seen (blind cash-up); final once declared.</summary>
     /// <param name="tillSessionId">The till session.</param>
     /// <param name="counts">The cash counted per currency.</param>

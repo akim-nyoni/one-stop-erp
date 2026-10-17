@@ -185,6 +185,23 @@ internal sealed class UserPermissionOverrideConfiguration : IEntityTypeConfigura
     }
 }
 
+internal sealed class AppLogEntryConfiguration : IEntityTypeConfiguration<Core.System.AppLogEntry>
+{
+    public void Configure(EntityTypeBuilder<Core.System.AppLogEntry> b)
+    {
+        b.ToTable("app_log", Schemas.System);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Level).HasMaxLength(16);
+        b.Property(x => x.Source).HasMaxLength(200);
+        b.Property(x => x.Message).HasColumnType("text");
+        b.Property(x => x.Exception).HasColumnType("text");
+        b.Property(x => x.Properties).HasColumnType("text");
+        b.Property(x => x.Host).HasMaxLength(40);
+        b.Property(x => x.Machine).HasMaxLength(64);
+        b.HasIndex(x => x.LoggedOnUtc);
+    }
+}
+
 internal sealed class LoginEventConfiguration : IEntityTypeConfiguration<LoginEvent>
 {
     public void Configure(EntityTypeBuilder<LoginEvent> b)

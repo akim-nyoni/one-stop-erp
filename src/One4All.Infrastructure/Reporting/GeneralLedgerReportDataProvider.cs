@@ -34,7 +34,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         static string? Dimension(IReadOnlyDictionary<string, object?> values, string name)
             => values.TryGetValue(name, out object? given) && given is string text && text.Trim().Length > 0 ? text.Trim().ToUpperInvariant() : null;
         LedgerReportOptions options = await CurrencyOptionsAsync(companyId, parameters, date, ct).ConfigureAwait(false);
-        return options with { CostCentre = Dimension(parameters, "CostCentre"), Department = Dimension(parameters, "Department") };
+        return options with { CostCentre = Dimension(parameters, "CostCentre"), Department = Dimension(parameters, "Department"), Branch = Dimension(parameters, "Branch") };
     }
 
     private async Task<LedgerReportOptions> CurrencyOptionsAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly date, CancellationToken ct)
@@ -104,7 +104,8 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TrialBalanceByTypeAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
-        TrialBalanceByTypeReport report = await _reports.TrialBalanceByTypeAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+        TrialBalanceByTypeReport report = await _reports.TrialBalanceByTypeAsync(companyId, asAt, await OptionsAsync(companyId, parameters, asAt, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
         return report.Rows.Select(r => Row(new()
         {
             ["Type"] = r.Type.ToString(),
@@ -201,7 +202,8 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
         string department = ReportParameters.String(parameters, "Department");
         DateOnly to = ReportParameters.Date(parameters, "ToDate");
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
-        IncomeStatement report = await _reports.IncomeStatementByDepartmentAsync(companyId, from, to, department, ct).ConfigureAwait(false);
+        LedgerReportOptions options = await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false);
+        IncomeStatement report = await _reports.IncomeStatementAsync(companyId, from, to, options with { Department = department.Trim().ToUpperInvariant() }, ct).ConfigureAwait(false);
 
         List<IReadOnlyDictionary<string, object?>> rows = [];
         rows.AddRange(report.Income.Select(l => Row(new() { ["Category"] = "Income", ["AccountCode"] = l.AccountCode, ["AccountName"] = l.AccountName, ["Amount"] = l.Amount })));
@@ -214,7 +216,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     {
         DateOnly to = ReportParameters.Date(parameters, "ToDate");
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
-        CashFlowStatement cf = await _reports.CashFlowStatementAsync(companyId, from, to, ct).ConfigureAwait(false);
+        CashFlowStatement cf = await _reports.CashFlowStatementAsync(companyId, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
 
         // The indirect method: each activity's lines (profit, then the movement on each account), then the activity's total.
         List<IReadOnlyDictionary<string, object?>> rows = [];
@@ -247,7 +249,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             return [];
         }
 
-        NominalActivityReport report = await _reports.NominalActivityAsync(companyId, account, from, to, ct).ConfigureAwait(false);
+        NominalActivityReport report = await _reports.NominalActivityAsync(companyId, account, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
         return report.Lines.Select(l => Row(new()
         {
             ["Date"] = l.Date.ToDateTime(TimeOnly.MinValue),
@@ -263,7 +265,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     {
         DateOnly to = ReportParameters.Date(parameters, "ToDate");
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
-        JournalDaybookReport report = await _reports.JournalDaybookAsync(companyId, from, to, ct).ConfigureAwait(false);
+        JournalDaybookReport report = await _reports.JournalDaybookAsync(companyId, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
         return report.Lines.Select(l => Row(new()
         {
             ["Date"] = l.Date.ToDateTime(TimeOnly.MinValue),
@@ -280,7 +282,7 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
     {
         DateOnly to = ReportParameters.Date(parameters, "ToDate");
         DateOnly from = ReportParameters.TryDate(parameters, "FromDate") ?? new DateOnly(to.Year, 1, 1);
-        TrialBalanceMovementReport report = await _reports.TrialBalanceMovementAsync(companyId, from, to, ct).ConfigureAwait(false);
+        TrialBalanceMovementReport report = await _reports.TrialBalanceMovementAsync(companyId, from, to, await OptionsAsync(companyId, parameters, to, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
         return report.Rows.Select(r => Row(new()
         {
             ["AccountCode"] = r.AccountCode,
@@ -308,7 +310,8 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> FinancialSnapshotAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct)
     {
-        FinancialSnapshotReport report = await _reports.FinancialSnapshotAsync(companyId, ReportParameters.Date(parameters, "AsAtDate"), ct).ConfigureAwait(false);
+        DateOnly asAt = ReportParameters.Date(parameters, "AsAtDate");
+        FinancialSnapshotReport report = await _reports.FinancialSnapshotAsync(companyId, asAt, await OptionsAsync(companyId, parameters, asAt, ct).ConfigureAwait(false), ct).ConfigureAwait(false);
         return report.Rows.Select(r => Row(new()
         {
             ["Metric"] = r.Metric,

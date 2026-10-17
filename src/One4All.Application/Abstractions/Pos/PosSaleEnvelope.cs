@@ -102,3 +102,62 @@ public sealed record PosOpenTillEnvelope(long CompanyId, long TerminalId, long C
     /// <summary>The operation kind.</summary>
     public const string Kind = "PosOpenTill";
 }
+
+/// <summary>A sale voided while the till was offline: replayed against the sale once it has synced (the sale and its stock are reversed).</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="SaleNumber">The sale (by number: an offline sale has no id until it syncs).</param>
+/// <param name="Date">The void date.</param>
+/// <param name="Reason">Why.</param>
+/// <param name="TaxAccountCode">The output-tax account.</param>
+/// <param name="AuthorisedByUserId">The supervisor who authorised it (verified against the sealed snapshot).</param>
+public sealed record PosVoidEnvelope(long CompanyId, string SaleNumber, DateOnly Date, string Reason, string? TaxAccountCode, long AuthorisedByUserId)
+{
+    /// <summary>The operation kind.</summary>
+    public const string Kind = "PosVoid";
+}
+
+/// <summary>
+/// A sale refunded in full, in cash, while the till was offline: replayed against the sale's lines once it has synced. The reason carries the terminal's
+/// offline reference, which keeps a redelivered refund from paying out twice.
+/// </summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="SaleNumber">The sale (by number).</param>
+/// <param name="TerminalId">The till.</param>
+/// <param name="CashierUserId">The cashier.</param>
+/// <param name="AuthorisedByUserId">The supervisor.</param>
+/// <param name="Date">The refund date.</param>
+/// <param name="RefundAccountCode">The cash account the money is paid from.</param>
+/// <param name="TaxAccountCode">The output-tax account.</param>
+/// <param name="Reason">Why, with the offline reference.</param>
+/// <param name="TillSessionId">The session (0 when the till itself was opened offline).</param>
+/// <param name="OfflineSessionKey">The key of a till opened offline.</param>
+public sealed record PosRefundEnvelope(long CompanyId, string SaleNumber, long TerminalId, long CashierUserId, long? AuthorisedByUserId, DateOnly Date, string RefundAccountCode,
+    string? TaxAccountCode, string Reason, long TillSessionId, string? OfflineSessionKey)
+{
+    /// <summary>The operation kind.</summary>
+    public const string Kind = "PosRefund";
+}
+
+/// <summary>One currency's declared count in an offline cash-up.</summary>
+/// <param name="Currency">The currency.</param>
+/// <param name="Amount">The amount counted.</param>
+public sealed record PosCashCountEnvelope(string Currency, decimal Amount);
+
+/// <summary>
+/// A till closed while offline: the count declared on the terminal, cashed up and closed centrally once the till (and the sales rung up in it) have synced;
+/// with no count the session is closed with a Z-read only.
+/// </summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="TillSessionId">The session (0 when the till was opened offline).</param>
+/// <param name="OfflineSessionKey">The key of a till opened offline.</param>
+/// <param name="Counts">The declared counts (empty: no cash-up).</param>
+/// <param name="CountedByUserId">Who counted.</param>
+/// <param name="Date">The cash-up date.</param>
+/// <param name="CashAccountCode">The cash account.</param>
+/// <param name="OverShortAccountCode">The over/short account.</param>
+public sealed record PosCashUpEnvelope(long CompanyId, long TillSessionId, string? OfflineSessionKey, IReadOnlyList<PosCashCountEnvelope> Counts, long CountedByUserId, DateOnly Date,
+    string? CashAccountCode, string? OverShortAccountCode)
+{
+    /// <summary>The operation kind.</summary>
+    public const string Kind = "PosCashUp";
+}
