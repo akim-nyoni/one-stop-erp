@@ -643,6 +643,24 @@ public partial class BandedDesignerWindow : Window
 
     private void Distribute_Click(object sender, RoutedEventArgs e) => Act(s => s.DistributeHorizontally(_selected));
 
+    private void Group_Click(object sender, RoutedEventArgs e) => Act(s => s.Group(_selected));
+
+    private void Ungroup_Click(object sender, RoutedEventArgs e) => Act(s => s.Ungroup(_selected));
+
+    private void Sort_Click(object sender, RoutedEventArgs e)
+    {
+        if (_session is null)
+        {
+            return;
+        }
+
+        string text = Microsoft.VisualBasic.Interaction.InputBox("Sort the records by (Field; Other desc; …). Blank keeps the data's own order; grouping still applies.", "Record sorting", _session.SortsText());
+        if (_session.SetSorts(text) is string problem)
+        {
+            MessageBox.Show(this, problem, "Record sorting", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void Duplicate_Click(object sender, RoutedEventArgs e)
     {
         if (_session is not null)

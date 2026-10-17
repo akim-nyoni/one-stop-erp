@@ -25,6 +25,7 @@ public sealed class ReportEngine
         }
 
         ReportDefinition def = input.Definition;
+        input = Sorted(def, input);
         RenderModel model = new() { ReportName = def.Name, Page = ResolvePage(def, input), RightToLeft = input.Culture?.TextInfo.IsRightToLeft ?? false };
 
         model.ReportHeader = ResolveOptional(def.BandOfType(BandType.ReportHeader), input, null, input.Rows);
@@ -49,6 +50,37 @@ public sealed class ReportEngine
 
         BuildGrouped(def, input, detail, model);
         return ReportHouseStyles.Apply(Columns.Arrange(model), input);
+    }
+
+    // The rows in the definition's sort order (brief §13.1: sorting apart from grouping); a stable sort, so equal keys keep the data's order and
+    // grouping afterwards keeps this order inside each group.
+    private ReportInput Sorted(ReportDefinition def, ReportInput input)
+    {
+        if (def.Sorts.Count == 0 || input.Rows.Count < 2)
+        {
+            return input;
+        }
+
+        List<(IReadOnlyDictionary<string, object?> Row, object?[] Keys)> keyed = [.. input.Rows.Select(row => (Row: row, Keys: def.Sorts.Select(s => Evaluate(s.Expression, input, row)).ToArray()))];
+        IOrderedEnumerable<(IReadOnlyDictionary<string, object?> Row, object?[] Keys)>? ordered = null;
+        for (int level = 0; level < def.Sorts.Count; level++)
+        {
+            int at = level;
+            Func<(IReadOnlyDictionary<string, object?> Row, object?[] Keys), object?> key = x => x.Keys[at];
+            ordered = (ordered, def.Sorts[at].Descending) switch
+            {
+                (null, false) => keyed.OrderBy(key, GroupKeyComparer.Instance),
+                (null, true) => keyed.OrderByDescending(key, GroupKeyComparer.Instance),
+                (_, false) => ordered.ThenBy(key, GroupKeyComparer.Instance),
+                _ => ordered.ThenByDescending(key, GroupKeyComparer.Instance),
+            };
+        }
+
+        return new ReportInput
+        {
+            Definition = input.Definition, Rows = [.. ordered!.Select(x => x.Row)], Parameters = input.Parameters, UserName = input.UserName, CompanyName = input.CompanyName, PrintDate = input.PrintDate,
+            ToBase = input.ToBase, Culture = input.Culture, Terminology = input.Terminology, SubReports = input.SubReports, Depth = input.Depth, CompanyLogo = input.CompanyLogo, HouseStyle = input.HouseStyle,
+        };
     }
 
     // The page with its watermark for this run: an expression's text when it gives one, else the fixed watermark.
@@ -187,6 +219,7 @@ public sealed class ReportEngine
             PageBreakBefore = band.PageBreakBefore, PageBreakAfter = band.PageBreakAfter,
         };
         ReportExpressionContext ctx = Context(input, row);
+        double designHeight = band.Height;
 
         foreach (ReportElement element in band.Elements)
         {
@@ -276,7 +309,25 @@ public sealed class ReportEngine
                 DrillKey = drillKey,
                 Runs = runs,
                 ImageData = imageData,
+                Tooltip = string.IsNullOrWhiteSpace(element.Tooltip) ? null : element.Tooltip,
+                BackgroundGradient = string.IsNullOrWhiteSpace(element.BackgroundGradient) ? null : element.BackgroundGradient,
+                GradientVertical = element.GradientVertical,
+                AnchorRight = element.AnchorRight,
+                AnchorBottom = element.AnchorBottom,
             });
+        }
+
+        // Anchoring: a band that grew (a sub-report laid into it) carries its bottom-anchored cells down with its bottom edge.
+        if (rendered.Height > designHeight)
+        {
+            double grown = rendered.Height - designHeight;
+            for (int i = 0; i < rendered.Cells.Count; i++)
+            {
+                if (rendered.Cells[i].AnchorBottom)
+                {
+                    rendered.Cells[i] = rendered.Cells[i] with { Y = rendered.Cells[i].Y + grown };
+                }
+            }
         }
 
         return rendered;
@@ -286,6 +337,11 @@ public sealed class ReportEngine
     // element's expression is CompanyLogo.
     private string? ImageFor(ReportElement element, ReportExpressionContext ctx, ReportInput input)
     {
+        if (!string.IsNullOrWhiteSpace(element.ImageSource) && ImageSources.Resolve(element.ImageSource) is string sourced)
+        {
+            return sourced;
+        }
+
         if (!string.IsNullOrWhiteSpace(element.ImageData))
         {
             return element.ImageData.StartsWith("data:", StringComparison.Ordinal) ? element.ImageData : "data:image/png;base64," + element.ImageData;

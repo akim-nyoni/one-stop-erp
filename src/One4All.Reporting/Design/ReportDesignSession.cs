@@ -66,7 +66,8 @@ public sealed class ReportDesignSession
         nameof(ReportElement.ChartCategoryField), nameof(ReportElement.ChartColor), nameof(ReportElement.ChartType), nameof(ReportElement.ChartSeriesField),
         nameof(ReportElement.VAlign), nameof(ReportElement.Padding), nameof(ReportElement.BorderLeft), nameof(ReportElement.BorderTop), nameof(ReportElement.BorderRight),
         nameof(ReportElement.BorderBottom), nameof(ReportElement.WordWrap), nameof(ReportElement.AutoShrink), nameof(ReportElement.Rotation), nameof(ReportElement.NullText), nameof(ReportElement.SubReportCode), nameof(ReportElement.SubReportLinks),
-        nameof(ReportElement.BarcodeSymbology),
+        nameof(ReportElement.BarcodeSymbology), nameof(ReportElement.Tooltip), nameof(ReportElement.ImageSource), nameof(ReportElement.GroupName), nameof(ReportElement.AnchorRight),
+        nameof(ReportElement.AnchorBottom), nameof(ReportElement.BackgroundGradient), nameof(ReportElement.GradientVertical),
     ];
 
     private const int MaxUndo = 200;
@@ -172,7 +173,7 @@ public sealed class ReportDesignSession
     /// <param name="dy">Vertical offset.</param>
     public void Move(IEnumerable<string> names, double dx, double dy)
     {
-        List<(ReportElement Element, ReportBand Band)> chosen = Resolve(names);
+        List<(ReportElement Element, ReportBand Band)> chosen = Resolve(WithGroups(names));
         if (chosen.Count == 0)
         {
             return;
@@ -643,6 +644,108 @@ public sealed class ReportDesignSession
         }
 
         element.Y = Math.Clamp(element.Y, 0, Math.Max(0, band.Height - element.Height));
+    }
+
+    /// <summary>Groups the named elements: they move together from now on (brief §13.1 group / ungroup).</summary>
+    /// <param name="names">The elements (two or more).</param>
+    /// <returns>The group's name, or null when fewer than two elements were named.</returns>
+    public string? Group(IEnumerable<string> names)
+    {
+        List<(ReportElement Element, ReportBand Band)> chosen = Resolve(names);
+        if (chosen.Count < 2)
+        {
+            return null;
+        }
+
+        Checkpoint();
+        string group = UniqueGroupName();
+        foreach ((ReportElement element, _) in chosen)
+        {
+            element.GroupName = group;
+        }
+
+        return group;
+    }
+
+    /// <summary>Ungroups the named elements (every member of a group one of them belongs to).</summary>
+    /// <param name="names">The elements.</param>
+    /// <returns>How many elements were released.</returns>
+    public int Ungroup(IEnumerable<string> names)
+    {
+        List<(ReportElement Element, ReportBand Band)> chosen = Resolve(WithGroups(names));
+        List<ReportElement> grouped = [.. chosen.Select(c => c.Element).Where(e => !string.IsNullOrEmpty(e.GroupName))];
+        if (grouped.Count == 0)
+        {
+            return 0;
+        }
+
+        Checkpoint();
+        foreach (ReportElement element in grouped)
+        {
+            element.GroupName = null;
+        }
+
+        return grouped.Count;
+    }
+
+    /// <summary>The names given plus every element sharing a group with one of them.</summary>
+    /// <param name="names">The names.</param>
+    /// <returns>The widened names.</returns>
+    public IReadOnlyList<string> WithGroups(IEnumerable<string> names)
+    {
+        List<string> listed = [.. names];
+        HashSet<string> groups = [.. Resolve(listed).Select(c => c.Element.GroupName).Where(g => !string.IsNullOrEmpty(g))!];
+        if (groups.Count == 0)
+        {
+            return listed;
+        }
+
+        HashSet<string> widened = new(listed, StringComparer.Ordinal);
+        foreach (ReportElement element in Definition.Bands.SelectMany(b => b.Elements).Where(e => e.GroupName is string g && groups.Contains(g)))
+        {
+            widened.Add(element.Name);
+        }
+
+        return [.. widened];
+    }
+
+    /// <summary>The record sorts as text: <c>Expression</c> or <c>Expression desc</c>, separated by semicolons.</summary>
+    /// <returns>The text (empty when the data's own order is kept).</returns>
+    public string SortsText() => string.Join("; ", Definition.Sorts.Select(s => s.Descending ? $"{s.Expression} desc" : s.Expression));
+
+    /// <summary>Sets the record sorts from text (see <see cref="SortsText"/>); blank clears them.</summary>
+    /// <param name="text">The text.</param>
+    /// <returns>Null, or why the text was refused.</returns>
+    public string? SetSorts(string? text)
+    {
+        List<ReportSort> sorts = [];
+        foreach (string part in (text ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            bool descending = part.EndsWith(" desc", StringComparison.OrdinalIgnoreCase);
+            string expression = (descending ? part[..^5] : part.EndsWith(" asc", StringComparison.OrdinalIgnoreCase) ? part[..^4] : part).Trim();
+            if (expression.Length == 0 || expression.Equals("desc", StringComparison.OrdinalIgnoreCase) || expression.Equals("asc", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Each sort needs a field or expression, optionally followed by desc.";
+            }
+
+            sorts.Add(new ReportSort { Expression = expression, Descending = descending });
+        }
+
+        Checkpoint();
+        Definition.Sorts = sorts;
+        return null;
+    }
+
+    private string UniqueGroupName()
+    {
+        HashSet<string> used = [.. Definition.Bands.SelectMany(b => b.Elements).Select(e => e.GroupName).Where(g => g is not null)!];
+        int n = 1;
+        while (used.Contains($"Group{n}"))
+        {
+            n++;
+        }
+
+        return $"Group{n}";
     }
 
     private List<(ReportElement Element, ReportBand Band)> Resolve(IEnumerable<string> names)

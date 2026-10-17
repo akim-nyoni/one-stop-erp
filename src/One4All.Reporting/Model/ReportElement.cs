@@ -152,6 +152,27 @@ public sealed class ReportElement
     /// <summary>Image data as a base64 string or a data URI, for an <see cref="ElementKind.Image"/>.</summary>
     public string? ImageData { get; set; }
 
+    /// <summary>A picture taken from a file path or an http(s) URL at render time, for an <see cref="ElementKind.Image"/> (instead of <see cref="ImageData"/> kept in the layout).</summary>
+    public string? ImageSource { get; set; }
+
+    /// <summary>Text shown when the pointer rests on the value in the viewer (HTML title; the designer shows it too).</summary>
+    public string? Tooltip { get; set; }
+
+    /// <summary>The group of elements this one moves with in the designer (Group / Ungroup); null when on its own.</summary>
+    public string? GroupName { get; set; }
+
+    /// <summary>Whether the element keeps its right edge at the right of its column when the page is laid out in columns (anchoring).</summary>
+    public bool AnchorRight { get; set; }
+
+    /// <summary>Whether the element keeps its distance from the bottom of its band when the band grows (anchoring).</summary>
+    public bool AnchorBottom { get; set; }
+
+    /// <summary>A second background colour: the background becomes a gradient from <see cref="Background"/> to this (viewer and HTML; print uses the first colour).</summary>
+    public string? BackgroundGradient { get; set; }
+
+    /// <summary>Whether the gradient runs top to bottom instead of left to right.</summary>
+    public bool GradientVertical { get; set; }
+
     /// <summary>The barcode symbology (e.g. Code128, QR) for a <see cref="ElementKind.Barcode"/>.</summary>
     public string? BarcodeSymbology { get; set; }
 

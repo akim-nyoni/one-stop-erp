@@ -137,6 +137,21 @@ public sealed record RenderCell
     /// <summary>For rich text: the runs to draw (the plain text is in <see cref="Text"/>).</summary>
     public IReadOnlyList<RichRun>? Runs { get; init; }
 
+    /// <summary>Text shown when the pointer rests on the cell.</summary>
+    public string? Tooltip { get; init; }
+
+    /// <summary>The second colour of a background gradient, when any.</summary>
+    public string? BackgroundGradient { get; init; }
+
+    /// <summary>Whether the gradient runs top to bottom.</summary>
+    public bool GradientVertical { get; init; }
+
+    /// <summary>Whether the cell keeps its right edge at the right of its column.</summary>
+    public bool AnchorRight { get; init; }
+
+    /// <summary>Whether the cell keeps its distance from the bottom of a band that grows.</summary>
+    public bool AnchorBottom { get; init; }
+
     /// <summary>For an image or barcode: the picture as a data URI (<c>data:image/png;base64,...</c>); the text keeps the barcode's value.</summary>
     public string? ImageData { get; init; }
 }

@@ -58,6 +58,10 @@
                 <Button Content="Paste" Padding="6,2" Margin="1" Click="Paste_Click" ToolTip="Ctrl+V — into the band of the selected element, else the 'Add to' band" />
                 <Button Content="To front" Padding="6,2" Margin="1" Click="ToFront_Click" ToolTip="Draw the selected elements over the others in their band" />
                 <Button Content="To back" Padding="6,2" Margin="1" Click="ToBack_Click" ToolTip="Draw the selected elements behind the others in their band" />
+                <Separator Margin="6,0" />
+                <Button Content="Group" Padding="6,2" Margin="1" Click="Group_Click" ToolTip="The selected elements move together from now on" />
+                <Button Content="Ungroup" Padding="6,2" Margin="1" Click="Ungroup_Click" ToolTip="Release the selected elements from their group" />
+                <Button Content="Sort…" Padding="6,2" Margin="1" Click="Sort_Click" ToolTip="How the records are sorted apart from grouping: Field; Other desc" />
                 <Button Content="Delete" Padding="6,2" Margin="1" Click="Delete_Click" />
                 <Button Content="↶ Undo" Padding="6,2" Margin="1" Click="Undo_Click" />
                 <Button Content="Redo ↷" Padding="6,2" Margin="1" Click="Redo_Click" />

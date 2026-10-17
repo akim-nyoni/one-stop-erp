@@ -76,12 +76,22 @@ public sealed class HtmlReportRenderer : IReportRenderer
         foreach (RenderCell cell in band.Cells)
         {
             string align = cell.HAlign switch { ReportHAlign.Right => "right", ReportHAlign.Center => "center", _ => "left" };
-            sb.Append("<div style=\"position:absolute;left:").Append(Px(cell.X)).Append("px;top:").Append(Px(cell.Y))
+            sb.Append("<div");
+            if (cell.Tooltip is string tooltip)
+            {
+                sb.Append(" title=\"").Append(Escape(tooltip).Replace("\"", "&quot;", StringComparison.Ordinal)).Append('"');
+            }
+
+            sb.Append(" style=\"position:absolute;left:").Append(Px(cell.X)).Append("px;top:").Append(Px(cell.Y))
               .Append("px;width:").Append(Px(cell.Width)).Append("px;height:").Append(Px(cell.Height))
               .Append("px;font-size:").Append(Px(cell.FontSize)).Append("pt;text-align:").Append(align)
               .Append(";color:").Append(cell.Foreground);
 
-            if (cell.Background is not null)
+            if (cell.Background is not null && cell.BackgroundGradient is not null)
+            {
+                sb.Append(";background:linear-gradient(").Append(cell.GradientVertical ? "to bottom" : "to right").Append(',').Append(cell.Background).Append(',').Append(cell.BackgroundGradient).Append(')');
+            }
+            else if (cell.Background is not null)
             {
                 sb.Append(";background:").Append(cell.Background);
             }

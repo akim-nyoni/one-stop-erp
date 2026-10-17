@@ -33,7 +33,7 @@ public static class Columns
                 arranged.Add(new RenderBand
                 {
                     Type = Model.BandType.Detail, Height = across.Max(b => b.Height),
-                    Cells = [.. across.SelectMany((band, column) => band.Cells.Select(c => c with { X = c.X + (column * pitch) }))],
+                    Cells = [.. across.SelectMany((band, column) => band.Cells.Select(c => c with { X = (c.AnchorRight ? Math.Max(0, pitch - gap - c.Width) : c.X) + (column * pitch) }))],
                 });
             }
 

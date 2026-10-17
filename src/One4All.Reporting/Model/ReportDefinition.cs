@@ -104,6 +104,16 @@ public sealed class ReportDataSource
 }
 
 /// <summary>A grouping level for a report (brief §13.1).</summary>
+/// <summary>A record sort key (brief §13.1 "sorting separate from grouping"): an expression and its direction.</summary>
+public sealed class ReportSort
+{
+    /// <summary>The field or expression sorted on.</summary>
+    public string Expression { get; set; } = string.Empty;
+
+    /// <summary>Whether the sort is descending.</summary>
+    public bool Descending { get; set; }
+}
+
 public sealed class ReportGroup
 {
     /// <summary>The field or expression to group on.</summary>
@@ -183,6 +193,9 @@ public sealed class ReportDefinition
 
     /// <summary>Grouping levels, outermost first.</summary>
     public List<ReportGroup> Groups { get; set; } = [];
+
+    /// <summary>How the records are sorted, apart from grouping: applied before grouping, so within each group the rows keep this order.</summary>
+    public List<ReportSort> Sorts { get; set; } = [];
 
     /// <summary>The bands, in render order.</summary>
     public List<ReportBand> Bands { get; set; } = [];
