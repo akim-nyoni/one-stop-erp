@@ -75,6 +75,6 @@ comments, docs, commit messages): use a plain hyphen. a search for U+2014 across
 ## State at handover
 
 The twelfth list is complete. The thirteenth audit (three Explore agents, 2026-10-17) is ranked in the memory file under "THIRTEENTH AUDIT":
-#1 to #13 and #15 to #16 are done, #14 partly (offer exceptions queue and stand ward; re-pointing an existing property's ratepayer and more than
-one stand per beneficiary are still open). Continue with #17 (field-level hiding in desktop lists) and down the list. The last rows of
+#1 to #13 and #15 to #17 are done, #14 partly (offer exceptions queue and stand ward; re-pointing an existing property's ratepayer and more than
+one stand per beneficiary are still open). Continue with #18 (the missing and thin section-14 reports) and down the list. The last rows of
 `docs/PROGRESS.md` say exactly what each increment did.
