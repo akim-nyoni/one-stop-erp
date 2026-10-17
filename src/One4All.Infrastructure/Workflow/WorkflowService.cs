@@ -396,11 +396,7 @@ public sealed class WorkflowService : IWorkflowService
     {
         List<long> users = [.. stage.EligibleUserIds];
         users.AddRange(await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false));
-        if (!string.IsNullOrWhiteSpace(stage.RequiredRoleName))
-        {
-            string role = stage.RequiredRoleName.Trim().ToUpperInvariant();
-            users.AddRange(await (from ur in _db.Set<Core.Security.UserRole>() join r in _db.Roles on ur.RoleId equals r.Id where r.NormalizedName == role select ur.UserId).ToListAsync(ct).ConfigureAwait(false));
-        }
+        users.AddRange(await RoleAndGroupHoldersAsync(stage, ct).ConfigureAwait(false));
 
         if (stage.DynamicApprover == DynamicApprover.RequesterManager
             && await _db.Users.Where(u => u.Id == instance.InitiatedByUserId).Select(u => u.ManagerUserId).FirstOrDefaultAsync(ct).ConfigureAwait(false) is long manager)
@@ -411,19 +407,36 @@ public sealed class WorkflowService : IWorkflowService
         return [.. users.Distinct()];
     }
 
+    // Who holds the stage's role (directly, or through a group that carries it) and who belongs to the stage's group.
+    private async Task<List<long>> RoleAndGroupHoldersAsync(WorkflowStage stage, CancellationToken ct)
+    {
+        List<long> users = [];
+        if (!string.IsNullOrWhiteSpace(stage.RequiredRoleName))
+        {
+            string role = stage.RequiredRoleName.Trim().ToUpperInvariant();
+            users.AddRange(await (from ur in _db.Set<Core.Security.UserRole>() join r in _db.Roles on ur.RoleId equals r.Id where r.NormalizedName == role select ur.UserId).ToListAsync(ct).ConfigureAwait(false));
+            users.AddRange(await (from m in _db.Set<Core.Security.UserGroupMember>()
+                                  join gr in _db.Set<Core.Security.GroupRole>() on m.GroupId equals gr.GroupId
+                                  join r in _db.Roles on gr.RoleId equals r.Id
+                                  where r.NormalizedName == role
+                                  select m.UserId).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        if (!string.IsNullOrWhiteSpace(stage.RequiredGroupName))
+        {
+            string groupName = stage.RequiredGroupName.Trim().ToUpperInvariant();
+            users.AddRange(await (from m in _db.Set<Core.Security.UserGroupMember>() join g in _db.Groups on m.GroupId equals g.Id where g.NormalizedName == groupName select m.UserId).ToListAsync(ct).ConfigureAwait(false));
+        }
+
+        return users;
+    }
+
     private async Task<(bool Eligible, long? OnBehalfOf)> EligibilityAsync(WorkflowInstance instance, WorkflowStage stage, long userId, CancellationToken ct)
     {
         List<long> extra = await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false);
 
-        // Holders of the stage's role, and the requester's manager when the stage asks for them, may approve too.
-        if (!string.IsNullOrWhiteSpace(stage.RequiredRoleName))
-        {
-            string role = stage.RequiredRoleName.Trim().ToUpperInvariant();
-            extra.AddRange(await (from ur in _db.Set<Core.Security.UserRole>()
-                                  join r in _db.Roles on ur.RoleId equals r.Id
-                                  where r.NormalizedName == role
-                                  select ur.UserId).ToListAsync(ct).ConfigureAwait(false));
-        }
+        // Holders of the stage's role (directly or through a group), members of its group, and the requester's manager when the stage asks for them, may approve too.
+        extra.AddRange(await RoleAndGroupHoldersAsync(stage, ct).ConfigureAwait(false));
 
         bool dynamicOnly = false;
         if (stage.DynamicApprover == DynamicApprover.RequesterManager)
@@ -437,7 +450,7 @@ public sealed class WorkflowService : IWorkflowService
             dynamicOnly = true;
         }
 
-        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0 && string.IsNullOrWhiteSpace(stage.RequiredRoleName) && !dynamicOnly;
+        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0 && string.IsNullOrWhiteSpace(stage.RequiredRoleName) && string.IsNullOrWhiteSpace(stage.RequiredGroupName) && !dynamicOnly;
         bool Direct(long user) => open || stage.EligibleUserIds.Contains(user) || extra.Contains(user);
         if (Direct(userId))
         {
@@ -467,6 +480,112 @@ public sealed class WorkflowService : IWorkflowService
         }
 
         return results;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<long>> DefineAsync(long companyId, WorkflowDefinitionInput definition, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        string documentType = (definition.DocumentType ?? string.Empty).Trim();
+        if (documentType.Length == 0 || string.IsNullOrWhiteSpace(definition.Name) || definition.Stages is not { Count: > 0 })
+        {
+            return Error.Validation("Workflow.DefinitionInvalid", "A workflow needs a document type, a name and at least one stage.");
+        }
+
+        if (definition.Stages.Select(s => s.Sequence).Distinct().Count() != definition.Stages.Count || definition.Stages.Any(s => s.Sequence <= 0 || string.IsNullOrWhiteSpace(s.Name) || s.Quorum < 1
+            || (s.MinValue is decimal min && min < 0m) || (s.EscalateAfterHours is int hours && hours <= 0)))
+        {
+            return Error.Validation("Workflow.DefinitionInvalid", "Each stage needs its own sequence (1, 2, …), a name, a quorum of at least 1, a value band not below zero and, if it escalates, hours above zero.");
+        }
+
+        if (definition.Stages.Any(s => s.RoleName is null && s.GroupName is null && (s.Approvers is null || s.Approvers.Count == 0) && s.DynamicApprover == DynamicApprover.None))
+        {
+            return Error.Validation("Workflow.DefinitionInvalid", "Each stage needs an approver: a role, named users, or the requester's manager.");
+        }
+
+        foreach (WorkflowStageInput stage in definition.Stages)
+        {
+            if (Application.Workflow.WorkflowCondition.Problem(stage.Condition) is string problem)
+            {
+                return Error.Validation("Workflow.ConditionInvalid", $"Stage {stage.Sequence}: {problem}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(stage.RoleName) && !await _db.Roles.AnyAsync(r => r.NormalizedName == stage.RoleName.Trim().ToUpperInvariant(), ct).ConfigureAwait(false))
+            {
+                return Error.NotFound("Workflow.RoleNotFound", $"Role {stage.RoleName} not found.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(stage.GroupName) && !await _db.Groups.AnyAsync(g => g.NormalizedName == stage.GroupName.Trim().ToUpperInvariant(), ct).ConfigureAwait(false))
+            {
+                return Error.NotFound("Workflow.GroupNotFound", $"Group {stage.GroupName} not found.");
+            }
+        }
+
+        // Named approvers and escalation targets by user name, resolved once.
+        List<string> names = [.. definition.Stages.SelectMany(s => (s.Approvers ?? []).Append(s.EscalateTo ?? string.Empty)).Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim().ToUpperInvariant()).Distinct()];
+        Dictionary<string, long> users = names.Count == 0 ? [] : await _db.Users.Where(u => names.Contains(u.NormalizedUsername)).ToDictionaryAsync(u => u.NormalizedUsername, u => u.Id, ct).ConfigureAwait(false);
+        if (names.FirstOrDefault(n => !users.ContainsKey(n)) is string unknown)
+        {
+            return Error.NotFound("Workflow.UserNotFound", $"User {unknown} not found.");
+        }
+
+        return await _db.AtomicAsync<long>(async () =>
+        {
+            // One active definition per document type: the earlier one stays for the documents already in flight, switched off.
+            if (definition.Active)
+            {
+                foreach (WorkflowDefinition earlier in await _db.WorkflowDefinitions.Where(d => d.CompanyId == companyId && d.DocumentType == documentType && d.IsActive).ToListAsync(ct).ConfigureAwait(false))
+                {
+                    earlier.IsActive = false;
+                }
+            }
+
+            WorkflowDefinition created = new(companyId, documentType, definition.Name.Trim()) { IsActive = definition.Active };
+            foreach (WorkflowStageInput input in definition.Stages.OrderBy(s => s.Sequence))
+            {
+                WorkflowStage stage = created.AddStage(input.Sequence, input.Name.Trim(), input.Quorum, input.MinValue);
+                stage.Condition = string.IsNullOrWhiteSpace(input.Condition) ? null : input.Condition.Trim();
+                stage.RequiredRoleName = string.IsNullOrWhiteSpace(input.RoleName) ? null : input.RoleName.Trim();
+                stage.RequiredGroupName = string.IsNullOrWhiteSpace(input.GroupName) ? null : input.GroupName.Trim();
+                stage.DynamicApprover = input.DynamicApprover;
+                stage.EscalateAfterHours = input.EscalateAfterHours;
+                stage.EscalateToUserId = string.IsNullOrWhiteSpace(input.EscalateTo) ? null : users[input.EscalateTo.Trim().ToUpperInvariant()];
+                foreach (string approver in input.Approvers ?? [])
+                {
+                    if (!string.IsNullOrWhiteSpace(approver))
+                    {
+                        stage.AddEligibleUser(users[approver.Trim().ToUpperInvariant()]);
+                    }
+                }
+            }
+
+            _db.WorkflowDefinitions.Add(created);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return created.Id;
+        }, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetDefinitionActiveAsync(long companyId, long definitionId, bool active, CancellationToken ct = default)
+    {
+        WorkflowDefinition? definition = await _db.WorkflowDefinitions.FirstOrDefaultAsync(d => d.Id == definitionId && d.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (definition is null)
+        {
+            return Result.Failure(Error.NotFound("Workflow.DefinitionNotFound", $"Workflow definition {definitionId} not found."));
+        }
+
+        if (active)
+        {
+            foreach (WorkflowDefinition other in await _db.WorkflowDefinitions.Where(d => d.CompanyId == companyId && d.DocumentType == definition.DocumentType && d.IsActive && d.Id != definitionId)
+                .ToListAsync(ct).ConfigureAwait(false))
+            {
+                other.IsActive = false;
+            }
+        }
+
+        definition.IsActive = active;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />

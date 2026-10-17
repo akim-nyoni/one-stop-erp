@@ -31,6 +31,7 @@ internal sealed class WorkflowStageConfiguration : IEntityTypeConfiguration<Work
         b.Property(x => x.Name).HasMaxLength(120);
         b.Property(x => x.MinValue).HasPrecision(19, 4);
         b.Property(x => x.RequiredRoleName).HasMaxLength(120);
+        b.Property(x => x.RequiredGroupName).HasMaxLength(100);
         b.Property<List<long>>("_eligibleUserIds")
             .HasColumnName("eligible_user_ids")
             .HasColumnType("text")

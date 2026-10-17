@@ -151,6 +151,7 @@ internal sealed class AllocationRunConfiguration : IEntityTypeConfiguration<Allo
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.InputCandidates).HasColumnType("text"); // unbounded: a 100,000-row waiting list is kept in full for the draw to be re-verified
         b.Property(x => x.CommitteeResolution).HasMaxLength(120);
+        b.Property(x => x.CommitteeMembers).HasMaxLength(400);
         b.Property(x => x.InputStands).HasColumnType("text");
         b.Property(x => x.InputHash).HasMaxLength(64);
         b.HasMany(x => x.Allocations).WithOne().HasForeignKey(x => x.AllocationRunId).OnDelete(DeleteBehavior.Restrict);
@@ -1257,6 +1258,7 @@ internal sealed class AllocationExclusionConfiguration : IEntityTypeConfiguratio
         b.ToTable("allocation_exclusion", Schemas.Housing);
         b.HasKey(x => x.Id);
         b.Property(x => x.Reason).HasConversion<int>();
+        b.Property(x => x.Note).HasMaxLength(200);
         b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
     }
 }

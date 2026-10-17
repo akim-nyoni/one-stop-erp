@@ -71,6 +71,7 @@ internal sealed class SaleLineConfiguration : IEntityTypeConfiguration<SaleLine>
         b.Property(x => x.PromotionDiscount).HasPrecision(19, 4);
         b.Property(x => x.DiscountAccountCode).HasMaxLength(8);
         b.Property(x => x.PromotionCode).HasMaxLength(60);
+        b.Property(x => x.GiftCardNumber).HasMaxLength(40);
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.Quantity).HasPrecision(19, 4);
@@ -114,6 +115,8 @@ internal sealed class PosEventConfiguration : IEntityTypeConfiguration<PosEvent>
         b.Property(x => x.CustomerReference).HasMaxLength(60);
         b.Property(x => x.Reference).HasMaxLength(60);
         b.Property(x => x.Outcome).HasMaxLength(200);
+        b.Property(x => x.FiscalCode).HasMaxLength(60);
+        b.Property(x => x.FiscalVerification).HasMaxLength(400);
         b.HasIndex(x => new { x.CompanyId, x.Kind, x.EventDate });
         b.HasIndex(x => new { x.CompanyId, x.SaleNumber });
     }

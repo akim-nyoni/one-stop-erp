@@ -125,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.IReadingRouteService, Municipal.ReadingRouteService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDepositService, Municipal.ServiceDepositService>();
         services.AddScoped<Application.Abstractions.Municipal.ITariffCatalogueService, Municipal.TariffCatalogueService>();
+        services.AddScoped<Application.Abstractions.Municipal.IMunicipalTariffService, Municipal.MunicipalTariffService>();
         services.AddScoped<Application.Abstractions.Municipal.IFacilityBookingService, Municipal.FacilityBookingService>();
         services.AddScoped<Application.Abstractions.Municipal.ICemeteryService, Municipal.CemeteryService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDeskService, Municipal.ServiceDeskService>();
@@ -247,8 +248,13 @@ public static class DependencyInjection
         services.AddScoped<ITaxCalculator, TaxCalculator>();
         services.AddScoped<IFxRevaluationService, FxRevaluationService>();
         // The fiscal device: none by default; ONE4ALL_FISCAL_SIMULATE=1 puts the tills on the simulator (a real device registers its own provider).
-        services.AddSingleton<IFiscalDeviceProvider>(_ => Environment.GetEnvironmentVariable("ONE4ALL_FISCAL_SIMULATE") == "1"
-            ? new SimulatedFiscalDeviceProvider() : new NullFiscalDeviceProvider());
+        // A real device: the Fiscal section (BaseUrl, ApiKey, DeviceId) or ONE4ALL_FISCAL_URL / ONE4ALL_FISCAL_KEY put the tills on the HTTP reference provider.
+        services.AddSingleton<IFiscalDeviceProvider>(sp =>
+        {
+            FiscalOptions options = sp.GetService<FiscalOptions>() ?? new FiscalOptions { BaseUrl = Environment.GetEnvironmentVariable("ONE4ALL_FISCAL_URL"), ApiKey = Environment.GetEnvironmentVariable("ONE4ALL_FISCAL_KEY") };
+            return !string.IsNullOrWhiteSpace(options.BaseUrl) ? new HttpFiscalDeviceProvider(new HttpClient(), options)
+                : Environment.GetEnvironmentVariable("ONE4ALL_FISCAL_SIMULATE") == "1" ? new SimulatedFiscalDeviceProvider() : new NullFiscalDeviceProvider();
+        });
         services.AddScoped<Application.Abstractions.Reporting.IGeneralLedgerReports, GeneralLedgerReports>();
         services.AddScoped<Application.Abstractions.Reporting.ISourceDocumentService, Reporting.SourceDocumentService>();
         services.AddScoped<Application.Abstractions.Reporting.IConsolidationService, Accounting.ConsolidationService>();

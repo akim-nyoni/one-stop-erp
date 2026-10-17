@@ -130,6 +130,9 @@ public sealed class WorkflowStage : Entity
     /// <summary>A role name whose holders may approve this stage (optional).</summary>
     public string? RequiredRoleName { get; set; }
 
+    /// <summary>A user group whose members may approve (brief §7 approvers by group), or null.</summary>
+    public string? RequiredGroupName { get; set; }
+
     /// <summary>Gets or sets the condition (over the document's value and attributes) for the stage to apply; null: always (value bands aside).</summary>
     public string? Condition { get; set; }
 

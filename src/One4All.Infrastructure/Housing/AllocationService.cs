@@ -74,19 +74,33 @@ public sealed class AllocationService : IAllocationService
             .Where(a => a.CompanyId == proposal.CompanyId && substituted.Contains(a.StandId) && (a.Status == AllocationStatus.Declined || a.Status == AllocationStatus.Lapsed))
             .Select(a => a.ApplicantId).ToListAsync(ct).ConfigureAwait(false)];
 
-        // One household, one stand: whoever's spouse holds a stand, or is an applicant with a live or completed allocation, is left out.
+        // One household, N stands (brief §4.10.4; N is 1 unless the council or the scheme says otherwise): a household's stands held plus its live allocations, counted on the
+        // national IDs of applicant and spouse, keep it out once it reaches the limit.
+        int limit = Math.Max(1, await _db.HousingSchemes.AsNoTracking().Where(s => s.Id == proposal.SchemeId).Select(s => s.StandsPerBeneficiary).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? await _db.Companies.AsNoTracking().Where(c => c.Id == proposal.CompanyId).Select(c => c.StandsPerBeneficiary).FirstOrDefaultAsync(ct).ConfigureAwait(false));
         HashSet<string> householdIds = [.. listed.SelectMany(a => new[] { a.IdNumber, a.SpouseIdNumber }).OfType<string>()];
-        HashSet<string> holdingIds = [.. await _db.Customers.AsNoTracking()
-            .Where(c => c.CompanyId == proposal.CompanyId && c.NationalIdNumber != null && householdIds.Contains(c.NationalIdNumber)
-                && _db.HousingStands.Any(s => s.CompanyId == proposal.CompanyId && s.CurrentHolderCustomerId == c.Id))
-            .Select(c => c.NationalIdNumber!).ToListAsync(ct).ConfigureAwait(false)];
-        holdingIds.UnionWith(await _db.HousingApplicants.AsNoTracking()
-            .Where(a => a.CompanyId == proposal.CompanyId && householdIds.Contains(a.IdNumber)
-                && (a.Status == ApplicantStatus.Allocated || _db.Set<StandAllocation>().Any(x => x.ApplicantId == a.Id && Live.Contains(x.Status))))
-            .Select(a => a.IdNumber).ToListAsync(ct).ConfigureAwait(false));
-        HashSet<long> spouseHolds = [.. listed.Where(a => (a.SpouseIdNumber is string spouse && holdingIds.Contains(spouse))
-            || listed.Any(o => o.SpouseIdNumber == a.IdNumber && liveApplicants.Contains(o.Id))).Select(a => a.Id)];
-        var applicants = listed.Where(a => a.Status == ApplicantStatus.Active && !liveApplicants.Contains(a.Id) && !spouseHolds.Contains(a.Id) && !refused.Contains(a.Id)).ToList();
+        Dictionary<string, int> held = new(StringComparer.Ordinal);
+        var holders = await _db.Customers.AsNoTracking()
+            .Where(c => c.CompanyId == proposal.CompanyId && c.NationalIdNumber != null && householdIds.Contains(c.NationalIdNumber))
+            .Select(c => new { Id = c.NationalIdNumber!, Count = _db.HousingStands.Count(s => s.CompanyId == proposal.CompanyId && s.CurrentHolderCustomerId == c.Id) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var holder in holders)
+        {
+            held[holder.Id] = held.GetValueOrDefault(holder.Id) + holder.Count;
+        }
+
+        var allocated = await _db.HousingApplicants.AsNoTracking()
+            .Where(a => a.CompanyId == proposal.CompanyId && householdIds.Contains(a.IdNumber))
+            .Select(a => new { a.IdNumber, Count = _db.Set<StandAllocation>().Count(x => x.ApplicantId == a.Id && Live.Contains(x.Status)) + (a.Status == ApplicantStatus.Allocated ? 1 : 0) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach (var holder in allocated)
+        {
+            held[holder.IdNumber] = held.GetValueOrDefault(holder.IdNumber) + holder.Count;
+        }
+
+        int Household(string idNumber, string? spouse) => held.GetValueOrDefault(idNumber) + (spouse is null || spouse == idNumber ? 0 : held.GetValueOrDefault(spouse));
+        HashSet<long> spouseHolds = [.. listed.Where(a => Household(a.IdNumber, a.SpouseIdNumber) >= limit && held.GetValueOrDefault(a.IdNumber) < limit).Select(a => a.Id)];
+        var applicants = listed.Where(a => a.Status == ApplicantStatus.Active && Household(a.IdNumber, a.SpouseIdNumber) < limit && !refused.Contains(a.Id)).ToList();
         Dictionary<string, long> applicantIds = applicants.ToDictionary(a => a.Number, a => a.Id, StringComparer.Ordinal);
 
         // The canonical candidate list: ranked for seniority and score, waiting-list-number order for a ballot.
@@ -130,7 +144,8 @@ public sealed class AllocationService : IAllocationService
         foreach (var left in listed.Where(a => !applicantIds.ContainsKey(a.Number)).OrderBy(a => a.Number, StringComparer.Ordinal))
         {
             run.Exclude(left.Id, left.Status == ApplicantStatus.Suspended ? ExclusionReason.Suspended : refused.Contains(left.Id) ? ExclusionReason.DeclinedStand
-                : spouseHolds.Contains(left.Id) && !liveApplicants.Contains(left.Id) ? ExclusionReason.SpouseHolds : ExclusionReason.LiveAllocation);
+                : liveApplicants.Contains(left.Id) ? ExclusionReason.LiveAllocation : spouseHolds.Contains(left.Id) ? ExclusionReason.SpouseHolds
+                : held.GetValueOrDefault(left.IdNumber) >= limit ? ExclusionReason.HoldsStand : ExclusionReason.LiveAllocation);
         }
 
         run.OfferDays = proposal.OfferDays < 1 ? 30 : proposal.OfferDays;
@@ -153,9 +168,99 @@ public sealed class AllocationService : IAllocationService
     /// <inheritdoc />
     public Task<Result<AllocationRunView>> ApproveByCommitteeAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, string committeeResolution,
         CancellationToken ct = default)
-        => string.IsNullOrWhiteSpace(committeeResolution)
+        => ApproveByCommitteeAsync(companyId, runNumber, approverUserId, date, offerDays, new CommitteeMeeting(committeeResolution), ct);
+
+    /// <inheritdoc />
+    public Task<Result<AllocationRunView>> ApproveByCommitteeAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CommitteeMeeting meeting, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(meeting);
+        return string.IsNullOrWhiteSpace(meeting.Resolution)
             ? Task.FromResult<Result<AllocationRunView>>(Error.Validation("Hse.CommitteeResolution", "Record the allocation committee's resolution."))
-            : LoggingBlocksAsync(companyId, runNumber, approverUserId, () => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct, committeeResolution.Trim()), ct), ct);
+            : LoggingBlocksAsync(companyId, runNumber, approverUserId, () => _db.AtomicAsync(() => ApproveCoreAsync(companyId, runNumber, approverUserId, date, offerDays, ct, meeting.Resolution.Trim(),
+                meeting.MeetingDate, string.IsNullOrWhiteSpace(meeting.Members) ? null : meeting.Members.Trim()), ct), ct);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<AllocationRunView>> RejectLineAsync(long companyId, string runNumber, int sequence, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Hse.ReasonRequired", "The committee's rejection needs a reason.");
+        }
+
+        Result<(AllocationRun Run, StandAllocation Line)> found = await ProposedLineAsync(companyId, runNumber, sequence, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        (AllocationRun run, StandAllocation line) = found.Value;
+        line.Close(AllocationStatus.Cancelled, null, reason.Trim());
+        run.Exclude(line.ApplicantId, ExclusionReason.CommitteeRejected, reason.Trim());
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return await ViewAsync(run, ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<AllocationRunView>> SubstituteLineAsync(long companyId, string runNumber, int sequence, string skipReason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(skipReason))
+        {
+            return Error.Validation("Hse.ReasonRequired", "A substitution must state why the skipped applicant was skipped.");
+        }
+
+        Result<(AllocationRun Run, StandAllocation Line)> found = await ProposedLineAsync(companyId, runNumber, sequence, ct).ConfigureAwait(false);
+        if (found.IsFailure)
+        {
+            return found.Error;
+        }
+
+        (AllocationRun run, StandAllocation line) = found.Value;
+
+        // The next applicant in the run's own order who is not on the run, not excluded from it, still active and without a live allocation.
+        HashSet<long> taken = [.. run.Allocations.Where(a => a.Status != AllocationStatus.Cancelled).Select(a => a.ApplicantId)];
+        HashSet<long> excluded = [.. run.Exclusions.Select(e => e.ApplicantId)];
+        HashSet<long> live = [.. await _db.Set<StandAllocation>().AsNoTracking().Where(a => a.CompanyId == companyId && Live.Contains(a.Status)).Select(a => a.ApplicantId).ToListAsync(ct).ConfigureAwait(false)];
+        List<string> order = [.. run.InputCandidates.Split('|', StringSplitOptions.RemoveEmptyEntries)];
+        Dictionary<string, long> byNumber = await _db.HousingApplicants.AsNoTracking()
+            .Where(a => a.CompanyId == companyId && a.WaitingListNumber != null && order.Contains(a.WaitingListNumber) && a.Status == ApplicantStatus.Active)
+            .ToDictionaryAsync(a => a.WaitingListNumber!, a => a.Id, StringComparer.Ordinal, ct).ConfigureAwait(false);
+        long? next = order.Select(n => byNumber.TryGetValue(n, out long id) ? (long?)id : null)
+            .FirstOrDefault(id => id is long candidate && !taken.Contains(candidate) && !excluded.Contains(candidate) && !live.Contains(candidate) && candidate != line.ApplicantId);
+        if (next is not long substitute)
+        {
+            return Error.Rule("Hse.NoSubstitute", "Nobody is left on the list to substitute; reject the pairing instead and propose a substitution run later.");
+        }
+
+        run.Exclude(line.ApplicantId, ExclusionReason.CommitteeSkipped, skipReason.Trim());
+        line.Substitute(substitute);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return await ViewAsync(run, ct).ConfigureAwait(false);
+    }
+
+    private async Task<Result<(AllocationRun Run, StandAllocation Line)>> ProposedLineAsync(long companyId, string runNumber, int sequence, CancellationToken ct)
+    {
+        string number = (runNumber ?? string.Empty).Trim();
+        AllocationRun? run = await _db.Set<AllocationRun>().Include(r => r.Allocations).Include(r => r.Exclusions)
+            .FirstOrDefaultAsync(r => r.CompanyId == companyId && r.RunNumber == number, ct).ConfigureAwait(false);
+        if (run is null)
+        {
+            return Error.NotFound("Hse.RunNotFound", $"Allocation run {number} not found.");
+        }
+
+        if (run.Status != AllocationRunStatus.Proposed)
+        {
+            return Error.Rule("Hse.RunNotProposed", $"Run {number} is {run.Status}; the committee decides on a proposed run.");
+        }
+
+        StandAllocation? line = run.Allocations.FirstOrDefault(a => a.Sequence == sequence);
+        if (line is null || line.Status != AllocationStatus.Proposed)
+        {
+            return Error.NotFound("Hse.LineNotProposed", $"Run {number} has no proposed pairing {sequence}.");
+        }
+
+        return (run, line);
+    }
 
     // A refused second allocation (a stand in the run no longer available, or blocked since) is kept as an exception entry after the approval's own
     // unit of work has rolled back, so the H39 exception report shows the attempt (brief §4.10.4).
@@ -228,7 +333,7 @@ public sealed class AllocationService : IAllocationService
         }, ct);
 
     private async Task<Result<AllocationRunView>> ApproveCoreAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct,
-        string? committeeResolution = null)
+        string? committeeResolution = null, DateOnly? meetingDate = null, string? members = null)
     {
         string reference = (runNumber ?? string.Empty).Trim();
         if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.AllocationRun, reference, ct).ConfigureAwait(false))
@@ -236,7 +341,7 @@ public sealed class AllocationService : IAllocationService
             return Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.AllocationRun, reference);
         }
 
-        return await ConcludeApprovalAsync(companyId, reference, approverUserId, date, offerDays, ct, committeeResolution).ConfigureAwait(false);
+        return await ConcludeApprovalAsync(companyId, reference, approverUserId, date, offerDays, ct, committeeResolution, meetingDate, members).ConfigureAwait(false);
     }
 
     /// <summary>Approves a proposed run: offers go out (the workflow's approval lands here too).</summary>
@@ -248,7 +353,7 @@ public sealed class AllocationService : IAllocationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The run, or why it cannot be approved.</returns>
     internal async Task<Result<AllocationRunView>> ConcludeApprovalAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct,
-        string? committeeResolution = null)
+        string? committeeResolution = null, DateOnly? meetingDate = null, string? committeeMembers = null)
     {
         if (offerDays < 1)
         {
@@ -272,7 +377,13 @@ public sealed class AllocationService : IAllocationService
             return Error.Rule("Hse.SelfApproval", $"Run {runNumber} must be approved by someone other than who proposed it.");
         }
 
-        List<long> standIds = [.. run.Allocations.Select(a => a.StandId)];
+        // Pairings the committee rejected stay out; their stands stay available.
+        List<long> standIds = [.. run.Allocations.Where(a => a.Status == AllocationStatus.Proposed).Select(a => a.StandId)];
+        if (standIds.Count == 0)
+        {
+            return Error.Rule("Hse.NothingToApprove", $"Every pairing on run {runNumber} was rejected; cancel it and propose again.");
+        }
+
         Dictionary<long, HousingStand> stands = await _db.Set<HousingStand>().Where(s => standIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
         HousingStand? gone = stands.Values.FirstOrDefault(s => s.Status != StandStatus.Available);
         if (gone is not null)
@@ -285,7 +396,13 @@ public sealed class AllocationService : IAllocationService
             return Error.Conflict("Hse.StandBlocked", "A stand in the run has since been blocked; cancel the run and propose again.");
         }
 
-        foreach (StandAllocation allocation in run.Allocations.OrderBy(a => a.Sequence))
+        if (meetingDate is not null || committeeMembers is not null)
+        {
+            run.MeetingDate = meetingDate;
+            run.CommitteeMembers = committeeMembers;
+        }
+
+        foreach (StandAllocation allocation in run.Allocations.Where(a => a.Status == AllocationStatus.Proposed).OrderBy(a => a.Sequence))
         {
             Result<string> certificate = await _numbers.AllocateAsync(companyId, "AC", date, ct: ct).ConfigureAwait(false);
             if (certificate.IsFailure)

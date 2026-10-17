@@ -148,7 +148,7 @@ public sealed class AllocationRun : AuditableEntity, ICompanyScoped
     /// <summary>Records that a listed applicant was left out of the run.</summary>
     /// <param name="applicantId">The applicant.</param>
     /// <param name="reason">Why.</param>
-    public void Exclude(long applicantId, ExclusionReason reason) => _exclusions.Add(new AllocationExclusion(applicantId, reason));
+    public void Exclude(long applicantId, ExclusionReason reason, string? note = null) => _exclusions.Add(new AllocationExclusion(applicantId, reason, note));
 
     /// <summary>Adds a pairing.</summary>
     /// <param name="allocation">The pairing.</param>
@@ -168,6 +168,12 @@ public sealed class AllocationRun : AuditableEntity, ICompanyScoped
         ApprovedByUserId = userId;
         ApprovedOn = date;
     }
+
+    /// <summary>The committee members present at the meeting that decided the run (brief §4.10.4), or null when approved by one officer.</summary>
+    public string? CommitteeMembers { get; set; }
+
+    /// <summary>When the committee met, or null.</summary>
+    public DateOnly? MeetingDate { get; set; }
 
     /// <summary>Gets or sets the allocation committee's resolution approving the list (brief §4.10.2).</summary>
     public string? CommitteeResolution { get; set; }
@@ -291,6 +297,18 @@ public sealed class StandAllocation : Entity
         DecidedOn = date;
         Reason = reason;
     }
+
+    /// <summary>Puts another applicant on a proposed pairing (the committee's substitution; the skipped applicant is recorded on the run).</summary>
+    /// <param name="applicantId">The applicant taking the pairing.</param>
+    public void Substitute(long applicantId)
+    {
+        if (Status != AllocationStatus.Proposed)
+        {
+            throw new InvalidOperationException("Only a proposed pairing can be substituted.");
+        }
+
+        ApplicantId = applicantId;
+    }
 }
 
 /// <summary>Why a listed applicant in a run's category was left out of it (brief §14 H34).</summary>
@@ -307,6 +325,15 @@ public enum ExclusionReason
 
     /// <summary>Declined or let lapse an offer of the stand a substitution run fills.</summary>
     DeclinedStand = 4,
+
+    /// <summary>The committee rejected the applicant's pairing, with a reason (the stand stays available).</summary>
+    CommitteeRejected = 5,
+
+    /// <summary>The committee substituted the next applicant for this one, stating why (brief §4.10.4).</summary>
+    CommitteeSkipped = 6,
+
+    /// <summary>Already holds as many stands as one beneficiary may (brief §4.10.4), on their own national ID.</summary>
+    HoldsStand = 7,
 }
 
 /// <summary>A listed applicant left out of an allocation run, recorded when the run is proposed (<c>hse.allocation_exclusion</c>).</summary>
@@ -320,11 +347,15 @@ public sealed class AllocationExclusion : Entity
     /// <summary>Records an exclusion.</summary>
     /// <param name="applicantId">The applicant.</param>
     /// <param name="reason">Why.</param>
-    public AllocationExclusion(long applicantId, ExclusionReason reason)
+    public AllocationExclusion(long applicantId, ExclusionReason reason, string? note = null)
     {
         ApplicantId = applicantId;
         Reason = reason;
+        Note = note;
     }
+
+    /// <summary>The committee's stated reason (a rejection or a substitution), or null for an automatic exclusion.</summary>
+    public string? Note { get; private set; }
 
     /// <summary>The run.</summary>
     public long AllocationRunId { get; private set; }

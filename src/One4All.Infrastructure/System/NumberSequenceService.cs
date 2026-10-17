@@ -41,4 +41,45 @@ public sealed class NumberSequenceService : INumberSequenceService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return number;
     }
+
+    /// <inheritdoc />
+    public async Task<Result<NumberSequenceRow>> ConfigureAsync(long companyId, string documentType, long? branchId, NumberSequenceSetup setup, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(setup);
+        string type = (documentType ?? string.Empty).Trim();
+        if (type.Length == 0 || type.Length > 60 || setup.Prefix is null || setup.Prefix.Length > 20 || setup.Padding is < 1 or > 12 || setup.StartAt is < 1)
+        {
+            return Error.Validation("Sequence.Setup", "A sequence needs a document type (up to 60 characters), a prefix up to 20 characters, padding of 1 to 12 digits and a starting number above zero.");
+        }
+
+        if (branchId is long branch && !await _db.Branches.AnyAsync(b => b.Id == branch && b.CompanyId == companyId, ct).ConfigureAwait(false))
+        {
+            return Error.NotFound("Sequence.BranchNotFound", $"Branch {branch} is not one of the company's.");
+        }
+
+        NumberSequence? sequence = await _db.Set<NumberSequence>().FirstOrDefaultAsync(s => s.CompanyId == companyId && s.DocumentType == type && s.BranchId == branchId, ct).ConfigureAwait(false);
+        if (sequence is null)
+        {
+            sequence = new NumberSequence(companyId, type, setup.Prefix, setup.Padding, branchId, setup.ResetYearly, setup.Gapless);
+            _db.Set<NumberSequence>().Add(sequence);
+        }
+        else
+        {
+            sequence.Configure(setup.Prefix, setup.Padding, setup.ResetYearly, setup.Gapless);
+        }
+
+        if (setup.StartAt is long startAt && !sequence.AdvanceTo(startAt))
+        {
+            return Error.Rule("Sequence.StartBehind", $"The sequence is already at {sequence.NextValue}; the next number cannot move back to {startAt}.");
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Row(sequence);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<NumberSequenceRow>> ListAsync(long companyId, CancellationToken ct = default)
+        => [.. (await _db.Set<NumberSequence>().AsNoTracking().Where(s => s.CompanyId == companyId).OrderBy(s => s.DocumentType).ThenBy(s => s.BranchId).ToListAsync(ct).ConfigureAwait(false)).Select(Row)];
+
+    private static NumberSequenceRow Row(NumberSequence s) => new(s.DocumentType, s.BranchId, s.Prefix, s.Padding, s.ResetYearly, s.Gapless, s.NextValue, s.CurrentYear);
 }

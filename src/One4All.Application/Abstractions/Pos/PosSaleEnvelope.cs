@@ -11,7 +11,7 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="LineNet">The net line value.</param>
 /// <param name="TaxAmount">The tax on the line.</param>
 /// <param name="RevenueAccountCode">The revenue account.</param>
-public sealed record PosSaleLineEnvelope(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode);
+public sealed record PosSaleLineEnvelope(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode, string? GiftCardNumber = null);
 
 /// <summary>A tender captured offline (a serializable mirror of <see cref="PosTenderRequest"/>).</summary>
 /// <param name="TenderType">The tender type.</param>
@@ -79,7 +79,7 @@ public sealed record PosSaleEnvelope(
         Tip = Tip,
         TipsAccountCode = TipsAccountCode,
         Lines = Lines
-            .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode))
+            .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, GiftCardNumber: l.GiftCardNumber))
             .ToList(),
         Tenders = Tenders
             .Select(t => new PosTenderRequest(t.TenderType, CurrencyCode.Parse(t.Currency), t.Amount, t.AccountCode, t.IsChange))

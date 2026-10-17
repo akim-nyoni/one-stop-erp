@@ -88,14 +88,23 @@ public sealed class HousingAllocationReportsTests
         (await Render("H32")).Should().Contain(run.RunNumber).And.Contain("42").And.Contain("Inputs and draw reproduce");
         (await Render("H33")).Should().Contain("2026-03").And.Contain("72");
 
-        AllocationLine forOwner = offered.Lines.Single(l => l.WaitingListNumber == $"WL-{ownerId}");
+        // Applicant A already holds HA-0, so one beneficiary, one stand keeps A out of the run (brief §4.10.4); B and C are offered the stands.
+        offered.Lines.Should().HaveCount(2).And.NotContain(l => l.WaitingListNumber == $"WL-{ownerId}");
+        (await Render("H34")).Should().Contain("Already holds a stand");
+        AllocationLine forOwner = offered.Lines.Single(l => l.WaitingListNumber == $"WL-HA-B-{companyId}");
         AllocationLine declined = offered.Lines.First(l => l != forOwner);
         (await allocations.AcceptAsync(companyId, forOwner.CertificateNumber!, new DateOnly(2026, 3, 10))).IsSuccess.Should().BeTrue();
         (await allocations.DeclineAsync(companyId, declined.CertificateNumber!, new DateOnly(2026, 3, 12), "Prefers another area")).IsSuccess.Should().BeTrue();
 
         (await Render("H36")).Should().Contain(declined.CertificateNumber).And.Contain("Declined").And.Contain("Prefers another area");
         (await Render("H41")).Should().Contain(forOwner.CertificateNumber).And.Contain("51"); // accepted 10 March, 51 days by 30 April
-        (await Render("H40")).Should().Contain(ownerId).And.Contain("HA-0 holds").And.Contain(forOwner.StandNumber);
+        // A second stand sold to A's customer account puts A on the multiple-stands report.
+        HousingStand second = new(companyId, parcel.Id, null, "HA-9", 300m, 1000m);
+        db.HousingStands.Add(second);
+        await db.SaveChangesAsync();
+        second.Sell(owner.Id, owner.Name, 3000m, new DateOnly(2026, 4, 1));
+        await db.SaveChangesAsync();
+        (await Render("H40")).Should().Contain(ownerId).And.Contain("HA-0 holds").And.Contain("HA-9 holds");
         (await Render("H11")).Should().Contain(parcel.ParcelNumber).And.Contain("HA-3");
     }
 }

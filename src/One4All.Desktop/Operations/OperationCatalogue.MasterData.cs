@@ -439,6 +439,31 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Number sequences", ListTitle = "Number sequences",
+            Description = "How each document type is numbered (brief §2.4): the prefix, the digits the number is padded to, whether the counter restarts every year (the year goes into "
+                + "the number, INV-2026-000001), whether it must be gapless, and per branch when a branch numbers its own. A sequence not set up here is created on first use as "
+                + "'<type>-' padded to 5 digits. A starting number moves the counter forward, never back.",
+            Fields = [Req("Type", "Document type (e.g. AR.Invoice, PO, AC, ALR)"), Opt("Branch", "Branch code (blank: company-wide)"), Req("Prefix", "Prefix"), Num("Padding", "Padding (digits)", "5"),
+                Tick("Yearly", "Restart each year"), Tick("Gapless", "Gapless", true), OptNum("StartAt", "Next number (move forward)")],
+            Run = async (c, i) =>
+            {
+                long? branch = null;
+                if (i.Optional("Branch") is string code && code.Trim().Length > 0)
+                {
+                    branch = await c.Db.Branches.AsNoTracking().Where(b => b.CompanyId == c.CompanyId && b.Code == code.Trim().ToUpper()).Select(b => (long?)b.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                        ?? throw new OperationException($"No branch {code}.");
+                }
+
+                Application.Abstractions.Numbering.NumberSequenceRow row = Check(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().ConfigureAsync(c.CompanyId, i.Text("Type"), branch,
+                    new Application.Abstractions.Numbering.NumberSequenceSetup(i.Text("Prefix"), i.Whole("Padding"), i.Flag("Yearly"), i.Flag("Gapless"), (long?)i.OptionalNumber("StartAt"))).ConfigureAwait(true));
+                return $"{row.DocumentType}: next number {row.Prefix}{(row.ResetYearly ? "<year>-" : string.Empty)}{row.NextValue.ToString(CultureInfo.InvariantCulture).PadLeft(row.Padding, '0')}{(row.Gapless ? " (gapless)" : string.Empty)}.";
+            },
+            List = async c => Table(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().ListAsync(c.CompanyId).ConfigureAwait(true),
+                ("Type", s => s.DocumentType), ("Branch", s => s.BranchId?.ToString(CultureInfo.InvariantCulture) ?? "all"), ("Prefix", s => s.Prefix), ("Padding", s => s.Padding),
+                ("Yearly", s => s.ResetYearly ? "yes" : string.Empty), ("Gapless", s => s.Gapless ? "yes" : string.Empty), ("Next", s => s.NextValue), ("Year", s => s.CurrentYear == 0 ? string.Empty : s.CurrentYear.ToString(CultureInfo.InvariantCulture))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Document layouts", ListTitle = "Document layouts",
             Description = "Which report lays out each business document. Copy the document's designable report (DOC01–DOC12, listed here) in the report designer, lay it out as your own, "
                 + "and name your copy's code here; a document with no layout prints as the standard text document. A blank code clears the layout.",

@@ -1367,7 +1367,8 @@ public static partial class OperationCatalogue
             Module = "Sales & Schools", Title = "Students, hostels and routes", ListTitle = "Students",
             Description = "Admit a student under their guardian's account (the customer billed); set up a hostel or transport route with its capacity and fee per term; place a "
                 + "student in a hostel and on a route (blank takes them out) within capacity.",
-            Fields = [Pick("Step", "Step", ["Admit", "Hostel", "Route", "Place"]), Opt("Student", "Admission number"), Opt("Name", "Name"), Opt("Grade", "Grade"), Opt("Guardian", "Guardian (customer code)"),
+            Fields = [Pick("Step", "Step", ["Admit", "Hostel", "Route", "Place", "Sponsor"]), Opt("Student", "Admission number"), Opt("Name", "Name"), Opt("Grade", "Grade"), Opt("Guardian", "Guardian (customer code)"),
+                Opt("Sponsor", "Sponsor (customer code billed instead of the guardian; blank: none)"),
                 Pick("Gender", "Gender", Enum.GetNames<Core.Payroll.Gender>()), Opt("Code", "Hostel / route code"), Num("Capacity", "Capacity", "0"), Num("Fee", "Fee per term", "0"), Opt("Revenue", "Revenue account"), Opt("HostelCode", "Hostel (place)"),
                 Opt("RouteCode", "Route (place)"), Today()],
             Run = async (c, i) =>
@@ -1380,6 +1381,8 @@ public static partial class OperationCatalogue
                     "Route" => $"Route saved (id {Check(await setup.SaveRouteAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Whole("Capacity"), i.Number("Fee"),
                         i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true))}).",
                     "Place" => Check(await setup.PlaceStudentAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("HostelCode"), i.Optional("RouteCode")).ConfigureAwait(true), "Student placed."),
+                    "Sponsor" => Check(await setup.SetSponsorAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("Sponsor")).ConfigureAwait(true),
+                        i.Optional("Sponsor") is null ? "Sponsor removed; the guardian is billed." : $"Sponsor {i.Optional("Sponsor")!.ToUpperInvariant()} is billed for the student."),
                     _ => $"Student admitted (id {Check(await setup.AdmitStudentAsync(c.CompanyId, i.Optional("Student") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Optional("Grade") ?? string.Empty,
                         i.Optional("Guardian") ?? string.Empty, i.Date("Date"), Enum.TryParse(i.Optional("Gender"), out Core.Payroll.Gender gender) ? gender : Core.Payroll.Gender.Unspecified).ConfigureAwait(true))}).",
                 };

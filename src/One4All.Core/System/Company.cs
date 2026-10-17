@@ -132,6 +132,9 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public string? DocumentLayoutsJson { get; set; }
 
+    /// <summary>Gets or sets how many stands one beneficiary (checked on national ID, spouse included) may hold across the council (brief §4.10.4 "one stand, configurable to N"); a scheme may set its own.</summary>
+    public int StandsPerBeneficiary { get; set; } = 1;
+
     /// <summary>
     /// Gets or sets the smallest cash amount the tills deal in (e.g. 0.05) when coins are scarce: a cash sale may be tendered up to half of
     /// it away from the exact total, the difference posted to <see cref="CashRoundingAccountCode"/> (brief §4.1). Null: no rounding.

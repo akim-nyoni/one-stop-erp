@@ -282,6 +282,7 @@
                             <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" FontSize="20" Background="#2980B9" Command="{Binding TenderCashCommand}" ToolTip="Type the cash handed over, then press CASH" />
                             <Button Content="CARD" Style="{StaticResource PadButton}" Height="48" FontSize="16" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
                             <Button Content="MOBILE MONEY" Style="{StaticResource PadButton}" Height="48" FontSize="15" Background="#117A65" Command="{Binding TenderMobileMoneyCommand}" />
+                            <Button Content="SELL GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#7D6608" Command="{Binding SellGiftCardCommand}" ToolTip="Card number in the gift card box, value on the number pad: printed stock activates, an active card tops up, when the sale posts" />
                             <Button Content="VOUCHER / GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#B9770E" Command="{Binding TenderVoucherCommand}" ToolTip="Type the gift card number under More functions first" />
                             <ItemsControl ItemsSource="{Binding CurrencyButtons}" Margin="3,2,3,0" ToolTip="{Binding PayingInText}">
                                 <ItemsControl.ItemsPanel>

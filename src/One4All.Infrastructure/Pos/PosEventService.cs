@@ -22,6 +22,7 @@ public sealed class PosEventService : IPosEventService
     private readonly IPosService? _pos;
     private readonly IInventoryService _inventory;
     private readonly IClock _clock;
+    private readonly IFiscalDeviceProvider? _fiscal;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -29,8 +30,9 @@ public sealed class PosEventService : IPosEventService
     /// <param name="inventory">Returns restocked goods.</param>
     /// <param name="clock">Stamps the events.</param>
     public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, IPosService? pos = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, IFiscalDeviceProvider? fiscal = null)
     {
+        _fiscal = fiscal;
         _permissions = permissions;
         _pos = pos;
         _db = db;
@@ -204,6 +206,15 @@ public sealed class PosEventService : IPosEventService
             SaleNumber = sale.SaleNumber, ItemId = r.Line.ItemId, SaleLineId = r.Line.Id, Quantity = r.Quantity, OriginalAmount = r.Line.LineNet + r.Line.TaxAmount,
             Reason = request.Reason.Trim(), AuthorisedByUserId = request.AuthorisedByUserId, Reference = posting.Value.JournalNumber, Outcome = request.Restock ? "Restocked" : "Not restocked",
         })];
+        if (await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(request.CompanyId, posting.Value.JournalNumber, gross, refunded.Sum(r => r.Tax), sale.BaseCurrency.Value, now,
+                FiscalDocumentKind.Refund, sale.SaleNumber), ct).ConfigureAwait(false) is FiscalReceiptResult signed)
+        {
+            foreach (PosEvent e in events)
+            {
+                (e.FiscalCode, e.FiscalVerification, e.FiscalQueued) = (signed.FiscalCode, signed.SignatureOrQr, signed.Queued || signed.FiscalCode is null);
+            }
+        }
+
         _db.PosEvents.AddRange(events);
         Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, gross, request.RefundAccountCode, $"Refund on {sale.SaleNumber}", request.CashierUserId,
             request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
@@ -379,6 +390,12 @@ public sealed class PosEventService : IPosEventService
             ItemId = item.Id, Quantity = request.Quantity, Reason = $"No receipt: {request.Reason.Trim()}", AuthorisedByUserId = request.AuthorisedByUserId, Reference = posting.Value.JournalNumber,
             Outcome = request.RestockWarehouseId is null ? "Not restocked" : "Restocked",
         };
+        if (await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(request.CompanyId, posting.Value.JournalNumber, gross, request.TaxAmount, company.BaseCurrency.Value, _clock.UtcNow,
+                FiscalDocumentKind.Refund), ct).ConfigureAwait(false) is FiscalReceiptResult signedRefund)
+        {
+            (refund.FiscalCode, refund.FiscalVerification, refund.FiscalQueued) = (signedRefund.FiscalCode, signedRefund.SignatureOrQr, signedRefund.Queued || signedRefund.FiscalCode is null);
+        }
+
         _db.PosEvents.Add(refund);
         Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, gross, request.RefundAccountCode, $"Refund without receipt: {item.Description}", request.CashierUserId,
             request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);

@@ -151,7 +151,47 @@ public sealed class PosService : IPosService
             }
 
             sale.AddLine(new SaleLine(line.ItemId, line.Description, request.WarehouseId, line.Quantity, line.UnitPrice, line.LineNet, line.TaxAmount, line.RevenueAccountCode,
-                line.PromotionDiscount, line.PromotionDiscount > 0m ? line.DiscountAccountCode : null, line.PromotionCode));
+                line.PromotionDiscount, line.PromotionDiscount > 0m ? line.DiscountAccountCode : null, line.PromotionCode, line.GiftCardNumber));
+        }
+
+        // Gift cards sold or topped up on the ticket (brief §4.8.1): the line's value loads the card and posts to the gift card liability the line names
+        // (Dr the tender, Cr liability — not revenue); printed stock activates, an active or emptied card tops up.
+        foreach (PosSaleLineRequest line in request.Lines.Where(l => !string.IsNullOrWhiteSpace(l.GiftCardNumber)))
+        {
+            string number = line.GiftCardNumber!.Trim().ToUpperInvariant();
+            if (line.LineNet <= 0m || line.TaxAmount != 0m || line.Quantity != 1m || line.PromotionDiscount != 0m)
+            {
+                return Error.Validation("Pos.GiftCardLine", $"Gift card {number}: one card per line, a positive value, no tax and no discount.");
+            }
+
+            Core.Vouchers.GiftCard? card = await _db.Set<Core.Vouchers.GiftCard>().FirstOrDefaultAsync(g => g.CompanyId == request.CompanyId && g.CardNumber == number, ct).ConfigureAwait(false);
+            if (card is null)
+            {
+                return Error.NotFound("Voucher.NotFound", $"Gift card {number} is not on the card stock.");
+            }
+
+            Core.Vouchers.GiftCardEvent loaded;
+            if (card.Status == Core.Vouchers.GiftCardStatus.Inactive)
+            {
+                Result activated = card.Activate(line.LineNet, request.SaleDate, null);
+                if (activated.IsFailure)
+                {
+                    return activated.Error;
+                }
+
+                loaded = Core.Vouchers.GiftCardEvent.Activated;
+            }
+            else if (card.Status is Core.Vouchers.GiftCardStatus.Active or Core.Vouchers.GiftCardStatus.Redeemed)
+            {
+                card.TopUp(line.LineNet);
+                loaded = Core.Vouchers.GiftCardEvent.ToppedUp;
+            }
+            else
+            {
+                return Error.Rule("Pos.GiftCardNotUsable", $"Gift card {number} is {card.Status}.");
+            }
+
+            _db.Set<Core.Vouchers.GiftCardTransaction>().Add(new Core.Vouchers.GiftCardTransaction(request.CompanyId, card.Id, request.SaleDate, loaded, line.LineNet, card.Balance, $"POS sale {request.SaleNumber}"));
         }
 
         // Vouchers: each card must be active, unexpired, in the tender's currency and cover what is taken from it; no change is given from a voucher.
@@ -589,6 +629,25 @@ public sealed class PosService : IPosService
             }
         }
 
+        // Take back what the sale loaded onto gift cards (a card since spent below that cannot be voided; refund its balance instead).
+        foreach (SaleLine loaded in sale.Lines.Where(l => l.GiftCardNumber is not null))
+        {
+            Core.Vouchers.GiftCard? card = await _db.Set<Core.Vouchers.GiftCard>().FirstOrDefaultAsync(g => g.CompanyId == companyId && g.CardNumber == loaded.GiftCardNumber, ct).ConfigureAwait(false);
+            if (card is null)
+            {
+                continue;
+            }
+
+            if (card.Balance < loaded.LineNet)
+            {
+                return Error.Rule("Pos.GiftCardSpent", $"Gift card {card.CardNumber} has {card.Balance:0.00} left of the {loaded.LineNet:0.00} this sale loaded; it has been spent, so refund the balance instead of voiding.");
+            }
+
+            card.TopUp(-loaded.LineNet);
+            _db.Set<Core.Vouchers.GiftCardTransaction>().Add(new Core.Vouchers.GiftCardTransaction(companyId, card.Id, date, Core.Vouchers.GiftCardEvent.Reinstated, -loaded.LineNet, card.Balance,
+                $"Void POS sale {sale.SaleNumber} (card load taken back)"));
+        }
+
         // Reverse the cost-of-sales stock issues raised by the sale.
         List<StockMovement> issues = await _db.Set<StockMovement>()
             .Where(m => m.CompanyId == companyId && m.Reference == sale.SaleNumber && m.Type == StockMovementType.Issue && !m.IsReversed)
@@ -603,10 +662,17 @@ public sealed class PosService : IPosService
         }
 
         sale.Void();
-        _db.PosEvents.Add(new PosEvent(companyId, sale.TerminalId, sale.CashierUserId, PosEventKind.SaleVoid, _clock.UtcNow, date, $"Sale {sale.SaleNumber}", sale.TotalNet + sale.TotalTax)
+        PosEvent voided = new(companyId, sale.TerminalId, sale.CashierUserId, PosEventKind.SaleVoid, _clock.UtcNow, date, $"Sale {sale.SaleNumber}", sale.TotalNet + sale.TotalTax)
         {
             TillSessionId = sale.TillSessionId, SaleNumber = sale.SaleNumber, Reason = reason.Trim(), Reference = posting.Value.JournalNumber,
-        });
+        };
+        if (sale.FiscalStatus != FiscalStatus.NotRequired && await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, posting.Value.JournalNumber, sale.TotalGross, sale.TotalTax,
+                sale.BaseCurrency.Value, _clock.UtcNow, FiscalDocumentKind.Refund, sale.SaleNumber), ct).ConfigureAwait(false) is FiscalReceiptResult signedVoid)
+        {
+            (voided.FiscalCode, voided.FiscalVerification, voided.FiscalQueued) = (signedVoid.FiscalCode, signedVoid.SignatureOrQr, signedVoid.Queued || signedVoid.FiscalCode is null);
+        }
+
+        _db.PosEvents.Add(voided);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         await Security.SemanticAudit.RecordAsync(_audit, _caller, companyId, "POS", "Sale", sale.SaleNumber, Core.Audit.AuditAction.Void, $"Voided by journal {posting.Value.JournalNumber}", reason,
             ct: ct).ConfigureAwait(false);
@@ -839,6 +905,21 @@ public sealed class PosService : IPosService
         if (_fiscal is { IsEnabled: true }
             && !await _db.Set<TillSession>().AnyAsync(s => s.CompanyId == session.CompanyId && s.Id != session.Id && s.ClosedOnUtc == null, ct).ConfigureAwait(false))
         {
+            List<Sale> daySales = await _db.Set<Sale>().AsNoTracking().Include(s => s.Lines).Where(s => s.CompanyId == session.CompanyId && s.SaleDate == request.Date && s.FiscalStatus != FiscalStatus.NotRequired)
+                .ToListAsync(ct).ConfigureAwait(false);
+            List<PosEvent> dayEvents = await _db.PosEvents.AsNoTracking().Where(e => e.CompanyId == session.CompanyId && e.EventDate == request.Date && (e.Kind == PosEventKind.Refund || e.Kind == PosEventKind.SaleVoid))
+                .ToListAsync(ct).ConfigureAwait(false);
+            string currency = (await _db.Companies.AsNoTracking().Where(c => c.Id == session.CompanyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false)).Value;
+            Result reported = await _fiscal.SubmitDayReportAsync(new FiscalDayReport(session.CompanyId, request.Date, daySales.Count(s => s.Status != SaleStatus.Voided),
+                daySales.Where(s => s.Status != SaleStatus.Voided).Sum(s => s.TotalGross), daySales.Where(s => s.Status != SaleStatus.Voided).Sum(s => s.TotalTax),
+                dayEvents.Count(e => e.Kind == PosEventKind.Refund), dayEvents.Where(e => e.Kind == PosEventKind.Refund).Sum(e => e.Amount),
+                dayEvents.Count(e => e.Kind == PosEventKind.SaleVoid), dayEvents.Where(e => e.Kind == PosEventKind.SaleVoid).Sum(e => e.Amount), currency), ct).ConfigureAwait(false);
+            if (reported.IsFailure)
+            {
+                _db.Set<PosEvent>().Add(new PosEvent(session.CompanyId, session.TerminalId, session.CashierUserId, PosEventKind.FiscalSubmission, _clock.UtcNow, request.Date,
+                    $"Z report not accepted: {reported.Error.Message}", 0m));
+            }
+
             Result closedDay = await _fiscal.CloseDayAsync(session.CompanyId, ct).ConfigureAwait(false);
             _db.Set<PosEvent>().Add(new PosEvent(session.CompanyId, session.TerminalId, session.CashierUserId, PosEventKind.FiscalSubmission, _clock.UtcNow, request.Date,
                 closedDay.IsSuccess ? "Fiscal day closed" : $"Fiscal day not closed: {closedDay.Error.Message}", 0m));
@@ -1080,6 +1161,61 @@ public sealed class PosService : IPosService
 
     /// <inheritdoc />
     public async Task<(int Fiscalised, int StillQueued)> RetryFiscalAsync(long companyId, CancellationToken ct = default)
+    {
+        (int signedOthers, int waitingOthers) = await RetryOthersAsync(companyId, ct).ConfigureAwait(false);
+        (int signedSales, int waitingSales) = await RetrySalesAsync(companyId, ct).ConfigureAwait(false);
+        return (signedSales + signedOthers, waitingSales + waitingOthers);
+    }
+
+    // Refunds, voids, invoices and credit notes the device could not sign when they happened.
+    private async Task<(int Fiscalised, int StillQueued)> RetryOthersAsync(long companyId, CancellationToken ct)
+    {
+        if (_fiscal is not { IsEnabled: true })
+        {
+            return (0, 0);
+        }
+
+        int signed = 0, waiting = 0;
+        string currency = (await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false)).Value;
+        foreach (PosEvent e in await _db.PosEvents.Where(e => e.CompanyId == companyId && e.FiscalQueued).OrderBy(e => e.Id).Take(500).ToListAsync(ct).ConfigureAwait(false))
+        {
+            FiscalReceiptResult? result = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, e.Reference ?? $"EVT-{e.Id}", e.Amount, 0m, currency, _clock.UtcNow,
+                FiscalDocumentKind.Refund, e.SaleNumber), ct).ConfigureAwait(false);
+            if (result is { Queued: false, FiscalCode: not null } ok)
+            {
+                (e.FiscalCode, e.FiscalVerification, e.FiscalQueued) = (ok.FiscalCode, ok.SignatureOrQr, false);
+                signed++;
+            }
+            else
+            {
+                waiting++;
+            }
+        }
+
+        foreach (OpenItem item in await _db.OpenItems.Where(i => i.CompanyId == companyId && i.FiscalQueued).OrderBy(i => i.Id).Take(500).ToListAsync(ct).ConfigureAwait(false))
+        {
+            FiscalReceiptResult? result = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, item.DocumentNumber, item.OriginalTransaction, 0m, item.Currency.Value,
+                _clock.UtcNow, item.ItemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice), ct).ConfigureAwait(false);
+            if (result is { Queued: false, FiscalCode: not null } ok)
+            {
+                (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (ok.FiscalCode, ok.SignatureOrQr, false);
+                signed++;
+            }
+            else
+            {
+                waiting++;
+            }
+        }
+
+        if (signed > 0)
+        {
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        }
+
+        return (signed, waiting);
+    }
+
+    private async Task<(int Fiscalised, int StillQueued)> RetrySalesAsync(long companyId, CancellationToken ct)
     {
         if (_fiscal is not { IsEnabled: true })
         {

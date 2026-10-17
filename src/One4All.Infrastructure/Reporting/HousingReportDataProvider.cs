@@ -1517,8 +1517,16 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             IReadOnlyDictionary<string, object?> Line(long applicantId, string outcome, string reason) => Row(("Run", run.RunNumber), ("Scheme", schemes.GetValueOrDefault(run.SchemeId, "?")),
                 ("Method", run.Method.ToString()), ("WaitingListNumber", applicants.GetValueOrDefault(applicantId)?.WaitingListNumber ?? "?"),
                 ("Applicant", applicants.GetValueOrDefault(applicantId)?.FullName ?? "?"), ("Outcome", outcome), ("Reason", reason));
-            rows.AddRange(run.Exclusions.Select(e => Line(e.ApplicantId, "Left out", e.Reason == ExclusionReason.Suspended
-                ? "Suspended for not confirming on the list" : "Already holds a live allocation from another run")));
+            rows.AddRange(run.Exclusions.Select(e => Line(e.ApplicantId, "Left out", e.Reason switch
+            {
+                ExclusionReason.Suspended => "Suspended for not confirming on the list",
+                ExclusionReason.SpouseHolds => "Spouse already holds a stand or a live allocation",
+                ExclusionReason.HoldsStand => "Already holds a stand (one beneficiary, one stand)",
+                ExclusionReason.DeclinedStand => "Declined or let lapse an offer of this stand",
+                ExclusionReason.CommitteeRejected => "Rejected by the committee" + (e.Note is null ? string.Empty : $": {e.Note}"),
+                ExclusionReason.CommitteeSkipped => "Substituted by the committee" + (e.Note is null ? string.Empty : $": {e.Note}"),
+                _ => "Already holds a live allocation from another run",
+            })));
             rows.AddRange(run.Allocations.Where(a => a.Status is AllocationStatus.Declined or AllocationStatus.Lapsed or AllocationStatus.Cancelled).OrderBy(a => a.Sequence)
                 .Select(a => Line(a.ApplicantId, a.Status.ToString(), a.Reason ?? (a.Status == AllocationStatus.Lapsed ? "Offer not accepted in time" : "—"))));
         }

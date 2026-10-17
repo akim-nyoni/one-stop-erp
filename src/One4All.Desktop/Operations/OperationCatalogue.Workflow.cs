@@ -93,6 +93,51 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Define a workflow", ListTitle = "Workflow definitions",
+            Description = "The approval route for a document type (brief §7): stages in order, each with its quorum, the value from which it applies, a condition on the document "
+                + "(e.g. Department = IT and Value > 5000), an approving role, named approvers, the requester's manager, and escalation after so many hours to someone. "
+                + "Stages are written one per line as sequence | name | quorum | from value | condition | role | approvers (comma-separated user names) | Manager or None | escalate hours | escalate to | group. "
+                + "Saving replaces the active definition for that document type (documents already in flight finish on the old one). Switch off/on by id with the Enable step.",
+            Fields = [Pick("Step", "Step", ["Define", "Enable", "Disable"]), Opt("DocumentType", "Document type (" + string.Join(", ", typeof(WorkflowDocumentTypes).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static).Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!)) + ", or your own)"), Opt("Name", "Workflow name"),
+                Opt("Stages", "Stages (one per line; see above)"), OptNum("Definition", "Definition id (enable / disable)")],
+            Run = async (c, i) =>
+            {
+                IWorkflowService workflow = c.Get<IWorkflowService>();
+                if (i.Text("Step") != "Define")
+                {
+                    long id = (long)(i.OptionalNumber("Definition") ?? throw new OperationException("Give the definition id (see the list)."));
+                    return Check(await workflow.SetDefinitionActiveAsync(c.CompanyId, id, i.Text("Step") == "Enable").ConfigureAwait(true), i.Text("Step") == "Enable" ? "Workflow enabled." : "Workflow disabled.");
+                }
+
+                List<WorkflowStageInput> stages = [];
+                foreach (string line in (i.Optional("Stages") ?? string.Empty).Split(['\n', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] p = [.. line.Split('|').Select(x => x.Trim())];
+                    string At(int index) => index < p.Length ? p[index] : string.Empty;
+                    if (p.Length < 2 || !int.TryParse(At(0), out int sequence))
+                    {
+                        throw new OperationException($"Stage line \"{line}\" needs at least sequence | name.");
+                    }
+
+                    stages.Add(new WorkflowStageInput(sequence, At(1), At(2).Length == 0 ? 1 : int.Parse(At(2), System.Globalization.CultureInfo.InvariantCulture),
+                        At(3).Length == 0 ? null : decimal.Parse(At(3), System.Globalization.CultureInfo.InvariantCulture), At(4).Length == 0 ? null : At(4), At(5).Length == 0 ? null : At(5),
+                        At(6).Length == 0 ? null : [.. At(6).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
+                        At(7).Equals("Manager", StringComparison.OrdinalIgnoreCase) || At(7).Equals("RequesterManager", StringComparison.OrdinalIgnoreCase) ? Core.Workflow.DynamicApprover.RequesterManager : Core.Workflow.DynamicApprover.None,
+                        At(8).Length == 0 ? null : int.Parse(At(8), System.Globalization.CultureInfo.InvariantCulture), At(9).Length == 0 ? null : At(9), At(10).Length == 0 ? null : At(10)));
+                }
+
+                long created = Check(await workflow.DefineAsync(c.CompanyId, new WorkflowDefinitionInput(i.Optional("DocumentType") ?? string.Empty, i.Optional("Name") ?? string.Empty, stages)).ConfigureAwait(true));
+                return $"Workflow {created} defined for {i.Optional("DocumentType")} with {stages.Count} stage(s); it routes new documents of that type from now.";
+            },
+            List = async c => Table(await c.Db.WorkflowDefinitions.AsNoTracking().Include(d => d.Stages).Where(d => d.CompanyId == c.CompanyId).OrderBy(d => d.DocumentType).ThenByDescending(d => d.Id)
+                    .ToListAsync().ConfigureAwait(true),
+                ("Id", d => d.Id), ("Document", d => d.DocumentType), ("Name", d => d.Name), ("Active", d => d.IsActive ? "yes" : "no"),
+                ("Stages", d => string.Join(" → ", d.Stages.Select(s => $"{s.Sequence} {s.Name} (×{s.Quorum}{(s.MinValue is decimal m ? $", from {m:N0}" : string.Empty)}"
+                    + $"{(s.RequiredRoleName is null ? string.Empty : $", role {s.RequiredRoleName}")}{(s.EligibleUserIds.Count == 0 ? string.Empty : $", {s.EligibleUserIds.Count} user(s)")}"
+                    + $"{(s.DynamicApprover == Core.Workflow.DynamicApprover.None ? string.Empty : ", manager")}{(s.EscalateAfterHours is int h ? $", escalates after {h} h" : string.Empty)})")))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Set a stage's rules", ListTitle = "Workflow stages",
             Description = "A condition (e.g. Department = IT and Value > 5000; ops = != > >= < <= in), a role whose holders approve, and/or the requester's manager.",
             Fields = [Num("Definition", "Workflow definition id"), Num("Stage", "Stage sequence"), Opt("Condition", "Condition"), Opt("Role", "Approving role"),

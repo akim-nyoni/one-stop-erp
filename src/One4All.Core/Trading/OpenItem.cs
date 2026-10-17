@@ -85,6 +85,15 @@ public sealed class OpenItem : AuditableEntity, ICompanyScoped
     /// <summary>The due date.</summary>
     public DateOnly DueDate { get; private set; }
 
+    /// <summary>The fiscal (e-invoicing) code the authority gave this invoice or credit note, or null.</summary>
+    public string? FiscalCode { get; set; }
+
+    /// <summary>The verification URL or signature on a signed invoice or credit note.</summary>
+    public string? FiscalVerification { get; set; }
+
+    /// <summary>Whether the invoice or credit note still waits for the fiscal device.</summary>
+    public bool FiscalQueued { get; set; }
+
     /// <summary>The transaction currency.</summary>
     public CurrencyCode Currency { get; private set; }
 

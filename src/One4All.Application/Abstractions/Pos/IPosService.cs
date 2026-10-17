@@ -16,7 +16,7 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="DiscountAccountCode">The account the discount posts to.</param>
 /// <param name="PromotionCode">The promotion(s) that gave it.</param>
 public readonly record struct PosSaleLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode,
-    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null);
+    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null, string? GiftCardNumber = null);
 
 /// <summary>A tender in a POS sale request.</summary>
 /// <param name="TenderType">The tender type.</param>

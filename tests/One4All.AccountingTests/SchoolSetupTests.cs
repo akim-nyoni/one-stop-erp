@@ -42,6 +42,11 @@ public sealed class SchoolSetupTests
         (await setup.SaveHostelAsync(companyId, "SS-H1", "Girls' hostel", 1, 300m, "4200")).IsSuccess.Should().BeTrue();
         (await setup.PlaceStudentAsync(companyId, "SS-1", "SS-H1", null)).IsSuccess.Should().BeTrue();
         (await setup.PlaceStudentAsync(companyId, "SS-2", "SS-H1", null)).Error.Code.Should().Be("School.HostelFull");
+        (await setup.SetSponsorAsync(companyId, "SS-2", "NO-SUCH")).Error.Code.Should().Be("School.SponsorNotFound");
+        (await setup.SetSponsorAsync(companyId, "SS-2", "ss-par2")).IsSuccess.Should().BeTrue();
+        (await db.Students.AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.AdmissionNumber == "SS-2")).SponsorCustomerId.Should().NotBeNull();
+        (await setup.SetSponsorAsync(companyId, "SS-2", null)).IsSuccess.Should().BeTrue();
+        (await db.Students.AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.AdmissionNumber == "SS-2")).SponsorCustomerId.Should().BeNull();
         (await db.Students.AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.AdmissionNumber == "SS-1")).IsBoarder.Should().BeTrue();
 
         TermBillResult term = (await scope.ServiceProvider.GetRequiredService<ISchoolBillingService>().BillTermAsync(companyId, structure, "SS-T1-", new DateOnly(2026, 1, 15))).Value;

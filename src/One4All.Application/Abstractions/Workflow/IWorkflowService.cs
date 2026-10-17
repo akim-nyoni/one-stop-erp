@@ -153,4 +153,44 @@ public interface IWorkflowService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or why not.</returns>
     Task<Result> SetStageRulesAsync(long companyId, long definitionId, int sequence, string? condition, string? roleName, One4All.Core.Workflow.DynamicApprover dynamicApprover, CancellationToken ct = default);
+
+    /// <summary>
+    /// Defines the workflow for a document type (brief §7: stages, quorum, value bands, conditions, approvers by user, role or the requester's manager,
+    /// SLA escalation). One definition is active per document type: an earlier one is kept for the documents already routed through it but switched off.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="definition">The definition.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The new definition's id, or why not (<c>Workflow.DefinitionInvalid</c>, <c>Workflow.RoleNotFound</c>, <c>Workflow.UserNotFound</c>, <c>Workflow.ConditionInvalid</c>).</returns>
+    Task<Result<long>> DefineAsync(long companyId, WorkflowDefinitionInput definition, CancellationToken ct = default);
+
+    /// <summary>Switches a definition on or off (off: new documents of its type are not routed; those in flight finish).</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="definitionId">The definition.</param>
+    /// <param name="active">On or off.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetDefinitionActiveAsync(long companyId, long definitionId, bool active, CancellationToken ct = default);
 }
+
+/// <summary>A stage of a workflow being defined.</summary>
+/// <param name="Sequence">Its order (1, 2, …).</param>
+/// <param name="Name">What the stage is called (Buyer, Finance, CFO).</param>
+/// <param name="Quorum">How many approvals it takes.</param>
+/// <param name="MinValue">The document value from which the stage applies (null: always).</param>
+/// <param name="Condition">A condition on the document's attributes (e.g. Department = IT and Value &gt; 5000), or null.</param>
+/// <param name="RoleName">A role whose holders may approve, or null.</param>
+/// <param name="Approvers">User names who may approve.</param>
+/// <param name="DynamicApprover">A dynamic approver (the requester's manager).</param>
+/// <param name="EscalateAfterHours">Hours before the stage escalates, or null.</param>
+/// <param name="EscalateTo">The user name escalated to, or null.</param>
+/// <param name="GroupName">A user group whose members may approve, or null.</param>
+public sealed record WorkflowStageInput(int Sequence, string Name, int Quorum = 1, decimal? MinValue = null, string? Condition = null, string? RoleName = null, IReadOnlyList<string>? Approvers = null,
+    One4All.Core.Workflow.DynamicApprover DynamicApprover = One4All.Core.Workflow.DynamicApprover.None, int? EscalateAfterHours = null, string? EscalateTo = null, string? GroupName = null);
+
+/// <summary>A workflow definition being saved.</summary>
+/// <param name="DocumentType">The document type it routes (<see cref="WorkflowDocumentTypes"/>, or a custom one).</param>
+/// <param name="Name">What the workflow is called.</param>
+/// <param name="Stages">Its stages in order.</param>
+/// <param name="Active">Whether it routes documents from now (default yes).</param>
+public sealed record WorkflowDefinitionInput(string DocumentType, string Name, IReadOnlyList<WorkflowStageInput> Stages, bool Active = true);

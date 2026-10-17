@@ -41,4 +41,12 @@ public interface ISchoolSetupService
 
     /// <summary>Puts a student into a hostel and/or onto a route (blank codes take them out), within capacity.</summary>
     Task<Result> PlaceStudentAsync(long companyId, string admissionNumber, string? hostelCode, string? routeCode, CancellationToken ct = default);
+
+    /// <summary>Names the sponsor (a customer account) billed for a student's fees instead of the guardian (brief §4.11 sponsor-paid accounts); blank takes the sponsor off.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="admissionNumber">The student.</param>
+    /// <param name="sponsorCustomerCode">The sponsor's customer code, or null/blank for none.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetSponsorAsync(long companyId, string admissionNumber, string? sponsorCustomerCode, CancellationToken ct = default);
 }

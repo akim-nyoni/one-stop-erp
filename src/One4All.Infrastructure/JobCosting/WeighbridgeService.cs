@@ -219,6 +219,30 @@ public sealed class WeighbridgeService : IWeighbridgeService
     public Task<Result<(long TicketId, string TicketNumber)>> FirstWeighAsync(FirstWeighRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => FirstWeighCoreAsync(request, ct), ct);
 
+    /// <inheritdoc />
+    public async Task<Result<long>> SaveVehicleAsync(long companyId, string registration, string? haulier, decimal? storedTareKg, decimal? maxGrossKg, bool active = true, CancellationToken ct = default)
+    {
+        string plate = (registration ?? string.Empty).Trim().ToUpperInvariant();
+        if (plate.Length == 0 || plate.Length > 20 || storedTareKg is < 0m || maxGrossKg is <= 0m || (storedTareKg is decimal tare && maxGrossKg is decimal gross && tare >= gross))
+        {
+            return Error.Validation("Wb.Vehicle", "A vehicle needs a registration (up to 20 characters); the stored tare is not negative and below the permitted gross.");
+        }
+
+        WeighbridgeVehicle? vehicle = await _db.WeighbridgeVehicles.FirstOrDefaultAsync(v => v.CompanyId == companyId && v.Registration == plate, ct).ConfigureAwait(false);
+        if (vehicle is null)
+        {
+            vehicle = new WeighbridgeVehicle(companyId, plate);
+            _db.WeighbridgeVehicles.Add(vehicle);
+        }
+
+        vehicle.Haulier = string.IsNullOrWhiteSpace(haulier) ? null : haulier.Trim();
+        vehicle.StoredTareKg = storedTareKg;
+        vehicle.MaxGrossKg = maxGrossKg;
+        vehicle.IsActive = active;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return vehicle.Id;
+    }
+
     // One unit of work: the ticket number and the ticket commit together.
     private async Task<Result<(long TicketId, string TicketNumber)>> FirstWeighCoreAsync(FirstWeighRequest request, CancellationToken ct)
     {

@@ -22,6 +22,24 @@ public sealed class SimulatedFiscalDeviceProvider : IFiscalDeviceProvider
     /// <summary>When true, the device behaves as if unreachable (fiscalisation is queued), for testing the retry path.</summary>
     public bool Offline { get; set; }
 
+    /// <summary>Gets the last day report submitted (what a real device would have received).</summary>
+    public FiscalDayReport? LastDayReport { get; private set; }
+
+    /// <summary>Gets every document signed, in order (kind, number and the reference it reverses).</summary>
+    public List<FiscalReceiptRequest> Signed { get; } = [];
+
+    /// <inheritdoc />
+    public Task<Result> SubmitDayReportAsync(FiscalDayReport report, CancellationToken ct = default)
+    {
+        if (Offline)
+        {
+            return Task.FromResult(Result.Failure(Error.Failure("Fiscal.Offline", "The fiscal device cannot be reached.")));
+        }
+
+        LastDayReport = report;
+        return Task.FromResult(Result.Success());
+    }
+
     /// <inheritdoc />
     public Task<Result<int>> OpenDayAsync(long companyId, CancellationToken ct = default)
     {
@@ -42,6 +60,7 @@ public sealed class SimulatedFiscalDeviceProvider : IFiscalDeviceProvider
             return Task.FromResult(Result.Success(new FiscalReceiptResult(null, null, null, Queued: true)));
         }
 
+        Signed.Add(request);
         (int day, int receipt, bool _) = _days.AddOrUpdate(request.CompanyId, _ => (1, 1, true), (_, d) => (d.Open ? d.Day : d.Day + 1, (d.Open ? d.Receipt : 0) + 1, true));
         string code = $"SIM-{day:D4}-{receipt:D6}";
         string payload = string.Create(CultureInfo.InvariantCulture, $"{request.CompanyId}|{request.DocumentNumber}|{request.TotalGross:0.00}|{request.TotalTax:0.00}|{request.Currency}|{code}");

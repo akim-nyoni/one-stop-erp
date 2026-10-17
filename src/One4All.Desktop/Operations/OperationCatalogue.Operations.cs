@@ -43,6 +43,18 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Vehicle register", ListTitle = "Vehicles",
+            Description = "The vehicles that use the weighbridge (brief §4.2): the haulier, the stored tare an outbound first weigh can take instead of weighing empty, the gross the vehicle may "
+                + "not exceed (an overload is flagged on the ticket), and whether it is barred from the bridge.",
+            Fields = [Req("Vehicle", "Registration"), Opt("Haulier", "Haulier"), OptNum("Tare", "Stored tare kg"), OptNum("MaxGross", "Permitted gross kg"), Tick("Active", "May use the bridge", true)],
+            Run = async (c, i) => Check(await c.Get<Application.Abstractions.JobCosting.IWeighbridgeService>().SaveVehicleAsync(c.CompanyId, i.Text("Vehicle"), i.Optional("Haulier"), i.OptionalNumber("Tare"),
+                i.OptionalNumber("MaxGross"), i.Flag("Active")).ConfigureAwait(true), id => $"Vehicle {i.Text("Vehicle").ToUpperInvariant()} saved (id {id})."),
+            List = async c => Table(await c.Db.WeighbridgeVehicles.AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderBy(v => v.Registration).ToListAsync().ConfigureAwait(true),
+                ("Vehicle", v => v.Registration), ("Haulier", v => v.Haulier ?? string.Empty), ("Stored tare kg", v => v.StoredTareKg?.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty),
+                ("Max gross kg", v => v.MaxGrossKg?.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty), ("Active", v => v.IsActive ? "yes" : "barred")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "First weigh (open a ticket)", ListTitle = "Tickets still on the bridge",
             Description = "Outbound loads weigh empty first (leave the weight blank to use the vehicle's stored tare); inbound loads weigh loaded first. A keyed weight needs a reason and another person's authority.",
             Fields = [Pick("Direction", "Direction", "Outbound", "Inbound"), Req("Vehicle", "Vehicle registration"), Req("Item", "Product (item code)"), Num("Density", "m³ per tonne", "0.6"), Today(),

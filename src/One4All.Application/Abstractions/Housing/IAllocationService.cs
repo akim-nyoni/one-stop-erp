@@ -50,6 +50,12 @@ public sealed record AllocationLine(int Sequence, string StandNumber, string Wai
 /// <param name="InputHash">The hash of the inputs.</param>
 /// <param name="Status">Where it stands.</param>
 /// <param name="Lines">The pairings.</param>
+/// <summary>The allocation committee's meeting (brief §4.10.4).</summary>
+/// <param name="Resolution">The minute or resolution reference.</param>
+/// <param name="MeetingDate">When the committee met.</param>
+/// <param name="Members">The members present.</param>
+public sealed record CommitteeMeeting(string Resolution, DateOnly? MeetingDate = null, string? Members = null);
+
 public sealed record AllocationRunView(string RunNumber, AllocationMethod Method, long? Seed, string InputHash, AllocationRunStatus Status, IReadOnlyList<AllocationLine> Lines);
 
 /// <summary>The result of re-verifying a draw.</summary>
@@ -95,6 +101,41 @@ public interface IAllocationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The approved list, or why it was refused.</returns>
     Task<Result<AllocationRunView>> ApproveByCommitteeAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, string committeeResolution, CancellationToken ct = default);
+
+    /// <summary>Approves a proposed run on the committee's decision, recording the meeting (minute reference, date, members present) on the run.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run.</param>
+    /// <param name="approverUserId">The approver (not the proposer).</param>
+    /// <param name="date">The approval date.</param>
+    /// <param name="offerDays">Days the offers stay open.</param>
+    /// <param name="meeting">The meeting.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The approved list, or why it was refused.</returns>
+    Task<Result<AllocationRunView>> ApproveByCommitteeAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CommitteeMeeting meeting, CancellationToken ct = default);
+
+    /// <summary>
+    /// The committee rejects one proposed pairing with a reason (brief §4.10.4): the applicant is recorded as rejected on the run, the stand stays
+    /// available (it can go in a substitution run), and the rest of the run goes on to approval.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run (still proposed).</param>
+    /// <param name="sequence">The pairing's sequence.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run as it now stands, or why not.</returns>
+    Task<Result<AllocationRunView>> RejectLineAsync(long companyId, string runNumber, int sequence, string reason, CancellationToken ct = default);
+
+    /// <summary>
+    /// The committee substitutes the next eligible applicant on the list for the one on a proposed pairing, stating why the skipped applicant was
+    /// skipped (kept on the run as an exclusion).
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="runNumber">The run (still proposed).</param>
+    /// <param name="sequence">The pairing's sequence.</param>
+    /// <param name="skipReason">Why the applicant is skipped.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The run as it now stands, or why not (<c>Hse.NoSubstitute</c> when nobody is left on the list).</returns>
+    Task<Result<AllocationRunView>> SubstituteLineAsync(long companyId, string runNumber, int sequence, string skipReason, CancellationToken ct = default);
 
     /// <summary>
     /// Swaps the stands of two allottees whose offers are live and whose stands are not yet sold, in the same scheme (brief §4.10.2): the

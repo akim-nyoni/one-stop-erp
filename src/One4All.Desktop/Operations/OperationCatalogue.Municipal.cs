@@ -163,6 +163,52 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Tariffs and versions", ListTitle = "Tariff versions",
+            Description = "A tariff and its effective-dated versions (brief §4.9): save a code with everything filled in to create it; save an existing code from a later date to add a version "
+                + "(blank fields carry over from the version before, blocks and seasons too). Stepped blocks as from-to:rate separated by ';' (top block open: 30-:1.2); seasonal rates as "
+                + "fromMonth-toMonth:rate (e.g. 5-8:0.9; 9-4:1.3). Withdraw takes a version out of force. Bills always use the version in force on the bill date.",
+            Fields = [Pick("Step", "Step", ["Save version", "Withdraw version"]), Req("Code", "Tariff code"), Today("From", "Effective from"), Opt("Name", "Name"), Pick("Service", "Service", Enum.GetNames<ServiceType>()),
+                Pick("Type", "Type", Enum.GetNames<TariffType>()), Opt("Account", "Revenue account"), OptNum("Fixed", "Fixed charge"), OptNum("Rate", "Per-unit rate"), OptNum("Minimum", "Minimum charge"),
+                OptNum("Cents", "Cents in the dollar of valuation"), OptNum("PerSqm", "Rate per square metre"), Pick("Category", "Consumer category", ["(as before)", .. Enum.GetNames<ConsumerCategory>()]),
+                Opt("Ward", "Ward (blank: as before; '-' all wards)"), Opt("Blocks", "Stepped blocks"), Opt("Seasons", "Seasonal rates")],
+            Run = async (c, i) =>
+            {
+                IMunicipalTariffService tariffs = c.Get<IMunicipalTariffService>();
+                if (i.Text("Step") == "Withdraw version")
+                {
+                    return Check(await tariffs.WithdrawVersionAsync(c.CompanyId, i.Text("Code"), i.Date("From")).ConfigureAwait(true), "Version withdrawn.");
+                }
+
+                static IReadOnlyList<TariffBlockInput>? Blocks(string? text) => text is null ? null : [.. text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(b =>
+                {
+                    string[] parts = b.Split(':', StringSplitOptions.TrimEntries);
+                    string[] range = parts.Length == 2 ? parts[0].Split('-', StringSplitOptions.TrimEntries) : [];
+                    return range.Length == 2 ? new TariffBlockInput(decimal.Parse(range[0], CultureInfo.InvariantCulture), range[1].Length == 0 ? null : decimal.Parse(range[1], CultureInfo.InvariantCulture),
+                        decimal.Parse(parts[1], CultureInfo.InvariantCulture)) : throw new OperationException($"Block '{b}' is not from-to:rate.");
+                })];
+                static IReadOnlyList<TariffSeasonInput>? Seasons(string? text) => text is null ? null : [.. text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s =>
+                {
+                    string[] parts = s.Split(':', StringSplitOptions.TrimEntries);
+                    string[] months = parts.Length == 2 ? parts[0].Split('-', StringSplitOptions.TrimEntries) : [];
+                    return months.Length == 2 ? new TariffSeasonInput(int.Parse(months[0], CultureInfo.InvariantCulture), int.Parse(months[1], CultureInfo.InvariantCulture), decimal.Parse(parts[1], CultureInfo.InvariantCulture))
+                        : throw new OperationException($"Season '{s}' is not fromMonth-toMonth:rate.");
+                })];
+                bool isNew = !await c.Db.Tariffs.AnyAsync(t => t.CompanyId == c.CompanyId && t.Code == i.Text("Code").Trim().ToUpper()).ConfigureAwait(true);
+                long id = Check(await tariffs.SaveVersionAsync(c.CompanyId, new TariffInput(i.Text("Code"), i.Date("From"), i.Optional("Name"),
+                    isNew ? Enum.Parse<ServiceType>(i.Text("Service")) : null, isNew ? Enum.Parse<TariffType>(i.Text("Type")) : null, i.Optional("Account"), i.OptionalNumber("Fixed"), i.OptionalNumber("Rate"),
+                    i.OptionalNumber("Minimum"), i.OptionalNumber("Cents"), i.OptionalNumber("PerSqm"), i.Text("Category") == "(as before)" ? null : Enum.Parse<ConsumerCategory>(i.Text("Category")),
+                    i.Optional("Ward") is string ward ? (ward.Trim() == "-" ? string.Empty : ward) : null, Blocks(i.Optional("Blocks")), Seasons(i.Optional("Seasons")))).ConfigureAwait(true));
+                return isNew ? $"Tariff {i.Text("Code").ToUpperInvariant()} created (id {id})." : $"Version of {i.Text("Code").ToUpperInvariant()} from {i.Date("From"):yyyy-MM-dd} saved (id {id}).";
+            },
+            List = async c => Table(await c.Db.Tariffs.AsNoTracking().Include(t => t.Blocks).Include(t => t.Seasons).Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ThenByDescending(t => t.EffectiveFrom)
+                    .ToListAsync().ConfigureAwait(true),
+                ("Tariff", t => t.Code), ("From", t => t.EffectiveFrom.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Name", t => t.Name), ("Service", t => t.ServiceType), ("Type", t => t.TariffType),
+                ("Fixed", t => M(t.FixedCharge)), ("Rate", t => t.PerUnitRate.ToString("0.####", CultureInfo.InvariantCulture)), ("Minimum", t => M(t.MinimumCharge)), ("Category", t => t.Category),
+                ("Ward", t => t.Ward ?? "all"), ("Blocks", t => string.Join("; ", t.Blocks.Select(b => $"{b.FromUnit:0.##}-{(b.ToUnit is decimal to ? to.ToString("0.##", CultureInfo.InvariantCulture) : string.Empty)}:{b.Rate:0.####}"))),
+                ("Seasons", t => string.Join("; ", t.Seasons.Select(s => $"{s.FromMonth}-{s.ToMonth}:{s.PerUnitRate:0.####}"))), ("In force", t => t.IsActive ? "yes" : "withdrawn")),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Tariff billing cycle", ListTitle = "Tariffs",
             Description = "How often a tariff is billed: monthly, quarterly, half-yearly or annually from a start month (e.g. 7 for a July rates year). Its amounts are per period; a period's "
                 + "charge is raised once by the first run in the period, or over monthly instalments from its start (the last takes the rounding), pro rata to the days the service is in place.",

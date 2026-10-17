@@ -213,8 +213,9 @@ public sealed class SaleLine : Entity
     /// <param name="discountAccountCode">The account the discount posts to.</param>
     /// <param name="promotionCode">The promotion(s) that gave it.</param>
     public SaleLine(long itemId, string description, long warehouseId, decimal quantity, decimal unitPrice, decimal lineNet, decimal taxAmount, string revenueAccountCode,
-        decimal promotionDiscount = 0m, string? discountAccountCode = null, string? promotionCode = null)
+        decimal promotionDiscount = 0m, string? discountAccountCode = null, string? promotionCode = null, string? giftCardNumber = null)
     {
+        GiftCardNumber = string.IsNullOrWhiteSpace(giftCardNumber) ? null : giftCardNumber.Trim().ToUpperInvariant();
         PromotionDiscount = promotionDiscount;
         DiscountAccountCode = discountAccountCode;
         PromotionCode = promotionCode;
@@ -263,6 +264,9 @@ public sealed class SaleLine : Entity
 
     /// <summary>The promotion(s) that gave the discount.</summary>
     public string? PromotionCode { get; private set; }
+
+    /// <summary>The gift card this line sold or topped up (its value went to the gift card liability), or null for goods.</summary>
+    public string? GiftCardNumber { get; private set; }
 }
 
 /// <summary>A tender of a POS <see cref="Sale"/> (<c>pos.sale_tender</c>).</summary>

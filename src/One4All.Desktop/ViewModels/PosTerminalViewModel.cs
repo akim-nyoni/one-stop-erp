@@ -1522,6 +1522,46 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await ShowOnDisplayAsync(devices, line.Description, line.LineGross).ConfigureAwait(true);
     }
 
+    /// <summary>
+    /// Sells or tops up a gift card on the ticket (brief §4.8.1: issued at POS, a liability): the card number in the gift card box and the value on the
+    /// number pad become a line on the GIFTCARD item posting to the gift card liability; printed stock activates and an active card tops up when the sale posts.
+    /// </summary>
+    [RelayCommand]
+    private void SellGiftCard()
+    {
+        string number = (VoucherNumber ?? string.Empty).Trim().ToUpperInvariant();
+        if (number.Length == 0)
+        {
+            StatusMessage = "Type or scan the gift card number in the gift card box first.";
+            return;
+        }
+
+        if (!TryEntry(out decimal value) || value <= 0m)
+        {
+            StatusMessage = "Type the card's value on the number pad.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(GiftCardAccountCode))
+        {
+            StatusMessage = "Set the gift card liability account under More › account settings first.";
+            return;
+        }
+
+        PosProductVm? product = _allProducts.FirstOrDefault(p => string.Equals(p.Tile?.Code, "GIFTCARD", StringComparison.OrdinalIgnoreCase));
+        if (product is null)
+        {
+            StatusMessage = "Add a non-stock item with code GIFTCARD (priced on the till's price list) to sell gift cards.";
+            return;
+        }
+
+        _ticket.AddGiftCardLine(product.ItemId, number, value, GiftCardAccountCode.Trim());
+        TenderEntry = string.Empty;
+        VoucherNumber = string.Empty;
+        RebuildCart();
+        StatusMessage = $"Gift card {number}: {value:N2} on the ticket (printed stock activates, an active card tops up, when the sale posts).";
+    }
+
     /// <summary>Sets the selected line's quantity to the weight on the scale (a settled weight only).</summary>
     [RelayCommand]
     private async Task WeighAsync()
@@ -2147,7 +2187,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         PosSaleEnvelope envelope = new(
             request.CompanyId, request.TerminalId, request.TillSessionId, request.CashierUserId,
             request.SaleNumber, request.SaleDate, request.WarehouseId, _currency.Value, request.TaxAccountCode,
-            request.Lines.Select(l => new PosSaleLineEnvelope(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode)).ToList(),
+            request.Lines.Select(l => new PosSaleLineEnvelope(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.GiftCardNumber)).ToList(),
             request.Tenders.Select(t => new PosTenderEnvelope(t.TenderType, t.Currency.Value, t.Amount, t.AccountCode, t.IsChange)).ToList(),
             request.AgeVerified, request.PrescriptionReference, request.TillSessionId == 0 ? _offlineSessionKey : null, request.Tip, request.TipsAccountCode);
 

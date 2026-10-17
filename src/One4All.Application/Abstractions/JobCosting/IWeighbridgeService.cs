@@ -175,4 +175,15 @@ public interface IWeighbridgeService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The ticket text, or why there is none.</returns>
     Task<Result<string>> RenderTicketAsync(long companyId, string ticketNumber, CancellationToken ct = default);
+
+    /// <summary>Registers a vehicle or changes its details (brief §4.2 vehicle register): haulier, stored tare, the gross it may not exceed, and whether it may use the bridge.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="registration">The registration.</param>
+    /// <param name="haulier">The haulier, or null.</param>
+    /// <param name="storedTareKg">The stored tare, or null for none.</param>
+    /// <param name="maxGrossKg">The permitted gross, or null for no check.</param>
+    /// <param name="active">Whether the vehicle may use the bridge.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The vehicle's id, or why not.</returns>
+    Task<Result<long>> SaveVehicleAsync(long companyId, string registration, string? haulier, decimal? storedTareKg, decimal? maxGrossKg, bool active = true, CancellationToken ct = default);
 }

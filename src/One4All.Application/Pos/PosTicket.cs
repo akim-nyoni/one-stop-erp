@@ -132,7 +132,10 @@ public sealed class PosTicketLine
     public string? PromotionAccountCode { get; private set; }
 
     /// <summary>Gets a value indicating whether promotions may price this line (no manual discount and no price override).</summary>
-    public bool TakesPromotions => Discount == 0m && !IsOverridden;
+    public bool TakesPromotions => Discount == 0m && !IsOverridden && GiftCardNumber is null;
+
+    /// <summary>The gift card this line sells or tops up, or null for goods.</summary>
+    public string? GiftCardNumber { get; internal set; }
 
     /// <summary>The net line value (quantity × unit price, less any discount), rounded to two decimals.</summary>
     public decimal LineNet => LineNetBeforeDiscount - Discount - PromotionDiscount;
@@ -385,9 +388,22 @@ public sealed class PosTicket
     /// <returns>The lines.</returns>
     public IReadOnlyList<PosSaleLineRequest> SaleLines(string? discountAccountCode = null)
         => [.. _lines.Select(l => l.PromotionDiscount > 0m
-            ? new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.PromotionDiscount, l.PromotionAccountCode, l.PromotionCode)
+            ? new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.PromotionDiscount, l.PromotionAccountCode, l.PromotionCode, l.GiftCardNumber)
             : new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode,
-                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null))];
+                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null, l.GiftCardNumber))];
+
+    /// <summary>Puts a gift card's sale or top-up on the ticket: one line of the card's value on the gift card item, posting to the gift card liability, no tax.</summary>
+    /// <param name="itemId">The gift card item.</param>
+    /// <param name="cardNumber">The card.</param>
+    /// <param name="value">The value loaded.</param>
+    /// <param name="liabilityAccountCode">The gift card liability account.</param>
+    /// <returns>The line.</returns>
+    public PosTicketLine AddGiftCardLine(long itemId, string cardNumber, decimal value, string liabilityAccountCode)
+    {
+        PosTicketLine line = AddLine(itemId, $"Gift card {cardNumber.Trim().ToUpperInvariant()}", value, 0m, liabilityAccountCode, null);
+        line.GiftCardNumber = cardNumber.Trim().ToUpperInvariant();
+        return line;
+    }
 
     /// <summary>The lines promotions may price (no manual discount or override), as the promotion engine's basket, in ticket order.</summary>
     /// <returns>The basket items.</returns>

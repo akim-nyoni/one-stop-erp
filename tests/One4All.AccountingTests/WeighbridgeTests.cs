@@ -45,6 +45,12 @@ public sealed class WeighbridgeTests
             new WeighbridgeVehicle(companyId, "abc123") { Haulier = "Haul Co", StoredTareKg = 10_000m, MaxGrossKg = 30_000m },
             new HaulageZone(companyId, "Z1", "Town", 0m, 10m, 2m, 30m), new HaulageZone(companyId, "Z2", "Country", 10m, 50m, 4m, 50m));
         await db.SaveChangesAsync();
+        IWeighbridgeService register = scope.ServiceProvider.GetRequiredService<IWeighbridgeService>();
+        (await register.SaveVehicleAsync(companyId, "xyz789", "Other Haul", 9_000m, 28_000m)).IsSuccess.Should().BeTrue();
+        (await register.SaveVehicleAsync(companyId, "XYZ789", "Other Haul", 30_000m, 28_000m)).Error.Code.Should().Be("Wb.Vehicle");
+        (await register.SaveVehicleAsync(companyId, "ABC123", "Haul Co", 10_500m, 30_000m, active: false)).IsSuccess.Should().BeTrue("an existing vehicle is updated in place");
+        (await db.WeighbridgeVehicles.AsNoTracking().Where(v => v.CompanyId == companyId).ToListAsync()).Should().HaveCount(2);
+        (await register.SaveVehicleAsync(companyId, "ABC123", "Haul Co", 10_000m, 30_000m)).IsSuccess.Should().BeTrue("back in use with the original tare for the rest of the test");
         IInventoryService inventory = scope.ServiceProvider.GetRequiredService<IInventoryService>();
         foreach ((Item item, Warehouse warehouse, decimal quantity, decimal cost) in new[] { (sand, pile, 100m, 5m), (cement, plant, 10m, 10m) })
         {

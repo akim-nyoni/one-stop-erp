@@ -142,6 +142,35 @@ public sealed class MasterDataChangeService : IMasterDataChangeService
         }
 
         string? before = Text(property.GetValue(record));
+        if (record is Core.Municipal.Tariff inForce && change.Field != nameof(Core.Municipal.Tariff.IsActive))
+        {
+            // A tariff is effective-dated (brief §4.9): the change is a new version from today, so the bills already raised keep the version they used.
+            DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+            if (inForce.EffectiveFrom < today)
+            {
+                Core.Municipal.Tariff version = new(inForce.CompanyId, inForce.Code, inForce.Name, inForce.ServiceType, inForce.TariffType, today, inForce.RevenueAccountCode)
+                {
+                    FixedCharge = inForce.FixedCharge, PerUnitRate = inForce.PerUnitRate, MinimumCharge = inForce.MinimumCharge, RatePerValuationCents = inForce.RatePerValuationCents,
+                    RatePerSquareMetre = inForce.RatePerSquareMetre, Category = inForce.Category, Ward = inForce.Ward,
+                };
+                version.SetCycle(inForce.Cycle, inForce.CycleStartMonth, inForce.Instalments);
+                await _db.Entry(inForce).Collection(t => t.Blocks).LoadAsync(ct).ConfigureAwait(false);
+                await _db.Entry(inForce).Collection(t => t.Seasons).LoadAsync(ct).ConfigureAwait(false);
+                foreach (Core.Municipal.TariffBlock block in inForce.Blocks)
+                {
+                    version.AddBlock(block.FromUnit, block.ToUnit, block.Rate);
+                }
+
+                foreach (Core.Municipal.TariffSeason season in inForce.Seasons)
+                {
+                    version.AddSeason(season.FromMonth, season.ToMonth, season.PerUnitRate);
+                }
+
+                _db.Tariffs.Add(version);
+                record = version;
+            }
+        }
+
         property.SetValue(record, value.Value);
         change.Applied(before, userId, _clock.UtcNow);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

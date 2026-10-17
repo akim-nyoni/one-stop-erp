@@ -133,4 +133,13 @@ public sealed class PosEvent : Entity, ICompanyScoped
 
     /// <summary>Gets or sets the outcome, for fiscal submissions (Accepted, Rejected: message, Pending).</summary>
     public string? Outcome { get; set; }
+
+    /// <summary>The fiscal code the device gave a refund or void receipt, or null.</summary>
+    public string? FiscalCode { get; set; }
+
+    /// <summary>The verification URL or signature on a signed refund or void.</summary>
+    public string? FiscalVerification { get; set; }
+
+    /// <summary>Whether a refund or void still waits for the fiscal device (the retry task sends it again).</summary>
+    public bool FiscalQueued { get; set; }
 }

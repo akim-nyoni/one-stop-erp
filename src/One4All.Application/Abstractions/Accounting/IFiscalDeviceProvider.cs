@@ -9,7 +9,48 @@ namespace One4All.Application.Abstractions.Accounting;
 /// <param name="TotalTax">The tax total.</param>
 /// <param name="Currency">The currency code.</param>
 /// <param name="IssuedAtUtc">When the document was issued.</param>
-public readonly record struct FiscalReceiptRequest(long CompanyId, string DocumentNumber, decimal TotalGross, decimal TotalTax, string Currency, DateTimeOffset IssuedAtUtc);
+/// <summary>What kind of document is being signed.</summary>
+public enum FiscalDocumentKind
+{
+    /// <summary>A till sale receipt.</summary>
+    Sale = 0,
+
+    /// <summary>A refund, void or return receipt (references the receipt it reverses).</summary>
+    Refund = 1,
+
+    /// <summary>A sales ledger tax invoice (e-invoicing).</summary>
+    Invoice = 2,
+
+    /// <summary>A sales ledger credit note (references the invoice it credits when known).</summary>
+    CreditNote = 3,
+}
+
+/// <summary>A document to sign: a sale, a refund (with the receipt it reverses), a tax invoice or a credit note.</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="DocumentNumber">The receipt, invoice or credit note number.</param>
+/// <param name="TotalGross">The total including tax.</param>
+/// <param name="TotalTax">The tax.</param>
+/// <param name="Currency">The currency.</param>
+/// <param name="IssuedAtUtc">When issued.</param>
+/// <param name="Kind">What kind of document.</param>
+/// <param name="ReferenceDocumentNumber">The document this one reverses or credits, when any.</param>
+/// <param name="CustomerTaxNumber">The buyer's tax number (an invoice or credit note).</param>
+public readonly record struct FiscalReceiptRequest(long CompanyId, string DocumentNumber, decimal TotalGross, decimal TotalTax, string Currency, DateTimeOffset IssuedAtUtc,
+    FiscalDocumentKind Kind = FiscalDocumentKind.Sale, string? ReferenceDocumentNumber = null, string? CustomerTaxNumber = null);
+
+/// <summary>The day's totals submitted with the fiscal day close (the Z report).</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="Date">The trading date.</param>
+/// <param name="SaleCount">Receipts signed.</param>
+/// <param name="SalesGross">Sales including tax.</param>
+/// <param name="SalesTax">Tax on sales.</param>
+/// <param name="RefundCount">Refund receipts.</param>
+/// <param name="RefundsGross">Refunds including tax.</param>
+/// <param name="VoidCount">Receipts voided.</param>
+/// <param name="VoidsGross">Voided receipts' value.</param>
+/// <param name="Currency">The currency.</param>
+public readonly record struct FiscalDayReport(long CompanyId, DateOnly Date, int SaleCount, decimal SalesGross, decimal SalesTax, int RefundCount, decimal RefundsGross, int VoidCount, decimal VoidsGross,
+    string Currency);
 
 /// <summary>The signed result returned by a fiscal device.</summary>
 /// <param name="FiscalCode">The device/receipt fiscal code.</param>
@@ -45,4 +86,10 @@ public interface IFiscalDeviceProvider
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or failure.</returns>
     Task<Result> CloseDayAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>Submits the day's totals (the Z report) before the day is closed; a device that has no such call accepts it.</summary>
+    /// <param name="report">The report.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SubmitDayReportAsync(FiscalDayReport report, CancellationToken ct = default) => Task.FromResult(Result.Success());
 }

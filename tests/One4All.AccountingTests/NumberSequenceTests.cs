@@ -40,6 +40,19 @@ public sealed class NumberSequenceTests
             // A different document type has its own independent counter.
             (await sequences.AllocateAsync(companyId, "PO", date)).Value.Should().Be("PO-00001");
             (await sequences.AllocateAsync(companyId, "AR.Invoice", date)).Value.Should().Be("AR.Invoice-00004");
+
+            // Configured: prefix, padding, yearly reset (the counter restarts for the year), gapless, a starting number that only moves forward.
+            (await sequences.ConfigureAsync(companyId, "Quote", null, new NumberSequenceSetup("QT-", 6, ResetYearly: true))).Value.Should().Match<NumberSequenceRow>(r => r.Prefix == "QT-" && r.Padding == 6 && r.ResetYearly && r.Gapless);
+            (await sequences.AllocateAsync(companyId, "Quote", date)).Value.Should().Be("QT-2026-000001");
+            (await sequences.AllocateAsync(companyId, "Quote", new DateOnly(2027, 1, 5))).Value.Should().Be("QT-2027-000001");
+            (await sequences.ConfigureAsync(companyId, "PO", null, new NumberSequenceSetup("PO-", 5, StartAt: 100))).IsSuccess.Should().BeTrue();
+            (await sequences.AllocateAsync(companyId, "PO", date)).Value.Should().Be("PO-00100");
+            (await sequences.ConfigureAsync(companyId, "PO", null, new NumberSequenceSetup("PO-", 5, StartAt: 50))).Error.Code.Should().Be("Sequence.StartBehind");
+            (await sequences.ConfigureAsync(companyId, "PO", null, new NumberSequenceSetup("TOO-LONG-A-PREFIX-FOR-SURE", 5))).Error.Code.Should().Be("Sequence.Setup");
+            (await sequences.ConfigureAsync(companyId, "PO", 999_999, new NumberSequenceSetup("PO-", 5))).Error.Code.Should().Be("Sequence.BranchNotFound");
+            (await sequences.ConfigureAsync(companyId, "GRN", null, new NumberSequenceSetup("GRN/", 4, Gapless: false))).Value.Gapless.Should().BeFalse();
+            (await sequences.AllocateAsync(companyId, "GRN", date)).Value.Should().Be("GRN/0001");
+            (await sequences.ListAsync(companyId)).Select(s => s.DocumentType).Should().Contain(["AR.Invoice", "Quote", "PO", "GRN"]);
         }
 
         // The counter survives across scopes (it is persisted).

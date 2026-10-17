@@ -28,8 +28,9 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     /// <param name="permissions">Checks who may override discounts, rates and budget blocks.</param>
     /// <param name="budget">The budget gate an invoice without an order passes at posting (brief §4.18.5).</param>
     public TradingService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Integration.IWebhookService? webhooks = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Budgeting.IBudgetGateService? budget = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Budgeting.IBudgetGateService? budget = null, IFiscalDeviceProvider? fiscal = null)
     {
+        _fiscal = fiscal;
         _budget = budget;
         _permissions = permissions;
         _db = db;
@@ -38,6 +39,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
+    private readonly IFiscalDeviceProvider? _fiscal;
     private readonly Application.Abstractions.Budgeting.IBudgetGateService? _budget;
 
     /// <inheritdoc />
@@ -338,7 +340,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         Result<TradingPostingResult> opened = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, itemType,
             LedgerSign.Debit, request.DocumentNumber, request.DocumentDate, customer.DueDateFor(request.DocumentDate),
-            request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
+            request.Currency, rate, gross, baseGross, request.Narrative, lines, ct, request.TaxAmount).ConfigureAwait(false);
 
         // The tax point, when delivery moves it off the invoice date.
         if (opened.IsSuccess && request.DeliveryDate is DateOnly delivered && TaxPoints.Determine(request.DocumentDate, delivered) is DateOnly point && point != request.DocumentDate)
@@ -831,7 +833,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.CreditNote,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
-            gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
+            gross, baseGross, request.Narrative, lines, ct, request.TaxAmount).ConfigureAwait(false);
         if (posted.IsSuccess && !string.IsNullOrWhiteSpace(request.ReasonCode))
         {
             OpenItem item = await _db.OpenItems.SingleAsync(i => i.Id == posted.Value.OpenItemId, ct).ConfigureAwait(false);
@@ -1436,7 +1438,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     private async Task<Result<TradingPostingResult>> PostAndOpenAsync(
         long companyId, string module, TradingLedger ledger, long traderId, OpenItemType itemType, LedgerSign sign,
         string documentNumber, DateOnly documentDate, DateOnly dueDate, CurrencyCode currency, decimal rate,
-        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct)
+        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct, decimal tax = 0m)
     {
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
@@ -1461,6 +1463,19 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             JournalEntryId = posting.Value.JournalId,
             Narrative = narrative,
         };
+
+        // E-invoicing (brief §3.5): a sales ledger tax invoice or credit note is signed by the fiscal device like a till receipt; unreachable means it waits for the retry task.
+        if (ledger == TradingLedger.AccountsReceivable && itemType is OpenItemType.Invoice or OpenItemType.CreditNote && _fiscal is { IsEnabled: true })
+        {
+            string? buyerTaxNumber = await _db.Customers.AsNoTracking().Where(c => c.Id == traderId).Select(c => c.TaxRegistration).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            FiscalReceiptResult? signed = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, documentNumber, amountTxn, tax, currency.Value, DateTimeOffset.UtcNow,
+                itemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice, null, buyerTaxNumber), ct).ConfigureAwait(false);
+            if (signed is FiscalReceiptResult result)
+            {
+                (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (result.FiscalCode, result.SignatureOrQr, result.Queued || result.FiscalCode is null);
+            }
+        }
+
         _db.OpenItems.Add(item);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 

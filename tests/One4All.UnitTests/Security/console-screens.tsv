@@ -1,6 +1,7 @@
 # Console module	Screen title	IsDocument	Area — a snapshot of One4All.Desktop.Operations.OperationCatalogue.All() (regenerate when screens are added)
 Approvals	Add an approver to a document	False	
 Approvals	Approve or reject several at once	False	
+Approvals	Define a workflow	False	
 Approvals	Delegate my approvals	False	
 Approvals	Email approval links	False	
 Approvals	Escalate overdue approvals	False	
@@ -259,6 +260,7 @@ Municipality	Service deposits	False
 Municipality	Stand location and meter details	False	
 Municipality	Tariff billing cycle	False	
 Municipality	Tariff catalogue	False	
+Municipality	Tariffs and versions	False	
 Municipality	Valuation roll	False	
 Point of Sale	Activate a gift card	False	
 Point of Sale	Category under a category	False	
@@ -419,6 +421,7 @@ System Manager	Language and terminology	False
 System Manager	Licence	False	
 System Manager	Load sample data for testing	False	
 System Manager	Manage webhooks	False	
+System Manager	Number sequences	False	
 System Manager	Payroll encryption	False	
 System Manager	Printers per workstation	False	
 System Manager	Quick search	False	
@@ -437,3 +440,4 @@ Weighbridge	Concrete slump and strength tests	False
 Weighbridge	First weigh (open a ticket)	False	
 Weighbridge	Invoice weighbridge loads	False	
 Weighbridge	Second weigh (complete a ticket)	False	
+Weighbridge	Vehicle register	False	

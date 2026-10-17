@@ -161,10 +161,12 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Allocation run", ListTitle = "Allocation runs",
-            Description = "Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify), approve it (someone else; offers go out with a deadline), "
-                + "cancel it, or verify a ballot's draw.",
-            Fields = [Pick("Step", "Step", ["Propose", "Approve", "Cancel", "Verify draw", "Swap stands"]), Opt("Stands", "Only these stands (substitution run; ',')"),
-                Opt("Resolution", "Committee resolution (approve)"), Opt("Certificate", "Certificate (swap)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
+            Description = "Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify); the committee rejects a pairing with a reason or "
+                + "substitutes the next applicant stating why the skipped one was skipped; approve it (someone else; offers go out with a deadline; with a resolution the meeting's date and "
+                + "members are kept), cancel it, or verify a ballot's draw.",
+            Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands"]), Opt("Stands", "Only these stands (substitution run; ',')"),
+                OptNum("Line", "Pairing sequence (reject / substitute)"), Opt("LineReason", "Reason (reject / substitute)"), Opt("Resolution", "Committee resolution (approve)"),
+                Opt("Meeting", "Meeting date yyyy-MM-dd (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
                 Opt("Reason", "Swap reason"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
                 Pick("Method", "Method", Enum.GetNames<AllocationMethod>()), OptNum("Seed", "Ballot seed (blank: random)"), Opt("Run", "Run number"), Today("Date", "Date"), Num("OfferDays", "Days to accept an offer", "30")],
             Run = async (c, i) =>
@@ -185,9 +187,14 @@ public static partial class OperationCatalogue
                             Seed = (long?)i.OptionalNumber("Seed"), AsAtDate = i.Date("Date"), UserId = c.UserId, OfferDays = i.Whole("OfferDays"),
                             StandNumbers = [.. (i.Optional("Stands") ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
                         }).ConfigureAwait(true)));
+                    case "Reject line":
+                        return Show(Check(await allocation.RejectLineAsync(c.CompanyId, i.Text("Run"), (int)(i.OptionalNumber("Line") ?? 0), i.Optional("LineReason") ?? string.Empty).ConfigureAwait(true)));
+                    case "Substitute line":
+                        return Show(Check(await allocation.SubstituteLineAsync(c.CompanyId, i.Text("Run"), (int)(i.OptionalNumber("Line") ?? 0), i.Optional("LineReason") ?? string.Empty).ConfigureAwait(true)));
                     case "Approve":
                         return Show(Check(await (i.Optional("Resolution") is string resolution
-                            ? allocation.ApproveByCommitteeAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"), resolution)
+                            ? allocation.ApproveByCommitteeAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"), new CommitteeMeeting(resolution,
+                                i.Optional("Meeting") is string meeting ? DateOnly.ParseExact(meeting, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null, i.Optional("Members")))
                             : allocation.ApproveAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"))).ConfigureAwait(true)));
                     case "Swap stands":
                         return Check(await allocation.SwapAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Optional("Other") ?? string.Empty, i.Date("Date"),
@@ -203,7 +210,8 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.Set<AllocationRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
                 ("Run", r => r.RunNumber), ("Scheme", r => r.SchemeId), ("Category", r => r.Category), ("Method", r => r.Method), ("Status", r => r.Status), ("Approved by", r => r.ApprovedByUserId),
-                ("Approved", r => r.ApprovedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture))),
+                ("Approved", r => r.ApprovedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Resolution", r => r.CommitteeResolution ?? string.Empty),
+                ("Meeting", r => r.MeetingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty), ("Members", r => r.CommitteeMembers ?? string.Empty)),
         };
         yield return new Operation
         {

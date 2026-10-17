@@ -149,6 +149,35 @@ public sealed class SchoolSetupService : ISchoolSetupService
     }
 
     /// <inheritdoc />
+    public async Task<Result> SetSponsorAsync(long companyId, string admissionNumber, string? sponsorCustomerCode, CancellationToken ct = default)
+    {
+        string number = Code(admissionNumber);
+        if (await _db.Students.FirstOrDefaultAsync(s => s.CompanyId == companyId && s.AdmissionNumber == number, ct).ConfigureAwait(false) is not Student student)
+        {
+            return Result.Failure(Error.NotFound("School.StudentNotFound", $"Student {number} not found."));
+        }
+
+        if (string.IsNullOrWhiteSpace(sponsorCustomerCode))
+        {
+            student.SponsorCustomerId = null;
+        }
+        else
+        {
+            string sponsor = Code(sponsorCustomerCode);
+            long? sponsorId = await _db.Customers.Where(c => c.CompanyId == companyId && c.Code == sponsor).Select(c => (long?)c.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (sponsorId is null)
+            {
+                return Result.Failure(Error.NotFound("School.SponsorNotFound", $"Sponsor account {sponsor} not found."));
+            }
+
+            student.SponsorCustomerId = sponsorId;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result> PlaceStudentAsync(long companyId, string admissionNumber, string? hostelCode, string? routeCode, CancellationToken ct = default)
     {
         string number = Code(admissionNumber);
