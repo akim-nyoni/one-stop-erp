@@ -72,6 +72,15 @@ public sealed class YearEndTests
             // The next fiscal year exists.
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             (await db.FiscalYears.AnyAsync(y => y.CompanyId == companyId && y.Code == "2027")).Should().BeTrue();
+
+            // The year-end pack (GL20, brief §14 report 20): the result before closing, the closing entries and the retained earnings they fed.
+            await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();
+            var pack = await scope.ServiceProvider.GetRequiredService<IReportRunner>().RenderAsync(companyId, "GL20",
+                new Dictionary<string, object?> { ["AsAtDate"] = new DateOnly(2026, 12, 31) }, ReportFormat.Csv);
+            pack.IsSuccess.Should().BeTrue(pack.IsFailure ? pack.Error.Message : null);
+            string csv = System.Text.Encoding.UTF8.GetString(pack.Value.Content);
+            csv.Should().Contain("Result,Net profit for the year,40.00").And.Contain("Trial balance (before closing),Total debits").And.Contain("Trial balance (after closing),Total debits")
+                .And.Contain("Closing entries,").And.Contain(" 3200 ").And.Contain("Retained earnings,Transferred from the closing journal,40.00");
         }
 
         // The closed year is locked: a further posting into it is rejected.

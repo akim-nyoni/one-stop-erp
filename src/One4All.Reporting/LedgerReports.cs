@@ -45,6 +45,13 @@ public static class LedgerReports
         yield return Listing("GL10", "Notes to the Accounts Schedules", "GeneralLedger", "Accounts grouped by their note reference: opening balance, the period's movement and closing balance, with a total per note.",
             "GledNotes", [new Column("Note", "Note", 50), new Column("Account", "Account", 70), new Column("Name", "Name", 200), new Column("Opening", "Opening", 100), new Column("Movement", "Movement", 100),
              new Column("Closing", "Closing", 100, true)], Period);
+        yield return Listing("GL11-CC", "Management Accounts - P&L by Department & Cost Centre vs Budget", "GeneralLedger", "Each income and expense account per department and cost centre: "
+            + "actual for the period against the active budget, the variance (favourable positive) and % variance, then the year to date against budget, the full-year budget and a "
+            + "full-year forecast (year-to-date actual plus the budget still to come).",
+            "GledManagementByCostCentre", [new Column("Department", "Department", 70), new Column("CostCentre", "Cost centre", 70), new Column("Account", "Account", 60),
+             new Column("Name", "Name", 140), new Column("Actual", "Actual", 85), new Column("Budget", "Budget", 85), new Column("Variance", "Variance", 80),
+             new Column("VariancePercent", "Var %", 50), new Column("YtdActual", "YTD actual", 85), new Column("YtdBudget", "YTD budget", 85), new Column("FullYearBudget", "Full-year budget", 90),
+             new Column("Forecast", "Forecast", 90, true)], Period);
         yield return Listing("GL11", "Management Accounts Pack", "GeneralLedger", "Results for the period and the year to date, the financial position at the end date and the working-capital balances.",
             "GledManagementPack", [new Column("Section", "Section", 120), new Column("Item", "Item", 220), new Column("Period", "Period", 110), new Column("YearToDate", "Year to date / at date", 120)], Period);
         yield return Listing("GL12", "Budget vs Actual vs Commitment", "GeneralLedger", "Year to date per budgeted account and department: budget, actual, open commitments, what is still available and the share used.",
@@ -70,7 +77,8 @@ public static class LedgerReports
             + "close check with its count, value and whether it blocks.", "GledCloseStatus",
             [new Column("Period", "Period", 70), new Column("Ends", "Ends", 75), new Column("Status", "Status", 150), new Column("Ready", "Ready", 55), new Column("Check", "Check", 170),
              new Column("Count", "Count", 50), new Column("Value", "Value", 90), new Column("Blocking", "Blocks", 50), new Column("Detail", "Detail", 220)], [("AsAtDate", ParameterType.Date)]);
-        yield return Listing("GL20", "Year-End Pack", "GeneralLedger", "For the year containing the date: the close checklist, the trial balance totals, the result for the year and the year's journals by source.",
+        yield return Listing("GL20", "Year-End Pack", "GeneralLedger", "For the year containing the date: the close checklist, the trial balance before and after the closing journals, the result for the year, every closing entry, "
+            + "the retained earnings movement and the year's journals by source.",
             "GledYearEnd", [new Column("Section", "Section", 110), new Column("Item", "Item", 260), new Column("Value", "Value", 160)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("GL22", "Recurring Journals Due & Missed", "GeneralLedger", "Each active recurring template's last posted month against the date: posted, due or missed.",
             "GledRecurringDue", [new Column("Code", "Code", 80), new Column("Description", "Description", 180), new Column("LastPosted", "Last posted", 75), new Column("Status", "Status", 120),

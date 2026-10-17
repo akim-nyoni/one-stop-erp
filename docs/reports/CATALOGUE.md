@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-610 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+611 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -163,6 +163,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL1 | Trial Balance - Comparative | Account balances at the date beside the same date a year earlier, with the change; both columns balance (the summary by account type is GL-TBTYPE). | AsAtDate (Date, optional) | Account, Name, Type, Debit, Credit, PriorDebit, PriorCredit, Change | - | Sum(Change) |
 | GL10 | Notes to the Accounts Schedules | Accounts grouped by their note reference: opening balance, the period's movement and closing balance, with a total per note. | FromDate (Date, optional), ToDate (Date, optional) | Note, Account, Name, Opening, Movement, Closing | - | Sum(Closing) |
 | GL11 | Management Accounts Pack | Results for the period and the year to date, the financial position at the end date and the working-capital balances. | FromDate (Date, optional), ToDate (Date, optional) | Section, Item, Period, YearToDate | - | - |
+| GL11-CC | Management Accounts - P&L by Department & Cost Centre vs Budget | Each income and expense account per department and cost centre: actual for the period against the active budget, the variance (favourable positive) and % variance, then the year to date against budget, the full-year budget and a full-year forecast (year-to-date actual plus the budget still to come). | FromDate (Date, optional), ToDate (Date, optional) | Department, CostCentre, Account, Name, Actual, Budget, Variance, VariancePercent, YtdActual, YtdBudget, FullYearBudget, Forecast | - | Sum(Forecast) |
 | GL12 | Budget vs Actual vs Commitment | Year to date per budgeted account and department: budget, actual, open commitments, what is still available and the share used. | AsAtDate (Date, optional) | Account, Name, Department, Budget, Actual, Committed, Used, Available | - | Sum(Available) |
 | GL14 | Consolidation Elimination Schedule | Every intercompany document across the group in the period: each side's amount, and whether it eliminates or is unmatched. | FromDate (Date, optional), ToDate (Date, optional) | Document, Date, FromCompany, FromAmount, ToCompany, ToAmount, Status, Eliminated | - | Sum(Eliminated) |
 | GL15 | FX Revaluation Report | Unrealised revaluations of foreign-currency balances (ledger and trading) in the period, by account. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Type, Narrative, Account, Amount | - | Sum(Amount) |
@@ -171,7 +172,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL18 | Control Reconciliation - VAT and Bank | Tax accounts against the tax-coded postings, and each bank account's ledger balance against its statement, with what explains the gap. | AsAtDate (Date, optional) | Control, Account, Ledger, Other, Explained, Difference | - | Sum(Difference) |
 | GL19 | Period Close Checklist & Status | Each period of the year to the date: its status per module, whether it is ready to close, and every close check with its count, value and whether it blocks. | AsAtDate (Date, optional) | Period, Ends, Status, Ready, Check, Count, Value, Blocking, Detail | - | - |
 | GL2 | Trial Balance - Multi-currency | Posted balances as at the date per account and transaction currency, in transaction and base. | AsAtDate (Date, optional) | Account, Name, Currency, Transaction, Base | - | Sum(Base) |
-| GL20 | Year-End Pack | For the year containing the date: the close checklist, the trial balance totals, the result for the year and the year's journals by source. | AsAtDate (Date, optional) | Section, Item, Value | - | - |
+| GL20 | Year-End Pack | For the year containing the date: the close checklist, the trial balance before and after the closing journals, the result for the year, every closing entry, the retained earnings movement and the year's journals by source. | AsAtDate (Date, optional) | Section, Item, Value | - | - |
 | GL22 | Recurring Journals Due & Missed | Each active recurring template's last posted month against the date: posted, due or missed. | AsAtDate (Date, optional) | Code, Description, LastPosted, Status, Value, Schedule | - | Sum(Value) |
 | GL23 | Accruals, Prepayments & Deferred Income Schedule | Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Reference, Date, Detail, Recognised, Amount | - | Sum(Amount) |
 | GL24 | Intercompany Balances & Reconciliation | Intercompany journals in the period and whether the counterparty company holds the mirror entry. | FromDate (Date, optional), ToDate (Date, optional) | Document, Date, Narrative, Counterparty, Status, Amount | - | Sum(Amount) |

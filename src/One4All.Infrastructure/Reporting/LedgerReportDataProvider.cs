@@ -58,6 +58,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             "GLEDACCRUALS" => await AccrualsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDNOTES" => await NotesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDMANAGEMENTPACK" => await ManagementPackAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDMANAGEMENTBYCOSTCENTRE" => await ManagementByCostCentreAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDELIMINATIONS" => await EliminationsAsync(fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDCONTROLLEGS" => await ControlLegsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDYEAREND" => await YearEndAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -390,6 +391,98 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         return rows;
     }
 
+    // GL11-CC: the brief's management accounts (§14 report 11) - P&L by department and cost centre with budget, variance, % variance, YTD and forecast.
+    // Amounts are in their natural sign (income as credits, expense as debits) so a variance is favourable when positive.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ManagementByCostCentreAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Core.System.FiscalYear? year = await _db.FiscalYears.AsNoTracking().FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= toDate && y.EndDate >= toDate, ct).ConfigureAwait(false);
+        if (year is null)
+        {
+            return [];
+        }
+
+        List<Core.System.FiscalPeriod> periods = await _db.Set<Core.System.FiscalPeriod>().AsNoTracking().Where(p => p.FiscalYearId == year.Id).OrderBy(p => p.PeriodNumber).ToListAsync(ct).ConfigureAwait(false);
+        int current = periods.FirstOrDefault(p => p.StartDate <= toDate && p.EndDate >= toDate)?.PeriodNumber ?? periods.Select(p => p.PeriodNumber).DefaultIfEmpty(12).Max();
+        HashSet<int> inPeriod = [.. periods.Where(p => p.EndDate >= fromDate && p.StartDate <= toDate).Select(p => p.PeriodNumber)];
+        Dictionary<string, (string Name, AccountType Type)> accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && (a.Type == AccountType.Income || a.Type == AccountType.Expense))
+            .ToDictionaryAsync(a => a.AccountCode, a => (a.Name, a.Type), StringComparer.Ordinal, ct).ConfigureAwait(false);
+        static string Dim(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim();
+
+        var budget = await (from l in _db.Set<BudgetLine>().AsNoTracking()
+                            join b in _db.Set<Budget>().AsNoTracking() on l.BudgetId equals b.Id
+                            where b.CompanyId == companyId && b.FiscalYearId == year.Id && b.IsActive
+                            select new { b.Department, l.CostCentre, l.AccountCode, l.Period, l.Amount }).ToListAsync(ct).ConfigureAwait(false);
+        DateOnly start = year.StartDate < fromDate ? year.StartDate : fromDate;
+        var actual = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                            join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                            where j.CompanyId == companyId && j.Status == JournalStatus.Posted && j.PostingDate >= start && j.PostingDate <= toDate
+                            select new { l.Department, l.CostCentre, l.AccountCode, j.PostingDate, Net = l.BaseDebit - l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
+
+        Dictionary<(string Department, string CostCentre, string Account), decimal[]> cells = [];
+        decimal[] Cell(string? department, string? costCentre, string account)
+        {
+            (string, string, string) key = (Dim(department), Dim(costCentre), account);
+            if (!cells.TryGetValue(key, out decimal[]? values))
+            {
+                values = new decimal[5]; // actual, budget, YTD actual, YTD budget, full-year budget
+                cells[key] = values;
+            }
+
+            return values;
+        }
+
+        foreach (var line in actual.Where(a => accounts.ContainsKey(a.AccountCode)))
+        {
+            decimal natural = accounts[line.AccountCode].Type == AccountType.Income ? -line.Net : line.Net;
+            decimal[] cell = Cell(line.Department, line.CostCentre, line.AccountCode);
+            if (line.PostingDate >= fromDate)
+            {
+                cell[0] += natural;
+            }
+
+            if (line.PostingDate >= year.StartDate)
+            {
+                cell[2] += natural;
+            }
+        }
+
+        foreach (var line in budget.Where(b => accounts.ContainsKey(b.AccountCode)))
+        {
+            decimal[] cell = Cell(line.Department, line.CostCentre, line.AccountCode);
+            cell[4] += line.Amount;
+            if (inPeriod.Contains(line.Period))
+            {
+                cell[1] += line.Amount;
+            }
+
+            if (line.Period <= current)
+            {
+                cell[3] += line.Amount;
+            }
+        }
+
+        List<KeyValuePair<(string Department, string CostCentre, string Account), decimal[]>> ordered = [.. cells.Where(c => c.Value.Any(v => v != 0m))
+            .OrderBy(c => c.Key.Department, StringComparer.Ordinal).ThenBy(c => c.Key.CostCentre, StringComparer.Ordinal)
+            .ThenBy(c => accounts[c.Key.Account].Type).ThenBy(c => c.Key.Account, StringComparer.Ordinal)];
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (KeyValuePair<(string Department, string CostCentre, string Account), decimal[]> cell in ordered)
+        {
+            decimal[] v = cell.Value;
+            bool income = accounts[cell.Key.Account].Type == AccountType.Income;
+            decimal variance = income ? v[0] - v[1] : v[1] - v[0];
+            string percent = v[1] == 0m ? "-" : (variance * 100m / Math.Abs(v[1])).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%";
+            Dictionary<string, object?> row = new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["Department"] = cell.Key.Department, ["CostCentre"] = cell.Key.CostCentre, ["Account"] = cell.Key.Account, ["Name"] = accounts[cell.Key.Account].Name,
+                ["Actual"] = v[0], ["Budget"] = v[1], ["Variance"] = variance, ["VariancePercent"] = percent,
+                ["YtdActual"] = v[2], ["YtdBudget"] = v[3], ["FullYearBudget"] = v[4], ["Forecast"] = v[2] + (v[4] - v[3]),
+            };
+            rows.Add(row);
+        }
+
+        return rows;
+    }
+
     private static string Margin(decimal income, decimal expense)
         => income == 0m ? "-" : ((income - expense) / income * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%";
 
@@ -459,16 +552,57 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         }
 
         List<LedgerAccount> accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
-        var balances = await PostedLines(companyId, DateOnly.MinValue, year.EndDate).GroupBy(l => l.AccountCode).Select(g => new { g.Key, Debit = g.Sum(l => l.BaseDebit), Credit = g.Sum(l => l.BaseCredit) })
-            .ToListAsync(ct).ConfigureAwait(false);
-        Add("Trial balance", "Total debits", Money(balances.Sum(b => Math.Max(0m, b.Debit - b.Credit))));
-        Add("Trial balance", "Total credits", Money(balances.Sum(b => Math.Max(0m, b.Credit - b.Debit))));
-        var movement = await PostedLines(companyId, year.StartDate, year.EndDate).GroupBy(l => l.AccountCode).Select(g => new { g.Key, Net = g.Sum(l => l.BaseDebit - l.BaseCredit) }).ToListAsync(ct).ConfigureAwait(false);
+        // The closing journals (brief §14 report 20): the trial balance before and after them, the entries themselves and the retained earnings they feed.
+        List<long> closing = await _db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.DocumentType == "YearEndClose" && j.Status == JournalStatus.Posted
+            && j.PostingDate >= year.StartDate && j.PostingDate <= year.EndDate).Select(j => j.Id).ToListAsync(ct).ConfigureAwait(false);
+        var balances = await PostedLines(companyId, DateOnly.MinValue, year.EndDate).GroupBy(l => new { l.AccountCode, Closing = closing.Contains(l.JournalEntryId) })
+            .Select(g => new { g.Key.AccountCode, g.Key.Closing, Net = g.Sum(l => l.BaseDebit - l.BaseCredit) }).ToListAsync(ct).ConfigureAwait(false);
+        void Totals(string section, bool withClosing)
+        {
+            List<decimal> nets = [.. balances.Where(b => withClosing || !b.Closing).GroupBy(b => b.AccountCode).Select(g => g.Sum(b => b.Net))];
+            Add(section, "Total debits", Money(nets.Sum(n => Math.Max(0m, n))));
+            Add(section, "Total credits", Money(nets.Sum(n => Math.Max(0m, -n))));
+        }
+
+        Totals("Trial balance (before closing)", false);
+        Totals("Trial balance (after closing)", true);
+        var movement = await PostedLines(companyId, year.StartDate, year.EndDate).Where(l => !closing.Contains(l.JournalEntryId)).GroupBy(l => l.AccountCode)
+            .Select(g => new { g.Key, Net = g.Sum(l => l.BaseDebit - l.BaseCredit) }).ToListAsync(ct).ConfigureAwait(false);
         decimal Of(AccountType type) => movement.Where(m => accounts.Any(a => a.AccountCode == m.Key && a.Type == type)).Sum(m => m.Net);
         decimal income = -Of(AccountType.Income), expense = Of(AccountType.Expense);
         Add("Result", "Income", Money(income));
         Add("Result", "Expenses", Money(expense));
         Add("Result", "Net profit for the year", Money(income - expense));
+
+        var entries = await (from l in _db.Set<JournalLine>().AsNoTracking() join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                             where closing.Contains(j.Id) orderby j.JournalNumber, l.AccountCode
+                             select new { j.JournalNumber, l.AccountCode, l.BaseDebit, l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, string> names = accounts.ToDictionary(a => a.AccountCode, a => a.Name, StringComparer.Ordinal);
+        if (entries.Count == 0)
+        {
+            Add("Closing entries", "None yet: the year has not been closed", "-");
+        }
+
+        foreach (var entry in entries)
+        {
+            Add("Closing entries", $"{entry.JournalNumber} {entry.AccountCode} {names.GetValueOrDefault(entry.AccountCode, "?")}",
+                entry.BaseDebit != 0m ? "Dr " + Money(entry.BaseDebit) : "Cr " + Money(entry.BaseCredit));
+        }
+
+        // Retained earnings: the retained-earnings control accounts and any equity account the closing journal credits.
+        HashSet<string> retained = [.. accounts.Where(a => a.ControlAccountType == ControlAccountType.RetainedEarnings).Select(a => a.AccountCode)];
+        retained.UnionWith(entries.Where(e => accounts.Any(a => a.AccountCode == e.AccountCode && a.Type == AccountType.Equity)).Select(e => e.AccountCode));
+        if (retained.Count > 0)
+        {
+            decimal opening = -await PostedLines(companyId, DateOnly.MinValue, year.StartDate.AddDays(-1)).Where(l => retained.Contains(l.AccountCode))
+                .SumAsync(l => l.BaseDebit - l.BaseCredit, ct).ConfigureAwait(false);
+            decimal other = -balances.Where(b => retained.Contains(b.AccountCode) && !b.Closing).Sum(b => b.Net) - opening;
+            decimal transferred = -balances.Where(b => retained.Contains(b.AccountCode) && b.Closing).Sum(b => b.Net);
+            Add("Retained earnings", $"Balance at {Date(year.StartDate)} ({string.Join(", ", retained.Order(StringComparer.Ordinal))})", Money(opening));
+            Add("Retained earnings", "Other movements in the year", Money(other));
+            Add("Retained earnings", "Transferred from the closing journal", Money(transferred));
+            Add("Retained earnings", $"Balance at {Date(year.EndDate)}", Money(opening + other + transferred));
+        }
         foreach (var source in (await _db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.PostingDate >= year.StartDate && j.PostingDate <= year.EndDate)
                      .GroupBy(j => new { j.SourceModule, j.Status }).Select(g => new { g.Key.SourceModule, g.Key.Status, Count = g.Count() }).ToListAsync(ct).ConfigureAwait(false))
                      .OrderBy(s => s.SourceModule, StringComparer.Ordinal).ThenBy(s => s.Status))
