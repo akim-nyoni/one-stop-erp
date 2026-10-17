@@ -45,6 +45,8 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             "GLEDMULTICURRENCYTB" => await MultiCurrencyTbAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDREPORTINGTB" => await ReportingTbAsync(companyId, asAt, ct).ConfigureAwait(false),
             "GLEDJOURNALS" => await JournalsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "GLEDCOMPARATIVETB" => await ComparativeTrialBalanceAsync(companyId, asAt, ct).ConfigureAwait(false),
+            "GLEDDIRECTCASHFLOW" => await DirectCashFlowAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDNOMINALACTIVITY" => await NominalActivityAsync(companyId, parameters.TryGetValue("AccountCode", out object? account) ? account?.ToString() : null, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDEQUITY" => await EquityAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "GLEDBUDGETCOMMITMENT" => await BudgetCommitmentAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -494,6 +496,95 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
     private static string Money(decimal amount) => amount.ToString("N2", CultureInfo.InvariantCulture);
+
+    // GL1: the trial balance at the date beside the same date a year earlier (brief §14 report 1, "comparative prior year").
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ComparativeTrialBalanceAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        IGeneralLedgerReports reports = _services.GetRequiredService<IGeneralLedgerReports>();
+        TrialBalanceReport current = await reports.TrialBalanceAsync(companyId, asAt, ct).ConfigureAwait(false);
+        TrialBalanceReport prior = await reports.TrialBalanceAsync(companyId, asAt.AddYears(-1), ct).ConfigureAwait(false);
+        Dictionary<string, TrialBalanceRow> now = current.Rows.ToDictionary(r => r.AccountCode, StringComparer.Ordinal);
+        Dictionary<string, TrialBalanceRow> then = prior.Rows.ToDictionary(r => r.AccountCode, StringComparer.Ordinal);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (string code in now.Keys.Union(then.Keys).Order(StringComparer.Ordinal))
+        {
+            TrialBalanceRow? a = now.GetValueOrDefault(code), b = then.GetValueOrDefault(code);
+            TrialBalanceRow any = a ?? b!;
+            decimal change = ((a?.Debit ?? 0m) - (a?.Credit ?? 0m)) - ((b?.Debit ?? 0m) - (b?.Credit ?? 0m));
+            rows.Add(Row(("Account", code), ("Name", any.AccountName), ("Type", any.Type.ToString()), ("Debit", a?.Debit ?? 0m), ("Credit", a?.Credit ?? 0m),
+                ("PriorDebit", b?.Debit ?? 0m), ("PriorCredit", b?.Credit ?? 0m), ("Change", change)));
+        }
+
+        rows.Add(Row(("Account", string.Empty), ("Name", "Total"), ("Type", string.Empty), ("Debit", current.TotalDebit), ("Credit", current.TotalCredit),
+            ("PriorDebit", prior.TotalDebit), ("PriorCredit", prior.TotalCredit), ("Change", 0m)));
+        return rows;
+    }
+
+    // GL-CFD: the direct method (brief §14 report 9). In every posted journal that moves a cash account, each other line's opposite amount is the cash it
+    // brought in or paid out, so the lines classified below add up exactly to the change in cash. Transfers between cash accounts net out.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> DirectCashFlowAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        var accounts = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId)
+            .Select(a => new { a.AccountCode, a.Name, a.Type, a.CashFlowCategory, a.ControlAccountType }).ToDictionaryAsync(a => a.AccountCode, StringComparer.Ordinal, ct).ConfigureAwait(false);
+        HashSet<string> cash = [.. accounts.Values.Where(a => a.CashFlowCategory == CashFlowCategory.CashAndEquivalents).Select(a => a.AccountCode)];
+        if (cash.Count == 0)
+        {
+            return [Row(("Section", "-"), ("Line", "No account is tagged cash and equivalents; tag the cash and bank accounts first"), ("Amount", null))];
+        }
+
+        decimal opening = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                                 join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                                 where j.CompanyId == companyId && j.Status == JournalStatus.Posted && j.PostingDate < fromDate && cash.Contains(l.AccountCode)
+                                 select l.BaseDebit - l.BaseCredit).SumAsync(ct).ConfigureAwait(false);
+        var lines = await (from l in _db.Set<JournalLine>().AsNoTracking()
+                           join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                           where j.CompanyId == companyId && j.Status == JournalStatus.Posted && j.PostingDate >= fromDate && j.PostingDate <= toDate
+                           select new { l.JournalEntryId, l.AccountCode, Net = l.BaseDebit - l.BaseCredit, j.SourceModule }).ToListAsync(ct).ConfigureAwait(false);
+        string[] order = ["Operating", "Investing", "Financing"];
+        Dictionary<(string Section, string Line), decimal> flows = [];
+        decimal change = 0m;
+        foreach (var journal in lines.GroupBy(l => l.JournalEntryId))
+        {
+            if (!journal.Any(l => cash.Contains(l.AccountCode)))
+            {
+                continue;
+            }
+
+            change += journal.Where(l => cash.Contains(l.AccountCode)).Sum(l => l.Net);
+            foreach (var line in journal.Where(l => !cash.Contains(l.AccountCode) && l.Net != 0m))
+            {
+                decimal effect = -line.Net;
+                var account = accounts.GetValueOrDefault(line.AccountCode);
+                string module = (line.SourceModule ?? string.Empty).ToUpperInvariant();
+                (string Section, string Line) key = account?.CashFlowCategory switch
+                {
+                    CashFlowCategory.Investing => ("Investing", account.Name),
+                    CashFlowCategory.Financing => ("Financing", account.Name),
+                    _ when account?.ControlAccountType is ControlAccountType.VatInput or ControlAccountType.VatOutput => ("Operating", "Taxes (VAT) paid and refunded"),
+                    _ when account?.ControlAccountType == ControlAccountType.AccountsReceivable || module is "AR" or "RC" or "RES" => ("Operating", "Receipts from customers"),
+                    _ when account?.ControlAccountType == ControlAccountType.AccountsPayable || module is "AP" or "POP" => ("Operating", "Payments to suppliers"),
+                    _ when module is "PAY" or "PR" => ("Operating", "Payments to and for employees"),
+                    _ when account?.Type == AccountType.Income => ("Operating", "Cash sales and other income received"),
+                    _ when account?.Type == AccountType.Expense => ("Operating", "Expenses paid in cash"),
+                    _ => ("Operating", effect > 0m ? "Other operating receipts" : "Other operating payments"),
+                };
+                flows[key] = flows.GetValueOrDefault(key) + effect;
+            }
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (string section in order)
+        {
+            List<KeyValuePair<(string Section, string Line), decimal>> inSection = [.. flows.Where(f => f.Key.Section == section && f.Value != 0m).OrderByDescending(f => f.Value)];
+            rows.AddRange(inSection.Select(f => (IReadOnlyDictionary<string, object?>)Row(("Section", section), ("Line", f.Key.Line), ("Amount", f.Value))));
+            rows.Add(Row(("Section", section), ("Line", $"Net cash from {section.ToLowerInvariant()} activities"), ("Amount", inSection.Sum(f => f.Value))));
+        }
+
+        rows.Add(Row(("Section", "Cash"), ("Line", "Net change in cash"), ("Amount", change)));
+        rows.Add(Row(("Section", "Cash"), ("Line", "Cash at the start of the period"), ("Amount", opening)));
+        rows.Add(Row(("Section", "Cash"), ("Line", "Cash at the end of the period"), ("Amount", opening + change)));
+        return rows;
+    }
 
     // GL3: one account's opening balance, lines with running balance, and closing balance (brief §14 report 3).
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> NominalActivityAsync(long companyId, string? accountCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

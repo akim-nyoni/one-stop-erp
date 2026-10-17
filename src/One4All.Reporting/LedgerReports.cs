@@ -22,6 +22,15 @@ public static class LedgerReports
             + "posting carried at the rate of its day.",
             "GledReportingTb", [new Column("Account", "Account", 70), new Column("Name", "Name", 180), new Column("Base", "Base balance", 110), new Column("Currency", "Reporting currency", 60),
              new Column("Reporting", "Reporting balance", 110, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("GL1", "Trial Balance - Comparative", "GeneralLedger", "Account balances at the date beside the same date a year earlier, with the change; "
+            + "both columns balance (the summary by account type is GL-TBTYPE).",
+            "GledComparativeTb", [new Column("Account", "Account", 70), new Column("Name", "Name", 170), new Column("Type", "Type", 70), new Column("Debit", "Debit", 85),
+             new Column("Credit", "Credit", 85), new Column("PriorDebit", "Prior debit", 85), new Column("PriorCredit", "Prior credit", 85), new Column("Change", "Change", 90, true)],
+            [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("GL-CFD", "Statement of Cash Flows - Direct Method", "GeneralLedger", "Cash received and paid in the period by kind - receipts from customers, payments to "
+            + "suppliers, sales and expenses settled in cash, taxes - then investing and financing flows by account, reconciled from the opening to the closing cash. Cash accounts are "
+            + "those tagged cash and equivalents (the indirect method is GL-CF).",
+            "GledDirectCashFlow", [new Column("Section", "Section", 90), new Column("Line", "Line", 280), new Column("Amount", "Amount", 100, true)], Period);
         yield return Listing("GL3", "Nominal Activity / Account Ledger Detail", "GeneralLedger", "One account over the period: the opening balance, every posted line with its journal, "
             + "date and narrative and the running balance, then the closing balance (each journal drills through to its source document).",
             "GledNominalActivity", [new Column("Date", "Date", 75), new Column("Journal", "Journal", 100), new Column("Narrative", "Narrative", 260), new Column("Debit", "Debit", 90),
