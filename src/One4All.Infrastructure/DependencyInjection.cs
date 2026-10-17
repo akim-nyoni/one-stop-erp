@@ -337,6 +337,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Banking.IChequeService, Banking.ChequeService>();
         services.AddScoped<Application.Abstractions.Banking.IStandingOrderService, Banking.StandingOrderService>();
         services.AddScoped<Application.Abstractions.Documents.IDocumentLayoutService, Documents.DocumentLayoutService>();
+        services.AddScoped<Application.Abstractions.Documents.ITextDocumentService, Documents.TextDocumentService>();
         services.AddScoped<Application.Abstractions.Banking.IBankStatementPostingService, Banking.BankStatementPostingService>();
         services.AddScoped<Application.Abstractions.Banking.IBankRuleService, Banking.BankRuleService>();
 

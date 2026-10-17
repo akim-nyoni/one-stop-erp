@@ -1992,6 +1992,20 @@ public static partial class OperationCatalogue
             Run = (c, i) => PrintAsync(c, i, kind, i.Text("Number"), null, () => print(c.Get<IDocumentLayoutService>(), c.CompanyId, i.Text("Number"))),
         };
 
+        yield return new Operation
+        {
+            Module = module, Title = "Print a document", IsDocument = true,
+            Description = "Prints any document of the list — statements, reminders, remittances, payslips, vouchers, certificates, tickets, pick lists, RFQs, the chain of title, cheques, "
+                + "shelf labels and the business documents — by its number (see Document layouts › Identified by), as the standard text or through the company's own layout as a PDF.",
+            Fields = [Pick("Document", "Document", [.. Application.Documents.DocumentKinds.All.Select(k => k.Name)]), Req("Number", "Number or code (two parts as a/b where the document says so)"),
+                new OperationField("Date", "Date (as at, pay date or month; today when blank)", FieldKind.Date, null, Required: false), Opt("SaveTo", "PDF file path (when a layout is set)")],
+            Run = (c, i) =>
+            {
+                Application.Documents.DocumentKind kind = Application.Documents.DocumentKinds.Find(i.Text("Document")) ?? throw new OperationException("Choose a document.");
+                return PrintAsync(c, i, kind.Kind, i.Text("Number"), i.OptionalDate("Date"),
+                    () => c.Get<ITextDocumentService>().RenderAsync(c.CompanyId, kind.Kind, i.Text("Number"), i.OptionalDate("Date")));
+            },
+        };
         yield return Doc(Application.Documents.DocumentKinds.Quotation, "Quotation", "Quote number", (s, co, n) => s.QuotationAsync(co, n));
         yield return Doc(Application.Documents.DocumentKinds.OrderConfirmation, "Order confirmation", "Sales order number", (s, co, n) => s.OrderConfirmationAsync(co, n));
         yield return Doc(Application.Documents.DocumentKinds.DeliveryNote, "Delivery note", "Delivery reference", (s, co, n) => s.DeliveryNoteAsync(co, n));

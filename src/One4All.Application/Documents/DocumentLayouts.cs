@@ -10,9 +10,12 @@ namespace One4All.Application.Documents;
 /// <param name="DesignableReportCode">The shipped report that is its data source and starting layout.</param>
 /// <param name="NumberLabel">What identifies one (the parameter prompt).</param>
 /// <param name="NeedsDate">Whether a date goes with the number (the municipal bill's month).</param>
-public sealed record DocumentKind(string Kind, string Name, string DesignableReportCode, string NumberLabel, bool NeedsDate = false);
+public sealed record DocumentKind(string Kind, string Name, string DesignableReportCode, string NumberLabel, bool NeedsDate = false, bool Text = false);
 
-/// <summary>The business documents with designer-editable layouts (brief §S), each with its designable data-source report.</summary>
+/// <summary>
+/// The documents with designer-editable layouts (brief §S), each with its designable data-source report: the business documents built as headed line documents
+/// (DOC01–DOC12) and the text-backed documents (Text = true, DOC13 on) whose standard text lines are the rows a company frames with its own layout.
+/// </summary>
 public static class DocumentKinds
 {
     /// <summary>A sales quotation.</summary>
@@ -51,6 +54,66 @@ public static class DocumentKinds
     /// <summary>A purchase order.</summary>
     public const string PurchaseOrder = "PurchaseOrder";
 
+    /// <summary>The till receipt of a point-of-sale sale.</summary>
+    public const string PosReceipt = "PosReceipt";
+
+    /// <summary>A customer's open-item statement as at a date.</summary>
+    public const string CustomerStatement = "CustomerStatement";
+
+    /// <summary>A customer's balance-forward statement for the month of a date.</summary>
+    public const string BalanceForwardStatement = "BalanceForwardStatement";
+
+    /// <summary>A supplier's statement as at a date.</summary>
+    public const string SupplierStatement = "SupplierStatement";
+
+    /// <summary>A customer's reminder or final notice as at a date.</summary>
+    public const string DunningLetter = "DunningLetter";
+
+    /// <summary>The remittance advice of a supplier payment.</summary>
+    public const string RemittanceAdvice = "RemittanceAdvice";
+
+    /// <summary>An employee's payslip for a pay date (the latest when none is given).</summary>
+    public const string Payslip = "Payslip";
+
+    /// <summary>A payment voucher.</summary>
+    public const string PaymentVoucher = "PaymentVoucher";
+
+    /// <summary>A receipt voucher.</summary>
+    public const string ReceiptVoucher = "ReceiptVoucher";
+
+    /// <summary>A journal voucher.</summary>
+    public const string JournalVoucher = "JournalVoucher";
+
+    /// <summary>A petty cash voucher.</summary>
+    public const string PettyCashVoucher = "PettyCashVoucher";
+
+    /// <summary>A withholding tax certificate.</summary>
+    public const string WithholdingCertificate = "WithholdingCertificate";
+
+    /// <summary>A weighbridge ticket.</summary>
+    public const string WeighbridgeTicket = "WeighbridgeTicket";
+
+    /// <summary>A sales order's pick list for a warehouse.</summary>
+    public const string PickList = "PickList";
+
+    /// <summary>A request for quotation.</summary>
+    public const string Rfq = "Rfq";
+
+    /// <summary>An employee's certificate of service.</summary>
+    public const string CertificateOfService = "CertificateOfService";
+
+    /// <summary>A budget holder's statement as at a date.</summary>
+    public const string BudgetHolderStatement = "BudgetHolderStatement";
+
+    /// <summary>A stand's chain-of-title printout.</summary>
+    public const string ChainOfTitle = "ChainOfTitle";
+
+    /// <summary>A cheque (bank account code/cheque number).</summary>
+    public const string Cheque = "Cheque";
+
+    /// <summary>A price list's shelf labels.</summary>
+    public const string ShelfLabels = "ShelfLabels";
+
     /// <summary>Every kind, in catalogue order.</summary>
     public static IReadOnlyList<DocumentKind> All { get; } =
     [
@@ -66,6 +129,26 @@ public static class DocumentKinds
         new(MunicipalBill, "Municipal bill", "DOC10", "Stand number", NeedsDate: true),
         new(TaxInvoice, "Tax invoice / credit note", "DOC11", "Invoice or credit note number"),
         new(PurchaseOrder, "Purchase order", "DOC12", "Order number"),
+        new(PosReceipt, "Till receipt", "DOC13", "Sale number", Text: true),
+        new(CustomerStatement, "Customer statement", "DOC14", "Customer code", NeedsDate: true, Text: true),
+        new(BalanceForwardStatement, "Balance-forward statement", "DOC15", "Customer code", NeedsDate: true, Text: true),
+        new(SupplierStatement, "Supplier statement", "DOC16", "Supplier code", NeedsDate: true, Text: true),
+        new(DunningLetter, "Reminder / dunning letter", "DOC17", "Customer code", NeedsDate: true, Text: true),
+        new(RemittanceAdvice, "Remittance advice", "DOC18", "Payment document number", Text: true),
+        new(Payslip, "Payslip", "DOC19", "Employee number", NeedsDate: true, Text: true),
+        new(PaymentVoucher, "Payment voucher", "DOC20", "Voucher number", Text: true),
+        new(ReceiptVoucher, "Receipt voucher", "DOC21", "Voucher number", Text: true),
+        new(JournalVoucher, "Journal voucher", "DOC22", "Voucher number", Text: true),
+        new(PettyCashVoucher, "Petty cash voucher", "DOC23", "Voucher number", Text: true),
+        new(WithholdingCertificate, "Withholding tax certificate", "DOC24", "Certificate number", Text: true),
+        new(WeighbridgeTicket, "Weighbridge ticket", "DOC25", "Ticket number", Text: true),
+        new(PickList, "Pick list", "DOC26", "Sales order number/warehouse code", Text: true),
+        new(Rfq, "Request for quotation", "DOC27", "RFQ number", Text: true),
+        new(CertificateOfService, "Certificate of service", "DOC28", "Employee number", Text: true),
+        new(BudgetHolderStatement, "Budget-holder statement", "DOC29", "Department code", NeedsDate: true, Text: true),
+        new(ChainOfTitle, "Chain-of-title printout", "DOC30", "Stand number", Text: true),
+        new(Cheque, "Cheque", "DOC31", "Bank account code/cheque number", Text: true),
+        new(ShelfLabels, "Shelf labels", "DOC32", "Price list code", Text: true),
     ];
 
     /// <summary>Finds a kind by key or name (case-insensitive).</summary>

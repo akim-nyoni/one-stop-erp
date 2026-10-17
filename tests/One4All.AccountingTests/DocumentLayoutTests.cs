@@ -95,6 +95,12 @@ public sealed class DocumentLayoutTests
         (await Csv("DOC03", "DL-D1")).Should().Contain("Delivery Note").And.Contain("Deliver to").And.Contain("DL-D1").And.Contain("DL-SO1").And.Contain("TRK1").And.Contain("Face brick");
         (await Csv("DOC12", "DL-PO1")).Should().Contain("Brick Co").And.Contain("DL-PO1").And.Contain("Face brick");
         (await Csv("DOC01", "NOPE")).Should().NotContain("DL-Q1");
+        (await Csv("DOC14", "DL-C")).Should().Contain("Customer statement").And.Contain("DL-C", "a text-backed document gives its standard text one line per row");
+        (await Csv("DOC26", "DL-SO1/DL-WH")).Should().Contain("Pick list").And.Contain("DL-SO1");
+        One4All.Application.Abstractions.Documents.ITextDocumentService texts = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Documents.ITextDocumentService>();
+        (await texts.RenderAsync(companyId, "Cheque", "NOPE")).Error.Code.Should().Be("Doc.Cheque");
+        (await texts.RenderAsync(companyId, "Payslip", "NOPE")).Error.Code.Should().Be("Doc.NotFound");
+        (await texts.RenderAsync(companyId, "Quotation", "DL-Q1")).Value.Should().Contain("QUOTATION", "the business documents render through the same entry point");
 
         One4All.Application.Documents.DocumentLayoutSettings settings = One4All.Application.Documents.DocumentLayoutSettings.Parse(null);
         settings.Set(One4All.Application.Documents.DocumentKinds.Quotation, "doc01");

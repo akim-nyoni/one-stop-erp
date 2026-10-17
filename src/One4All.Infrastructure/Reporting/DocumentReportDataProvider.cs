@@ -14,8 +14,9 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Infrastructure.Reporting;
 
 /// <summary>
-/// Rows for the designable document reports (DOC01–DOC12): one business document, tax invoice or purchase order by its number, one row per line with
-/// the heading, party, reference fields and totals on every row, so a company lays out its own invoice, quotation or delivery note in the designer.
+/// Rows for the designable document reports (DOC01–DOC32): one business document, tax invoice or purchase order by its number, one row per line with
+/// the heading, party, reference fields and totals on every row, so a company lays out its own invoice, quotation or delivery note in the designer; and,
+/// for the text-backed documents (statements, payslips, vouchers, certificates, tickets …), one row per line of the standard text to frame.
 /// </summary>
 public sealed class DocumentReportDataProvider : IReportDataProvider
 {
@@ -24,14 +25,17 @@ public sealed class DocumentReportDataProvider : IReportDataProvider
     private readonly IDocumentLayoutService _documents;
     private readonly IInvoiceDocumentService _invoices;
     private readonly IPurchaseOrderDocumentService _orders;
+    private readonly ITextDocumentService _text;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="documents">The business documents.</param>
     /// <param name="invoices">Tax invoices and credit notes.</param>
     /// <param name="orders">Purchase orders.</param>
-    public DocumentReportDataProvider(One4AllDbContext db, IDocumentLayoutService documents, IInvoiceDocumentService invoices, IPurchaseOrderDocumentService orders)
+    /// <param name="text">The text-backed documents.</param>
+    public DocumentReportDataProvider(One4AllDbContext db, IDocumentLayoutService documents, IInvoiceDocumentService invoices, IPurchaseOrderDocumentService orders, ITextDocumentService text)
     {
+        _text = text;
         _db = db;
         _documents = documents;
         _invoices = invoices;
@@ -58,6 +62,12 @@ public sealed class DocumentReportDataProvider : IReportDataProvider
             return [];
         }
 
+        if (kind.Text)
+        {
+            Result<string> text = await _text.RenderAsync(companyId, kind.Kind, number, date, ct).ConfigureAwait(false);
+            return text.IsSuccess ? TextRows(kind, number, date, text.Value) : [];
+        }
+
         switch (kind.Kind)
         {
             case DocumentKinds.TaxInvoice:
@@ -81,6 +91,16 @@ public sealed class DocumentReportDataProvider : IReportDataProvider
                 return document.IsSuccess ? BusinessDocumentRows.Of(document.Value) : [];
             }
         }
+    }
+
+    // One row per line of the standard text, the heading fields on every row, so the detail band prints the document in a monospaced font inside the company's frame.
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> TextRows(DocumentKind kind, string number, DateOnly? date, string text)
+    {
+        string[] lines = text.Replace("\r\n", "\n", StringComparison.Ordinal).TrimEnd('\n').Split('\n');
+        return [.. lines.Select((line, index) => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Title"] = kind.Name, ["Number"] = number, ["Date"] = date, ["LineNo"] = index + 1, ["Line"] = line.TrimEnd(),
+        })];
     }
 
     private static IReadOnlyList<IReadOnlyDictionary<string, object?>> InvoiceRows(InvoiceDocument invoice)
