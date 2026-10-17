@@ -2,158 +2,394 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:One4All.Desktop"
-        Title="One4All — Report Designer" Height="820" Width="1400"
+        Title="One4All — Report Designer" Height="860" Width="1480"
         WindowStartupLocation="CenterOwner" Background="White">
+    <Window.Resources>
+        <Style x:Key="Glyph" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="PaneTitle" TargetType="Border">
+            <Setter Property="Background" Value="#DCE3EC" />
+            <Setter Property="BorderBrush" Value="#B9C4D2" />
+            <Setter Property="BorderThickness" Value="0,1,0,1" />
+            <Setter Property="Padding" Value="6,2" />
+        </Style>
+        <Style x:Key="Link" TargetType="Button">
+            <Setter Property="Foreground" Value="#1F5FA8" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Margin" Value="0,2" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <TextBlock Text="{TemplateBinding Content}" Foreground="{TemplateBinding Foreground}" TextWrapping="Wrap" TextDecorations="Underline" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
     <Window.InputBindings>
         <KeyBinding Key="Z" Modifiers="Control" Command="Undo" />
         <KeyBinding Key="Y" Modifiers="Control" Command="Redo" />
         <KeyBinding Key="Delete" Command="Delete" />
         <KeyBinding Key="D" Modifiers="Control" Command="{x:Static local:BandedDesignerWindow.DuplicateCommand}" />
+        <KeyBinding Key="A" Modifiers="Control" Command="SelectAll" />
+        <KeyBinding Key="S" Modifiers="Control" Command="Save" />
+        <KeyBinding Key="P" Modifiers="Control" Command="Print" />
+        <KeyBinding Key="Escape" Command="{x:Static local:BandedDesignerWindow.PointerCommand}" />
     </Window.InputBindings>
     <Window.CommandBindings>
         <CommandBinding Command="Undo" Executed="Undo_Click" />
         <CommandBinding Command="Redo" Executed="Redo_Click" />
         <CommandBinding Command="Delete" Executed="Delete_Click" />
         <CommandBinding Command="{x:Static local:BandedDesignerWindow.DuplicateCommand}" Executed="Duplicate_Click" />
+        <CommandBinding Command="{x:Static local:BandedDesignerWindow.PointerCommand}" Executed="Pointer_Click" />
         <CommandBinding Command="Copy" Executed="Copy_Click" />
         <CommandBinding Command="Cut" Executed="Cut_Click" />
         <CommandBinding Command="Paste" Executed="Paste_Click" />
+        <CommandBinding Command="SelectAll" Executed="SelectAll_Click" />
+        <CommandBinding Command="Save" Executed="Save_Click" />
+        <CommandBinding Command="Print" Executed="Preview_Click" />
     </Window.CommandBindings>
     <DockPanel>
-        <Border DockPanel.Dock="Bottom" Background="{StaticResource BrandBrush}">
-            <TextBlock x:Name="Status" Foreground="White" FontSize="12" Margin="10,4" />
-        </Border>
+        <!-- Menu bar (as the Sage Report Designer lays it out: File, Edit, View, Toolbox, Sections, Report, Format, Tools, Help) -->
+        <Menu DockPanel.Dock="Top" Background="{StaticResource ToolbarBrush}">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New report…" Click="NewMenu_Click" InputGestureText="Ctrl+N" />
+                <MenuItem Header="_Save version" Click="Save_Click" InputGestureText="Ctrl+S" />
+                <MenuItem Header="Save as _my own version" x:Name="MineMenu" IsCheckable="True" Click="MineMenu_Click" ToolTip="Your own version comes before the company's; untick to save the company's version for everyone" />
+                <Separator />
+                <MenuItem Header="_Preview" Click="Preview_Click" InputGestureText="Ctrl+P" />
+                <MenuItem Header="Page set_up…" Click="PageSetup_Click" />
+                <Separator />
+                <MenuItem Header="_Import .mrpt…" Click="ImportFile_Click" />
+                <MenuItem Header="_Export .mrpt…" Click="ExportFile_Click" />
+                <Separator />
+                <MenuItem Header="_Close" Click="Close_Click" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Undo" Click="Undo_Click" InputGestureText="Ctrl+Z" />
+                <MenuItem Header="_Redo" Click="Redo_Click" InputGestureText="Ctrl+Y" />
+                <Separator />
+                <MenuItem Header="Cu_t" Click="Cut_Click" InputGestureText="Ctrl+X" />
+                <MenuItem Header="_Copy" Click="Copy_Click" InputGestureText="Ctrl+C" />
+                <MenuItem Header="_Paste" Click="Paste_Click" InputGestureText="Ctrl+V" />
+                <MenuItem Header="_Duplicate" Click="Duplicate_Click" InputGestureText="Ctrl+D" />
+                <MenuItem Header="De_lete" Click="Delete_Click" InputGestureText="Del" />
+                <Separator />
+                <MenuItem Header="Select _all in section" Click="SelectAll_Click" InputGestureText="Ctrl+A" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem Header="Dynamic _Help" x:Name="HelpMenu" IsCheckable="True" IsChecked="True" Click="Pane_Toggle" Tag="Help" />
+                <MenuItem Header="_Variables" x:Name="VariablesMenu" IsCheckable="True" IsChecked="True" Click="Pane_Toggle" Tag="Variables" />
+                <MenuItem Header="_File Explorer" x:Name="FilesMenu" IsCheckable="True" IsChecked="True" Click="Pane_Toggle" Tag="Files" />
+                <MenuItem Header="_Report Explorer" x:Name="ExplorerMenu" IsCheckable="True" IsChecked="True" Click="Pane_Toggle" Tag="Explorer" />
+                <MenuItem Header="_Properties" x:Name="PropertiesMenu" IsCheckable="True" IsChecked="True" Click="Pane_Toggle" Tag="Properties" />
+                <MenuItem Header="_Expression editor" x:Name="ExpressionMenu" IsCheckable="True" IsChecked="True" Click="Pane_Toggle" Tag="Expression" />
+                <Separator />
+                <MenuItem Header="_Zoom">
+                    <MenuItem Header="50%" Click="ZoomMenu_Click" Tag="0.5" />
+                    <MenuItem Header="75%" Click="ZoomMenu_Click" Tag="0.75" />
+                    <MenuItem Header="100%" Click="ZoomMenu_Click" Tag="1" />
+                    <MenuItem Header="130%" Click="ZoomMenu_Click" Tag="1.3" />
+                    <MenuItem Header="150%" Click="ZoomMenu_Click" Tag="1.5" />
+                    <MenuItem Header="200%" Click="ZoomMenu_Click" Tag="2" />
+                </MenuItem>
+                <MenuItem Header="_Grid">
+                    <MenuItem Header="None" Click="GridMenu_Click" Tag="0" />
+                    <MenuItem Header="2 pt" Click="GridMenu_Click" Tag="2" />
+                    <MenuItem Header="4 pt" Click="GridMenu_Click" Tag="4" />
+                    <MenuItem Header="8 pt" Click="GridMenu_Click" Tag="8" />
+                </MenuItem>
+            </MenuItem>
+            <MenuItem Header="_Toolbox" x:Name="ToolboxMenu" />
+            <MenuItem Header="_Sections">
+                <MenuItem Header="Add _Report Header" Click="AddBand_Click" Tag="ReportHeader" />
+                <MenuItem Header="Add _Page Header" Click="AddBand_Click" Tag="PageHeader" />
+                <MenuItem Header="Add _Group Header" Click="AddBand_Click" Tag="GroupHeader" />
+                <MenuItem Header="Add _Details" Click="AddBand_Click" Tag="Detail" />
+                <MenuItem Header="Add Group _Footer" Click="AddBand_Click" Tag="GroupFooter" />
+                <MenuItem Header="Add Page F_ooter" Click="AddBand_Click" Tag="PageFooter" />
+                <MenuItem Header="Add Report Foo_ter" Click="AddBand_Click" Tag="ReportFooter" />
+                <MenuItem Header="Add O_verlay" Click="AddBand_Click" Tag="Overlay" />
+                <Separator />
+                <MenuItem Header="Section _flow (hide when, repeat, keep together, page breaks)…" Click="BandFlowMenu_Click" />
+                <MenuItem Header="Section _height…" Click="BandHeightMenu_Click" />
+            </MenuItem>
+            <MenuItem Header="_Report">
+                <MenuItem Header="Report _name and description…" Click="ReportInfo_Click" />
+                <MenuItem Header="_Data source (restrict the information)…" Click="DataSource_Click" />
+                <MenuItem Header="_Sort…" Click="Sort_Click" />
+                <MenuItem Header="_Grouping…" Click="Grouping_Click" />
+                <MenuItem Header="_Page setup…" Click="PageSetup_Click" />
+                <MenuItem Header="_Theme" x:Name="ThemeMenu" />
+                <Separator />
+                <MenuItem Header="Set up _email…" Click="Email_Click" />
+            </MenuItem>
+            <MenuItem Header="F_ormat">
+                <MenuItem Header="_Align">
+                    <MenuItem Header="_Left" Click="Align_Click" Tag="Left" />
+                    <MenuItem Header="_Right" Click="Align_Click" Tag="Right" />
+                    <MenuItem Header="_Top" Click="Align_Click" Tag="Top" />
+                    <MenuItem Header="_Bottom" Click="Align_Click" Tag="Bottom" />
+                    <MenuItem Header="Centre _horizontally" Click="Align_Click" Tag="CenterHorizontally" />
+                    <MenuItem Header="Centre _vertically" Click="Align_Click" Tag="CenterVertically" />
+                </MenuItem>
+                <MenuItem Header="Same _width" Click="SameWidth_Click" />
+                <MenuItem Header="Same _height" Click="SameHeight_Click" />
+                <MenuItem Header="_Distribute horizontally" Click="Distribute_Click" />
+                <Separator />
+                <MenuItem Header="Bring to _front" Click="ToFront_Click" />
+                <MenuItem Header="Send to _back" Click="ToBack_Click" />
+                <Separator />
+                <MenuItem Header="_Group" Click="Group_Click" />
+                <MenuItem Header="_Ungroup" Click="Ungroup_Click" />
+            </MenuItem>
+            <MenuItem Header="_Tools">
+                <MenuItem Header="_Expression editor" Click="FocusExpression_Click" />
+                <MenuItem Header="_Reset the layout of the panes" Click="ResetPanes_Click" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Dynamic Help" Click="ShowHelp_Click" />
+                <MenuItem Header="_About the Report Designer" Click="About_Click" />
+            </MenuItem>
+        </Menu>
 
-        <!-- Toolbar -->
-        <Border DockPanel.Dock="Top" Background="{StaticResource ToolbarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="6,4">
-            <WrapPanel>
-                <TextBlock Text="Add to" VerticalAlignment="Center" Margin="0,0,4,0" />
-                <ComboBox x:Name="BandBox" Width="110" Margin="0,0,4,0" />
-                <Button Content="Label" Padding="8,2" Margin="1" Click="AddLabel_Click" />
-                <Button Content="Field" Padding="8,2" Margin="1" Click="AddField_Click" />
-                <Button Content="Expression" Padding="8,2" Margin="1" Click="AddExpression_Click" />
-                <Button Content="Line" Padding="8,2" Margin="1" Click="AddLine_Click" />
-                <Button Content="Tick box" Padding="8,2" Margin="1" Click="AddCheckbox_Click" />
-                <Button Content="Signature" Padding="8,2" Margin="1" Click="AddSignature_Click" />
-                <Button Content="Chart" Padding="8,2" Margin="1" Click="AddChart_Click" ToolTip="A bar chart of the selected field; set its category field in the properties" />
-                <Button Content="Rich text" Padding="8,2" Margin="1" Click="AddRichText_Click" ToolTip="Text with **bold**, *italic*, __underline__, line breaks and {Field} values" />
-                <Button Content="Image" Padding="8,2" Margin="1" Click="AddImage_Click" ToolTip="A picture from a file (PNG or JPEG), kept in the layout" />
-                <Button Content="Logo" Padding="8,2" Margin="1" Click="AddLogo_Click" ToolTip="The company logo (set under System Manager)" />
-                <Button Content="Barcode" Padding="8,2" Margin="1" Click="AddBarcode_Click" ToolTip="A Code 128 barcode of the selected field; set BarcodeSymbology to QR, Code39, EAN13 or PDF417 for another kind" />
-                <Button Content="Sub-report" Padding="8,2" Margin="1" Click="AddSubReport_Click" ToolTip="Another report run inside this band; set SubReportCode and SubReportLinks (Parameter=Field; ...) in the properties" />
-                <Separator Margin="6,0" />
-                <Button Content="⇤ Left" Padding="6,2" Margin="1" Tag="Left" Click="Align_Click" />
-                <Button Content="Right ⇥" Padding="6,2" Margin="1" Tag="Right" Click="Align_Click" />
-                <Button Content="⤒ Top" Padding="6,2" Margin="1" Tag="Top" Click="Align_Click" />
-                <Button Content="Bottom ⤓" Padding="6,2" Margin="1" Tag="Bottom" Click="Align_Click" />
-                <Button Content="Centre ↔" Padding="6,2" Margin="1" Tag="CenterHorizontally" Click="Align_Click" />
-                <Button Content="Centre ↕" Padding="6,2" Margin="1" Tag="CenterVertically" Click="Align_Click" />
-                <Button Content="Same width" Padding="6,2" Margin="1" Click="SameWidth_Click" />
-                <Button Content="Same height" Padding="6,2" Margin="1" Click="SameHeight_Click" />
-                <Button Content="Distribute" Padding="6,2" Margin="1" Click="Distribute_Click" />
-                <Separator Margin="6,0" />
-                <Button Content="Duplicate" Padding="6,2" Margin="1" Click="Duplicate_Click" ToolTip="Ctrl+D" />
-                <Button Content="Copy" Padding="6,2" Margin="1" Click="Copy_Click" ToolTip="Ctrl+C — copy the selected elements; paste them here or in another report" />
-                <Button Content="Cut" Padding="6,2" Margin="1" Click="Cut_Click" ToolTip="Ctrl+X" />
-                <Button Content="Paste" Padding="6,2" Margin="1" Click="Paste_Click" ToolTip="Ctrl+V — into the band of the selected element, else the 'Add to' band" />
-                <Button Content="To front" Padding="6,2" Margin="1" Click="ToFront_Click" ToolTip="Draw the selected elements over the others in their band" />
-                <Button Content="To back" Padding="6,2" Margin="1" Click="ToBack_Click" ToolTip="Draw the selected elements behind the others in their band" />
-                <Separator Margin="6,0" />
-                <Button Content="Group" Padding="6,2" Margin="1" Click="Group_Click" ToolTip="The selected elements move together from now on" />
-                <Button Content="Ungroup" Padding="6,2" Margin="1" Click="Ungroup_Click" ToolTip="Release the selected elements from their group" />
-                <Button Content="Sort…" Padding="6,2" Margin="1" Click="Sort_Click" ToolTip="How the records are sorted apart from grouping: Field; Other desc" />
-                <Button Content="Delete" Padding="6,2" Margin="1" Click="Delete_Click" />
-                <Button Content="↶ Undo" Padding="6,2" Margin="1" Click="Undo_Click" />
-                <Button Content="Redo ↷" Padding="6,2" Margin="1" Click="Redo_Click" />
-                <Separator Margin="6,0" />
-                <TextBlock Text="Grid" VerticalAlignment="Center" Margin="4,0" />
-                <ComboBox x:Name="GridBox" Width="55" SelectionChanged="Grid_Changed" />
-                <TextBlock Text="Zoom" VerticalAlignment="Center" Margin="8,0,4,0" />
-                <Slider x:Name="ZoomSlider" Width="110" Minimum="0.6" Maximum="2.5" Value="1.3" VerticalAlignment="Center" ValueChanged="Zoom_Changed" />
-                <Button Content="Page setup…" Padding="6,2" Margin="8,1,1,1" Click="PageSetup_Click" ToolTip="Paper, margins, columns for labels, watermark, background picture, tray and two-sided printing" />
-                <Button Content="Data source…" Padding="6,2" Margin="4,1,1,1" Click="DataSource_Click" ToolTip="The SQL query, reporting view or function the report reads, with its fields discovered without running it" />
-                <TextBlock Text="Theme" VerticalAlignment="Center" Margin="8,0,4,0" />
-                <ComboBox x:Name="ThemeBox" Width="110" />
-                <Button Content="Apply" Padding="6,2" Margin="1" Click="Theme_Click" />
-            </WrapPanel>
-        </Border>
+        <!-- Toolbars: standard, formatting, and the toolbox -->
+        <ToolBarTray DockPanel.Dock="Top" Background="{StaticResource ToolbarBrush}">
+            <ToolBar Band="0" BandIndex="0">
+                <Button Click="NewMenu_Click" ToolTip="New report (Ctrl+N)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE7C3;" /></Button>
+                <Button Click="Save_Click" ToolTip="Save version (Ctrl+S)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE74E;" /></Button>
+                <Button Click="Preview_Click" ToolTip="Preview (Ctrl+P)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8A6;" /></Button>
+                <Button Click="PageSetup_Click" ToolTip="Page setup"><TextBlock Style="{StaticResource Glyph}" Text="&#xE7F8;" /></Button>
+                <Separator />
+                <Button Click="Cut_Click" ToolTip="Cut (Ctrl+X)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8C6;" /></Button>
+                <Button Click="Copy_Click" ToolTip="Copy (Ctrl+C)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8C8;" /></Button>
+                <Button Click="Paste_Click" ToolTip="Paste (Ctrl+V)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE77F;" /></Button>
+                <Button Click="Delete_Click" ToolTip="Delete"><TextBlock Style="{StaticResource Glyph}" Text="&#xE74D;" /></Button>
+                <Separator />
+                <Button Click="Undo_Click" ToolTip="Undo (Ctrl+Z)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE7A7;" /></Button>
+                <Button Click="Redo_Click" ToolTip="Redo (Ctrl+Y)"><TextBlock Style="{StaticResource Glyph}" Text="&#xE7A6;" /></Button>
+                <Separator />
+                <TextBlock Text="Section" VerticalAlignment="Center" Margin="4,0" ToolTip="The section new elements go into when a tool is not placed by clicking" />
+                <ComboBox x:Name="BandBox" Width="110" />
+                <TextBlock Text="Grid" VerticalAlignment="Center" Margin="8,0,4,0" />
+                <ComboBox x:Name="GridBox" Width="50" SelectionChanged="Grid_Changed" />
+            </ToolBar>
+            <ToolBar Band="1" BandIndex="0">
+                <ComboBox x:Name="FontBox" Width="150" IsEditable="True" ToolTip="Font of the selected elements" SelectionChanged="Font_Changed" KeyDown="Font_KeyDown" />
+                <ComboBox x:Name="SizeBox" Width="50" IsEditable="True" ToolTip="Font size of the selected elements" SelectionChanged="Font_Changed" KeyDown="Font_KeyDown" />
+                <ToggleButton x:Name="BoldButton" Click="Style_Click" Tag="Bold" ToolTip="Bold"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8DD;" /></ToggleButton>
+                <ToggleButton x:Name="ItalicButton" Click="Style_Click" Tag="Italic" ToolTip="Italic"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8DB;" /></ToggleButton>
+                <ToggleButton x:Name="UnderlineButton" Click="Style_Click" Tag="Underline" ToolTip="Underline"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8DC;" /></ToggleButton>
+                <ComboBox x:Name="ColourBox" Width="90" ToolTip="Text colour of the selected elements" SelectionChanged="Colour_Changed" />
+                <Separator />
+                <Button Click="HAlign_Click" Tag="Left" ToolTip="Align text left"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8E4;" /></Button>
+                <Button Click="HAlign_Click" Tag="Center" ToolTip="Centre text"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8E3;" /></Button>
+                <Button Click="HAlign_Click" Tag="Right" ToolTip="Align text right"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8E2;" /></Button>
+                <Separator />
+                <Button Content="⇤" Tag="Left" Click="Align_Click" ToolTip="Align the selected elements' left edges to the first selected" />
+                <Button Content="⇥" Tag="Right" Click="Align_Click" ToolTip="Align right edges" />
+                <Button Content="⤒" Tag="Top" Click="Align_Click" ToolTip="Align top edges" />
+                <Button Content="⤓" Tag="Bottom" Click="Align_Click" ToolTip="Align bottom edges" />
+                <Button Content="↔" Tag="CenterHorizontally" Click="Align_Click" ToolTip="Centre horizontally" />
+                <Button Content="↕" Tag="CenterVertically" Click="Align_Click" ToolTip="Centre vertically" />
+                <Button Content="⟷" Click="SameWidth_Click" ToolTip="Same width" />
+                <Button Content="⇅" Click="SameHeight_Click" ToolTip="Same height" />
+                <Button Content="⋯" Click="Distribute_Click" ToolTip="Distribute horizontally" />
+                <Separator />
+                <Button Content="Front" Click="ToFront_Click" ToolTip="Bring to front" />
+                <Button Content="Back" Click="ToBack_Click" ToolTip="Send to back" />
+                <Button Content="Group" Click="Group_Click" ToolTip="The selected elements move together from now on" />
+                <Button Content="Ungroup" Click="Ungroup_Click" ToolTip="Release the selected elements from their group" />
+            </ToolBar>
+            <ToolBar Band="2" BandIndex="0" x:Name="ToolsBar" ToolTip="Pick a tool, then click in a section to place it; Esc returns to the pointer" />
+        </ToolBarTray>
+
+        <!-- Status bar: position and size of the selection, page, zoom -->
+        <StatusBar DockPanel.Dock="Bottom" Background="{StaticResource ToolbarBrush}">
+            <StatusBarItem>
+                <TextBlock x:Name="Status" FontSize="12" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="PositionText" Margin="8,0" MinWidth="200" ToolTip="Position and size of the selected element (millimetres)" />
+                    <TextBlock x:Name="PageText" Text="Page 1 of 1" Margin="8,0" />
+                    <TextBlock x:Name="ZoomText" Text="130%" Margin="8,0" MinWidth="40" />
+                    <Slider x:Name="ZoomSlider" Width="110" Minimum="0.5" Maximum="2.5" Value="1.3" VerticalAlignment="Center" ValueChanged="Zoom_Changed" />
+                </StackPanel>
+            </StatusBarItem>
+        </StatusBar>
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="250" x:Name="LeftColumn" />
+                <ColumnDefinition Width="4" />
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="320" x:Name="RightColumn" />
             </Grid.ColumnDefinitions>
 
-            <!-- Reports and fields -->
-            <DockPanel Grid.Column="0" Background="{StaticResource TreeBrush}">
-                <StackPanel DockPanel.Dock="Top" Margin="8">
-                    <TextBlock Text="Report" FontWeight="SemiBold" />
-                    <ComboBox x:Name="ReportBox" DisplayMemberPath="Display" SelectionChanged="Report_Changed" Margin="0,2,0,6" />
-                    <DockPanel>
-                        <Button Content="New" Width="50" DockPanel.Dock="Right" Click="New_Click" Margin="4,0,0,0" />
-                        <TextBox x:Name="NewCodeBox" ToolTip="Code for a new blank report (based on the selected report's data)" />
+            <!-- Left: Dynamic Help, Variables, File Explorer -->
+            <Grid Grid.Column="0" Background="{StaticResource TreeBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" x:Name="HelpRow" />
+                    <RowDefinition Height="*" x:Name="VariablesRow" />
+                    <RowDefinition Height="*" x:Name="FilesRow" />
+                </Grid.RowDefinitions>
+                <DockPanel Grid.Row="0" x:Name="HelpPanel">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="✕" BorderThickness="0" Background="Transparent" Padding="4,0" Click="Pane_Toggle" Tag="Help" ToolTip="Hide (View › Dynamic Help shows it again)" />
+                            <TextBlock Text="Dynamic Help" FontWeight="SemiBold" />
+                        </DockPanel>
+                    </Border>
+                    <StackPanel Margin="10,6">
+                        <TextBlock Text="What would you like to do?" FontSize="14" Foreground="#555" Margin="0,0,0,4" />
+                        <ItemsControl x:Name="HelpList">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel>
+                                        <TextBlock Text="»" Foreground="#888" Margin="0,2,6,0" VerticalAlignment="Top" />
+                                        <Button Style="{StaticResource Link}" Content="{Binding Title}" Tag="{Binding Key}" Click="HelpTask_Click" />
+                                    </DockPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel Grid.Row="1" x:Name="VariablesPanel">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="✕" BorderThickness="0" Background="Transparent" Padding="4,0" Click="Pane_Toggle" Tag="Variables" />
+                            <TextBlock Text="Variables" FontWeight="SemiBold" />
+                        </DockPanel>
+                    </Border>
+                    <DockPanel DockPanel.Dock="Top" Margin="4,3">
+                        <TextBlock Text="Find" VerticalAlignment="Center" Margin="2,0,6,0" />
+                        <TextBox x:Name="VariableFind" TextChanged="VariableFind_Changed" ToolTip="Filter the variables by name" />
                     </DockPanel>
-                    <TextBlock Text="Fields (double-click to add to the detail band)" FontWeight="SemiBold" Margin="0,10,0,2" TextWrapping="Wrap" />
-                </StackPanel>
-                <StackPanel DockPanel.Dock="Bottom" Margin="8">
-                    <TextBlock Text="Version note" />
-                    <TextBox x:Name="NoteBox" Margin="0,2,0,6" />
-                    <CheckBox x:Name="MineBox" Content="Save as my own version (only I run it)" Margin="0,0,0,6"
-                              ToolTip="Your own version comes before the company's; untick to save the company's version for everyone" />
-                    <UniformGrid Columns="2">
-                        <Button Content="Preview" Height="30" Margin="0,0,4,0" Click="Preview_Click" />
-                        <Button Content="Save version" Height="30" FontWeight="SemiBold" Click="Save_Click" />
-                        <Button Content="Import .mrpt…" Height="26" Margin="0,4,4,0" Click="ImportFile_Click" ToolTip="Open a report layout file (from another company or installation) to edit and save here" />
-                        <Button Content="Export .mrpt…" Height="26" Margin="0,4,0,0" Click="ExportFile_Click" ToolTip="Save this layout to a file to copy it to another company or installation" />
-                    </UniformGrid>
-                </StackPanel>
-                <ListBox x:Name="FieldList" Margin="8,0" MouseDoubleClick="Field_DoubleClick" />
-            </DockPanel>
+                    <TreeView x:Name="VariablesTree" BorderThickness="0" Background="Transparent" SelectedItemChanged="Variables_Selected" MouseDoubleClick="Variables_DoubleClick"
+                              ToolTip="Double-click a field to add it to the section; or pick Add Data Field and click where it goes" />
+                    <ListBox x:Name="FieldList" Visibility="Collapsed" MouseDoubleClick="Field_DoubleClick" />
+                </DockPanel>
+                <DockPanel Grid.Row="2" x:Name="FilesPanel">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="✕" BorderThickness="0" Background="Transparent" Padding="4,0" Click="Pane_Toggle" Tag="Files" />
+                            <TextBlock Text="File Explorer" FontWeight="SemiBold" />
+                        </DockPanel>
+                    </Border>
+                    <DockPanel DockPanel.Dock="Bottom" Margin="4,3">
+                        <Button Content="New" Width="46" DockPanel.Dock="Right" Click="New_Click" Margin="4,0,0,0" ToolTip="A new blank report with this code, based on the open report's data" />
+                        <TextBox x:Name="NewCodeBox" ToolTip="Code for a new blank report (based on the open report's data)" />
+                    </DockPanel>
+                    <ComboBox x:Name="ReportBox" Visibility="Collapsed" DisplayMemberPath="Display" SelectionChanged="Report_Changed" />
+                    <TreeView x:Name="FilesTree" BorderThickness="0" Background="Transparent" MouseDoubleClick="Files_DoubleClick" ToolTip="Double-click a report to open it" />
+                </DockPanel>
+            </Grid>
+            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" Background="{StaticResource BorderBrush}" />
 
-            <!-- The bands -->
-            <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#E9ECEF">
+            <!-- The sections -->
+            <ScrollViewer Grid.Column="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#E9ECEF">
                 <StackPanel x:Name="BandsPanel" Margin="16" HorizontalAlignment="Left" />
             </ScrollViewer>
+            <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" Background="{StaticResource BorderBrush}" />
 
-            <!-- Properties and expression editor -->
-            <DockPanel Grid.Column="2" Background="{StaticResource TreeBrush}">
-                <StackPanel DockPanel.Dock="Bottom" Margin="8">
-                    <TextBlock Text="Expression editor (live preview on the first sample row)" FontWeight="SemiBold" TextWrapping="Wrap" />
-                    <TextBox x:Name="ExpressionBox" Height="60" TextWrapping="Wrap" AcceptsReturn="True" FontFamily="Consolas" TextChanged="Expression_Changed" PreviewKeyDown="Expression_PreviewKeyDown" Margin="0,2"
-                             ToolTip="Type a field, function or value name and pick from the list (Tab or Enter); fields can be written by name, or Field(&quot;name&quot;) when the name has spaces" />
-                    <Popup x:Name="CompletionPopup" PlacementTarget="{Binding ElementName=ExpressionBox}" Placement="Bottom" StaysOpen="True" AllowsTransparency="True">
-                        <Border Background="White" BorderBrush="#9AA" BorderThickness="1">
-                            <ListBox x:Name="CompletionList" MaxHeight="170" MinWidth="240" FontFamily="Consolas" BorderThickness="0" MouseDoubleClick="Completion_DoubleClick" />
-                        </Border>
-                    </Popup>
-                    <TextBlock x:Name="ExpressionResult" TextWrapping="Wrap" Foreground="#2E5E2E" />
-                    <Button Content="Use for the selected element" Margin="0,4,0,0" Click="UseExpression_Click" />
-                </StackPanel>
-                <TextBlock DockPanel.Dock="Top" x:Name="SelectionTitle" Text="Properties" FontWeight="SemiBold" Margin="8,8,8,4" />
-                <TextBox DockPanel.Dock="Top" x:Name="PropertyFilter" Margin="8,0,8,4" TextChanged="PropertyFilter_Changed" ToolTip="Filter the properties by name (e.g. font, border)" />
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <ItemsControl x:Name="PropertyList" Margin="8,0">
-                        <ItemsControl.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.HeaderTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#2E7D32" Margin="0,6,0,2" />
-                                    </DataTemplate>
-                                </GroupStyle.HeaderTemplate>
-                            </GroupStyle>
-                        </ItemsControl.GroupStyle>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <DockPanel Margin="0,1">
-                                    <TextBlock Text="{Binding Name}" Width="110" VerticalAlignment="Center" Foreground="#445" />
-                                    <TextBox Text="{Binding Value, UpdateSourceTrigger=Explicit}" Tag="{Binding Name}" LostFocus="Property_LostFocus" KeyDown="Property_KeyDown" />
-                                </DockPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
-            </DockPanel>
+            <!-- Right: Report Explorer, Properties, expression editor -->
+            <Grid Grid.Column="4" Background="{StaticResource TreeBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="180" x:Name="ExplorerRow" />
+                    <RowDefinition Height="*" x:Name="PropertiesRow" />
+                    <RowDefinition Height="Auto" x:Name="ExpressionRow" />
+                </Grid.RowDefinitions>
+                <DockPanel Grid.Row="0" x:Name="ExplorerPanel">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="✕" BorderThickness="0" Background="Transparent" Padding="4,0" Click="Pane_Toggle" Tag="Explorer" />
+                            <TextBlock Text="Report Explorer" FontWeight="SemiBold" />
+                        </DockPanel>
+                    </Border>
+                    <TreeView x:Name="ExplorerTree" BorderThickness="0" Background="Transparent" SelectedItemChanged="Explorer_Selected" ToolTip="The sections and their elements; click one to select it" />
+                </DockPanel>
+                <DockPanel Grid.Row="1" x:Name="PropertiesPanel">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="✕" BorderThickness="0" Background="Transparent" Padding="4,0" Click="Pane_Toggle" Tag="Properties" />
+                            <TextBlock Text="Properties" FontWeight="SemiBold" />
+                        </DockPanel>
+                    </Border>
+                    <DockPanel DockPanel.Dock="Top" Margin="4,3">
+                        <ToggleButton x:Name="CategorizedButton" IsChecked="True" Click="PropertyView_Click" ToolTip="Categorized" Padding="4,0"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8FD;" FontSize="12" /></ToggleButton>
+                        <ToggleButton x:Name="AlphabeticalButton" Click="PropertyView_Click" ToolTip="Alphabetical" Padding="4,0" Margin="2,0"><TextBlock Style="{StaticResource Glyph}" Text="&#xE8CB;" FontSize="12" /></ToggleButton>
+                        <TextBox x:Name="PropertyFilter" Margin="4,0,0,0" TextChanged="PropertyFilter_Changed" ToolTip="Filter the properties by name (e.g. font, border)" />
+                    </DockPanel>
+                    <TextBlock DockPanel.Dock="Top" x:Name="SelectionTitle" Text="Properties" Margin="6,0,6,2" Foreground="#445" TextTrimming="CharacterEllipsis" />
+                    <Border DockPanel.Dock="Bottom" Background="#F3F5F8" BorderBrush="#B9C4D2" BorderThickness="0,1,0,0" Padding="6,4" MinHeight="64">
+                        <StackPanel>
+                            <TextBlock x:Name="PropertyHelpTitle" FontWeight="SemiBold" />
+                            <TextBlock x:Name="PropertyHelpText" TextWrapping="Wrap" Foreground="#445" />
+                        </StackPanel>
+                    </Border>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl x:Name="PropertyList" Margin="4,0">
+                            <ItemsControl.GroupStyle>
+                                <GroupStyle>
+                                    <GroupStyle.HeaderTemplate>
+                                        <DataTemplate>
+                                            <Border Background="#E4E9F0" Margin="0,4,0,1" Padding="4,1">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="#333" />
+                                            </Border>
+                                        </DataTemplate>
+                                    </GroupStyle.HeaderTemplate>
+                                </GroupStyle>
+                            </ItemsControl.GroupStyle>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border BorderBrush="#E6E9EE" BorderThickness="0,0,0,1">
+                                        <DockPanel Margin="0,1">
+                                            <TextBlock Text="{Binding Name}" Width="118" VerticalAlignment="Center" Foreground="#223" Margin="4,0,0,0" />
+                                            <TextBox Text="{Binding Value, UpdateSourceTrigger=Explicit}" Tag="{Binding Name}" BorderThickness="0" Background="Transparent"
+                                                     LostFocus="Property_LostFocus" KeyDown="Property_KeyDown" GotFocus="Property_GotFocus" />
+                                        </DockPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+                <DockPanel Grid.Row="2" x:Name="ExpressionPanel">
+                    <Border DockPanel.Dock="Top" Style="{StaticResource PaneTitle}">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Content="✕" BorderThickness="0" Background="Transparent" Padding="4,0" Click="Pane_Toggle" Tag="Expression" />
+                            <TextBlock Text="Expression editor" FontWeight="SemiBold" ToolTip="Live preview on the first sample row" />
+                        </DockPanel>
+                    </Border>
+                    <StackPanel Margin="6,4">
+                        <TextBox x:Name="ExpressionBox" Height="56" TextWrapping="Wrap" AcceptsReturn="True" FontFamily="Consolas" TextChanged="Expression_Changed" PreviewKeyDown="Expression_PreviewKeyDown"
+                                 ToolTip="Type a field, function or value name and pick from the list (Tab or Enter); fields can be written by name, or Field(&quot;name&quot;) when the name has spaces" />
+                        <Popup x:Name="CompletionPopup" PlacementTarget="{Binding ElementName=ExpressionBox}" Placement="Bottom" StaysOpen="True" AllowsTransparency="True">
+                            <Border Background="White" BorderBrush="#9AA" BorderThickness="1">
+                                <ListBox x:Name="CompletionList" MaxHeight="170" MinWidth="240" FontFamily="Consolas" BorderThickness="0" MouseDoubleClick="Completion_DoubleClick" />
+                            </Border>
+                        </Popup>
+                        <TextBlock x:Name="ExpressionResult" TextWrapping="Wrap" Foreground="#2E5E2E" />
+                        <DockPanel Margin="0,4,0,0">
+                            <Button DockPanel.Dock="Right" Content="Use for the selected element" Click="UseExpression_Click" Padding="6,2" />
+                            <TextBlock Text="Version note" VerticalAlignment="Center" Margin="0,0,4,0" />
+                            <TextBox x:Name="NoteBox" ToolTip="A note kept with the saved version" Margin="0,0,6,0" />
+                        </DockPanel>
+                        <CheckBox x:Name="MineBox" Visibility="Collapsed" />
+                        <ComboBox x:Name="ThemeBox" Visibility="Collapsed" />
+                    </StackPanel>
+                </DockPanel>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

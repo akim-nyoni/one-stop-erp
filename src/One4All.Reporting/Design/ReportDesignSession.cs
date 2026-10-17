@@ -736,6 +736,128 @@ public sealed class ReportDesignSession
         return null;
     }
 
+    /// <summary>The groups as text: "Field; Other desc".</summary>
+    /// <returns>The text.</returns>
+    public string GroupsText() => string.Join("; ", Definition.Groups.Select(g => g.Descending ? $"{g.Expression} desc" : g.Expression));
+
+    /// <summary>Sets the groups from text (see <see cref="GroupsText"/>); blank clears them. Group sections beyond the new count are removed.</summary>
+    /// <param name="text">The text.</param>
+    /// <returns>Null, or why the text was refused.</returns>
+    public string? SetGroups(string? text)
+    {
+        List<ReportGroup> groups = [];
+        foreach (string part in (text ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            bool descending = part.EndsWith(" desc", StringComparison.OrdinalIgnoreCase);
+            string expression = (descending ? part[..^5] : part.EndsWith(" asc", StringComparison.OrdinalIgnoreCase) ? part[..^4] : part).Trim();
+            if (expression.Length == 0 || expression.Equals("desc", StringComparison.OrdinalIgnoreCase) || expression.Equals("asc", StringComparison.OrdinalIgnoreCase))
+            {
+                return "Each group needs a field or expression, optionally followed by desc.";
+            }
+
+            ReportGroup existing = Definition.Groups.FirstOrDefault(g => string.Equals(g.Expression, expression, StringComparison.OrdinalIgnoreCase)) ?? new ReportGroup { Expression = expression };
+            existing.Descending = descending;
+            groups.Add(existing);
+        }
+
+        Checkpoint();
+        Definition.Groups = groups;
+        Definition.Bands.RemoveAll(b => b.Type is BandType.GroupHeader or BandType.GroupFooter && b.GroupLevel > groups.Count);
+        return null;
+    }
+
+    /// <summary>Adds a group section for a group, adding the group when it is new (a header gets a field element for the group expression).</summary>
+    /// <param name="type">GroupHeader or GroupFooter.</param>
+    /// <param name="expression">The group's field or expression.</param>
+    /// <returns>The section.</returns>
+    public ReportBand AddGroupBand(BandType type, string expression)
+    {
+        if (type is not (BandType.GroupHeader or BandType.GroupFooter))
+        {
+            throw new ArgumentException("A group section is a GroupHeader or a GroupFooter.", nameof(type));
+        }
+
+        string key = (expression ?? string.Empty).Trim();
+        if (key.Length == 0)
+        {
+            throw new ArgumentException("A group needs a field or expression.", nameof(expression));
+        }
+
+        Checkpoint();
+        int level = Definition.Groups.FindIndex(g => string.Equals(g.Expression, key, StringComparison.OrdinalIgnoreCase)) + 1;
+        if (level == 0)
+        {
+            Definition.Groups.Add(new ReportGroup { Expression = key });
+            level = Definition.Groups.Count;
+        }
+
+        if (Definition.Bands.FirstOrDefault(b => b.Type == type && b.GroupLevel == level) is ReportBand existing)
+        {
+            return existing;
+        }
+
+        ReportBand band = new() { Type = type, GroupLevel = level, Height = 18 };
+        if (type == BandType.GroupHeader)
+        {
+            band.Elements.Add(new ReportElement { Kind = ElementKind.Field, Name = UniqueName("Field"), FieldName = key, X = 0, Y = 1, Width = 160, Height = 16, Bold = true });
+        }
+
+        Definition.Bands.Add(band);
+        Definition.Bands.Sort((a, b) => a.Type != b.Type ? ((int)a.Type).CompareTo((int)b.Type) : a.Type == BandType.GroupFooter ? b.GroupLevel.CompareTo(a.GroupLevel) : a.GroupLevel.CompareTo(b.GroupLevel));
+        return band;
+    }
+
+    /// <summary>Sets the report's name and description (undoable).</summary>
+    /// <param name="name">The name.</param>
+    /// <param name="description">The description, or null to leave it.</param>
+    /// <returns>Null, or why it was refused.</returns>
+    public string? SetReportInfo(string? name, string? description)
+    {
+        string title = (name ?? string.Empty).Trim();
+        if (title.Length == 0)
+        {
+            return "The report needs a name.";
+        }
+
+        Checkpoint();
+        Definition.Name = title;
+        if (description is not null)
+        {
+            Definition.Description = description.Trim().Length == 0 ? null : description.Trim();
+        }
+
+        return null;
+    }
+
+    /// <summary>Sets one property on several elements as one undoable step (the formatting toolbar).</summary>
+    /// <param name="names">The elements.</param>
+    /// <param name="property">The property.</param>
+    /// <param name="value">The value as text.</param>
+    /// <returns>Null, or the first problem.</returns>
+    public string? SetPropertyOnAll(IEnumerable<string> names, string property, string? value)
+    {
+        List<string> list = [.. names];
+        if (list.Count == 0)
+        {
+            return "Select an element first.";
+        }
+
+        int depth = _undo.Count;
+        string? problem = null;
+        foreach (string name in list)
+        {
+            problem ??= SetProperty(name, property, value);
+        }
+
+        // One undo step for the whole toolbar action: each element's checkpoint collapses into the first (the state before the action).
+        while (_undo.Count > depth + 1)
+        {
+            _undo.Pop();
+        }
+
+        return problem;
+    }
+
     private string UniqueGroupName()
     {
         HashSet<string> used = [.. Definition.Bands.SelectMany(b => b.Elements).Select(e => e.GroupName).Where(g => g is not null)!];

@@ -20,9 +20,10 @@ using One4All.Reporting.Model;
 namespace One4All.Desktop;
 
 /// <summary>
-/// The banded report designer (brief §13.2): bands drawn to scale on a snap grid; elements placed, dragged, resized, aligned, sized and
-/// distributed; a property panel; a field list from the report's data; an expression editor previewed on sample data; house-style themes;
-/// undo / redo; a live preview; and saving as a new company version (system reports are never edited in place).
+/// The banded report designer (brief §13.2), laid out as the Sage Report Designer is (see BandedDesignerWindow.Sage.cs for the chrome): sections drawn to
+/// scale on a snap grid; elements placed by a toolbox, dragged, resized, aligned, sized and distributed; a categorised property grid; variables from the
+/// report's data; an expression editor previewed on sample data; house-style themes; undo / redo; a live preview; and saving as a new company version
+/// (system reports are never edited in place).
 /// </summary>
 public partial class BandedDesignerWindow : Window
 {
@@ -53,6 +54,7 @@ public partial class BandedDesignerWindow : Window
         ThemeBox.ItemsSource = ReportTheme.BuiltIn;
         ThemeBox.DisplayMemberPath = nameof(ReportTheme.Name);
         ThemeBox.SelectedIndex = 0;
+        InitialiseChrome();
         Loaded += async (_, _) => await LoadCatalogueAsync().ConfigureAwait(true);
     }
 
@@ -67,8 +69,10 @@ public partial class BandedDesignerWindow : Window
             .Where(r => r.Scope == ReportScope.System || (r.Scope == ReportScope.Company && r.CompanyId == _companyId)).ToListAsync().ConfigureAwait(true);
 
         // The company's version stands in for the system report it copies.
-        ReportBox.ItemsSource = records.GroupBy(r => r.Code).Select(g => g.OrderByDescending(r => r.Scope).First())
+        _catalogue = records.GroupBy(r => r.Code).Select(g => g.OrderByDescending(r => r.Scope).First())
             .OrderBy(r => r.Module).ThenBy(r => r.Name).Select(r => new DesignerReport(r.Code, r.Name, r.Module, r.DefinitionJson, r.Scope == ReportScope.Company)).ToList();
+        ReportBox.ItemsSource = _catalogue;
+        BuildFiles();
         Status.Text = "Choose a report to design (system reports are saved as your company's own version).";
     }
 
@@ -87,6 +91,7 @@ public partial class BandedDesignerWindow : Window
         _selected.Clear();
         await LoadSampleAsync(definition).ConfigureAwait(true);
         FieldList.ItemsSource = _session.Fields(_sample.FirstOrDefault());
+        BuildVariables();
         Render();
         Status.Text = $"{report.Name}: {_sample.Count} sample row(s). Drag to move, drag the corner to resize, Ctrl+click to select several.";
     }
@@ -126,9 +131,11 @@ public partial class BandedDesignerWindow : Window
 
         double width = _session.PrintableWidth * Zoom;
         BandsPanel.Children.Add(new Border { Child = Ruler(width, true), Margin = new Thickness(RulerSize, 0, 0, 2), ToolTip = "Millimetres across the printable width" });
+        int number = 0;
         foreach (ReportBand band in _session.Definition.Bands)
         {
-            DockPanel strip = new() { Background = new SolidColorBrush(Color.FromRgb(0xDD, 0xE6, 0xDD)), Width = width, Margin = new Thickness(RulerSize, 0, 0, 0) };
+            number++;
+            DockPanel strip = new() { Background = new SolidColorBrush(Color.FromRgb(0xDC, 0xE3, 0xEC)), Width = width, Margin = new Thickness(RulerSize, 0, 0, 0) };
             TextBox height = new() { Text = band.Height.ToString("0.#", CultureInfo.InvariantCulture), Width = 44, Tag = band.Type, ToolTip = "Band height (points)" };
             height.KeyDown += BandHeight_KeyDown;
             DockPanel.SetDock(height, Dock.Right);
@@ -144,7 +151,7 @@ public partial class BandedDesignerWindow : Window
             }.OfType<string>());
             strip.Children.Add(new TextBlock
             {
-                Text = $" {band.Type}{(band.Type is BandType.GroupHeader or BandType.GroupFooter ? $" {band.GroupLevel}" : string.Empty)}{(flags.Length > 0 ? "   (" + flags + ")" : string.Empty)}",
+                Text = $" {DesignerCatalogue.BandCaption(number, band, _session.Definition)}{(flags.Length > 0 ? "   (" + flags + ")" : string.Empty)}",
                 FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center,
             });
             BandsPanel.Children.Add(strip);
@@ -154,6 +161,14 @@ public partial class BandedDesignerWindow : Window
             {
                 if (e.OriginalSource == canvas)
                 {
+                    if (_tool != "Pointer")
+                    {
+                        Point at = e.GetPosition(canvas);
+                        PlaceTool(band.Type, at.X / Zoom, at.Y / Zoom);
+                        e.Handled = true;
+                        return;
+                    }
+
                     BandBox.SelectedItem = band.Type;
                     _selected.Clear();
                     Render();
@@ -168,6 +183,7 @@ public partial class BandedDesignerWindow : Window
         }
 
         ShowProperties();
+        BuildExplorer();
     }
 
     private Brush GridBrush()
@@ -344,15 +360,19 @@ public partial class BandedDesignerWindow : Window
         if (_session is null || _selected.Count == 0)
         {
             SelectionTitle.Text = "Properties (select an element)";
+            SyncFormatBar();
             return;
         }
 
         string name = _selected[0];
         SelectionTitle.Text = _selected.Count == 1 ? $"Properties — {name}" : $"Properties — {name} (+{_selected.Count - 1} more; anchor for alignment)";
+        _properties.Add(new PropertyRow("Name", name));
         foreach (string property in ReportDesignSession.EditableProperties)
         {
             _properties.Add(new PropertyRow(property, _session.GetProperty(name, property) ?? string.Empty));
         }
+
+        SyncFormatBar();
     }
 
     private void Property_LostFocus(object sender, RoutedEventArgs e) => ApplyProperty((TextBox)sender);
@@ -545,13 +565,13 @@ public partial class BandedDesignerWindow : Window
             return;
         }
 
-        string name = _session.AddElement(TargetBand, ElementKind.Label, 4, 2, null);
+        string name = _session.AddElement(PlaceBand, ElementKind.Label, PlaceX, PlaceY, null);
         if (_session.Find(name).Element is ReportElement element)
         {
             element.Kind = ElementKind.Image;
             string type = dialog.FileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "png" : "jpeg";
             element.ImageData = $"data:image/{type};base64,{Convert.ToBase64String(bytes)}";
-            _session.SetBandHeight(TargetBand, Math.Max(_session.Definition.BandOfType(TargetBand)!.Height, 64));
+            _session.SetBandHeight(PlaceBand, Math.Max(_session.Definition.BandOfType(PlaceBand)!.Height, 64));
             _session.Resize(name, 120, 60);
         }
 
@@ -565,12 +585,12 @@ public partial class BandedDesignerWindow : Window
             return;
         }
 
-        string name = _session.AddElement(TargetBand, ElementKind.Label, 4, 2, null);
+        string name = _session.AddElement(PlaceBand, ElementKind.Label, PlaceX, PlaceY, null);
         if (_session.Find(name).Element is ReportElement element)
         {
             element.Kind = ElementKind.Image;
             element.Expression = "CompanyLogo";
-            _session.SetBandHeight(TargetBand, Math.Max(_session.Definition.BandOfType(TargetBand)!.Height, 64));
+            _session.SetBandHeight(PlaceBand, Math.Max(_session.Definition.BandOfType(PlaceBand)!.Height, 64));
             _session.Resize(name, 120, 60);
         }
 
@@ -609,7 +629,7 @@ public partial class BandedDesignerWindow : Window
             return;
         }
 
-        string name = _session.AddElement(TargetBand, kind, 4, 2, content);
+        string name = _session.AddElement(PlaceBand, kind, PlaceX, PlaceY, content);
         if (asKind is ElementKind finalKind && _session.Find(name).Element is ReportElement element)
         {
             element.Kind = finalKind;
@@ -620,7 +640,7 @@ public partial class BandedDesignerWindow : Window
 
             if (width > 0)
             {
-                _session.SetBandHeight(TargetBand, Math.Max(_session.Definition.BandOfType(TargetBand)!.Height, height + 4));
+                _session.SetBandHeight(PlaceBand, Math.Max(_session.Definition.BandOfType(PlaceBand)!.Height, height + 4));
                 _session.Resize(name, width, height);
             }
         }
@@ -864,15 +884,8 @@ public partial class BandedDesignerWindow : Window
     /// <param name="Value">Its value as text.</param>
     private sealed record PropertyRow(string Name, string Value)
     {
-        // The property grid's categories (brief §13.2): position and size, text and font, colours and borders, data, then the rest.
-        public string Category => Name switch
-        {
-            "X" or "Y" or "Width" or "Height" or "Rotation" or "Padding" => "Position and size",
-            "Text" or "FontFamily" or "FontSize" or "Bold" or "Italic" or "Underline" or "HAlign" or "VAlign" or "WordWrap" or "AutoShrink" or "NullText" => "Text and font",
-            "Foreground" or "Background" or "BorderThickness" or "BorderColor" or "BorderLeft" or "BorderTop" or "BorderRight" or "BorderBottom" => "Colours and borders",
-            "FieldName" or "Expression" or "Format" or "Aggregate" or "AggregateField" or "ChartCategoryField" or "SubReportCode" or "SubReportLinks" or "BarcodeSymbology" => "Data",
-            _ => "More",
-        };
+        // The property grid's categories, as the Sage Report Designer groups them: Appearance, Behaviour, Data, Design, Layout.
+        public string Category => DesignerCatalogue.Category(Name);
     }
 
     /// <summary>Duplicates the selected elements (Ctrl+D).</summary>
