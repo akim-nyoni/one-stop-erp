@@ -212,6 +212,7 @@ public static partial class ScreenPermissions
         ("System Manager", @"currency", "System.Currency"),
         ("System Manager", @"branch", "System.Branch"),
         ("System Manager", @"industry|sample data", "System.Industry"),
+        ("System Manager", @"message template|message batch", "System.Company"),
         ("System Manager", @"company|logo|language", "System.Company"),
         ("System Manager", @"role", "Security.Role"),
         ("System Manager", @"group", "Security.Group"),

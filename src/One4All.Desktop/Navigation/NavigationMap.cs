@@ -365,7 +365,7 @@ public static class NavigationMap
         [
             G("Company",
                 O("System Manager: Create a company"), O("System Manager: Set up a company for an industry"), O("System Manager: Add an industry to this company"), O("System Manager: Load sample data for testing"),
-                O("System Manager: Add a branch"), O("System Manager: Set the company logo"), O("System Manager: Company email and SMS settings"),
+                O("System Manager: Add a branch"), O("System Manager: Set the company logo"), O("System Manager: Company email and SMS settings"), O("System Manager: Message templates"), O("System Manager: Message batches"),
                 O("System Manager: Language and terminology"), O("System Manager: Attachments", "Attachment rules")),
             G("Reports",
                 W("report-viewer", "Run a report", "Choose a report, fill its options and view, print or export it.", MenuArea.Enquiries),

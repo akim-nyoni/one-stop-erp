@@ -159,6 +159,7 @@ await using (AsyncServiceScope scope = app.Services.CreateAsyncScope())
     await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Database.MigrateAsync();
     await scope.ServiceProvider.GetRequiredService<PermissionSeeder>().SeedAsync();
     await scope.ServiceProvider.GetRequiredService<AdministratorSeeder>().SeedAsync();
+    await scope.ServiceProvider.GetRequiredService<MessageTemplateSeeder>().SeedAsync();
 
     One4All.Application.Abstractions.Licensing.ILicenceService licence = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Licensing.ILicenceService>();
     await licence.ReloadAsync();
@@ -2940,6 +2941,7 @@ api.MapPost("/api/payroll/runs", async (long companyId, string period, DateOnly 
     ValueResponse(await payroll.RunGroupAsync(companyId, payGroup, period, payDate, netPayAccount, documentNumber, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("PayrollRun");
+
 
 app.Run();
 

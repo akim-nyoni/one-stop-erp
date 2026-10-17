@@ -8,6 +8,7 @@ using One4All.Application.Abstractions.MasterData;
 using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Onboarding;
 using One4All.Application.Abstractions.Security;
+using One4All.Application.Communications;
 using One4All.Application.MasterData;
 using One4All.Core.Security;
 using One4All.Core.Accounting;
@@ -176,6 +177,79 @@ public static partial class OperationCatalogue
 
                 return await messaging.DescribeAsync(c.CompanyId).ConfigureAwait(true);
             },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Message templates", ListTitle = "Message templates",
+            Description = "The email, SMS and WhatsApp templates bulk sends use (statements STATEMENT, fee statements FEES, reminders REMINDER, bills BILL), with {{Field}} merge fields. "
+                + "Save: creates or rewords a template (\\n in the body starts a new line). Preview: renders it with sample values \"Name=Thandi;Account=C001\" and lists fields still blank. "
+                + "Seed standard: adds the standard templates this company is missing without touching reworded ones.",
+            Fields = [Pick("Step", "Step", ["List", "Save", "Preview", "Seed standard"]), Opt("Code", "Template code"), Pick("Channel", "Channel", ["Email", "Sms", "WhatsApp", "InApp"]), Opt("Language", "Language", "en"),
+                Opt("DocumentType", "Document type (save)"), Opt("Subject", "Subject (email)"), Opt("Body", "Body (save; \\n for a new line)"), Opt("Values", "Sample values (preview), Field=value; …")],
+            Run = async (c, i) =>
+            {
+                INotificationService messages = c.Get<INotificationService>();
+                Core.Communications.MessageChannel channel = Enum.Parse<Core.Communications.MessageChannel>(i.Text("Channel"));
+                string language = i.Optional("Language") ?? "en";
+                switch (i.Text("Step"))
+                {
+                    case "Save":
+                        IReadOnlyList<string> fields = Check(await messages.SaveTemplateAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("DocumentType") ?? string.Empty, language, channel,
+                            i.Optional("Subject") ?? string.Empty, (i.Optional("Body") ?? string.Empty).Replace("\\n", Environment.NewLine, StringComparison.Ordinal)).ConfigureAwait(true));
+                        return $"Template {i.Optional("Code")?.ToUpperInvariant()} ({channel}, {language}) saved; merge fields: {(fields.Count == 0 ? "none" : string.Join(", ", fields))}.";
+                    case "Preview":
+                        Dictionary<string, string> values = (i.Optional("Values") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                            .Select(pair => pair.Split('=', 2)).Where(parts => parts.Length == 2).ToDictionary(parts => parts[0].Trim(), parts => parts[1].Trim(), StringComparer.OrdinalIgnoreCase);
+                        RenderedMessage rendered = Check(await messages.PreviewAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, language, channel, values).ConfigureAwait(true));
+                        return (rendered.Subject.Length == 0 ? string.Empty : $"Subject: {rendered.Subject}{Environment.NewLine}") + rendered.Body
+                            + (rendered.MissingFields.Count == 0 ? string.Empty : $"{Environment.NewLine}Fields without a value: {string.Join(", ", rendered.MissingFields)}");
+                    case "Seed standard":
+                        int added = await c.Get<Infrastructure.Persistence.Seeding.MessageTemplateSeeder>().SeedAsync(c.CompanyId).ConfigureAwait(true);
+                        return added == 0 ? "Every standard template is already there." : $"{added} standard template(s) added.";
+                    default:
+                        List<Core.Communications.MessageTemplate> all = await c.Db.Set<Core.Communications.MessageTemplate>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId)
+                            .OrderBy(x => x.Code).ThenBy(x => x.Channel).ThenBy(x => x.Language).ToListAsync().ConfigureAwait(true);
+                        return all.Count == 0 ? "No templates; Seed standard adds the standard ones."
+                            : string.Join(Environment.NewLine, all.Select(x => $"{x.Code,-12} {x.Channel,-8} {x.Language,-4} {x.DocumentType,-14} {(x.Subject.Length == 0 ? x.Body : x.Subject)[..Math.Min(70, (x.Subject.Length == 0 ? x.Body : x.Subject).Length)]}"));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Communications.MessageTemplate>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ThenBy(x => x.Channel).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Channel", x => x.Channel), ("Language", x => x.Language), ("Document", x => x.DocumentType), ("Subject", x => x.Subject)),
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Message batches", ListTitle = "Message batches",
+            Description = "Every bulk send (statements, bills, reminders, fee statements, payslips) with how many messages are queued, sent and failed. Status: one batch's failures by recipient. "
+                + "Despatch now: sends everything queued (retrying failures up to the attempts given).",
+            Fields = [Pick("Step", "Step", ["List", "Status", "Despatch now"]), OptNum("Batch", "Batch id (status)"), Num("Attempts", "Attempts before a message is failed (despatch)", "3")],
+            Run = async (c, i) =>
+            {
+                INotificationService messages = c.Get<INotificationService>();
+                switch (i.Text("Step"))
+                {
+                    case "Status":
+                        BatchStatus status = Check(await messages.BatchStatusAsync(c.CompanyId, (long)(i.OptionalNumber("Batch") ?? 0m)).ConfigureAwait(true));
+                        return $"{status.Name}: queued {status.Queued}, sent {status.Sent}, failed {status.Failed}" + (status.Failures.Count == 0 ? string.Empty : Environment.NewLine + string.Join(Environment.NewLine, status.Failures));
+                    case "Despatch now":
+                        DespatchRun run = await messages.DespatchAsync(c.CompanyId, (int)(i.OptionalNumber("Attempts") ?? 3m)).ConfigureAwait(true);
+                        return $"Sent {run.Sent}, retrying {run.Retrying}, failed {run.Failed}.";
+                    default:
+                        var batches = await (from b in c.Db.Set<Core.Communications.DespatchBatch>().AsNoTracking()
+                                             where b.CompanyId == c.CompanyId
+                                             orderby b.QueuedOn descending
+                                             select new
+                                             {
+                                                 b.Id, b.Name, b.TemplateCode, b.QueuedOn,
+                                                 Queued = c.Db.Set<Core.Communications.OutboundMessage>().Count(m => m.BatchId == b.Id && m.Status == Core.Communications.MessageStatus.Queued),
+                                                 Sent = c.Db.Set<Core.Communications.OutboundMessage>().Count(m => m.BatchId == b.Id && m.Status == Core.Communications.MessageStatus.Sent),
+                                                 Failed = c.Db.Set<Core.Communications.OutboundMessage>().Count(m => m.BatchId == b.Id && m.Status == Core.Communications.MessageStatus.Failed),
+                                             }).Take(200).ToListAsync().ConfigureAwait(true);
+                        return batches.Count == 0 ? "No message batches yet."
+                            : string.Join(Environment.NewLine, batches.Select(b => $"{b.Id,6} {b.QueuedOn:yyyy-MM-dd HH:mm} {b.TemplateCode,-10} {b.Name,-40} queued {b.Queued,5} sent {b.Sent,5} failed {b.Failed,5}"));
+                }
+            },
+            List = async c => Table(await c.Db.Set<Core.Communications.DespatchBatch>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.QueuedOn).Take(200).ToListAsync().ConfigureAwait(true),
+                ("Id", x => x.Id), ("Queued", x => x.QueuedOn.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)), ("Template", x => x.TemplateCode), ("Name", x => x.Name)),
         };
         yield return new Operation
         {

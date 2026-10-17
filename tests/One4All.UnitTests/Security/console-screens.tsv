@@ -423,6 +423,8 @@ System Manager	Language and terminology	False
 System Manager	Licence	False	
 System Manager	Load sample data for testing	False	
 System Manager	Manage webhooks	False	
+System Manager	Message batches	False	
+System Manager	Message templates	False	
 System Manager	Number sequences	False	
 System Manager	Payroll encryption	False	
 System Manager	Printers per workstation	False	
