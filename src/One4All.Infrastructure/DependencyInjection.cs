@@ -296,6 +296,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.PosJobReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportDataProvider, Reporting.RegistersReportDataProvider>();
         services.AddScoped<Application.Abstractions.Reporting.IReportRunner, Reporting.ReportRunner>();
+        services.AddScoped<Application.Abstractions.Reporting.IDrillThroughService, Reporting.DrillThroughService>();
         services.AddScoped<Application.Abstractions.Reporting.IReportParameterLookupService, Reporting.ReportParameterLookupService>();
 
         // Trading sub-ledgers (AR/AP + Cash Book).

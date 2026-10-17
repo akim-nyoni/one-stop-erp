@@ -22,7 +22,7 @@ public static class DrillThroughOpener
     /// <param name="services">The application services.</param>
     /// <param name="owner">The window opening it.</param>
     /// <param name="companyId">The company.</param>
-    /// <param name="target">Journal, Account, Customer, Supplier or Item.</param>
+    /// <param name="target">Journal, Account, Customer, Supplier or Item here; Document, PurchaseOrder, Grn, Receipt, Stand, Payslip and TaxCode through the drill-through service.</param>
     /// <param name="key">The record's number or code.</param>
     /// <returns>A task.</returns>
     public static async Task OpenAsync(IServiceProvider services, Window owner, long companyId, string target, string key)
@@ -46,7 +46,8 @@ public static class DrillThroughOpener
                 ? Text(await scope.ServiceProvider.GetRequiredService<IStatementService>().RenderSupplierStatementTextAsync(companyId, supplier, today, 80).ConfigureAwait(true))
                 : null,
             "Item" => await ItemAsync(db, companyId, key).ConfigureAwait(true),
-            _ => null,
+            _ => await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IDrillThroughService>().DescribeAsync(companyId, target, key).ConfigureAwait(true) is { IsSuccess: true } described
+                ? described.Value : null,
         };
         ShowText(owner, $"{target} {key}", text ?? $"{target} {key} was not found.");
     }

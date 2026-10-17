@@ -48,7 +48,7 @@ public sealed class ReportElement
     public string? FieldName { get; set; }
 
     /// <summary>
-    /// Gets or sets what clicking the value opens (Journal, Account, Customer, Supplier, Item...), with <see cref="DrillField"/> giving the key; when
+    /// Gets or sets what clicking the value opens (Journal, Account, Customer, Supplier, Item, Document, PurchaseOrder, Grn, Receipt, Stand, Payslip, TaxCode...), with <see cref="DrillField"/> giving the key; when
     /// empty, a field named like a journal number, account, customer, supplier or item code drills to that record by itself.
     /// </summary>
     public string? DrillTarget { get; set; }

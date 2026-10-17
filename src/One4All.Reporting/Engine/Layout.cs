@@ -251,6 +251,13 @@ public static class DrillThrough
             "customercode" or "customer" or "debtorcode" => "Customer",
             "suppliercode" or "supplier" or "creditorcode" => "Supplier",
             "itemcode" or "item" or "stockcode" => "Item",
+            "document" or "documentnumber" or "documentno" or "invoice" or "invoicenumber" or "invoiceno" or "bill" or "billnumber" or "creditnote" or "certificate" => "Document",
+            "order" or "ordernumber" or "purchaseorder" or "ponumber" or "po" => "PurchaseOrder",
+            "grn" or "grnnumber" => "Grn",
+            "receipt" or "receiptnumber" or "receiptno" => "Receipt",
+            "stand" or "standnumber" => "Stand",
+            "payslip" => "Payslip",
+            "taxcode" => "TaxCode",
             _ => null,
         };
     }
