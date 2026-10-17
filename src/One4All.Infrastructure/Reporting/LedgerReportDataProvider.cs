@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Core.Accounting;
 using One4All.Core.Budgeting;
+using One4All.Core.Common;
 using One4All.Core.System;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
@@ -214,9 +215,21 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
             int? last = t.LastPostedPeriod is int p ? ((p / 100) * 12) + (p % 100) - 1 : null;
             int behind = last is int l ? current - l : int.MaxValue;
             string status = behind switch { <= 0 => "Posted for this month", 1 => "Due for this month", int.MaxValue => "Never posted", _ => $"Missed {behind - 1} month(s)" };
+            if (behind > 0 && t.NotDueReason(asAt) is string notDue)
+            {
+                status = $"Not due: {notDue}";
+            }
             return Row(("Code", t.Code), ("Description", t.Description), ("LastPosted", t.LastPostedPeriod is int lp ? $"{lp / 100}-{lp % 100:00}" : "—"), ("Status", status),
-                ("Value", t.Lines.Where(x => x.IsDebit).Sum(x => x.Amount)));
+                ("Value", t.Lines.Where(x => x.IsDebit).Sum(x => x.Amount)), ("Schedule", Schedule(t)));
         })];
+
+        static string Schedule(RecurringJournal t)
+        {
+            string every = t.IntervalMonths switch { 1 => "monthly", 3 => "quarterly", 6 => "half-yearly", 12 => "yearly", int n => $"every {n} months" };
+            string span = (t.StartDate is DateOnly s ? $" from {s:yyyy-MM}" : string.Empty) + (t.EndDate is DateOnly e ? $" to {e:yyyy-MM-dd}" : string.Empty)
+                + (t.MaxOccurrences is int m ? $", {t.Occurrences} of {m}" : string.Empty) + (t.AutoReverse ? ", auto-reverse" : string.Empty) + (t.Currency is CurrencyCode c ? $", {c.Value}" : string.Empty);
+            return every + span;
+        }
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AccrualsAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)

@@ -53,6 +53,82 @@ public sealed class RecurringJournal : AuditableEntity, ICompanyScoped
     /// <summary>Whether the template is active.</summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>Months between postings: 1 monthly, 3 quarterly, 6 half-yearly, 12 yearly.</summary>
+    public int IntervalMonths { get; private set; } = 1;
+
+    /// <summary>The first month it may post in, when limited.</summary>
+    public DateOnly? StartDate { get; private set; }
+
+    /// <summary>The last date it may post on, when limited.</summary>
+    public DateOnly? EndDate { get; private set; }
+
+    /// <summary>How many times it may post in all, when limited.</summary>
+    public int? MaxOccurrences { get; private set; }
+
+    /// <summary>How many times it has posted.</summary>
+    public int Occurrences { get; private set; }
+
+    /// <summary>Whether each posting is reversed on the first day of the following month (an accrual template).</summary>
+    public bool AutoReverse { get; private set; }
+
+    /// <summary>The currency the amounts are in; null is the company's base currency.</summary>
+    public CurrencyCode? Currency { get; private set; }
+
+    /// <summary>Sets the schedule: how often, between which dates, how many times, whether to auto-reverse, and in which currency.</summary>
+    /// <param name="intervalMonths">Months between postings (1, 3, 6 or 12).</param>
+    /// <param name="startDate">The first month it may post in, or null for any.</param>
+    /// <param name="endDate">The last date it may post on, or null for no end.</param>
+    /// <param name="maxOccurrences">How many times it may post in all, or null for no limit.</param>
+    /// <param name="autoReverse">Whether each posting is reversed on the first day of the next month.</param>
+    /// <param name="currency">The currency of the amounts, or null for base.</param>
+    public void Schedule(int intervalMonths, DateOnly? startDate, DateOnly? endDate, int? maxOccurrences, bool autoReverse, CurrencyCode? currency)
+    {
+        IntervalMonths = intervalMonths;
+        StartDate = startDate;
+        EndDate = endDate;
+        MaxOccurrences = maxOccurrences;
+        AutoReverse = autoReverse;
+        Currency = currency;
+    }
+
+    /// <summary>Why the template may not post on a date, or null when it may (ignoring whether the month is already posted).</summary>
+    /// <param name="date">The posting date.</param>
+    /// <returns>The reason, or null.</returns>
+    public string? NotDueReason(DateOnly date)
+    {
+        if (StartDate is DateOnly start && PeriodOf(date) < PeriodOf(start))
+        {
+            return $"starts {start:yyyy-MM}";
+        }
+
+        if (EndDate is DateOnly end && date > end)
+        {
+            return $"ended {end:yyyy-MM-dd}";
+        }
+
+        if (MaxOccurrences is int max && Occurrences >= max)
+        {
+            return $"posted {Occurrences} of {max} times";
+        }
+
+        if (IntervalMonths > 1)
+        {
+            DateOnly anchor = StartDate ?? new DateOnly(date.Year, 1, 1);
+            int months = ((date.Year - anchor.Year) * 12) + date.Month - anchor.Month;
+            if (months < 0 || months % IntervalMonths != 0)
+            {
+                return $"every {IntervalMonths} months from {anchor:yyyy-MM}";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Whether the template is due to post on the date: active, within its schedule and not yet posted for the month.</summary>
+    /// <param name="date">The posting date.</param>
+    /// <returns>True when due.</returns>
+    public bool IsDueOn(DateOnly date) => IsActive && !IsPostedFor(date) && NotDueReason(date) is null;
+
     /// <summary>The template lines.</summary>
     public IReadOnlyList<RecurringJournalLine> Lines => _lines.AsReadOnly();
 
@@ -92,7 +168,11 @@ public sealed class RecurringJournal : AuditableEntity, ICompanyScoped
 
     /// <summary>Records that the template was posted for the month of <paramref name="date"/>.</summary>
     /// <param name="date">The posting date.</param>
-    public void RecordPosted(DateOnly date) => LastPostedPeriod = PeriodOf(date);
+    public void RecordPosted(DateOnly date)
+    {
+        LastPostedPeriod = PeriodOf(date);
+        Occurrences++;
+    }
 
     /// <summary>Activates or deactivates the template.</summary>
     /// <param name="isActive">Whether the template is active.</param>

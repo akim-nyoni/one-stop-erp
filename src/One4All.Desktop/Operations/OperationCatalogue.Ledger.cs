@@ -351,33 +351,50 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Recurring journals", ListTitle = "Recurring journals",
-            Description = "Create: a journal posted again each period (\"6100 Dr 500 cc=ADM; 2100 Cr 500\"). Post: one of them on a date. Post all: every active one. Stop / restart one.",
-            Fields = [Pick("Step", "Step", ["Create", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Lines (create)"),
-                Opt("Narrative", "Narrative"), Opt("Document", "Document number (post)"), Today()],
+            Description = "Create: a journal posted again on a schedule (\"6100 Dr 500 cc=ADM; 2100 Cr 500\"): monthly, quarterly, half-yearly or yearly, from a start month to an end date or for "
+                + "a number of times, in a currency, and reversed on the first of the next month when it is an accrual. Schedule: change those on one. Post: one of them on a date. Post all: every one "
+                + "due. Stop / restart one.",
+            Fields = [Pick("Step", "Step", ["Create", "Schedule", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Lines (create)"),
+                Opt("Narrative", "Narrative"), Pick("Frequency", "Frequency", ["Monthly", "Quarterly", "Half-yearly", "Yearly"]), Opt("Start", "Start month (yyyy-MM, blank: any)"),
+                Opt("End", "End date (yyyy-MM-dd, blank: none)"), OptNum("Times", "Post at most this many times (blank: no limit)"), Tick("Reverse", "Auto-reverse next month", false),
+                Opt("Currency", "Currency (blank: base)"), Opt("Document", "Document number (post)"), Today()],
             Run = async (c, i) =>
             {
                 IRecurringJournalService recurring = c.Get<IRecurringJournalService>();
                 async Task<long> Id() => await FindAsync(c.Db.Set<Core.Accounting.RecurringJournal>(), r => r.CompanyId == c.CompanyId && r.Code == (i.Optional("Code") ?? string.Empty).ToUpper(), r => r.Id,
                     "recurring journal", i.Optional("Code") ?? string.Empty).ConfigureAwait(true);
+                RecurringSchedule Schedule()
+                {
+                    int interval = i.Text("Frequency") switch { "Quarterly" => 3, "Half-yearly" => 6, "Yearly" => 12, _ => 1 };
+                    DateOnly? start = i.Optional("Start") is string s ? DateOnly.ParseExact(s + "-01", "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : null;
+                    DateOnly? end = i.Optional("End") is string e ? DateOnly.ParseExact(e, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : null;
+                    return new RecurringSchedule(interval, start, end, i.OptionalNumber("Times") is decimal n ? (int)n : null, i.Flag("Reverse"), i.Optional("Currency") is string cur ? CurrencyCode.Parse(cur) : null);
+                }
+
                 switch (i.Text("Step"))
                 {
                     case "Create":
                         List<RecurringJournalLineInput> lines = [.. JournalLines(i.Optional("Lines") ?? string.Empty)
                             .Select(l => new RecurringJournalLineInput(l.AccountCode, l.Side == JournalSide.Debit, l.TransactionAmount, l.CostCentre, l.Department))];
-                        return Check(await recurring.CreateAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Description") ?? string.Empty, "GL", lines, i.Optional("Narrative")).ConfigureAwait(true),
+                        return Check(await recurring.CreateAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Description") ?? string.Empty, "GL", lines, Schedule(), i.Optional("Narrative")).ConfigureAwait(true),
                             _ => "Recurring journal created.");
+                    case "Schedule":
+                        return Check(await recurring.SetScheduleAsync(c.CompanyId, await Id().ConfigureAwait(true), Schedule()).ConfigureAwait(true), "Schedule changed.");
                     case "Post":
                         return $"Posted {Check(await recurring.PostAsync(c.CompanyId, await Id().ConfigureAwait(true), i.Date("Date"), i.Optional("Document")).ConfigureAwait(true))}.";
                     case "Post all":
                         IReadOnlyList<RecurringRunLine> run = Check(await recurring.PostAllActiveAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
-                        return run.Count == 0 ? "Nothing to post." : string.Join(Environment.NewLine, run.Select(r => $"{r.Code}: {r.JournalNumber}{(r.AlreadyPosted ? " (already posted)" : string.Empty)}"));
+                        return run.Count == 0 ? "Nothing to post." : string.Join(Environment.NewLine, run.Select(r => $"{r.Code}: {(r.AlreadyPosted ? "already posted" : r.Note ?? r.JournalNumber)}"
+                            + (r.ReversalJournalNumber is null ? string.Empty : $" (reversed by {r.ReversalJournalNumber})")));
                     default:
                         bool active = i.Text("Step") == "Restart";
                         return Check(await recurring.SetActiveAsync(c.CompanyId, await Id().ConfigureAwait(true), active).ConfigureAwait(true), active ? "Restarted." : "Stopped.");
                 }
             },
             List = async c => Table(await c.Db.Set<Core.Accounting.RecurringJournal>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", r => r.Code), ("Description", r => r.Description), ("Active", r => r.IsActive)),
+                ("Code", r => r.Code), ("Description", r => r.Description), ("Active", r => r.IsActive), ("Every", r => $"{r.IntervalMonths} month(s)"), ("Start", r => r.StartDate is DateOnly s ? D(s) : string.Empty),
+                ("End", r => r.EndDate is DateOnly e ? D(e) : string.Empty), ("Times", r => r.MaxOccurrences is int m ? $"{r.Occurrences} of {m}" : r.Occurrences.ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ("Reverses", r => r.AutoReverse), ("Currency", r => r.Currency?.Value ?? "base")),
         };
         yield return new Operation
         {

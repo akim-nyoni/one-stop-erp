@@ -18,7 +18,7 @@ public sealed record JournalCsvLine(int LineNumber, string AccountCode, string? 
 /// <param name="Date">The posting date.</param>
 /// <param name="Narrative">The first narrative given on its lines.</param>
 /// <param name="Lines">Its lines, in file order.</param>
-public sealed record ImportedJournal(string Reference, DateOnly Date, string? Narrative, IReadOnlyList<JournalCsvLine> Lines)
+public sealed record ImportedJournal(string Reference, DateOnly Date, string? Narrative, IReadOnlyList<JournalCsvLine> Lines, string? Currency = null, decimal? ExchangeRate = null)
 {
     /// <summary>The journal's total debits.</summary>
     public decimal TotalDebit => Lines.Sum(l => l.Debit);
@@ -71,7 +71,7 @@ public static class JournalCsvParser
         }
 
         List<string> order = [];
-        Dictionary<string, (DateOnly Date, List<JournalCsvLine> Lines, int FirstLine)> journals = new(StringComparer.Ordinal);
+        Dictionary<string, (DateOnly Date, List<JournalCsvLine> Lines, int FirstLine, string? Currency, decimal? Rate)> journals = new(StringComparer.Ordinal);
         for (int i = 1; i < rows.Length; i++)
         {
             if (string.IsNullOrWhiteSpace(rows[i]))
@@ -109,15 +109,41 @@ public static class JournalCsvParser
                 continue;
             }
 
+            // An optional currency (ISO code) and keyed rate on the journal; blank is the company's base currency at the table rate.
+            string currencyText = Field("CURRENCY").ToUpperInvariant();
+            string? currency = currencyText.Length == 0 ? null : currencyText;
+            if (currency is not null && (currency.Length != 3 || !currency.All(char.IsAsciiLetterUpper)))
+            {
+                errors.Add(new JournalCsvError(lineNumber, $"'{currencyText}' is not a currency code."));
+                continue;
+            }
+
+            decimal? rate = null;
+            if (Field("RATE").Length > 0)
+            {
+                if (!TryAmount(Field("RATE"), out decimal keyed) || keyed <= 0m)
+                {
+                    errors.Add(new JournalCsvError(lineNumber, $"'{Field("RATE")}' is not an exchange rate."));
+                    continue;
+                }
+
+                rate = keyed;
+            }
+
             if (!journals.TryGetValue(reference, out var journal))
             {
-                journal = (date, [], lineNumber);
+                journal = (date, [], lineNumber, currency, rate);
                 journals[reference] = journal;
                 order.Add(reference);
             }
             else if (journal.Date != date)
             {
                 errors.Add(new JournalCsvError(lineNumber, $"Journal {reference} has lines on different dates."));
+                continue;
+            }
+            else if (journal.Currency != currency || (rate is not null && journal.Rate is not null && journal.Rate != rate))
+            {
+                errors.Add(new JournalCsvError(lineNumber, $"Journal {reference} has lines in different currencies or at different rates."));
                 continue;
             }
 
@@ -127,7 +153,7 @@ public static class JournalCsvParser
         List<ImportedJournal> result = [];
         foreach (string reference in order)
         {
-            (DateOnly date, List<JournalCsvLine> lines, int firstLine) = journals[reference];
+            (DateOnly date, List<JournalCsvLine> lines, int firstLine, string? currency, decimal? rate) = journals[reference];
             decimal debits = lines.Sum(l => l.Debit);
             decimal credits = lines.Sum(l => l.Credit);
             if (debits != credits)
@@ -136,7 +162,7 @@ public static class JournalCsvParser
                 continue;
             }
 
-            result.Add(new ImportedJournal(reference, date, lines.Select(l => l.Narrative).FirstOrDefault(n => n is not null), lines));
+            result.Add(new ImportedJournal(reference, date, lines.Select(l => l.Narrative).FirstOrDefault(n => n is not null), lines, currency, rate));
         }
 
         if (result.Count == 0 && errors.Count == 0)

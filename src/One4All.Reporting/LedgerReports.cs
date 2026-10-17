@@ -61,7 +61,8 @@ public static class LedgerReports
             "GledYearEnd", [new Column("Section", "Section", 110), new Column("Item", "Item", 260), new Column("Value", "Value", 160)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("GL22", "Recurring Journals Due & Missed", "GeneralLedger", "Each active recurring template's last posted month against the date: posted, due or missed.",
             "GledRecurringDue", [new Column("Code", "Code", 80), new Column("Description", "Description", 180), new Column("LastPosted", "Last posted", 75), new Column("Status", "Status", 120),
-             new Column("Value", "Monthly value", 95, true)], [("AsAtDate", ParameterType.Date)]);
+             new Column("Value", "Value", 95, true), new Column("Schedule", "Schedule", 200)], [("AsAtDate", ParameterType.Date)]);
+
         yield return Listing("GL23", "Accruals, Prepayments & Deferred Income Schedule", "GeneralLedger", "Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise.",
             "GledAccruals", [new Column("Kind", "Kind", 100), new Column("Reference", "Reference", 110), new Column("Date", "Date / start", 75), new Column("Detail", "Detail", 220), new Column("Recognised", "Recognised", 90),
              new Column("Amount", "Amount / remaining", 100, true)], Period);

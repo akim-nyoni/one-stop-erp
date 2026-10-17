@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Accounting;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
@@ -56,7 +57,7 @@ public sealed class JournalImportService : IJournalImportService
                 CompanyId = companyId,
                 SourceModule = "GL",
                 PostingDate = journal.Date,
-                TransactionCurrency = company.BaseCurrency,
+                TransactionCurrency = journal.Currency is string currency ? CurrencyCode.Parse(currency) : company.BaseCurrency,
                 DocumentType = "JournalImport",
                 DocumentNumber = journal.Reference,
                 Narrative = journal.Narrative,
@@ -68,6 +69,7 @@ public sealed class JournalImportService : IJournalImportService
                     Department = l.Department,
                     Side = l.Debit > 0m ? JournalSide.Debit : JournalSide.Credit,
                     TransactionAmount = l.Debit > 0m ? l.Debit : l.Credit,
+                    ExchangeRate = journal.ExchangeRate,
                     Narrative = l.Narrative,
                 })],
             };

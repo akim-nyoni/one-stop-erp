@@ -264,6 +264,7 @@ internal sealed class RecurringJournalConfiguration : IEntityTypeConfiguration<R
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.SourceModule).HasMaxLength(10);
         b.Property(x => x.Narrative).HasMaxLength(400);
+        b.Property(x => x.Currency).HasMaxLength(3);
         b.Ignore(x => x.TotalDebit);
         b.Ignore(x => x.TotalCredit);
         b.Ignore(x => x.IsBalanced);
