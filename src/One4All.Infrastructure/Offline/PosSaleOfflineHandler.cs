@@ -245,7 +245,7 @@ public sealed class PosCashUpOfflineHandler : IOfflineOperationHandler
         Result<CashUpResult> cashedUp = await _pos.CashUpAndCloseAsync(new CashUpRequest
         {
             TillSessionId = session.Id, Date = envelope.Date, CashAccountCode = envelope.CashAccountCode.Trim(), OverShortAccountCode = envelope.OverShortAccountCode.Trim(),
-            CountedByUserId = envelope.CountedByUserId,
+            CountedByUserId = envelope.CountedByUserId, SupervisorUserId = envelope.SupervisorUserId,
         }, ct).ConfigureAwait(false);
         return cashedUp.IsSuccess ? Result.Success() : Result.Failure(cashedUp.Error);
     }

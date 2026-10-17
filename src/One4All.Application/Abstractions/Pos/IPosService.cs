@@ -16,7 +16,7 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="DiscountAccountCode">The account the discount posts to.</param>
 /// <param name="PromotionCode">The promotion(s) that gave it.</param>
 public readonly record struct PosSaleLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode,
-    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null, string? GiftCardNumber = null);
+    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null, string? GiftCardNumber = null, string? Note = null, string? SerialNumber = null, bool GiftWrap = false);
 
 /// <summary>A tender in a POS sale request.</summary>
 /// <param name="TenderType">The tender type.</param>
@@ -139,6 +139,9 @@ public sealed class CashUpRequest
 
     /// <summary>The cash over/short GL account the variance posts to.</summary>
     public string OverShortAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The supervisor signing off a variance over the till's limit (<see cref="Core.Pos.PosTerminal.CashUpSignOffVariance"/>); not the cashier.</summary>
+    public long? SupervisorUserId { get; init; }
 }
 
 /// <summary>The result of a cash-up close.</summary>
@@ -330,6 +333,9 @@ public sealed class CashierHandoverRequest
 
     /// <summary>Gets the cash counted per currency (empty: the counted cash).</summary>
     public IReadOnlyList<One4All.Application.Pos.CashCount> Counts { get; init; } = [];
+
+    /// <summary>The supervisor signing off the outgoing cash-up when its variance is over the till's limit.</summary>
+    public long? SupervisorUserId { get; init; }
 
     /// <summary>Gets who counted.</summary>
     public long CountedByUserId { get; init; }

@@ -43,6 +43,12 @@ public enum PosEventKind
 
     /// <summary>The till passed to another cashier mid-shift without a cash-up (the drawer stays shared until the hand-over or Z-read).</summary>
     CashierSwitch = 13,
+
+    /// <summary>A weight keyed by hand on a weighed line instead of read from the scale (brief §4.1).</summary>
+    ManualWeight = 14,
+
+    /// <summary>A supervisor signed off a cash-up whose variance was over the till's limit.</summary>
+    CashUpSignOff = 15,
 }
 
 /// <summary>

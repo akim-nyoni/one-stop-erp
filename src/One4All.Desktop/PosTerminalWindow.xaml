@@ -237,6 +237,17 @@
                             <Button Content="Enter" Style="{StaticResource PadButton}" Height="36" Width="84" FontSize="14" Background="#1E8449" Command="{Binding ScanCommand}" DockPanel.Dock="Right" Margin="6,0,0,0" />
                             <Button Content="Weigh" Style="{StaticResource PadButton}" Height="36" Width="70" FontSize="13" Background="#6C3483" Command="{Binding WeighCommand}" DockPanel.Dock="Right"
                                     Visibility="{Binding IsScaleVisible, Converter={StaticResource BoolToVis}}" />
+                            <Button Content="Tare" Style="{StaticResource PadButton}" Height="36" Width="54" FontSize="12" Background="#5B2C6F" Command="{Binding SetTareCommand}" DockPanel.Dock="Right"
+                                    ToolTip="Type the container's weight in kg on the pad, then Tare; nothing typed clears it" Visibility="{Binding IsScaleVisible, Converter={StaticResource BoolToVis}}" />
+                            <ToggleButton Content="Hold" Height="36" Width="54" FontSize="12" Margin="3,0,0,0" IsChecked="{Binding HoldWeight}" DockPanel.Dock="Right"
+                                    ToolTip="Keep the last stable reading for the next weighed line" Visibility="{Binding IsScaleVisible, Converter={StaticResource BoolToVis}}" />
+                            <Button Content="Manual kg" Style="{StaticResource PadButton}" Height="36" Width="72" FontSize="12" Background="#922B21" Command="{Binding ManualWeightCommand}" DockPanel.Dock="Right"
+                                    ToolTip="Key the weight on the pad for the selected line (supervisor authority, logged)" Visibility="{Binding IsScaleVisible, Converter={StaticResource BoolToVis}}" />
+                            <Button Content="Gift wrap" Style="{StaticResource PadButton}" Height="36" Width="72" FontSize="12" Background="#B9770E" Command="{Binding ToggleGiftWrapCommand}" DockPanel.Dock="Right" ToolTip="Gift-wrap the selected line" />
+                            <Button Content="S/N" Style="{StaticResource PadButton}" Height="36" Width="48" FontSize="12" Background="#1F618D" Command="{Binding SerialLineCommand}" DockPanel.Dock="Right" ToolTip="Record the typed serial number on the selected line" />
+                            <Button Content="Note" Style="{StaticResource PadButton}" Height="36" Width="52" FontSize="12" Background="#1F618D" Command="{Binding NoteLineCommand}" DockPanel.Dock="Right" ToolTip="Put the typed note on the selected line (kitchen, engraving, request)" />
+                            <TextBox Text="{Binding LineNoteEntry, UpdateSourceTrigger=PropertyChanged}" Width="150" FontSize="13" Padding="4,2" VerticalContentAlignment="Center" Margin="6,0,0,0" DockPanel.Dock="Right"
+                                     ToolTip="Note or serial number for the selected line" />
                             <TextBox x:Name="ScanBox" Text="{Binding ScanEntry, UpdateSourceTrigger=PropertyChanged}" FontSize="17" Padding="6,3" VerticalContentAlignment="Center"
                                      ToolTip="Scan a barcode or type a PLU / product code and press Enter (type a quantity on the keypad first for more than one)">
                                 <TextBox.InputBindings>

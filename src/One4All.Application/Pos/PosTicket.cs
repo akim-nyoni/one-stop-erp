@@ -137,6 +137,21 @@ public sealed class PosTicketLine
     /// <summary>The gift card this line sells or tops up, or null for goods.</summary>
     public string? GiftCardNumber { get; internal set; }
 
+    /// <summary>A note on the line (kitchen instruction, engraving, customer request), printed on the receipt and kitchen ticket.</summary>
+    public string? Note { get; set; }
+
+    /// <summary>The serial number sold, for a serial-tracked item.</summary>
+    public string? SerialNumber { get; set; }
+
+    /// <summary>Whether the line is to be gift-wrapped.</summary>
+    public bool GiftWrap { get; set; }
+
+    /// <summary>Whether the item is serial-tracked, so the till must take a serial number before the sale completes.</summary>
+    public bool RequiresSerial { get; set; }
+
+    /// <summary>Whether the quantity came from the scale (a weight keyed by hand on such a line is a manual weight, audited).</summary>
+    public bool Weighed { get; set; }
+
     /// <summary>The net line value (quantity × unit price, less any discount), rounded to two decimals.</summary>
     public decimal LineNet => LineNetBeforeDiscount - Discount - PromotionDiscount;
 
@@ -388,9 +403,10 @@ public sealed class PosTicket
     /// <returns>The lines.</returns>
     public IReadOnlyList<PosSaleLineRequest> SaleLines(string? discountAccountCode = null)
         => [.. _lines.Select(l => l.PromotionDiscount > 0m
-            ? new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.PromotionDiscount, l.PromotionAccountCode, l.PromotionCode, l.GiftCardNumber)
+            ? new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.PromotionDiscount, l.PromotionAccountCode, l.PromotionCode, l.GiftCardNumber,
+                l.Note, l.SerialNumber, l.GiftWrap)
             : new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode,
-                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null, l.GiftCardNumber))];
+                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null, l.GiftCardNumber, l.Note, l.SerialNumber, l.GiftWrap))];
 
     /// <summary>Puts a gift card's sale or top-up on the ticket: one line of the card's value on the gift card item, posting to the gift card liability, no tax.</summary>
     /// <param name="itemId">The gift card item.</param>

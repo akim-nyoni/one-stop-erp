@@ -88,9 +88,9 @@ public sealed class KitchenTicket : AuditableEntity, ICompanyScoped
     /// <param name="description">The description.</param>
     /// <param name="quantity">The quantity.</param>
     /// <returns>The created line.</returns>
-    public KitchenTicketLine AddLine(long menuItemId, string description, decimal quantity)
+    public KitchenTicketLine AddLine(long menuItemId, string description, decimal quantity, string? note = null)
     {
-        KitchenTicketLine line = new(menuItemId, description, quantity);
+        KitchenTicketLine line = new(menuItemId, description, quantity) { Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim() };
         _lines.Add(line);
         return line;
     }
@@ -138,4 +138,7 @@ public sealed class KitchenTicketLine : Entity
 
     /// <summary>The quantity.</summary>
     public decimal Quantity { get; private set; }
+
+    /// <summary>The note for the kitchen, when any.</summary>
+    public string? Note { get; set; }
 }

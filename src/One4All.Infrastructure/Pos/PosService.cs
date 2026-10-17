@@ -20,6 +20,7 @@ public sealed class PosService : IPosService
     private readonly Application.Abstractions.Licensing.ILicenceService? _licence;
     private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
     private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
     private readonly Application.Abstractions.Security.ICurrentUser? _caller;
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
@@ -39,8 +40,10 @@ public sealed class PosService : IPosService
     /// <param name="allocations">Settles a voided on-account sale's invoice against its credit.</param>
     public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
         Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null,
-        Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? caller = null)
+        Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? caller = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _audit = audit;
         _caller = caller;
         _allocations = allocations;
@@ -130,6 +133,21 @@ public sealed class PosService : IPosService
             return allowed.Error;
         }
 
+        // A serial-tracked item is sold one at a time with its serial number (brief §4.1 serial prompt at the till).
+        HashSet<long> serialTracked = [.. await _db.Items.AsNoTracking().Where(i => soldIds.Contains(i.Id) && i.Tracking == ItemTracking.Serial).Select(i => i.Id).ToListAsync(ct).ConfigureAwait(false)];
+        foreach (PosSaleLineRequest line in request.Lines.Where(l => serialTracked.Contains(l.ItemId)))
+        {
+            if (string.IsNullOrWhiteSpace(line.SerialNumber))
+            {
+                return Error.Validation("Pos.SerialRequired", $"{line.Description} is serial-tracked: enter the serial number sold.");
+            }
+
+            if (line.Quantity != 1m)
+            {
+                return Error.Validation("Pos.SerialOnePerLine", $"{line.Description} is serial-tracked: one unit per line, each with its serial number.");
+            }
+        }
+
         // Deposits are liabilities, not revenue (brief §4.4): a deposit line carries no tax and posts to a liability account.
         HashSet<long> deposits = [.. await _db.Items.AsNoTracking().Where(i => soldIds.Contains(i.Id) && i.ItemType == ItemType.Deposit).Select(i => i.Id).ToListAsync(ct).ConfigureAwait(false)];
         if (deposits.Count > 0)
@@ -151,7 +169,7 @@ public sealed class PosService : IPosService
             }
 
             sale.AddLine(new SaleLine(line.ItemId, line.Description, request.WarehouseId, line.Quantity, line.UnitPrice, line.LineNet, line.TaxAmount, line.RevenueAccountCode,
-                line.PromotionDiscount, line.PromotionDiscount > 0m ? line.DiscountAccountCode : null, line.PromotionCode, line.GiftCardNumber));
+                line.PromotionDiscount, line.PromotionDiscount > 0m ? line.DiscountAccountCode : null, line.PromotionCode, line.GiftCardNumber, line.Note, line.SerialNumber, line.GiftWrap));
         }
 
         // Gift cards sold or topped up on the ticket (brief §4.8.1): the line's value loads the card and posts to the gift card liability the line names
@@ -784,7 +802,7 @@ public sealed class PosService : IPosService
             Result<CashUpResult> cashUp = await CashUpAndCloseCoreAsync(new CashUpRequest
             {
                 TillSessionId = session.Id, CountedCash = request.CountedCash, Counts = request.Counts, CountedByUserId = request.CountedByUserId, Date = request.Date,
-                CashAccountCode = request.CashAccountCode, OverShortAccountCode = request.OverShortAccountCode,
+                CashAccountCode = request.CashAccountCode, OverShortAccountCode = request.OverShortAccountCode, SupervisorUserId = request.SupervisorUserId,
             }, ct).ConfigureAwait(false);
             if (cashUp.IsFailure)
             {
@@ -856,6 +874,30 @@ public sealed class PosService : IPosService
 
         IReadOnlyList<CurrencyCashUp> byCurrency = position.Value.ByCurrency;
         decimal varianceBase = byCurrency.Sum(c => c.VarianceBase);
+
+        // A variance over the till's limit needs a supervisor's sign-off (brief §4.1 "variance ... supervisor sign-off"): someone else, allowed to authorise till sessions.
+        decimal? signOffLimit = await _db.PosTerminals.AsNoTracking().Where(t => t.Id == session.TerminalId).Select(t => t.CashUpSignOffVariance).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (signOffLimit is decimal limit && Math.Abs(varianceBase) > limit)
+        {
+            if (request.SupervisorUserId is not long supervisor)
+            {
+                return Error.Rule("Pos.CashUp.SignOffRequired", $"The cash-up is {(varianceBase > 0m ? "over" : "short")} by {Math.Abs(varianceBase):N2}, more than the till's {limit:N2} limit: a supervisor must sign it off.");
+            }
+
+            if (supervisor == request.CountedByUserId)
+            {
+                return Error.Rule("Pos.CashUp.SelfSignOff", "The cashier cannot sign off their own cash-up variance.");
+            }
+
+            if (_permissions is not null && !(await _permissions.ResolveAsync(supervisor, ct).ConfigureAwait(false)).Has("Pos.TillSession", Core.Security.OperationFlags.AuthoriseLevel1))
+            {
+                return Error.Forbidden("Pos.CashUp.SignOffNotAllowed", "That supervisor may not sign off cash-up variances.");
+            }
+
+            session.SignOff(supervisor);
+            _db.PosEvents.Add(new PosEvent(session.CompanyId, session.TerminalId, request.CountedByUserId, PosEventKind.CashUpSignOff, _clock.UtcNow, request.Date,
+                $"Cash-up variance {varianceBase:N2} signed off", Math.Abs(varianceBase)) { TillSessionId = session.Id, AuthorisedByUserId = supervisor });
+        }
         string? varianceJournal = null;
         if (byCurrency.Any(c => c.VarianceBase != 0m))
         {

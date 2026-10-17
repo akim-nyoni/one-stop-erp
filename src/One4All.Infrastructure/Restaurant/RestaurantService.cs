@@ -153,6 +153,21 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
+    public async Task<Result> NoteLineAsync(long companyId, long orderId, long lineId, string? note, CancellationToken ct = default)
+    {
+        TableOrder? order = await _db.TableOrders.Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        TableOrderLine? line = order?.Lines.FirstOrDefault(l => l.Id == lineId);
+        if (line is null)
+        {
+            return Result.Failure(Error.NotFound("Rst.LineNotFound", $"Order {orderId} has no line {lineId}."));
+        }
+
+        line.Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, string? priceLevel = null, CancellationToken ct = default)
     {
         if (quantity <= 0m)
@@ -1443,7 +1458,7 @@ public sealed class RestaurantService : IRestaurantService
             KitchenTicket ticket = new(companyId, orderId, number, date, course) { Station = group.Key };
             foreach (TableOrderLine line in group)
             {
-                ticket.AddLine(line.MenuItemId, line.Description, line.Quantity);
+                ticket.AddLine(line.MenuItemId, line.Description, line.Quantity, line.Note);
                 line.MarkFired();
             }
 

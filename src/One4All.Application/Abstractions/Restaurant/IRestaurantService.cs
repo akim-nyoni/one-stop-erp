@@ -128,6 +128,15 @@ public interface IRestaurantService
     /// <returns>The line net value.</returns>
     Task<Result<decimal>> AddItemAsync(long companyId, long orderId, long menuItemId, decimal quantity, decimal taxAmount = 0m, MenuCourse course = MenuCourse.Main, int? seatNumber = null, string? priceLevel = null, CancellationToken ct = default);
 
+    /// <summary>Puts a note for the kitchen on an order line (no onions, well done); it prints under the dish on the kitchen ticket.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="orderId">The order.</param>
+    /// <param name="lineId">The line.</param>
+    /// <param name="note">The note, or null to clear it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or an error.</returns>
+    Task<Result> NoteLineAsync(long companyId, long orderId, long lineId, string? note, CancellationToken ct = default);
+
     /// <summary>
     /// Records spoilage / waste of a stock ingredient: issues the stock at moving-average cost and books the
     /// loss to a wastage expense account (Dr wastage / Cr stock, keeping it out of cost of sales). Requires a

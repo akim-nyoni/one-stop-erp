@@ -98,6 +98,9 @@ public sealed class PosTerminal : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>Gets or sets the terminal's own function keys ("F2=TenderCash; F3=TenderCard"), over its profile's defaults.</summary>
     public string? FunctionKeys { get; set; }
+
+    /// <summary>The cash-up variance (base currency, either way) above which a supervisor must sign the cash-up off; null for never.</summary>
+    public decimal? CashUpSignOffVariance { get; set; }
 }
 
 /// <summary>What kind of counter a terminal is.</summary>
@@ -172,6 +175,13 @@ public sealed class TillSession : AuditableEntity, ICompanyScoped
 
     /// <summary>The sequential Z-read number, assigned on close.</summary>
     public int? ZReadNumber { get; private set; }
+
+    /// <summary>The supervisor who signed off the cash-up variance, when one was required.</summary>
+    public long? SignedOffByUserId { get; private set; }
+
+    /// <summary>Records the supervisor's sign-off of the cash-up.</summary>
+    /// <param name="userId">The supervisor.</param>
+    public void SignOff(long userId) => SignedOffByUserId = userId;
 
     /// <summary>The status.</summary>
     public TillSessionStatus Status { get; private set; }

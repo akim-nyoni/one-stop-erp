@@ -424,6 +424,9 @@ public sealed class TableOrderLine : Entity
     /// <summary>The owning order id.</summary>
     public long TableOrderId { get; private set; }
 
+    /// <summary>A note for the kitchen (no onions, well done), printed under the dish on the kitchen ticket.</summary>
+    public string? Note { get; set; }
+
     /// <summary>The menu item.</summary>
     public long MenuItemId { get; private set; }
 

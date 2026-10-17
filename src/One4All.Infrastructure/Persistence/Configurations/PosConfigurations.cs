@@ -72,6 +72,8 @@ internal sealed class SaleLineConfiguration : IEntityTypeConfiguration<SaleLine>
         b.Property(x => x.DiscountAccountCode).HasMaxLength(8);
         b.Property(x => x.PromotionCode).HasMaxLength(60);
         b.Property(x => x.GiftCardNumber).HasMaxLength(40);
+        b.Property(x => x.Note).HasMaxLength(200);
+        b.Property(x => x.SerialNumber).HasMaxLength(60);
         b.Property(x => x.Description).HasMaxLength(200);
         b.Property(x => x.RevenueAccountCode).HasMaxLength(8);
         b.Property(x => x.Quantity).HasPrecision(19, 4);

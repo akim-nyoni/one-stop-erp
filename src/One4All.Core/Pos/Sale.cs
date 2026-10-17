@@ -213,9 +213,12 @@ public sealed class SaleLine : Entity
     /// <param name="discountAccountCode">The account the discount posts to.</param>
     /// <param name="promotionCode">The promotion(s) that gave it.</param>
     public SaleLine(long itemId, string description, long warehouseId, decimal quantity, decimal unitPrice, decimal lineNet, decimal taxAmount, string revenueAccountCode,
-        decimal promotionDiscount = 0m, string? discountAccountCode = null, string? promotionCode = null, string? giftCardNumber = null)
+        decimal promotionDiscount = 0m, string? discountAccountCode = null, string? promotionCode = null, string? giftCardNumber = null, string? note = null, string? serialNumber = null, bool giftWrap = false)
     {
         GiftCardNumber = string.IsNullOrWhiteSpace(giftCardNumber) ? null : giftCardNumber.Trim().ToUpperInvariant();
+        Note = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        SerialNumber = string.IsNullOrWhiteSpace(serialNumber) ? null : serialNumber.Trim().ToUpperInvariant();
+        GiftWrap = giftWrap;
         PromotionDiscount = promotionDiscount;
         DiscountAccountCode = discountAccountCode;
         PromotionCode = promotionCode;
@@ -267,6 +270,15 @@ public sealed class SaleLine : Entity
 
     /// <summary>The gift card this line sold or topped up (its value went to the gift card liability), or null for goods.</summary>
     public string? GiftCardNumber { get; private set; }
+
+    /// <summary>A note on the line (a kitchen instruction, an engraving, a customer's request).</summary>
+    public string? Note { get; private set; }
+
+    /// <summary>The serial number sold, for a serial-tracked item.</summary>
+    public string? SerialNumber { get; private set; }
+
+    /// <summary>Whether the line is to be gift-wrapped.</summary>
+    public bool GiftWrap { get; private set; }
 }
 
 /// <summary>A tender of a POS <see cref="Sale"/> (<c>pos.sale_tender</c>).</summary>

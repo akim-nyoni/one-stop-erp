@@ -136,6 +136,7 @@ public static class PermissionCatalogue
         Add(pos, LicenceModules.PointOfSale, "TillSession", "Till Sessions (X/Z Read)", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.Print | OperationFlags.Reprint);
         Add(pos, LicenceModules.PointOfSale, "Promotion", "Promotions", master);
         Add(pos, LicenceModules.PointOfSale, "PriceOverride", "Supervisor Price Override", OperationFlags.OverridePrice | OperationFlags.AuthoriseLevel1);
+        Add(pos, LicenceModules.PointOfSale, "ManualWeight", "Manual Weight Entry", OperationFlags.Create | OperationFlags.AuthoriseLevel1);
 
         // ---- Vouchers ----
         const string vou = "Voucher";

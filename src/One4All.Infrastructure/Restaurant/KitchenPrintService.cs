@@ -82,7 +82,7 @@ public sealed class KitchenPrintService : IKitchenPrintService
             var order = orders[ticket.TableOrderId];
             string where = order.Table is string table ? $"Table {table}" : $"{order.OrderType}{(order.CustomerName is null ? string.Empty : " - " + order.CustomerName)}";
             KitchenTicketDocument document = new(station, ticket.TicketNumber, order.OrderNumber, where, ticket.Course?.ToString(), ticket.CreatedOnUtc,
-                [.. ticket.Lines.Select(l => (l.Quantity, l.Description))], ticket.PrintCount > 0);
+                [.. ticket.Lines.Select(l => (l.Quantity, l.Note is null ? l.Description : $"{l.Description} ** {l.Note}"))], ticket.PrintCount > 0);
             string text = KitchenTicketFormatter.ToPlainText(document);
             if (!printers.TryGetValue(station, out KitchenStationPrinter? printer))
             {

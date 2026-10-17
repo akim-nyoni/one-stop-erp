@@ -81,6 +81,10 @@ public sealed class PosCartLineVm(PosTicketLine line)
         Line.IsOverridden ? $"price {Line.ListUnitPriceNet.ToString("N2", CultureInfo.CurrentCulture)} → {Line.UnitPriceNet.ToString("N2", CultureInfo.CurrentCulture)}" : null,
         Line.Discount > 0m ? $"less {Line.Discount.ToString("N2", CultureInfo.CurrentCulture)}{(Line.DiscountPercent is decimal p ? $" ({p:0.##}%)" : string.Empty)}" : null,
         Line.PromotionDiscount > 0m ? $"{Line.PromotionCode} −{Line.PromotionDiscount.ToString("N2", CultureInfo.CurrentCulture)}" : null,
+        Line.Note is string note ? $"note: {note}" : null,
+        Line.SerialNumber is string serial ? $"S/N {serial}" : Line.RequiresSerial ? "S/N needed" : null,
+        Line.GiftWrap ? "gift wrap" : null,
+        Line.Weighed ? "weighed" : null,
     }.Where(t => t is not null));
 
     /// <summary>Gets or sets a value indicating whether this row is selected for an adjustment.</summary>
@@ -458,6 +462,20 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// <summary>The number being typed on the tender pad.</summary>
     [ObservableProperty]
     private string _tenderEntry = string.Empty;
+
+    /// <summary>The note, serial number or tare being typed for the selected line.</summary>
+    [ObservableProperty]
+    private string _lineNoteEntry = string.Empty;
+
+    /// <summary>The container weight taken off every scale reading, in kilograms.</summary>
+    [ObservableProperty]
+    private decimal _tareKilograms;
+
+    /// <summary>Whether the last stable scale reading is held for the next weighed line (the customer lifts the goods before the line is rung).</summary>
+    [ObservableProperty]
+    private bool _holdWeight;
+
+    private ScaleReading? _heldReading;
 
     /// <summary>A status/message line.</summary>
     [ObservableProperty]
@@ -1488,10 +1506,12 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         PosTicketLine line = _ticket.AddLine(item.Id, item.Description, unitPrice, rate, item.RevenueAccountCode, item.TaxCode, quantity);
+        line.RequiresSerial = item.Tracking == ItemTracking.Serial;
+        line.Weighed = embedded?.Kind == EmbeddedValueKind.Weight;
         AddDepositFor(item.DepositItemId, quantity);
         TenderEntry = string.Empty;
         RebuildCart();
-        StatusMessage = $"{item.Description} × {quantity:0.###}";
+        StatusMessage = line.RequiresSerial ? $"{item.Description}: type the serial number and press S/N." : $"{item.Description} × {quantity:0.###}";
         await ShowOnDisplayAsync(devices, line.Description, line.LineGross).ConfigureAwait(true);
     }
 
@@ -1563,6 +1583,98 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     }
 
     /// <summary>Sets the selected line's quantity to the weight on the scale (a settled weight only).</summary>
+    /// <summary>Puts the typed note on the selected line (a kitchen instruction, an engraving, a customer's request); it prints on the receipt and the kitchen ticket.</summary>
+    [RelayCommand]
+    private void NoteLine()
+    {
+        if (SelectedCartLine is not PosCartLineVm row)
+        {
+            StatusMessage = "Select the line to note.";
+            return;
+        }
+
+        row.Line.Note = NullIfBlank(LineNoteEntry);
+        LineNoteEntry = string.Empty;
+        RebuildCart();
+        StatusMessage = row.Line.Note is null ? $"{row.Line.Description}: note cleared." : $"{row.Line.Description}: {row.Line.Note}";
+    }
+
+    /// <summary>Records the typed serial number on the selected line (asked for on a serial-tracked item before the sale completes).</summary>
+    [RelayCommand]
+    private void SerialLine()
+    {
+        if (SelectedCartLine is not PosCartLineVm row)
+        {
+            StatusMessage = "Select the line the serial number belongs to.";
+            return;
+        }
+
+        if (NullIfBlank(LineNoteEntry) is not string serial)
+        {
+            StatusMessage = "Type the serial number first.";
+            return;
+        }
+
+        row.Line.SerialNumber = serial.ToUpperInvariant();
+        LineNoteEntry = string.Empty;
+        RebuildCart();
+        StatusMessage = $"{row.Line.Description}: S/N {row.Line.SerialNumber}";
+    }
+
+    /// <summary>Marks the selected line for gift-wrapping, or unmarks it.</summary>
+    [RelayCommand]
+    private void ToggleGiftWrap()
+    {
+        if (SelectedCartLine is not PosCartLineVm row)
+        {
+            StatusMessage = "Select the line to gift-wrap.";
+            return;
+        }
+
+        row.Line.GiftWrap = !row.Line.GiftWrap;
+        RebuildCart();
+        StatusMessage = row.Line.GiftWrap ? $"{row.Line.Description}: gift wrap." : $"{row.Line.Description}: no gift wrap.";
+    }
+
+    /// <summary>Sets the tare (the container's weight in kilograms, typed on the pad) taken off every scale reading; nothing typed clears it.</summary>
+    [RelayCommand]
+    private void SetTare()
+    {
+        TareKilograms = TryEntry(out decimal typed) && typed > 0m ? typed : 0m;
+        TenderEntry = string.Empty;
+        StatusMessage = TareKilograms == 0m ? "Tare cleared." : $"Tare {TareKilograms:0.000} kg.";
+    }
+
+    /// <summary>
+    /// Keys a weight by hand on the selected weighed line (the scale is down or the goods are off it): the kilograms typed on the pad, with a supervisor's
+    /// authority under Pos.ManualWeight, logged as a till event with the weight it replaced.
+    /// </summary>
+    [RelayCommand]
+    private async Task ManualWeightAsync()
+    {
+        if (SelectedCartLine is not PosCartLineVm row)
+        {
+            StatusMessage = "Select the line to weigh by hand.";
+            return;
+        }
+
+        if (!TryEntry(out decimal kilograms) || kilograms <= 0m)
+        {
+            StatusMessage = "Type the weight in kilograms first.";
+            return;
+        }
+
+        if (await SupervisorAsync("Pos.ManualWeight", OperationFlags.AuthoriseLevel1).ConfigureAwait(true) is not long supervisor)
+        {
+            return;
+        }
+
+        decimal before = row.Line.Quantity;
+        row.Line.Quantity = kilograms;
+        row.Line.Weighed = true;
+        await AfterAdjustmentAsync(Result.Success(), PosEventKind.ManualWeight, $"{row.Line.Description}: weight keyed by hand {kilograms:0.000} kg", kilograms, before, supervisor).ConfigureAwait(true);
+    }
+
     [RelayCommand]
     private async Task WeighAsync()
     {
@@ -1574,16 +1686,26 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IScale? scale = scope.ServiceProvider.GetRequiredService<IDeviceProvider>().Scale;
-        ScaleReading? reading = scale is null ? null : await scale.ReadAsync().ConfigureAwait(true);
+        // Hold: the last stable reading serves this line too (the goods were lifted off before the line was rung); otherwise the scale is read now.
+        ScaleReading? reading = HoldWeight && _heldReading is not null ? _heldReading : scale is null ? null : await scale.ReadAsync().ConfigureAwait(true);
         if (reading is null || !reading.Stable || reading.Kilograms <= 0m)
         {
             StatusMessage = scale is null ? "No scale is connected to this till." : reading is null ? "The scale did not answer." : "Wait for the weight to settle.";
             return;
         }
 
-        row.Line.Quantity = reading.Kilograms;
+        decimal net = reading.Kilograms - TareKilograms;
+        if (net <= 0m)
+        {
+            StatusMessage = $"The scale reads {reading.Kilograms:0.000} kg, no more than the {TareKilograms:0.000} kg tare.";
+            return;
+        }
+
+        _heldReading = HoldWeight ? reading : null;
+        row.Line.Quantity = net;
+        row.Line.Weighed = true;
         RebuildCart();
-        StatusMessage = $"{row.Line.Description}: {reading.Kilograms:0.000} kg";
+        StatusMessage = $"{row.Line.Description}: {net:0.000} kg{(TareKilograms > 0m ? $" (tare {TareKilograms:0.000})" : string.Empty)}{(HoldWeight ? ", held" : string.Empty)}";
     }
 
     /// <summary>Sends the last receipt to the receipt printer.</summary>

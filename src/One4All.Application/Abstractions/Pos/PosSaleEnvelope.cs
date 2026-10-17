@@ -11,7 +11,8 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="LineNet">The net line value.</param>
 /// <param name="TaxAmount">The tax on the line.</param>
 /// <param name="RevenueAccountCode">The revenue account.</param>
-public sealed record PosSaleLineEnvelope(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode, string? GiftCardNumber = null);
+public sealed record PosSaleLineEnvelope(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode, string? GiftCardNumber = null,
+    string? Note = null, string? SerialNumber = null, bool GiftWrap = false);
 
 /// <summary>A tender captured offline (a serializable mirror of <see cref="PosTenderRequest"/>).</summary>
 /// <param name="TenderType">The tender type.</param>
@@ -79,7 +80,7 @@ public sealed record PosSaleEnvelope(
         Tip = Tip,
         TipsAccountCode = TipsAccountCode,
         Lines = Lines
-            .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, GiftCardNumber: l.GiftCardNumber))
+            .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, GiftCardNumber: l.GiftCardNumber, Note: l.Note, SerialNumber: l.SerialNumber, GiftWrap: l.GiftWrap))
             .ToList(),
         Tenders = Tenders
             .Select(t => new PosTenderRequest(t.TenderType, CurrencyCode.Parse(t.Currency), t.Amount, t.AccountCode, t.IsChange))
@@ -156,7 +157,7 @@ public sealed record PosCashCountEnvelope(string Currency, decimal Amount);
 /// <param name="CashAccountCode">The cash account.</param>
 /// <param name="OverShortAccountCode">The over/short account.</param>
 public sealed record PosCashUpEnvelope(long CompanyId, long TillSessionId, string? OfflineSessionKey, IReadOnlyList<PosCashCountEnvelope> Counts, long CountedByUserId, DateOnly Date,
-    string? CashAccountCode, string? OverShortAccountCode)
+    string? CashAccountCode, string? OverShortAccountCode, long? SupervisorUserId = null)
 {
     /// <summary>The operation kind.</summary>
     public const string Kind = "PosCashUp";
