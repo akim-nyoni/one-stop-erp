@@ -51,6 +51,17 @@ public sealed class BackupTests
                 ((long)(await count.ExecuteScalarAsync())!).Should().BeGreaterThanOrEqualTo(0);
             }
 
+            // The off-site copy restores by file alone (no record needed), and a switch-over is refused without the phrase or a database to switch to.
+            string fromFile = restored + "f";
+            (await backups.RestoreFileToNewDatabaseAsync(first.OffsiteCopy!, fromFile, "yes")).Error.Code.Should().Be("Backup.NotConfirmed");
+            (await backups.RestoreFileToNewDatabaseAsync(Path.Combine(folder, "missing.backup"), fromFile, $"RESTORE {fromFile}")).Error.Code.Should().Be("Backup.FileNotFound");
+            Core.Common.Result<string> fileRestore = await backups.RestoreFileToNewDatabaseAsync(first.OffsiteCopy!, fromFile, $"RESTORE {fromFile}");
+            fileRestore.IsSuccess.Should().BeTrue(fileRestore.IsFailure ? fileRestore.Error.Message : null);
+            (await backups.RestoreFileToNewDatabaseAsync(first.OffsiteCopy!, fromFile, $"RESTORE {fromFile}")).Error.Code.Should().Be("Backup.TargetExists");
+            (await backups.SwitchOverAsync(fromFile, "yes")).Error.Code.Should().Be("Backup.NotConfirmed");
+            (await backups.SwitchOverAsync(live, $"SWITCH TO {live}")).Error.Code.Should().Be("Backup.TargetInvalid");
+            (await backups.SwitchOverAsync("one4all_nowhere_x", "SWITCH TO one4all_nowhere_x")).Error.Code.Should().Be("Backup.TargetMissing");
+
             // A second backup; then the first is altered and fails its check, and retention keeps only the newest.
             BackupRecord second = (await backups.BackupAsync("test")).Value;
             await File.AppendAllTextAsync(first.FileName, "tampered");
@@ -65,6 +76,8 @@ public sealed class BackupTests
             await admin.OpenAsync();
             await using NpgsqlCommand drop = new($"DROP DATABASE IF EXISTS \"{restored}\" WITH (FORCE)", admin);
             await drop.ExecuteNonQueryAsync();
+            await using NpgsqlCommand dropFile = new($"DROP DATABASE IF EXISTS \"{restored}f\" WITH (FORCE)", admin);
+            await dropFile.ExecuteNonQueryAsync();
             if (Directory.Exists(folder))
             {
                 Directory.Delete(folder, recursive: true);

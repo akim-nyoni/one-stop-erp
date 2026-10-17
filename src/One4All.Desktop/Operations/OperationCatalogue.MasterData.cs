@@ -31,9 +31,11 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Back up or restore the database", ListTitle = "Backups",
             Description = "Takes a backup now (pg_dump, SHA-256 recorded, copied off-site when configured), checks one, or restores a checked backup into a NEW database "
-                + "(type RESTORE <name> to confirm) — the live database is never overwritten.",
-            Fields = [Pick("Do", "Action", ["Back up now", "Check a backup", "Restore into a new database"]), OptNum("Backup", "Backup id (check / restore)"), Opt("Database", "New database name"),
-                Opt("Confirm", "Confirmation (RESTORE name)")],
+                + "(type RESTORE <name> to confirm) — the live database is never overwritten. Restore a file: an off-site copy or another server's backup with no record here, into a new database. "
+                + "Switch over: the restored database takes the live name and the old live one is kept as <live>_retired_<stamp> (type SWITCH TO <name>); restart the server and every desktop afterwards.",
+            Fields = [Pick("Do", "Action", ["Back up now", "Check a backup", "Restore into a new database", "Restore a file into a new database", "Switch over to a restored database"]),
+                OptNum("Backup", "Backup id (check / restore)"), Opt("File", "Backup file path (restore a file)"), Opt("Database", "New / restored database name"),
+                Opt("Confirm", "Confirmation (RESTORE name / SWITCH TO name)")],
             Run = async (c, i) =>
             {
                 IBackupService backups = c.Get<IBackupService>();
@@ -50,6 +52,10 @@ public static partial class OperationCatalogue
                         return $"Backup {taken.Id}: {taken.FileName} ({taken.SizeBytes:N0} bytes), {status}.";
                     case "Check a backup":
                         return $"Backup is {Check(await backups.VerifyAsync((long)i.Number("Backup")).ConfigureAwait(true))}.";
+                    case "Restore a file into a new database":
+                        return Check(await backups.RestoreFileToNewDatabaseAsync(i.Text("File"), i.Text("Database"), i.Optional("Confirm") ?? string.Empty).ConfigureAwait(true));
+                    case "Switch over to a restored database":
+                        return Check(await backups.SwitchOverAsync(i.Text("Database"), i.Optional("Confirm") ?? string.Empty).ConfigureAwait(true));
                     default:
                         return Check(await backups.RestoreToNewDatabaseAsync((long)i.Number("Backup"), i.Text("Database"), i.Optional("Confirm") ?? string.Empty).ConfigureAwait(true));
                 }

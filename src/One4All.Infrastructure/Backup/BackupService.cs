@@ -144,6 +144,100 @@ public sealed partial class BackupService : IBackupService
             return Error.Rule("Backup.NotVerified", "Only a backup that passes its check can be restored.");
         }
 
+        BackupRecord record = await _db.Set<BackupRecord>().AsNoTracking().SingleAsync(b => b.Id == backupId, ct).ConfigureAwait(false);
+        return await RestoreArchiveAsync(record.FileName, name, $"backup {backupId}", ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RestoreFileToNewDatabaseAsync(string filePath, string databaseName, string confirmation, CancellationToken ct = default)
+    {
+        NpgsqlConnectionStringBuilder live = new(_options.ConnectionString);
+        string name = (databaseName ?? string.Empty).Trim();
+        if (!DatabaseName().IsMatch(name) || string.Equals(name, live.Database, StringComparison.OrdinalIgnoreCase))
+        {
+            return Error.Validation("Backup.TargetInvalid", "Restore into a new database named with lower-case letters, digits and underscores — never the live one.");
+        }
+
+        if (!string.Equals(confirmation?.Trim(), $"RESTORE {name}", StringComparison.Ordinal))
+        {
+            return Error.Validation("Backup.NotConfirmed", $"Type RESTORE {name} to confirm.");
+        }
+
+        string file = (filePath ?? string.Empty).Trim();
+        if (file.Length == 0 || !File.Exists(file))
+        {
+            return Error.NotFound("Backup.FileNotFound", $"Backup file '{file}' was not found.");
+        }
+
+        // The archive must read back before a database is created for it (a truncated off-site copy is the usual failure).
+        (int listed, string listError) = await RunAsync("pg_restore", ["--list", file], live, ct).ConfigureAwait(false);
+        if (listed != 0)
+        {
+            return Error.Rule("Backup.FileUnreadable", $"The archive does not read back: {Trim(listError)}");
+        }
+
+        return await RestoreArchiveAsync(file, name, Path.GetFileName(file), ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<string>> SwitchOverAsync(string databaseName, string confirmation, CancellationToken ct = default)
+    {
+        NpgsqlConnectionStringBuilder live = new(_options.ConnectionString);
+        string name = (databaseName ?? string.Empty).Trim();
+        string liveName = live.Database ?? string.Empty;
+        if (!DatabaseName().IsMatch(name) || string.Equals(name, liveName, StringComparison.OrdinalIgnoreCase))
+        {
+            return Error.Validation("Backup.TargetInvalid", "Name the restored database (lower-case letters, digits and underscores) that is to become live; it cannot be the live one.");
+        }
+
+        if (!string.Equals(confirmation?.Trim(), $"SWITCH TO {name}", StringComparison.Ordinal))
+        {
+            return Error.Validation("Backup.NotConfirmed", $"Type SWITCH TO {name} to confirm.");
+        }
+
+        NpgsqlConnectionStringBuilder maintenance = new(_options.ConnectionString) { Database = "postgres" };
+        await using NpgsqlConnection connection = new(maintenance.ConnectionString);
+        await connection.OpenAsync(ct).ConfigureAwait(false);
+        await using (NpgsqlCommand exists = new("SELECT 1 FROM pg_database WHERE datname = @n", connection))
+        {
+            exists.Parameters.AddWithValue("n", name);
+            if (await exists.ExecuteScalarAsync(ct).ConfigureAwait(false) is null)
+            {
+                return Error.NotFound("Backup.TargetMissing", $"Database {name} does not exist; restore into it first.");
+            }
+        }
+
+        string retired = $"{liveName}_retired_{DateTimeOffset.UtcNow:yyyyMMddHHmm}";
+        if (!DatabaseName().IsMatch(retired))
+        {
+            return Error.Rule("Backup.LiveName", $"The live database name '{liveName}' cannot be retired by renaming.");
+        }
+
+        // Every session on either database is ended, then the names swap: the old live database is kept under its retired name.
+        NpgsqlConnection.ClearAllPools();
+        foreach (string database in new[] { liveName, name })
+        {
+            await using NpgsqlCommand end = new("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = @n AND pid <> pg_backend_pid()", connection);
+            end.Parameters.AddWithValue("n", database);
+            await end.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        await using (NpgsqlCommand retire = new($"ALTER DATABASE \"{liveName}\" RENAME TO \"{retired}\"", connection)) // both names validated above
+        {
+            await retire.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        await using (NpgsqlCommand promote = new($"ALTER DATABASE \"{name}\" RENAME TO \"{liveName}\"", connection))
+        {
+            await promote.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+        }
+
+        return $"Switched over: {name} is now {liveName}; the previous live database is kept as {retired}. Restart the server and every desktop.";
+    }
+
+    // Creates the new database and restores the archive into it.
+    private async Task<Result<string>> RestoreArchiveAsync(string file, string name, string what, CancellationToken ct)
+    {
         NpgsqlConnectionStringBuilder maintenance = new(_options.ConnectionString) { Database = "postgres" };
         await using (NpgsqlConnection connection = new(maintenance.ConnectionString))
         {
@@ -155,14 +249,13 @@ public sealed partial class BackupService : IBackupService
                 return Error.Conflict("Backup.TargetExists", $"Database {name} already exists.");
             }
 
-            await using NpgsqlCommand create = new($"CREATE DATABASE \"{name}\"", connection); // the name is validated above
+            await using NpgsqlCommand create = new($"CREATE DATABASE \"{name}\"", connection); // the name is validated by the callers
             await create.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
         }
 
-        BackupRecord record = await _db.Set<BackupRecord>().AsNoTracking().SingleAsync(b => b.Id == backupId, ct).ConfigureAwait(false);
         NpgsqlConnectionStringBuilder target = new(_options.ConnectionString) { Database = name };
-        (int exit, string error) = await RunAsync("pg_restore", ["--no-owner", "--no-password", .. ConnectionArgs(target), $"--dbname={name}", record.FileName], target, ct).ConfigureAwait(false);
-        return exit == 0 ? $"Restored backup {backupId} into {name}." : Error.Failure("Backup.RestoreFailed", $"pg_restore failed ({exit}): {Trim(error)}");
+        (int exit, string error) = await RunAsync("pg_restore", ["--no-owner", "--no-password", .. ConnectionArgs(target), $"--dbname={name}", file], target, ct).ConfigureAwait(false);
+        return exit == 0 ? $"Restored {what} into {name}." : Error.Failure("Backup.RestoreFailed", $"pg_restore failed ({exit}): {Trim(error)}");
     }
 
     /// <inheritdoc />

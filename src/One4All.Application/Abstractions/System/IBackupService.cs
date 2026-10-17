@@ -39,6 +39,29 @@ public interface IBackupService
     /// <returns>What happened.</returns>
     Task<Result<string>> RestoreToNewDatabaseAsync(long backupId, string databaseName, string confirmation, CancellationToken ct = default);
 
+    /// <summary>
+    /// Restores a backup file — an off-site copy, or one taken on another server, with no record in this database — into a new database
+    /// (brief §10 disaster recovery). The archive is read back first (pg_restore --list); <paramref name="confirmation"/> must read
+    /// <c>RESTORE {databaseName}</c>.
+    /// </summary>
+    /// <param name="filePath">The backup archive (pg_dump custom format).</param>
+    /// <param name="databaseName">The new database.</param>
+    /// <param name="confirmation">The confirmation phrase.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What happened.</returns>
+    Task<Result<string>> RestoreFileToNewDatabaseAsync(string filePath, string databaseName, string confirmation, CancellationToken ct = default);
+
+    /// <summary>
+    /// Switches the system over to a restored database: every session on the live and restored databases is ended, the live database is
+    /// renamed <c>{live}_retired_{yyyyMMddHHmm}</c> (kept, never dropped) and the restored one takes the live name, so the next start-up of
+    /// the server and every desktop runs on it. <paramref name="confirmation"/> must read <c>SWITCH TO {databaseName}</c>.
+    /// </summary>
+    /// <param name="databaseName">The restored database that becomes live.</param>
+    /// <param name="confirmation">The confirmation phrase.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What happened (restart everything afterwards).</returns>
+    Task<Result<string>> SwitchOverAsync(string databaseName, string confirmation, CancellationToken ct = default);
+
     /// <summary>The backups, newest first.</summary>
     /// <param name="take">At most this many.</param>
     /// <param name="ct">Cancellation token.</param>
