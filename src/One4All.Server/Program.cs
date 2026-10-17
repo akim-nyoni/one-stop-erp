@@ -2942,6 +2942,7 @@ api.MapPost("/api/payroll/runs", async (long companyId, string period, DateOnly 
 .RequireAuthorization()
 .WithName("PayrollRun");
 
+One4All.Server.TradingApiEndpoints.Map(api);
 
 app.Run();
 
