@@ -166,7 +166,7 @@ public static class NavigationMap
                 O("General Ledger: Submit a manual journal", "Enter a journal"),
                 W("journal-approvals", "Journals awaiting approval", "Approve or reject journals others have entered.", MenuArea.Transactions, "General Ledger"),
                 O("General Ledger: Accounting vouchers"), O("General Ledger: Accruals and prepayments"), O("General Ledger: Recurring journals"),
-                O("General Ledger: Import journals from a file"), O("General Ledger: Intercompany journal"), O("General Ledger: Petty cash")),
+                O("General Ledger: Import journals from a file"), O("General Ledger: Intercompany journal"), O("General Ledger: Petty cash"), O("General Ledger: Petty cash funds")),
             G("Look up",
                 W("account-enquiry", "Account enquiry", "An account's postings and balance, and the document behind each one.", MenuArea.Enquiries, "General Ledger"),
                 W("analytics", "Analytics dashboard", "Key figures and trends at a glance.", MenuArea.Enquiries, "General Ledger"),

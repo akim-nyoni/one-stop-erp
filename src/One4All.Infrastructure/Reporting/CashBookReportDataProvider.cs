@@ -28,7 +28,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
 
     /// <inheritdoc />
     public bool CanHandle(string command) => command.StartsWith("Cash", StringComparison.OrdinalIgnoreCase)
-        && command.ToUpperInvariant() is "CASHBOOKLISTING" or "CASHUNRECONCILED" or "CASHFORECAST" or "CASHPETTY" or "CASHTRANSFERS" or "CASHCHEQUES" or "CASHWALLETS" or "CASHRECSTATEMENT" or "CASHBALANCES";
+        && command.ToUpperInvariant() is "CASHBOOKLISTING" or "CASHUNRECONCILED" or "CASHFORECAST" or "CASHPETTY" or "CASHPETTYCOUNTS" or "CASHTRANSFERS" or "CASHCHEQUES" or "CASHWALLETS" or "CASHRECSTATEMENT" or "CASHBALANCES";
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
@@ -48,6 +48,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
             "CASHUNRECONCILED" => await UnreconciledAsync(companyId, asAt, ct).ConfigureAwait(false),
             "CASHFORECAST" => await ForecastAsync(companyId, asAt, ct).ConfigureAwait(false),
             "CASHPETTY" => await PettyCashAsync(companyId, Text(parameters, "AccountCode"), fromDate, toDate, ct).ConfigureAwait(false),
+            "CASHPETTYCOUNTS" => await PettyCashCountsAsync(companyId, Text(parameters, "FundCode")?.ToUpperInvariant(), fromDate, toDate, ct).ConfigureAwait(false),
             "CASHTRANSFERS" => await TransfersAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
         };
@@ -268,6 +269,30 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         => parameters.TryGetValue(name, out object? value) && value is string text && text.Trim().Length > 0 ? text.Trim() : null;
 
     private static DateOnly? DateParameter(IReadOnlyDictionary<string, object?> parameters, string name) => parameters.TryGetValue(name, out object? value) && value is DateOnly date ? date : null;
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PettyCashCountsAsync(long companyId, string? fundCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        List<PettyCashFund> funds = await _db.Set<PettyCashFund>().AsNoTracking().Where(f => f.CompanyId == companyId && (fundCode == null || f.Code == fundCode)).OrderBy(f => f.Code).ToListAsync(ct).ConfigureAwait(false);
+        List<PettyCashCount> counts = await _db.Set<PettyCashCount>().AsNoTracking().Where(c => c.CompanyId == companyId && c.CountDate >= fromDate && c.CountDate <= toDate)
+            .OrderBy(c => c.CountDate).ThenBy(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, string> users = await _db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (PettyCashFund fund in funds)
+        {
+            decimal book = (await LinesAsync(companyId, [fund.AccountCode], DateOnly.MinValue, toDate, ct).ConfigureAwait(false)).Sum(x => x.Line.BaseDebit - x.Line.BaseCredit);
+            rows.Add(Row(("Fund", fund.Code), ("Date", string.Empty), ("Float", Money(fund.FloatAmount)), ("Book", Money(book)), ("Counted", string.Empty), ("Variance", string.Empty),
+                ("Status", fund.IsActive ? "Open" : "Closed"), ("CountedBy", string.Empty), ("Journals", string.Empty), ("Note", fund.Name)));
+            foreach (PettyCashCount count in counts.Where(c => c.FundId == fund.Id))
+            {
+                string journals = string.Join(", ", new[] { count.VarianceJournalNumber, count.ReimbursementJournalNumber }.Where(j => j is not null));
+                rows.Add(Row(("Fund", fund.Code), ("Date", Date(count.CountDate)), ("Float", string.Empty), ("Book", Money(count.BookBalance)), ("Counted", Money(count.CountedAmount)),
+                    ("Variance", Money(count.Variance)), ("Status", count.Status.ToString()), ("CountedBy", users.TryGetValue(count.CountedByUserId, out string? who) ? who : count.CountedByUserId.ToString(CultureInfo.InvariantCulture)),
+                    ("Journals", journals.Length == 0 ? "—" : journals), ("Note", count.Note ?? string.Empty)));
+            }
+        }
+
+        return rows;
+    }
 
     private static string Date(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

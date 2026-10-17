@@ -1,7 +1,9 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Reporting;
+using One4All.Core.Accounting;
 using One4All.Infrastructure.Persistence;
 using Xunit;
 
@@ -67,6 +69,91 @@ public sealed class PettyCashTests
             tb.IsBalanced.Should().BeTrue();
             tb.Rows.Should().Contain(r => r.AccountCode == PettyCash && r.Debit == 100m); // float restored
             tb.Rows.Should().Contain(r => r.AccountCode == Expense && r.Debit == 30m);    // expense recognised
+        }
+    }
+
+    [SkippableFact]
+    public async Task Fund_is_counted_reconciled_and_claims_input_tax()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        const string OverShort = "7500"; // Cash Shortages & Overages
+        const string VatInput = "2210";
+
+        long companyId;
+        await using (AsyncServiceScope scope = provider.CreateAsyncScope())
+        {
+            One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            companyId = await Scenario.SeedAsync(db);
+            TaxCode vat = new(companyId, "PVAT", "VAT 15%", TaxType.Standard) { OutputAccountCode = "2200", InputAccountCode = VatInput };
+            vat.AddRate(new DateOnly(2020, 1, 1), 15m);
+            db.TaxCodes.Add(vat);
+            await db.SaveChangesAsync();
+        }
+
+        long countId;
+        await using (AsyncServiceScope scope = provider.CreateAsyncScope())
+        {
+            IPettyCashService petty = scope.ServiceProvider.GetRequiredService<IPettyCashService>();
+
+            // The fund: a 200 float in the safe account, reimbursed from the bank; variances to over/short.
+            (await petty.SaveFundAsync(companyId, new PettyCashFundInput("MAIN", "Head office", PettyCash, Bank, 0m))).Error.Code.Should().Be("PettyCash.Float");
+            (await petty.SaveFundAsync(companyId, new PettyCashFundInput("MAIN", "Head office", "9999", Bank, 200m))).Error.Code.Should().Be("PettyCash.Account");
+            var fund = await petty.SaveFundAsync(companyId, new PettyCashFundInput("MAIN", "Head office", PettyCash, Bank, 200m, OverShort));
+            fund.IsSuccess.Should().BeTrue(fund.IsFailure ? fund.Error.ToString() : null);
+
+            // Paying from an empty fund is refused; establishing the float fills it.
+            (await petty.DisburseFromFundAsync(companyId, new PettyCashDisbursement("MAIN", 10m, new DateOnly(2026, 4, 1), Expense, "PC-0"))).Error.Code.Should().Be("PettyCash.Insufficient");
+            (await petty.ReimburseFundAsync(companyId, "MAIN", new DateOnly(2026, 4, 1), "PC-INIT")).Value.ReimbursedAmount.Should().Be(200m);
+
+            // 115 paid on a VAT receipt: 100 expense, 15 input tax, 115 out of the fund.
+            var paid = await petty.DisburseFromFundAsync(companyId, new PettyCashDisbursement("MAIN", 115m, new DateOnly(2026, 4, 3), Expense, "PC-1", "PVAT", "Stationers", "Printer paper"));
+            paid.IsSuccess.Should().BeTrue(paid.IsFailure ? paid.Error.ToString() : null);
+            paid.Value.Net.Should().Be(100m);
+            paid.Value.InputTax.Should().Be(15m);
+            paid.Value.FundBalanceAfter.Should().Be(85m);
+
+            // Counted 80 against a book of 85: a 5 shortage.
+            var count = await petty.CountAsync(companyId, new PettyCashCountInput("MAIN", new DateOnly(2026, 4, 30), 80m, 1, "50x1, 20x1, 10x1", "Missing 5"));
+            count.IsSuccess.Should().BeTrue(count.IsFailure ? count.Error.ToString() : null);
+            count.Value.BookBalance.Should().Be(85m);
+            count.Value.Variance.Should().Be(-5m);
+            countId = count.Value.CountId;
+
+            // Reconcile: the shortage is written off and the float restored (120 drawn: 115 spent + 5 short).
+            var rec = await petty.ReconcileAsync(companyId, countId, new DateOnly(2026, 4, 30), "PC-REC", 1);
+            rec.IsSuccess.Should().BeTrue(rec.IsFailure ? rec.Error.ToString() : null);
+            rec.Value.Variance.Should().Be(-5m);
+            rec.Value.VarianceJournalNumber.Should().NotBeNull();
+            rec.Value.ReimbursedAmount.Should().Be(120m);
+            rec.Value.FloatBalanceAfter.Should().Be(200m);
+            (await petty.ReconcileAsync(companyId, countId, new DateOnly(2026, 4, 30), "PC-REC2", 1)).Error.Code.Should().Be("PettyCash.Reconciled");
+
+            IReadOnlyList<PettyCashFundRow> funds = await petty.ListFundsAsync(companyId);
+            funds.Should().ContainSingle(f => f.Code == "MAIN" && f.FloatAmount == 200m && f.Balance == 200m && f.LastCountDate == new DateOnly(2026, 4, 30));
+        }
+
+        await using (AsyncServiceScope scope = provider.CreateAsyncScope())
+        {
+            One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            PettyCashCount stored = await db.Set<PettyCashCount>().AsNoTracking().SingleAsync(c => c.Id == countId);
+            stored.Status.Should().Be(PettyCashCountStatus.Reconciled);
+            stored.ReimbursementJournalNumber.Should().NotBeNull();
+
+            IGeneralLedgerReports gl = scope.ServiceProvider.GetRequiredService<IGeneralLedgerReports>();
+            TrialBalanceReport tb = await gl.TrialBalanceAsync(companyId, new DateOnly(2026, 4, 30));
+            tb.IsBalanced.Should().BeTrue();
+            tb.Rows.Should().Contain(r => r.AccountCode == PettyCash && r.Debit == 200m);
+            tb.Rows.Should().Contain(r => r.AccountCode == Expense && r.Debit == 100m);
+            tb.Rows.Should().Contain(r => r.AccountCode == VatInput && r.Debit == 15m);
+            tb.Rows.Should().Contain(r => r.AccountCode == OverShort && r.Debit == 5m);
+            tb.Rows.Should().Contain(r => r.AccountCode == Bank && r.Credit == 320m);
+
+            IReportDataProvider provider2 = scope.ServiceProvider.GetServices<IReportDataProvider>().First(p => p.CanHandle("CashPettyCounts"));
+            var rows = await provider2.GetRowsAsync(companyId, "CashPettyCounts", new Dictionary<string, object?> { ["FundCode"] = "MAIN", ["FromDate"] = new DateOnly(2026, 4, 1), ["ToDate"] = new DateOnly(2026, 4, 30) });
+            rows.Should().HaveCount(2);
+            rows[1]["Variance"].Should().Be("-5.00");
+            rows[1]["Status"].Should().Be("Reconciled");
         }
     }
 }

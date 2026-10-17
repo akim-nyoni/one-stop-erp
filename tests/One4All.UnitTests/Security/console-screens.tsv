@@ -131,6 +131,7 @@ General Ledger	Import journals from a file	False
 General Ledger	Intercompany journal	False	
 General Ledger	Overhead allocation	False	
 General Ledger	Petty cash	False	
+General Ledger	Petty cash funds	False	
 General Ledger	Recognise deferred income	False	
 General Ledger	Recurring journals	False	
 General Ledger	Reporting trees	False	

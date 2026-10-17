@@ -412,6 +412,48 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Petty cash funds",
+            Description = "Imprest funds: Save fund (code, float, petty cash and bank accounts, over/short account, custodian); Pay out from a fund, claiming the recoverable input tax on the receipt "
+                + "when a tax code is given; Top up reimburses the fund to its float; Count records the cash counted against the book; Reconcile posts the count's variance and tops the float up; List shows every fund.",
+            Fields = [Pick("Step", "Step", ["List", "Save fund", "Pay out", "Top up", "Count", "Reconcile"]), Req("Fund", "Fund code"), Opt("Name", "Fund name (save)"), OptNum("Amount", "Float / amount paid / cash counted"),
+                Opt("PettyCash", "Petty cash account (save)"), Opt("Bank", "Bank account (save)"), Opt("OverShort", "Over/short account (save)"), Opt("Custodian", "Custodian username (save)"),
+                Opt("Expense", "Expense account (pay out)"), Opt("TaxCode", "Tax code on the receipt (pay out)"), Opt("Payee", "Payee (pay out)"), Opt("Narrative", "Narrative / note"),
+                Opt("Denominations", "Denominations counted, e.g. 100x2, 20x5 (count)"), OptNum("CountId", "Count id (reconcile)"), Opt("Document", "Document number"), Today()],
+            Run = async (c, i) =>
+            {
+                IPettyCashService petty = c.Get<IPettyCashService>();
+                string document = i.Optional("Document") ?? $"PC-{i.Date("Date"):yyyyMMdd}";
+                switch (i.Text("Step"))
+                {
+                    case "Save fund":
+                        PettyCashFund saved = Check(await petty.SaveFundAsync(c.CompanyId, new PettyCashFundInput(i.Text("Fund"), i.Optional("Name") ?? i.Text("Fund"), i.Optional("PettyCash") ?? string.Empty,
+                            i.Optional("Bank") ?? string.Empty, i.OptionalNumber("Amount") ?? 0m, i.Optional("OverShort"), i.Optional("Custodian"))).ConfigureAwait(true));
+                        return $"Fund {saved.Code} saved: float {M(saved.FloatAmount)} in {saved.AccountCode}, reimbursed from {saved.BankAccountCode}.";
+                    case "Pay out":
+                        PettyCashDisbursementResult paid = Check(await petty.DisburseFromFundAsync(c.CompanyId, new PettyCashDisbursement(i.Text("Fund"), i.OptionalNumber("Amount") ?? 0m, i.Date("Date"),
+                            i.Optional("Expense") ?? string.Empty, document, i.Optional("TaxCode"), i.Optional("Payee"), i.Optional("Narrative"))).ConfigureAwait(true));
+                        return $"Paid ({paid.JournalNumber}): expense {M(paid.Net)}, input tax {M(paid.InputTax)}; fund now {M(paid.FundBalanceAfter)}.";
+                    case "Top up":
+                        ImprestResult topped = Check(await petty.ReimburseFundAsync(c.CompanyId, i.Text("Fund"), i.Date("Date"), document).ConfigureAwait(true));
+                        return $"Reimbursed {M(topped.ReimbursedAmount)}; float now {M(topped.FloatBalanceAfter)}{(topped.JournalNumber is null ? string.Empty : $" ({topped.JournalNumber})")}.";
+                    case "Count":
+                        PettyCashCountResult counted = Check(await petty.CountAsync(c.CompanyId, new PettyCashCountInput(i.Text("Fund"), i.Date("Date"), i.OptionalNumber("Amount") ?? 0m, c.UserId,
+                            i.Optional("Denominations"), i.Optional("Narrative"))).ConfigureAwait(true));
+                        return $"Count {counted.CountId}: book {M(counted.BookBalance)}, counted {M(counted.CountedAmount)}, variance {M(counted.Variance)}. Reconcile with this count id.";
+                    case "Reconcile":
+                        PettyCashReconciliation rec = Check(await petty.ReconcileAsync(c.CompanyId, (long)(i.OptionalNumber("CountId") ?? 0m), i.Date("Date"), document, c.UserId).ConfigureAwait(true));
+                        return $"Variance {M(rec.Variance)}{(rec.VarianceJournalNumber is null ? string.Empty : $" ({rec.VarianceJournalNumber})")}; reimbursed {M(rec.ReimbursedAmount)}"
+                            + $"{(rec.ReimbursementJournalNumber is null ? string.Empty : $" ({rec.ReimbursementJournalNumber})")}; float now {M(rec.FloatBalanceAfter)}.";
+                    default:
+                        IReadOnlyList<PettyCashFundRow> funds = await petty.ListFundsAsync(c.CompanyId).ConfigureAwait(true);
+                        return funds.Count == 0 ? "No petty cash funds."
+                            : string.Join(Environment.NewLine, funds.Select(f => $"{f.Code,-10} {f.Name,-24} {f.AccountCode,-8} float {M(f.FloatAmount),10} book {M(f.Balance),10}  {f.Custodian ?? "—",-12} {(f.IsActive ? "open" : "closed")}"
+                                + (f.LastCountDate is null ? string.Empty : $"  last count {f.LastCountDate:yyyy-MM-dd}")));
+                }
+            },
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Import journals from a file",
             Description = "Imports manual journals from a CSV file or an Excel workbook (its first sheet), all or nothing (a file with any problem imports nothing); journals over "
                 + "the approval threshold wait for a second user's approval instead of posting.",

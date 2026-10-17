@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-578 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+579 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -76,6 +76,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | CB74 | Inter-account Transfers | Transfers between bank accounts in the period, with the amount out, the amount in and any exchange difference. | FromDate (Date, optional), ToDate (Date, optional) | Date, Journal, Document, From, To, Out, In, Difference | — | Sum(Difference) |
 | CB75 | Cheque Register | Every cheque written in the period by bank account: payee, amount and status — issued, presented, cancelled, voided, or stale when unpresented past the limit. | FromDate (Date, optional), ToDate (Date, optional), StaleMonths (Integer, optional) | Bank, Cheque, Issued, Payee, Document, Status, StatusDate, Days, Reason, Amount | — | Sum(Amount) |
 | CB76 | Mobile Money / Wallet Reconciliation | Per mobile-money wallet at the date: ledger balance against the wallet statement, unmatched items on each side and any difference left unexplained. | AsAtDate (Date, optional) | Wallet, Ledger, Statement, LedgerOnly, StatementOnly, Difference | — | Sum(Difference) |
+| CB77 | Petty Cash Counts & Imprest Reconciliation | Every petty cash fund with its float and book balance, and each count in the period: cash counted against the book, the variance, who counted, and the variance and reimbursement journals once reconciled. | FundCode (String, optional), FromDate (Date, optional), ToDate (Date, optional) | Fund, Date, Float, Book, Counted, Variance, Status, CountedBy, Journals, Note | — | Sum(Variance) |
 
 ## Documents
 

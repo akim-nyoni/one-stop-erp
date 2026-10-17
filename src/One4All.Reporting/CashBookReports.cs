@@ -46,5 +46,10 @@ public static class CashBookReports
         yield return Listing("CB76", "Mobile Money / Wallet Reconciliation", "CashBook", "Per mobile-money wallet at the date: ledger balance against the wallet statement, unmatched items on each side and any difference left unexplained.",
             "CashWallets", [new Column("Wallet", "Wallet", 120), new Column("Ledger", "Ledger", 95), new Column("Statement", "Statement", 95), new Column("LedgerOnly", "Ledger not on statement", 110),
              new Column("StatementOnly", "Statement not in ledger", 110), new Column("Difference", "Unexplained", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("CB77", "Petty Cash Counts & Imprest Reconciliation", "CashBook", "Every petty cash fund with its float and book balance, and each count in the period: cash counted against the book, "
+            + "the variance, who counted, and the variance and reimbursement journals once reconciled.",
+            "CashPettyCounts", [new Column("Fund", "Fund", 80), new Column("Date", "Counted", 75), new Column("Float", "Float", 85), new Column("Book", "Book", 85), new Column("Counted", "Counted", 85),
+             new Column("Variance", "Variance", 85, true), new Column("Status", "Status", 80), new Column("CountedBy", "Counted by", 100), new Column("Journals", "Journals", 160), new Column("Note", "Note", 160)],
+            [("FundCode", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
     }
 }
