@@ -200,6 +200,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Trading.IDebtCollectionService>(sp => sp.GetRequiredService<Trading.DebtCollectionService>());
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();
+        services.AddScoped<Application.Abstractions.Trading.ISupplierAdvanceService, Trading.SupplierAdvanceService>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
         services.AddScoped<IDeferredIncomeService, Accounting.DeferredIncomeService>();
         services.AddScoped<ILedgerIntegrityService, Accounting.LedgerIntegrityService>();

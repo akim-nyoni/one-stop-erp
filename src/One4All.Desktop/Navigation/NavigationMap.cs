@@ -95,7 +95,7 @@ public static class NavigationMap
                 O("Purchasing: Receive goods"), O("Purchasing: Quality inspection of a receipt"), O("Purchasing: Return stock to a supplier"), O("Stock: Landed costs on a receipt")),
             G("Invoices and payments",
                 O("Suppliers: Supplier invoice or credit note"), O("Purchasing: Match a supplier invoice", "Match a supplier invoice to the order"), O("Purchasing: Supplier invoice disputes"),
-                O("Suppliers: Allocate supplier items", "Match payments to invoices"), O("Suppliers: Supplier payment"),
+                O("Suppliers: Allocate supplier items", "Match payments to invoices"), O("Suppliers: Supplier payment"), O("Suppliers: Supplier advances"),
                 W("payment-run", "Supplier payment run", "Choose which supplier invoices to pay and produce the payments.", MenuArea.Transactions, "Suppliers"),
                 O("Suppliers: Payment run approval"), O("Suppliers: Recurring purchase invoices"), O("Suppliers: Allowance vouchers")),
             G("Statements",

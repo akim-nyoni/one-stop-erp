@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand — run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-579 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+580 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -149,7 +149,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | GL19 | Period Close Checklist & Status | Each period of the year to the date: its status per module, whether it is ready to close, and every close check with its count, value and whether it blocks. | AsAtDate (Date, optional) | Period, Ends, Status, Ready, Check, Count, Value, Blocking, Detail | — | — |
 | GL2 | Trial Balance — Multi-currency | Posted balances as at the date per account and transaction currency, in transaction and base. | AsAtDate (Date, optional) | Account, Name, Currency, Transaction, Base | — | Sum(Base) |
 | GL20 | Year-End Pack | For the year containing the date: the close checklist, the trial balance totals, the result for the year and the year's journals by source. | AsAtDate (Date, optional) | Section, Item, Value | — | — |
-| GL22 | Recurring Journals Due & Missed | Each active recurring template's last posted month against the date: posted, due or missed. | AsAtDate (Date, optional) | Code, Description, LastPosted, Status, Value | — | Sum(Value) |
+| GL22 | Recurring Journals Due & Missed | Each active recurring template's last posted month against the date: posted, due or missed. | AsAtDate (Date, optional) | Code, Description, LastPosted, Status, Value, Schedule | — | Sum(Value) |
 | GL23 | Accruals, Prepayments & Deferred Income Schedule | Accrual and prepayment journals in the period, then deferred income schedules with what is left to recognise. | FromDate (Date, optional), ToDate (Date, optional) | Kind, Reference, Date, Detail, Recognised, Amount | — | Sum(Amount) |
 | GL24 | Intercompany Balances & Reconciliation | Intercompany journals in the period and whether the counterparty company holds the mirror entry. | FromDate (Date, optional), ToDate (Date, optional) | Document, Date, Narrative, Counterparty, Status, Amount | — | Sum(Amount) |
 | GL25 | Hyperinflation (IAS 29) Working Papers | Each account's historical balance restated by the price index at the date, monetary items unchanged, with the restatement. | AsAtDate (Date, optional), IndexCode (String, optional) | Account, Name, Type, Monetary, Historical, Restated, Restatement | — | Sum(Restatement) |
@@ -479,9 +479,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | AP61 | Supplier Statement Reconciliation | Each supplier's latest captured statement at the date against our ledger: both balances, items only they show, items only we show, and amounts that differ. | AsAtDate (Date, optional) | Supplier, Section, Document, Theirs, Ours, Difference | — | Sum(Difference) |
 | AP62 | Withholding Tax Deducted | Tax withheld from supplier payments in the period, by certificate, and whether it has been remitted. | FromDate (Date, optional), ToDate (Date, optional) | Certificate, Supplier, Payment, Date, Tax, Rate, Gross, Remitted, Withheld | — | Sum(Withheld) |
 | AP63 | Supplier Performance Scorecard | Per supplier in the period: deliveries, on time, quantity received and returned, quality and spend. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Deliveries, OnTime, Received, Returned, Quality, Spend | — | Sum(Spend) |
-| AP64 | Supplier Balances (with debit balances) | What is owed to each supplier at the date; suppliers in debit (owing us) flagged, with hold and blacklist status. | AsAtDate (Date, optional) | Supplier, Currency, Flag, Status, Balance | — | Sum(Balance) |
+| AP64 | Supplier Balances (with debit balances) | What is owed to each supplier at the date; suppliers in debit (owing us) flagged, with hold and blacklist status. | AsAtDate (Date, optional) | Supplier, Currency, Flag, Status, Balance, Advances | — | Sum(Advances) |
 | AP65 | Supplier Bank Detail Change Audit | Every request to change a supplier's bank details: who asked, who reviewed, outcome (account numbers masked). | — | Requested, Supplier, RequestedBy, NewDetails, Status, ReviewedBy, Reason | — | — |
 | AP66 | Top Suppliers & Concentration | Suppliers ranked by net purchases in the period, with share and cumulative share. | FromDate (Date, optional), ToDate (Date, optional) | Rank, Supplier, Documents, Share, Cumulative, Purchases | — | Sum(Purchases) |
+| AP67 | Supplier Advances & Prepayments | Every advance paid to a supplier in the period (or still held at its end): the purchase order it is for, what was applied to invoices, what the supplier refunded and the balance still held in the advances account. | FromDate (Date, optional), ToDate (Date, optional) | Supplier, Document, Date, Order, Currency, Amount, Applied, Refunded, Outstanding, Status | — | Sum(Outstanding) |
 | PO124 | Requisition Approval Turnaround | Requisitions in the period with who approved them and how many days it took. | FromDate (Date, optional), ToDate (Date, optional) | Requisition, Supplier, Requested, Status, Approver, Approved, Days, Value | — | Sum(Value) |
 | PO125 | Approval History / Authorisation Audit | Every workflow action in the period: document, stage, who, what and when, with the document value. | FromDate (Date, optional), ToDate (Date, optional) | When, Document, Reference, Stage, User, Action, Comment, Value | — | Sum(Value) |
 | PO126 | Purchase Order Listing | Every order in the period with status, required-by date, overdue flag and the value still to be received. | FromDate (Date, optional), ToDate (Date, optional), AsAtDate (Date, optional) | Order, Date, Supplier, Status, RequiredBy, Overdue, Currency, Ordered, Received, Outstanding | — | Sum(Outstanding) |

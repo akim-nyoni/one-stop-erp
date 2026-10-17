@@ -195,7 +195,7 @@ public static partial class ScreenPermissions
         ("Stock", @"*", "Inventory.Item"),
 
         ("Suppliers", @"invoice|credit note|recurring|allowance|allocate", "Purchasing.Invoice"),
-        ("Suppliers", @"payment|remittance", "Purchasing.PaymentRun"),
+        ("Suppliers", @"payment|remittance|advance", "Purchasing.PaymentRun"),
         ("Suppliers", @"bank details", "Purchasing.SupplierBankDetail"),
         ("Suppliers", @"withholding", "Purchasing.WithholdingTax"),
         ("Suppliers", @"statement", "Purchasing.Statement"),

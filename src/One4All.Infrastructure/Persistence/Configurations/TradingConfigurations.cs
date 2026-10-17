@@ -389,3 +389,23 @@ internal sealed class FinanceChargePolicyConfiguration : IEntityTypeConfiguratio
         b.Property(x => x.DocumentPrefix).HasMaxLength(10).IsRequired();
     }
 }
+
+internal sealed class SupplierAdvanceConfiguration : IEntityTypeConfiguration<SupplierAdvance>
+{
+    public void Configure(EntityTypeBuilder<SupplierAdvance> b)
+    {
+        b.ToTable("supplier_advance", Schemas.Trading);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocumentNumber).HasMaxLength(40);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.ExchangeRate).HasPrecision(19, 6);
+        b.Property(x => x.AdvanceAccountCode).HasMaxLength(30);
+        b.Property(x => x.BankAccountCode).HasMaxLength(30);
+        b.Property(x => x.PurchaseOrderNumber).HasMaxLength(40);
+        b.Property(x => x.Narrative).HasMaxLength(512);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Ignore(x => x.Outstanding);
+        b.HasIndex(x => new { x.CompanyId, x.DocumentNumber }).IsUnique();
+        b.HasIndex(x => new { x.CompanyId, x.SupplierId, x.Status });
+    }
+}

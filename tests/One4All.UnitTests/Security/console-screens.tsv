@@ -382,6 +382,7 @@ Suppliers	Exchange-rate type	False
 Suppliers	Payment run approval	False	
 Suppliers	Recurring purchase invoices	False	
 Suppliers	Remittance advice	False	
+Suppliers	Supplier advances	False	
 Suppliers	Supplier bank details	False	
 Suppliers	Supplier invoice or credit note	False	
 Suppliers	Supplier payment	False	

@@ -87,6 +87,7 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
             "PAYBBALANCES" => await BalancesAsync(companyId, asAt, ct).ConfigureAwait(false),
             "PAYBBANKCHANGES" => await BankChangesAsync(companyId, ct).ConfigureAwait(false),
             "PAYBTOPSUPPLIERS" => await TopSuppliersAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PAYBADVANCES" => await AdvancesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             _ => [],
         };
     }
@@ -189,11 +190,16 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
     {
         Dictionary<long, Supplier> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
         List<OpenItemAsAt> items = await OpenItemsAsAt.LoadAsync(_db, companyId, TradingLedger.AccountsPayable, asAt, ct).ConfigureAwait(false);
-        return [.. items.Where(i => suppliers.ContainsKey(i.Item.TraderId)).GroupBy(i => i.Item.TraderId)
-            .Select(g => (Supplier: suppliers[g.Key], Balance: g.Sum(i => i.Signed(LedgerSign.Credit)))).Where(x => x.Balance != 0m)
+        // Advances still held at the date live in the advances account, outside the ledger balance: shown beside it.
+        Dictionary<long, decimal> advances = (await _db.Set<SupplierAdvance>().AsNoTracking().Where(a => a.CompanyId == companyId && a.AdvanceDate <= asAt && a.Status == SupplierAdvanceStatus.Open).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(a => a.SupplierId).ToDictionary(g => g.Key, g => g.Sum(a => a.Outstanding));
+        HashSet<long> traders = [.. items.Select(i => i.Item.TraderId).Concat(advances.Keys)];
+        return [.. traders.Where(suppliers.ContainsKey)
+            .Select(id => (Supplier: suppliers[id], Balance: items.Where(i => i.Item.TraderId == id).Sum(i => i.Signed(LedgerSign.Credit)), Advances: advances.GetValueOrDefault(id)))
+            .Where(x => x.Balance != 0m || x.Advances != 0m)
             .OrderBy(x => x.Balance > 0m).ThenBy(x => x.Supplier.Name, StringComparer.Ordinal)
-            .Select(x => Row(("Supplier", x.Supplier.Name), ("Currency", x.Supplier.Currency.Value), ("Flag", x.Balance < 0m ? "Debit balance" : string.Empty),
-                ("Status", x.Supplier.IsBlacklisted ? "Blacklisted" : x.Supplier.OnHold ? "On hold" : "Active"), ("Balance", x.Balance)))];
+            .Select(x => Row(("Supplier", x.Supplier.Name), ("Currency", x.Supplier.Currency.Value), ("Flag", x.Balance < 0m ? "Debit balance" : x.Advances > 0m ? "Advance held" : string.Empty),
+                ("Status", x.Supplier.IsBlacklisted ? "Blacklisted" : x.Supplier.OnHold ? "On hold" : "Active"), ("Balance", x.Balance), ("Advances", x.Advances)))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> BankChangesAsync(long companyId, CancellationToken ct)
@@ -237,6 +243,17 @@ public sealed class PayablesReportDataProvider : IReportDataProvider
             .OrderBy(x => suppliers.GetValueOrDefault(x.Key.SupplierId), StringComparer.Ordinal).ThenByDescending(x => x.Value)
             .Select(x => Row(("Supplier", suppliers.GetValueOrDefault(x.Key.SupplierId, "?")), ("Item", items.GetValueOrDefault(x.Key.ItemId, "?")), ("Orders", x.Orders), ("Quantity", Qty(x.Quantity)),
                 ("AveragePrice", x.Quantity == 0m ? "—" : Money(x.Value / x.Quantity)), ("Currency", x.Key.Currency), ("Value", x.Value)))];
+    }
+
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AdvancesAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<long, string> suppliers = await _db.Suppliers.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(s => s.CompanyId == companyId)
+            .ToDictionaryAsync(s => s.Id, s => s.Code, ct).ConfigureAwait(false);
+        List<SupplierAdvance> advances = await _db.Set<SupplierAdvance>().AsNoTracking()
+            .Where(a => a.CompanyId == companyId && ((a.AdvanceDate >= fromDate && a.AdvanceDate <= toDate) || (a.AdvanceDate <= toDate && a.Status == SupplierAdvanceStatus.Open)))
+            .OrderBy(a => a.AdvanceDate).ThenBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
+        return [.. advances.Select(a => Row(("Supplier", suppliers.GetValueOrDefault(a.SupplierId, "?")), ("Document", a.DocumentNumber), ("Date", Date(a.AdvanceDate)), ("Order", a.PurchaseOrderNumber ?? "—"),
+            ("Currency", a.Currency.Value), ("Amount", Money(a.Amount)), ("Applied", Money(a.Applied)), ("Refunded", Money(a.Refunded)), ("Outstanding", Money(a.Outstanding)), ("Status", a.Status.ToString())))];
     }
 
     private Task<Dictionary<long, string>> SuppliersAsync(long companyId, CancellationToken ct)

@@ -381,6 +381,43 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Suppliers", Title = "Supplier advances", ListTitle = "Open supplier items",
+            Description = "Advances and prepayments to suppliers. Pay: money paid ahead of the invoice into the advances account (held suppliers refused). Apply: moves an advance into the "
+                + "purchase ledger against the invoice (the open item id) and allocates it. Refund: the supplier returns the balance. List: advances for the supplier, or all.",
+            Fields = [Pick("Step", "Step", ["List", "Pay", "Apply", "Refund"]), SupplierPick("Supplier", "Supplier (pay / list)", false), Opt("Number", "Document number (pay / refund)"), Today("Date", "Date"),
+                OptNum("Amount", "Amount (pay; apply / refund: blank for all)"), Opt("AdvanceAccount", "Advances account (pay)"), Opt("Bank", "Bank account (pay / refund)", "1100"), Opt("Order", "Purchase order (pay)"),
+                Opt("Currency", "Currency (blank: the supplier's)"), OptNum("Advance", "Advance id (apply / refund)"), OptNum("Invoice", "Invoice open item id (apply)"), Opt("Narrative", "Narrative")],
+            Run = async (c, i) =>
+            {
+                ISupplierAdvanceService advances = c.Get<ISupplierAdvanceService>();
+                switch (i.Text("Step"))
+                {
+                    case "Pay":
+                        long supplier = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true);
+                        CurrencyCode currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code)
+                            : await c.Db.Suppliers.AsNoTracking().Where(x => x.Id == supplier).Select(x => x.Currency).SingleAsync().ConfigureAwait(true);
+                        SupplierAdvanceResult paid = Check(await advances.PayAsync(new SupplierAdvanceRequest(c.CompanyId, supplier, i.Text("Number"), i.Date("Date"), currency, i.Number("Amount"),
+                            i.Optional("AdvanceAccount") ?? string.Empty, i.Optional("Bank") ?? string.Empty, i.Optional("Order"), i.Optional("Narrative"))).ConfigureAwait(true));
+                        return $"Advance {i.Text("Number")} paid (id {paid.AdvanceId}, journal {paid.JournalNumber}): {M(paid.AmountBase)} base.";
+                    case "Apply":
+                        SupplierAdvanceApplication applied = Check(await advances.ApplyAsync(c.CompanyId, (long)(i.OptionalNumber("Advance") ?? 0m), (long)(i.OptionalNumber("Invoice") ?? 0m), i.Date("Date"),
+                            i.OptionalNumber("Amount")).ConfigureAwait(true));
+                        return $"Applied {M(applied.Applied)} (journal {applied.JournalNumber}); advance left {M(applied.AdvanceOutstanding)}, invoice left {M(applied.InvoiceOutstanding)}.";
+                    case "Refund":
+                        string journal = Check(await advances.RefundAsync(c.CompanyId, (long)(i.OptionalNumber("Advance") ?? 0m), i.Date("Date"), i.Optional("Bank") ?? string.Empty, i.Text("Number"),
+                            i.OptionalNumber("Amount")).ConfigureAwait(true));
+                        return $"Refund {i.Text("Number")} posted (journal {journal}).";
+                    default:
+                        long? forSupplier = i.Optional("Supplier") is string s ? await SupplierAsync(c, s).ConfigureAwait(true) : null;
+                        IReadOnlyList<SupplierAdvanceRow> rows = await advances.ListAsync(c.CompanyId, forSupplier).ConfigureAwait(true);
+                        return rows.Count == 0 ? "No advances."
+                            : string.Join(Environment.NewLine, rows.Select(r => $"{r.Id,6} {r.SupplierCode,-10} {r.DocumentNumber,-14} {D(r.Date)} {r.PurchaseOrderNumber ?? "—",-12} {r.Currency} paid {M(r.Amount),12} applied {M(r.Applied),12} refunded {M(r.Refunded),12} held {M(r.Outstanding),12}  {r.Status}"));
+                }
+            },
+            List = c => OpenItemsAsync(c, TradingLedger.AccountsPayable),
+        };
+        yield return new Operation
+        {
             Module = "Suppliers", Title = "Payment run approval", ListTitle = "Saved payment runs",
             Description = "Saves a proposed payment run for review: everyone due (held suppliers left out with the reason); lines can be left out or part-paid (oldest invoices "
                 + "first); someone other than the proposer approves it, which pays exactly what it holds. Require approval stops direct payment runs for the company. With funds "

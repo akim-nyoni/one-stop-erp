@@ -1278,6 +1278,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<bool>("AutoReverse")
+                        .HasColumnType("boolean")
+                        .HasColumnName("auto_reverse");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -1296,11 +1300,24 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
 
+                    b.Property<string>("Currency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)")
                         .HasColumnName("description");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("date")
+                        .HasColumnName("end_date");
+
+                    b.Property<int>("IntervalMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("interval_months");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean")
@@ -1309,6 +1326,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int?>("LastPostedPeriod")
                         .HasColumnType("integer")
                         .HasColumnName("last_posted_period");
+
+                    b.Property<int?>("MaxOccurrences")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_occurrences");
 
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
@@ -1323,6 +1344,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(400)")
                         .HasColumnName("narrative");
 
+                    b.Property<int>("Occurrences")
+                        .HasColumnType("integer")
+                        .HasColumnName("occurrences");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -1334,6 +1359,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)")
                         .HasColumnName("source_module");
+
+                    b.Property<DateOnly?>("StartDate")
+                        .HasColumnType("date")
+                        .HasColumnName("start_date");
 
                     b.HasKey("Id")
                         .HasName("pk_recurring_journal");
@@ -34732,6 +34761,131 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasFilter("is_deleted = false");
 
                     b.ToTable("supplier", "ap");
+                });
+
+            modelBuilder.Entity("One4All.Core.Trading.SupplierAdvance", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AdvanceAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("advance_account_code");
+
+                    b.Property<DateOnly>("AdvanceDate")
+                        .HasColumnType("date")
+                        .HasColumnName("advance_date");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount");
+
+                    b.Property<decimal>("AmountBase")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("amount_base");
+
+                    b.Property<int>("Applications")
+                        .HasColumnType("integer")
+                        .HasColumnName("applications");
+
+                    b.Property<decimal>("Applied")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("applied");
+
+                    b.Property<string>("BankAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("bank_account_code");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_number");
+
+                    b.Property<decimal>("ExchangeRate")
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasColumnName("exchange_rate");
+
+                    b.Property<long?>("JournalEntryId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("journal_entry_id");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Narrative")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("narrative");
+
+                    b.Property<string>("PurchaseOrderNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("purchase_order_number");
+
+                    b.Property<decimal>("Refunded")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("refunded");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("SupplierId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("supplier_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_supplier_advance");
+
+                    b.HasIndex("CompanyId", "DocumentNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_supplier_advance_company_id_document_number");
+
+                    b.HasIndex("CompanyId", "SupplierId", "Status")
+                        .HasDatabaseName("ix_supplier_advance_company_id_supplier_id_status");
+
+                    b.ToTable("supplier_advance", "trd");
                 });
 
             modelBuilder.Entity("One4All.Core.Trading.SupplierBankChange", b =>

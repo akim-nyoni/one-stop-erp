@@ -43,7 +43,8 @@ public static class PayablesReports
             "PaybScorecard", [new Column("Supplier", "Supplier", 150), new Column("Deliveries", "Deliveries", 65), new Column("OnTime", "On time", 70), new Column("Received", "Received", 70),
              new Column("Returned", "Returned", 65), new Column("Quality", "Quality", 65), new Column("Spend", "Spend", 95, true)], Period);
         yield return Listing("AP64", "Supplier Balances (with debit balances)", "Purchasing", "What is owed to each supplier at the date; suppliers in debit (owing us) flagged, with hold and blacklist status.",
-            "PaybBalances", [new Column("Supplier", "Supplier", 150), new Column("Currency", "Currency", 55), new Column("Flag", "Flag", 90), new Column("Status", "Status", 110), new Column("Balance", "Balance owed", 100, true)],
+            "PaybBalances", [new Column("Supplier", "Supplier", 150), new Column("Currency", "Currency", 55), new Column("Flag", "Flag", 90), new Column("Status", "Status", 110), new Column("Balance", "Balance owed", 100, true),
+             new Column("Advances", "Advances held", 100, true)],
             [("AsAtDate", ParameterType.Date)]);
         yield return Listing("AP65", "Supplier Bank Detail Change Audit", "Purchasing", "Every request to change a supplier's bank details: who asked, who reviewed, outcome (account numbers masked).",
             "PaybBankChanges", [new Column("Requested", "Requested", 110), new Column("Supplier", "Supplier", 140), new Column("RequestedBy", "Requested by", 90), new Column("NewDetails", "New details", 200),
@@ -51,5 +52,10 @@ public static class PayablesReports
         yield return Listing("AP66", "Top Suppliers & Concentration", "Purchasing", "Suppliers ranked by net purchases in the period, with share and cumulative share.",
             "PaybTopSuppliers", [new Column("Rank", "Rank", 40), new Column("Supplier", "Supplier", 160), new Column("Documents", "Documents", 65), new Column("Share", "Share", 60),
              new Column("Cumulative", "Cumulative", 70), new Column("Purchases", "Net purchases", 100, true)], Period);
+        yield return Listing("AP67", "Supplier Advances & Prepayments", "Purchasing", "Every advance paid to a supplier in the period (or still held at its end): the purchase order it is for, what was applied to "
+            + "invoices, what the supplier refunded and the balance still held in the advances account.",
+            "PaybAdvances", [new Column("Supplier", "Supplier", 90), new Column("Document", "Document", 100), new Column("Date", "Paid", 75), new Column("Order", "Purchase order", 100), new Column("Currency", "Currency", 55),
+             new Column("Amount", "Paid", 90), new Column("Applied", "Applied", 90), new Column("Refunded", "Refunded", 90), new Column("Outstanding", "Held", 90, true), new Column("Status", "Status", 70)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
     }
 }
