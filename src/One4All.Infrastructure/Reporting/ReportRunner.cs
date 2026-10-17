@@ -87,6 +87,7 @@ public sealed class ReportRunner : IReportRunner
 
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = Application.Reporting.ReportRowScope.Apply(
             await RowsAsync(companyId, reportCode, definition, parameters, hiddenFields, ct).ConfigureAwait(false), access.Scope);
+        (rows, parameters) = await ReportCurrencyTranslation.ApplyAsync(_db, companyId, definition, rows, parameters, ct).ConfigureAwait(false);
 
         var company = await _db.Companies.Where(c => c.Id == companyId).Select(c => new { c.Name, c.Locale, c.Logo, c.ReportThemeJson }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         Dictionary<string, string> terms = await _db.TerminologyOverrides.AsNoTracking().Where(t => t.CompanyId == companyId)
@@ -129,6 +130,7 @@ public sealed class ReportRunner : IReportRunner
 
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = Application.Reporting.ReportRowScope.Apply(
             await RowsAsync(companyId, reportCode, definition, parameters, access.Hidden, ct).ConfigureAwait(false), access.Scope);
+        (rows, parameters) = await ReportCurrencyTranslation.ApplyAsync(_db, companyId, definition, rows, parameters, ct).ConfigureAwait(false);
         if (rows.Count > 0 && !rows[0].ContainsKey(keyField.Trim()))
         {
             return Error.Validation("Rpt.BurstKey", $"Report {reportCode} has no field {keyField.Trim()} to split by.");

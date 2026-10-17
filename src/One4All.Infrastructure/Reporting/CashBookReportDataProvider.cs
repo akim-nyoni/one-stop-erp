@@ -33,6 +33,7 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
     /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
     {
+        _common = Application.Reporting.ReportCommonParameters.From(parameters);
         DateOnly today = DateOnly.FromDateTime(DateTime.Today);
         DateOnly asAt = DateParameter(parameters, "AsAtDate") ?? today;
         DateOnly toDate = DateParameter(parameters, "ToDate") ?? today;
@@ -54,13 +55,24 @@ public sealed class CashBookReportDataProvider : IReportDataProvider
         };
     }
 
-    // Posted lines on a set of ledger accounts, with their journal, in date order.
+    // The common parameters of the run in progress (branch, cost centre, department, unposted) — set at the start of each GetRowsAsync.
+    private Application.Reporting.ReportCommonParameters _common = Application.Reporting.ReportCommonParameters.None;
+
+    // Posted lines on a set of ledger accounts, with their journal, in date order — narrowed to the branch, cost centre and department asked for,
+    // and taking draft and deferred journals in too when unposted ones are wanted (brief §9 common parameters).
     private async Task<List<(JournalEntry Journal, JournalLine Line)>> LinesAsync(long companyId, IReadOnlyCollection<string> accounts, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
-        => [.. (await (from l in _db.Set<JournalLine>().AsNoTracking() join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
-                      where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && accounts.Contains(l.AccountCode)
-                          && j.PostingDate >= fromDate && j.PostingDate <= toDate
-                      orderby j.PostingDate, j.JournalNumber, l.Id
-                      select new { Journal = j, Line = l }).ToListAsync(ct).ConfigureAwait(false)).Select(x => (x.Journal, x.Line))];
+    {
+        Application.Reporting.ReportCommonParameters common = _common;
+        IQueryable<JournalLine> lines = _db.Set<JournalLine>().AsNoTracking();
+        if (common.Branch is string branch) { lines = lines.Where(l => l.Branch == branch); }
+        if (common.CostCentre is string costCentre) { lines = lines.Where(l => l.CostCentre == costCentre); }
+        if (common.Department is string department) { lines = lines.Where(l => l.Department == department); }
+        return [.. (await (from l in lines join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+                           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed || (common.IncludeUnposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred)))
+                               && accounts.Contains(l.AccountCode) && j.PostingDate >= fromDate && j.PostingDate <= toDate
+                           orderby j.PostingDate, j.JournalNumber, l.Id
+                           select new { Journal = j, Line = l }).ToListAsync(ct).ConfigureAwait(false)).Select(x => (x.Journal, x.Line))];
+    }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> ListingAsync(long companyId, string? bankCode, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {

@@ -946,15 +946,33 @@ public static class SystemReports
             def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
         }
 
+        // Sales, purchasing, cash book and tax listings all take the common parameters (brief §9): a reporting currency and rate basis, a branch,
+        // cost centre and department to narrow to, and whether unposted journals count; the header then names the rate basis the runner used.
+        bool common = CommonParameterModules.Contains(module, StringComparer.Ordinal);
+        if (common)
+        {
+            foreach ((string paramName, ParameterType type) in CommonParameters.Where(c => def.Parameters.All(p => !string.Equals(p.Name, c.Name, StringComparison.OrdinalIgnoreCase))))
+            {
+                def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
+            }
+        }
+
         def.Bands.Add(new ReportBand
         {
             Type = BandType.ReportHeader,
-            Height = 40,
-            Elements =
-            [
-                new ReportElement { Kind = ElementKind.Expression, Name = "company", Expression = "CompanyName", X = 0, Y = 0, Width = 400, Height = 16, Bold = true, FontSize = 13 },
-                Label("title", name, 0, 18, 500, 14, bold: true, size: 11),
-            ],
+            Height = common ? 46 : 40,
+            Elements = common
+                ?
+                [
+                    new ReportElement { Kind = ElementKind.Expression, Name = "company", Expression = "CompanyName", X = 0, Y = 0, Width = 400, Height = 16, Bold = true, FontSize = 13 },
+                    Label("title", name, 0, 18, 500, 14, bold: true, size: 11),
+                    new ReportElement { Kind = ElementKind.RichText, Name = "basis", Text = "{" + RateBasisUsedParameter + "}", X = 0, Y = 33, Width = 600, Height = 11, FontSize = 8 },
+                ]
+                :
+                [
+                    new ReportElement { Kind = ElementKind.Expression, Name = "company", Expression = "CompanyName", X = 0, Y = 0, Width = 400, Height = 16, Bold = true, FontSize = 13 },
+                    Label("title", name, 0, 18, 500, 14, bold: true, size: 11),
+                ],
         });
 
         Column? lastMoney = columns.LastOrDefault(c => c.Money) is { Field.Length: > 0 } lm ? lm : null;
@@ -1025,6 +1043,19 @@ public static class SystemReports
     /// <returns>The command, or the report code when no data source is defined.</returns>
     public static string CommandOf(ReportDefinition definition) =>
         definition.DataSources.FirstOrDefault()?.Command ?? definition.Code;
+
+    /// <summary>The modules whose listings take the common parameters (mirrored by the application layer's ReportCommonParameters, which this project cannot reference).</summary>
+    public static readonly string[] CommonParameterModules = ["Sales", "Purchasing", "CashBook", "Tax"];
+
+    /// <summary>The parameter the report runner adds to say which rate it translated amounts at; the listing header shows it.</summary>
+    public const string RateBasisUsedParameter = "RateBasisUsed";
+
+    /// <summary>The common parameters of sales, purchasing, cash book and tax listings, in the order they are prompted.</summary>
+    public static readonly (string Name, ParameterType Type)[] CommonParameters =
+    [
+        ("ReportingCurrency", ParameterType.String), ("RateBasis", ParameterType.String), ("Rate", ParameterType.Decimal), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String),
+        ("Department", ParameterType.String), ("IncludeUnposted", ParameterType.Boolean),
+    ];
 
     private static ReportElement Label(string name, string text, double x, double y, double w, double h, bool bold = false, double size = 9, ReportHAlign align = ReportHAlign.Left) =>
         new() { Kind = ElementKind.Label, Name = name, Text = text, X = x, Y = y, Width = w, Height = h, Bold = bold, FontSize = size, HAlign = align };

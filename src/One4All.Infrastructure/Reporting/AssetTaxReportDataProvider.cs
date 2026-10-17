@@ -23,6 +23,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
     /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
     {
+        _common = Application.Reporting.ReportCommonParameters.From(parameters);
         DateOnly today = DateOnly.FromDateTime(DateTime.Today);
         DateOnly toDate = DateParameter(parameters, "ToDate") ?? today;
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
@@ -48,10 +49,25 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
         };
     }
 
+    // The common parameters of the run in progress (branch, cost centre, department, unposted) — set at the start of each GetRowsAsync.
+    private Application.Reporting.ReportCommonParameters _common = Application.Reporting.ReportCommonParameters.None;
+
+    // Journal lines narrowed to the branch, cost centre and department asked for, and drafts and deferred journals counted when unposted ones are wanted.
+    private IQueryable<JournalLine> Lines()
+    {
+        Application.Reporting.ReportCommonParameters common = _common;
+        IQueryable<JournalLine> lines = _db.Set<JournalLine>().AsNoTracking();
+        if (common.Branch is string branch) { lines = lines.Where(l => l.Branch == branch); }
+        if (common.CostCentre is string costCentre) { lines = lines.Where(l => l.CostCentre == costCentre); }
+        if (common.Department is string department) { lines = lines.Where(l => l.Department == department); }
+        return lines;
+    }
+
     private IQueryable<PostedLine> Posted(long companyId, DateOnly fromDate, DateOnly toDate)
-        => from l in _db.Set<JournalLine>().AsNoTracking()
+        => from l in Lines()
            join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
-           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate >= fromDate && j.PostingDate <= toDate
+           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed || (_common.IncludeUnposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred)))
+               && j.PostingDate >= fromDate && j.PostingDate <= toDate
            select new PostedLine
            {
                Date = j.PostingDate, Journal = j.JournalNumber, DocumentType = j.DocumentType, DocumentNumber = j.DocumentNumber, AccountCode = l.AccountCode, TaxCode = l.TaxCode,
@@ -207,9 +223,10 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> AuditFileAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
-        var lines = await (from l in _db.Set<JournalLine>().AsNoTracking()
+        var lines = await (from l in Lines()
                            join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
-                           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate >= fromDate && j.PostingDate <= toDate
+                           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed || (_common.IncludeUnposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred)))
+                               && j.PostingDate >= fromDate && j.PostingDate <= toDate
                            orderby j.PostingDate, j.JournalNumber, l.Id
                            select new { j.Id, j.JournalNumber, j.PostingDate, j.FiscalPeriodId, j.SourceModule, j.DocumentType, j.DocumentNumber, j.TransactionCurrency, l.AccountCode, l.TaxCode, l.Narrative,
                                l.TransactionDebit, l.TransactionCredit, l.BaseDebit, l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
