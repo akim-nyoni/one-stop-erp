@@ -18,14 +18,17 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
 
     private readonly One4AllDbContext _db;
     private readonly IBudgetControlService _control;
+    private readonly Application.Abstractions.Banking.ICashForecastService? _forecast;
 
     /// <summary>Creates the provider.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="control">Budget control (seal verification).</param>
-    public BudgetingReportDataProvider(One4AllDbContext db, IBudgetControlService control)
+    /// <param name="forecast">The cash forecast the months still to come are read from (B41).</param>
+    public BudgetingReportDataProvider(One4AllDbContext db, IBudgetControlService control, Application.Abstractions.Banking.ICashForecastService? forecast = null)
     {
         _db = db;
         _control = control;
+        _forecast = forecast;
     }
 
     /// <inheritdoc />
@@ -73,7 +76,10 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             "BGTCASH" => await CashAsync(context, ct).ConfigureAwait(false),
             "BGTCAPITALPROJECTS" => await CapitalProjectsAsync(context, ct).ConfigureAwait(false),
             "BGTSUBMISSION" => await SubmissionAsync(context, ct).ConfigureAwait(false),
-            "BGTVERSIONS" => await VersionsAsync(context, ct).ConfigureAwait(false),
+            "BGTVERSIONS" => await VersionsAsync(context, parameters.TryGetValue("Budget", out object? label) ? label as string : null,
+                parameters.TryGetValue("FromVersion", out object? fromVersion) && fromVersion is not null and not "" ? Convert.ToInt32(fromVersion, CultureInfo.InvariantCulture) : null,
+                parameters.TryGetValue("ToVersion", out object? toVersion) && toVersion is not null and not "" ? Convert.ToInt32(toVersion, CultureInfo.InvariantCulture) : null,
+                parameters.TryGetValue("By", out object? by) ? by as string : null, ct).ConfigureAwait(false),
             "BGTMULTIYEAR" => await MultiYearAsync(context, ct).ConfigureAwait(false),
             "BGTREGISTER" => await RegisterAsync(context, ct).ConfigureAwait(false),
             "BGTVERSIONREGISTER" => await VersionRegisterAsync(context, ct).ConfigureAwait(false),
@@ -187,20 +193,45 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
                 ("Q4", Money(Quarter(g, 3))), ("Total", g.Sum(l => l.Amount)))))];
     }
 
-    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VersionsAsync(Context c, CancellationToken ct)
+    // B12: two versions of a budget side by side - the latest and the one before unless versions are named - per account, or per account and
+    // period or cost centre; one budget when its label is given (any department of it).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VersionsAsync(Context c, string? label, int? fromVersion, int? toVersion, string? by, CancellationToken ct)
     {
         Dictionary<string, string> names = await NamesAsync(c.CompanyId, ct).ConfigureAwait(false);
+        string detail = (by ?? string.Empty).Trim().ToUpperInvariant() switch
+        {
+            "PERIOD" => "Period",
+            "COSTCENTRE" or "COST CENTRE" or "CC" => "CostCentre",
+            _ => "All",
+        };
+        string Detail(BudgetLine line) => detail switch
+        {
+            "Period" => "P" + line.Period.ToString("00", CultureInfo.InvariantCulture),
+            "CostCentre" => string.IsNullOrWhiteSpace(line.CostCentre) ? "-" : line.CostCentre,
+            _ => "All",
+        };
+
         List<IReadOnlyDictionary<string, object?>> rows = [];
         foreach (IGrouping<(string Label, string? Department), Budget> group in (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false))
+                     .Where(b => string.IsNullOrWhiteSpace(label) || string.Equals(b.Label, label.Trim(), StringComparison.OrdinalIgnoreCase))
                      .GroupBy(b => (b.Label, b.Department)).Where(g => g.Count() > 1).OrderBy(g => g.Key.Label, StringComparer.Ordinal))
         {
             List<Budget> ordered = [.. group.OrderBy(b => b.VersionNumber)];
-            Budget previous = ordered[^2], current = ordered[^1];
-            foreach (string account in previous.Lines.Select(l => l.AccountCode).Union(current.Lines.Select(l => l.AccountCode)).Order(StringComparer.Ordinal))
+            Budget? current = toVersion is int to ? ordered.FirstOrDefault(b => b.VersionNumber == to) : ordered[^1];
+            Budget? previous = fromVersion is int from ? ordered.FirstOrDefault(b => b.VersionNumber == from)
+                : current is null ? null : ordered.LastOrDefault(b => b.VersionNumber < current.VersionNumber);
+            if (previous is null || current is null || previous == current)
             {
-                decimal before = previous.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount), after = current.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount);
+                continue;
+            }
+
+            foreach ((string account, string part) in previous.Lines.Concat(current.Lines).Select(l => (l.AccountCode, Detail(l))).Distinct()
+                         .OrderBy(k => k.AccountCode, StringComparer.Ordinal).ThenBy(k => k.Item2, StringComparer.Ordinal))
+            {
+                decimal before = previous.Lines.Where(l => l.AccountCode == account && Detail(l) == part).Sum(l => l.Amount);
+                decimal after = current.Lines.Where(l => l.AccountCode == account && Detail(l) == part).Sum(l => l.Amount);
                 rows.Add(Row(("Budget", group.Key.Label + (group.Key.Department is null ? string.Empty : $" ({group.Key.Department})")), ("Versions", $"v{previous.VersionNumber} → v{current.VersionNumber}"),
-                    ("Account", account), ("Name", names.GetValueOrDefault(account, "?")), ("Previous", Money(before)), ("Current", Money(after)),
+                    ("Account", account), ("Name", names.GetValueOrDefault(account, "?")), ("Detail", part), ("Previous", Money(before)), ("Current", Money(after)),
                     ("Percent", before == 0m ? "-" : ((after - before) * 100m / before).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("Change", after - before)));
             }
         }
@@ -518,7 +549,8 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
             ("Name", names.GetValueOrDefault(a, "?")), ("Previous", Money(Total(previous, a))), ("Latest", Money(Total(latest, a))), ("Reason", latest.Reason ?? string.Empty), ("Movement", Total(latest, a) - Total(previous, a))))];
     }
 
-    // Cash budget lines carry the planned net cash per period; actual is the net movement on the bank accounts' ledger accounts.
+    // Cash budget lines carry the planned net cash per period; actual is the net movement on the bank accounts' ledger accounts. The months after the
+    // date take the cash forecast's flows (dated inside the year) in place of actuals, so the year reads budget against actual-then-forecast.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CashAsync(Context c, CancellationToken ct)
     {
         Budget? cash = (await BudgetsAsync(c.CompanyId, c.Year.Id, false, ct).ConfigureAwait(false)).Where(b => b.Type == BudgetType.Cash).OrderBy(b => b.VersionNumber).LastOrDefault();
@@ -528,12 +560,27 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
                                join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
                                where j.CompanyId == c.CompanyId && j.Status == JournalStatus.Posted && j.PostingDate >= c.Year.StartDate && j.PostingDate <= c.AsAt && banks.Contains(l.AccountCode)
                                select new { j.PostingDate, Net = l.BaseDebit - l.BaseCredit }).ToListAsync(ct).ConfigureAwait(false);
-        return [.. Enumerable.Range(1, c.Period).Select(p =>
+        int last = Math.Max(c.Period, PeriodOf(c.Year, c.Year.EndDate));
+        Dictionary<int, decimal> forecast = [];
+        if (_forecast is not null && c.AsAt < c.Year.EndDate)
+        {
+            DateOnly from = c.AsAt.AddDays(1);
+            int weeks = (int)Math.Ceiling((c.Year.EndDate.DayNumber - from.DayNumber + 1) / 7m);
+            Application.Banking.CashForecast flows = await _forecast.ForecastAsync(c.CompanyId, from, weeks, 0m, ct).ConfigureAwait(false);
+            foreach (var month in flows.Lines.Where(l => l.Date >= from && l.Date <= c.Year.EndDate).GroupBy(l => PeriodOf(c.Year, l.Date)))
+            {
+                forecast[month.Key] = month.Sum(l => l.Amount);
+            }
+        }
+
+        return [.. Enumerable.Range(1, last).Select(p =>
         {
             DateOnly month = c.Year.StartDate.AddMonths(p - 1);
             decimal budget = cash?.Lines.Where(l => l.Period == p).Sum(l => l.Amount) ?? 0m;
-            decimal actual = movements.Where(m => PeriodOf(c.Year, m.PostingDate) == p).Sum(m => m.Net);
-            return Row(("Period", p), ("Month", month.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Budget", Money(budget)), ("Actual", Money(actual)), ("Variance", Math.Round(actual - budget, 2)));
+            bool ahead = p > c.Period;
+            decimal amount = ahead ? forecast.GetValueOrDefault(p) : movements.Where(m => PeriodOf(c.Year, m.PostingDate) == p).Sum(m => m.Net);
+            return Row(("Period", p), ("Month", month.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Basis", ahead ? "Forecast" : "Actual"), ("Budget", Money(budget)), ("Actual", Money(amount)),
+                ("Variance", Math.Round(amount - budget, 2)));
         })];
     }
 

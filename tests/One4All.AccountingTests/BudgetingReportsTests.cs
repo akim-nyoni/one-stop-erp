@@ -64,14 +64,17 @@ public sealed class BudgetingReportsTests
         await Spend("BG-4", new DateOnly(2026, 3, 20), "6100", 200m);
 
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
-        async Task<string> Render(string code)
+        async Task<string> Render(string code, Dictionary<string, object?>? extra = null)
         {
-            var rendered = await runner.RenderAsync(companyId, code, new Dictionary<string, object?> { ["AsAtDate"] = new DateOnly(2026, 3, 31) }, ReportFormat.Csv);
+            Dictionary<string, object?> parameters = new(extra ?? new Dictionary<string, object?>()) { ["AsAtDate"] = new DateOnly(2026, 3, 31) };
+            var rendered = await runner.RenderAsync(companyId, code, parameters, ReportFormat.Csv);
             rendered.IsSuccess.Should().BeTrue(rendered.IsFailure ? $"{code}: {rendered.Error.Message}" : null);
             return Encoding.UTF8.GetString(rendered.Value.Content);
         }
 
-        (await Render("B12")).Should().Contain("OPEX,v1 → v2,6000,").And.Contain("\"1,200.00\",\"1,440.00\",+20.0%,240");
+        (await Render("B12")).Should().Contain("OPEX,v1 → v2,6000,").And.Contain(",All,\"1,200.00\",\"1,440.00\",+20.0%,240");
+        (await Render("B12", new() { ["Budget"] = "opex", ["By"] = "Period" })).Should().Contain(",P03,100.00,120.00,+20.0%,20").And.NotContain(",All,");
+        (await Render("B12", new() { ["Budget"] = "OPEX", ["FromVersion"] = 2, ["ToVersion"] = 1 })).Should().Contain("OPEX,v2 → v1,6000,").And.Contain(",-16.7%,-240");
         (await Render("B17")).Should().Contain("OPEX,2026,OriginalApproved,1,Superseded").And.Contain("OPEX,2026,SupplementaryRevised,2,Active,Yes");
         (await Render("B24")).Should().Contain("6000,").And.Contain(",All,\"1,440.00\",450.00,0.00,990");
         (await Render("B28")).Should().Contain("6100,Salaries & Wages,1,200");
@@ -103,8 +106,12 @@ public sealed class BudgetingReportsTests
         (await Render("B22")).Should().Contain("OPEX v2,Active,6000,\"1,200.00\",\"1,440.00\",,240");
         (await Render("B38")).Should().Contain(",All,\"1,440.00\",450.00,\"1,350.00\",\"1,800.00\",-360");
         (await Render("B39")).Should().Contain("\"1,560.00\",\"1,800.00\",Fuel prices,240");
+        // B41: actual to March, then the cash forecast - a manual flow of -400 in June lands in June's forecast.
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Banking.ICashForecastService>()
+            .AddEntryAsync(companyId, new DateOnly(2026, 6, 15), -400m, "Insurance premium")).IsSuccess.Should().BeTrue();
         string cashFlow = await Render("B41");
-        cashFlow.Should().Contain("1,2026-01,-100.00,-150.00,-50").And.Contain("3,2026-03,-100.00,-350.00,-250");
+        cashFlow.Should().Contain("1,2026-01,Actual,-100.00,-150.00,-50").And.Contain("3,2026-03,Actual,-100.00,-350.00,-250").And.Contain("6,2026-06,Forecast,-100.00,-400.00,-300")
+            .And.Contain("12,2026-12,Forecast,-100.00,");
         (await Render("B42")).Should().Contain("CP1,Plant upgrade,In progress,\"10,000.00\",\"2,500.00\",0.00,25.0%,7500");
 
         Budget capex = new(companyId, yearId, "CAPEX", BudgetType.Capital, null, 1);

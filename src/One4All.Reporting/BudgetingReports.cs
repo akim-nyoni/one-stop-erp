@@ -53,9 +53,11 @@ public static class BudgetingReports
             [new Column("Budget", "Budget", 130), new Column("Version", "Ver", 40), new Column("Type", "Type", 100), new Column("Status", "Status", 75), new Column("Author", "Author", 80),
              new Column("Created", "Created", 75), new Column("Reason", "Reason", 140), new Column("ApprovedBy", "Approved by", 80), new Column("Resolution", "Resolution", 90),
              new Column("Seal", "Seal hash", 110), new Column("Verified", "Verifies", 60)], AsAt);
-        yield return Listing("B12", "Budget Version Comparison", "Budget", "For each budget with more than one version: the latest against the one before, per account.",
-            "BgtVersions", [new Column("Budget", "Budget", 130), new Column("Versions", "Versions", 70), new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Previous", "Previous", 95),
-             new Column("Current", "Current", 95), new Column("Percent", "Change %", 65), new Column("Change", "Change", 95, true)], AsAt);
+        yield return Listing("B12", "Budget Version Comparison", "Budget", "For each budget with more than one version (or the one named): the latest against the one before, or any two versions "
+            + "chosen, per account - or per account and period, or per account and cost centre.",
+            "BgtVersions", [new Column("Budget", "Budget", 130), new Column("Versions", "Versions", 70), new Column("Account", "Account", 65), new Column("Name", "Name", 150), new Column("Detail", "Period / cost centre", 80),
+             new Column("Previous", "Previous", 95), new Column("Current", "Current", 95), new Column("Percent", "Change %", 65), new Column("Change", "Change", 95, true)],
+            [("AsAtDate", ParameterType.Date), ("Budget", ParameterType.String), ("FromVersion", ParameterType.Integer), ("ToVersion", ParameterType.Integer), ("By", ParameterType.String)]);
         yield return Listing("B13", "Original vs Recommended vs Approved", "Budget", "Per department and account: what was first requested, the last draft recommended, what was approved, and the cut.",
             "BgtCutsTrail", [new Column("Department", "Department", 110), new Column("Account", "Account", 70), new Column("Name", "Name", 150), new Column("Requested", "Requested", 95), new Column("Recommended", "Recommended", 95),
              new Column("Approved", "Approved", 95), new Column("Cut", "Cut", 95, true)], [("AsAtDate", ParameterType.Date)]);
@@ -138,8 +140,10 @@ public static class BudgetingReports
         yield return Listing("B40", "Rolling Forecast", "Budget", "The next N months from the date: per vote, the latest reforecast (else the budget) month by month.",
             "BgtRolling", [new Column("Account", "Vote", 70), new Column("Name", "Name", 150), new Column("Month", "Month", 65), new Column("Source", "Source", 80), new Column("Amount", "Forecast", 95, true)],
             [("AsAtDate", ParameterType.Date), ("Months", ParameterType.Integer)]);
-        yield return Listing("B41", "Cash Budget vs Actual Cash Flow", "Budget", "Month by month to the date: the cash budget's net flow against the actual net movement on the bank accounts, and the variance.",
-            "BgtCash", [new Column("Period", "Period", 60), new Column("Month", "Month", 70), new Column("Budget", "Budgeted net cash", 110), new Column("Actual", "Actual net cash", 110), new Column("Variance", "Variance", 95, true)], [("AsAtDate", ParameterType.Date)]);
+        yield return Listing("B41", "Cash Budget vs Actual Cash Flow", "Budget", "Every month of the year: the cash budget's net flow against the actual net movement on the bank accounts up to the date, "
+            + "then the cash forecast (receivables and payables due, payment runs, scheduled and manual flows) for the months still to come, and the variance.",
+            "BgtCash", [new Column("Period", "Period", 60), new Column("Month", "Month", 70), new Column("Basis", "Actual / forecast", 70), new Column("Budget", "Budgeted net cash", 110),
+             new Column("Actual", "Actual / forecast net cash", 120), new Column("Variance", "Variance", 95, true)], [("AsAtDate", ParameterType.Date)]);
         yield return Listing("B42", "Capital Project Budget vs Actual vs Commitment", "Budget", "Each capital project: budget, cost to date, commitments, the share spent and the cost to complete.",
             "BgtCapitalProjects", [new Column("Project", "Project", 80), new Column("Name", "Name", 150), new Column("Status", "Status", 90), new Column("Budget", "Budget", 95), new Column("Actual", "Actual", 95),
              new Column("Committed", "Committed", 90), new Column("Spent", "Spent %", 60), new Column("ToComplete", "Cost to complete", 100, true)], [("AsAtDate", ParameterType.Date)]);
