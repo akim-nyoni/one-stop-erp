@@ -91,9 +91,10 @@ public static class FinalPay
     /// <param name="ordinaryTax">PAYE for an amount of ordinary pay (the tax table in force).</param>
     /// <param name="annualBonus">The year's bonus, paid for the part of the calendar year served (nil: none).</param>
     /// <param name="otherDeductions">Unreturned company property and overpayments to recover after the loans.</param>
+    /// <param name="terminalTax">The tax on taxable gratuity and severance by the terminal tax table (null: the policy's flat rate).</param>
     /// <returns>The statement.</returns>
     public static FinalPayStatement Calculate(TerminationType type, decimal monthlyBasic, DateOnly engaged, DateOnly lastDay, bool lastMonthPaid, decimal leaveDays, decimal loans,
-        TerminalPolicy policy, Func<decimal, decimal> ordinaryTax, decimal annualBonus = 0m, decimal otherDeductions = 0m)
+        TerminalPolicy policy, Func<decimal, decimal> ordinaryTax, decimal annualBonus = 0m, decimal otherDeductions = 0m, Func<decimal, decimal>? terminalTax = null)
     {
         (bool notice, bool gratuity, bool severance) = Entitlements(type);
         FinalSettlement settled = TerminalBenefits.Settle(monthlyBasic, engaged, lastDay, leaveDays, severance, 0m, policy);
@@ -102,7 +103,7 @@ public static class FinalPay
         decimal bonus = ProRataBonus(annualBonus, engaged, lastDay);
         decimal ordinary = proRata + noticePay + settled.Leave + bonus;
         decimal taxOnOrdinary = Math.Round(Math.Max(0m, ordinaryTax(ordinary)), 2, MidpointRounding.AwayFromZero);
-        decimal taxOnTerminal = Math.Round((gratuityPay + severancePay) * policy.TerminalTaxRatePercent / 100m, 2, MidpointRounding.AwayFromZero);
+        decimal taxOnTerminal = TerminalBenefits.TerminalTax(gratuityPay + severancePay, policy, terminalTax);
         decimal available = Math.Max(0m, ordinary + gratuityPay + severancePay - taxOnOrdinary - taxOnTerminal);
         decimal recovered = Math.Min(Math.Max(0m, loans), available);
         decimal other = Math.Min(Math.Max(0m, otherDeductions), available - recovered);

@@ -217,15 +217,34 @@ public sealed class TerminationService : ITerminationService
         List<EmployeeLoan> loans = await _db.EmployeeLoans.Where(l => l.CompanyId == request.CompanyId && l.EmployeeId == employee.Id && l.Outstanding > 0m).ToListAsync(ct).ConfigureAwait(false);
         string tableCode = request.TaxTableCode.Trim().ToUpperInvariant();
         DateOnly payDate = request.PayDate ?? request.LastDay;
-        TaxTable? table = (await _db.Set<TaxTable>().Include(t => t.Bands).Where(t => t.CompanyId == request.CompanyId && t.Code == tableCode && t.Currency == null && t.EffectiveFrom <= payDate)
-            .ToListAsync(ct).ConfigureAwait(false)).OrderBy(t => t.EffectiveFrom).LastOrDefault();
+        TaxTable? table = await TableAsync(request.CompanyId, tableCode, payDate, ct).ConfigureAwait(false);
         decimal Tax(decimal ordinary) => table is null ? 0m : PayeTable.Tax(table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), ordinary);
+
+        // Gratuity and severance on their own table when the company gives one (brief §4.15.8: terminal benefits taxed in bands, after the tax-free part).
+        Func<decimal, decimal>? terminalTax = null;
+        if (!string.IsNullOrWhiteSpace(request.TerminalTaxTableCode))
+        {
+            string terminalCode = request.TerminalTaxTableCode.Trim().ToUpperInvariant();
+            TaxTable? terminal = await TableAsync(request.CompanyId, terminalCode, payDate, ct).ConfigureAwait(false);
+            if (terminal is null)
+            {
+                return Error.NotFound("Payroll.TerminalTaxTable", $"No tax table {terminalCode} in force on {payDate:yyyy-MM-dd}.");
+            }
+
+            terminalTax = benefits => PayeTable.Tax(terminal.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), benefits);
+        }
+
         // Company property still out with the leaver is recovered at its recorded value, with any overpayment.
         decimal unreturned = await _db.Set<EmployeeAssetIssue>().Where(a => a.EmployeeId == employee.Id && a.ReturnedOn == null).SumAsync(a => (decimal?)a.Value, ct).ConfigureAwait(false) ?? 0m;
         FinalPayStatement statement = FinalPay.Calculate(request.Type, employee.BasicSalary, employee.EngagementDate, request.LastDay, lastMonthPaid, leaveDays, loans.Sum(l => l.Outstanding),
-            request.Policy, Tax, request.AnnualBonus, unreturned + Math.Max(0m, request.Overpayment));
+            request.Policy, Tax, request.AnnualBonus, unreturned + Math.Max(0m, request.Overpayment), terminalTax);
         return (employee, statement, loans);
     }
+
+    // The base-currency table of a code in force on a date (the latest effective by then).
+    private async Task<TaxTable?> TableAsync(long companyId, string code, DateOnly date, CancellationToken ct)
+        => (await _db.Set<TaxTable>().Include(t => t.Bands).Where(t => t.CompanyId == companyId && t.Code == code && t.Currency == null && t.EffectiveFrom <= date)
+            .ToListAsync(ct).ConfigureAwait(false)).OrderBy(t => t.EffectiveFrom).LastOrDefault();
 
     /// <inheritdoc />
     public Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default)

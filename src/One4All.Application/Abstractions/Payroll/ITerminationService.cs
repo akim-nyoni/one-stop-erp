@@ -12,6 +12,9 @@ public sealed record TerminationRequest(long CompanyId, string EmployeeNumber, T
     /// <summary>The tax table ordinary final pay is taxed on.</summary>
     public string TaxTableCode { get; init; } = "PAYE";
 
+    /// <summary>The tax table gratuity and severance are taxed on, above the policy's tax-free amount (blank: the policy's flat rate).</summary>
+    public string? TerminalTaxTableCode { get; init; }
+
     /// <summary>When the final pay is paid (defaults to the last day).</summary>
     public DateOnly? PayDate { get; init; }
 

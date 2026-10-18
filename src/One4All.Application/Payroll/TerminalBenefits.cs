@@ -5,8 +5,10 @@ namespace One4All.Application.Payroll;
 /// <param name="WorkingDaysPerMonth">Working days in a month (for the daily rate).</param>
 /// <param name="GratuityWeeksPerYear">Weeks of pay per completed year of service as gratuity.</param>
 /// <param name="SeveranceWeeksPerYear">Weeks of pay per completed year as severance on retrenchment.</param>
-/// <param name="TerminalTaxRatePercent">The tax rate on gratuity and severance.</param>
-public readonly record struct TerminalPolicy(decimal NoticeMonths, decimal WorkingDaysPerMonth, decimal GratuityWeeksPerYear, decimal SeveranceWeeksPerYear, decimal TerminalTaxRatePercent);
+/// <param name="TerminalTaxRatePercent">The tax rate on gratuity and severance (when no terminal tax table is given).</param>
+/// <param name="TaxFreeAmount">The part of gratuity and severance taken tax-free before the rate or the table applies.</param>
+public readonly record struct TerminalPolicy(decimal NoticeMonths, decimal WorkingDaysPerMonth, decimal GratuityWeeksPerYear, decimal SeveranceWeeksPerYear, decimal TerminalTaxRatePercent,
+    decimal TaxFreeAmount = 0m);
 
 /// <summary>A final settlement, line by line.</summary>
 /// <param name="Years">Completed years of service.</param>
@@ -54,8 +56,23 @@ public static class TerminalBenefits
         decimal leave = policy.WorkingDaysPerMonth <= 0m ? 0m : R(Math.Max(0m, leaveDays) * monthlyBasic / policy.WorkingDaysPerMonth);
         decimal gratuity = R(years * policy.GratuityWeeksPerYear * Weekly(monthlyBasic));
         decimal severance = retrenched ? R(years * policy.SeveranceWeeksPerYear * Weekly(monthlyBasic)) : 0m;
-        decimal tax = R((gratuity + severance) * policy.TerminalTaxRatePercent / 100m);
+        decimal tax = TerminalTax(gratuity + severance, policy);
         return new FinalSettlement(years, notice, leave, gratuity, severance, R(recoveries), tax, notice + leave + gratuity + severance - R(recoveries) - tax);
+    }
+
+    /// <summary>
+    /// The tax on gratuity and severance (brief §4.15.8): what is above the policy's tax-free amount, taxed on the terminal tax table's bands when one is
+    /// given, else at the policy's flat rate.
+    /// </summary>
+    /// <param name="benefits">Gratuity plus severance.</param>
+    /// <param name="policy">The terminal policy.</param>
+    /// <param name="bands">The tax on an amount by the terminal tax table (null: the flat rate).</param>
+    /// <returns>The tax, to the cent.</returns>
+    public static decimal TerminalTax(decimal benefits, TerminalPolicy policy, Func<decimal, decimal>? bands = null)
+    {
+        decimal taxable = Math.Max(0m, benefits - Math.Max(0m, policy.TaxFreeAmount));
+        decimal tax = bands is null ? taxable * policy.TerminalTaxRatePercent / 100m : Math.Max(0m, bands(taxable));
+        return Math.Round(tax, 2, MidpointRounding.AwayFromZero);
     }
 
     /// <summary>The long-service provision for an employee: the gratuity earned to date, discounted from retirement to today.</summary>

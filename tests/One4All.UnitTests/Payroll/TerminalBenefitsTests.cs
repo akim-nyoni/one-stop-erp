@@ -29,4 +29,14 @@ public sealed class TerminalBenefitsTests
         TerminalBenefits.Provision(2_600m, new DateOnly(2020, 1, 1), new DateOnly(2026, 3, 31), new DateOnly(1966, 4, 1), 2m, 65, 10m).Should().Be((7_200m, 6, 4_064.21m));
         TerminalBenefits.Provision(2_600m, new DateOnly(2020, 1, 1), new DateOnly(2026, 3, 31), null, 2m, 65, 10m).Should().Be((7_200m, 0, 7_200m));
     }
+
+    [Fact]
+    public void Terminal_tax_takes_the_tax_free_part_off_then_the_rate_or_the_table()
+    {
+        TerminalPolicy policy = new(1m, 22m, 2m, 4m, 10m, TaxFreeAmount: 2_000m);
+        TerminalBenefits.TerminalTax(5_000m, policy).Should().Be(300m, "10% of the 3,000 above the tax-free 2,000");
+        TerminalBenefits.TerminalTax(1_500m, policy).Should().Be(0m);
+        TerminalBenefits.TerminalTax(5_000m, policy, taxable => taxable > 1_000m ? (taxable - 1_000m) * 0.25m : 0m).Should().Be(500m, "the table's bands on the taxable 3,000");
+        TerminalBenefits.TerminalTax(5_000m, new TerminalPolicy(1m, 22m, 2m, 4m, 10m)).Should().Be(500m, "no tax-free part: the flat rate on all of it");
+    }
 }

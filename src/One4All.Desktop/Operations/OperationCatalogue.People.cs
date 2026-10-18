@@ -23,7 +23,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Termination and final pay", ListTitle = "Clearance checklist",
-            Description = "Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans "
+            Description = "Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay; on benefits above the tax-free "
+                + "amount, the terminal tax table's bands when one is given, else the terminal rate; loans "
                 + "recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are "
                 + "cleared, release the final pay from the bank; print the certificate.",
             Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Release final pay", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
@@ -31,7 +32,8 @@ public static partial class OperationCatalogue
                 Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
                 Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id"),
                 Opt("Bank", "Bank account paying (release)"), OptNum("Bonus", "Year's bonus (paid pro rata)"), OptNum("Overpayment", "Overpayment to recover"),
-                Opt("Recoveries", "Recoveries account (property, overpayments)")],
+                Opt("Recoveries", "Recoveries account (property, overpayments)"), OptNum("TaxFree", "Tax-free terminal benefits"),
+                Opt("TerminalTable", "Terminal tax table (bands, instead of the rate)")],
             Run = async (c, i) =>
             {
                 ITerminationService terminations = c.Get<ITerminationService>();
@@ -50,7 +52,9 @@ public static partial class OperationCatalogue
 
                 TerminationRequest request = new(c.CompanyId, i.Text("Number"), Enum.Parse<Application.Payroll.TerminationType>(i.Text("Type")), i.Date("LastDay"), i.Optional("Reason") ?? string.Empty)
                 {
-                    Policy = new Application.Payroll.TerminalPolicy(i.Number("NoticeMonths"), i.Number("WorkingDays"), i.Number("GratuityWeeks"), i.Number("SeveranceWeeks"), i.Number("TerminalTax")),
+                    Policy = new Application.Payroll.TerminalPolicy(i.Number("NoticeMonths"), i.Number("WorkingDays"), i.Number("GratuityWeeks"), i.Number("SeveranceWeeks"), i.Number("TerminalTax"),
+                        i.OptionalNumber("TaxFree") ?? 0m),
+                    TerminalTaxTableCode = i.Optional("TerminalTable"),
                     SalaryExpenseAccount = i.Text("Salary"), TerminalBenefitsAccount = i.Text("Benefits"), PayeLiabilityAccount = i.Text("Paye"), NetPayAccount = i.Text("NetPay"), ApprovedByUserId = c.UserId,
                     AnnualBonus = i.OptionalNumber("Bonus") ?? 0m, Overpayment = i.OptionalNumber("Overpayment") ?? 0m, RecoveriesAccount = i.Optional("Recoveries"),
                 };

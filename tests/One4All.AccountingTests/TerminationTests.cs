@@ -67,6 +67,13 @@ public sealed class TerminationTests
         (preview.OrdinaryTax, preview.TerminalTax, preview.Recoveries, preview.UnrecoveredLoans, preview.Net).Should().Be((509.09m, 830.77m, 200m, 0m, 8_631.47m));
         (await db.Employees.AsNoTracking().SingleAsync(e => e.Id == retrenched)).Status.Should().Be(EmployeeStatus.Active, "a preview changes nothing");
 
+        // On a terminal tax table instead: 1,000 tax-free, the first 5,000 of the rest at 0 and 20% above - 20% of 2,307.69.
+        (await setup.CreateTaxTableAsync(companyId, "TERM", new DateOnly(2026, 1, 1), null, [new TaxBandInput(0m, 5_000m, 0m), new TaxBandInput(5_000m, null, 20m)])).IsSuccess.Should().BeTrue();
+        TerminationRequest banded = Request("TM-001", TerminationType.Retrenchment) with { TerminalTaxTableCode = "term" };
+        banded = banded with { Policy = banded.Policy with { TaxFreeAmount = 1_000m } };
+        (await terminations.PreviewAsync(banded)).Value.TerminalTax.Should().Be(461.54m);
+        (await terminations.PreviewAsync(Request("TM-001", TerminationType.Retrenchment) with { TerminalTaxTableCode = "NONE" })).Error.Code.Should().Be("Payroll.TerminalTaxTable");
+
         var doneResult = await terminations.TerminateAsync(Request("TM-001", TerminationType.Retrenchment));
         doneResult.IsSuccess.Should().BeTrue(doneResult.IsFailure ? doneResult.Error.ToString() : null);
         TerminationResult done = doneResult.Value;
