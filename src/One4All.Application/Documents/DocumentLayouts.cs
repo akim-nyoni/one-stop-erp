@@ -156,6 +156,18 @@ public static class DocumentKinds
     /// <summary>An employment contract (brief §S).</summary>
     public const string EmploymentContract = "EmploymentContract";
 
+    /// <summary>A stand's instalment sale agreement with its schedule (brief §S).</summary>
+    public const string InstalmentAgreement = "InstalmentAgreement";
+
+    /// <summary>An instalment default notice (brief §S).</summary>
+    public const string InstalmentNotice = "InstalmentNotice";
+
+    /// <summary>A budget submission form (brief §S).</summary>
+    public const string BudgetForm = "BudgetForm";
+
+    /// <summary>A school fee receipt naming the students it pays for (brief §S).</summary>
+    public const string StudentReceipt = "StudentReceipt";
+
     /// <summary>Every kind, in catalogue order.</summary>
     public static IReadOnlyList<DocumentKind> All { get; } =
     [
@@ -205,6 +217,10 @@ public static class DocumentKinds
         new(HousingOfferLetter, "Housing offer letter", "DOC44", "Certificate number", NeedsDate: true, Text: true),
         new(HousingAllocationLetter, "Housing allocation letter", "DOC45", "Certificate number", NeedsDate: true, Text: true),
         new(EmploymentContract, "Employment contract", "DOC46", "Employee number", Text: true),
+        new(InstalmentAgreement, "Instalment sale agreement", "DOC47", "Agreement number", Text: true),
+        new(InstalmentNotice, "Instalment default notice", "DOC48", "Notice number", Text: true),
+        new(BudgetForm, "Budget submission form", "DOC49", "Budget label", Text: true),
+        new(StudentReceipt, "Student fee receipt", "DOC50", "Receipt number", Text: true),
     ];
 
     /// <summary>Finds a kind by key or name (case-insensitive).</summary>

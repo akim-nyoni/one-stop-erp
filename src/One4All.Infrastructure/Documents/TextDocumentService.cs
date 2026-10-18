@@ -219,6 +219,18 @@ public sealed class TextDocumentService : ITextDocumentService
             case DocumentKinds.EmploymentContract:
                 return await EmploymentContractAsync(companyId, found, key, ct).ConfigureAwait(false);
 
+            case DocumentKinds.InstalmentAgreement:
+                return await InstalmentAgreementAsync(companyId, found, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.InstalmentNotice:
+                return await InstalmentNoticeAsync(companyId, found, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.BudgetForm:
+                return await BudgetFormAsync(companyId, found, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.StudentReceipt:
+                return await StudentReceiptAsync(companyId, found, key, ct).ConfigureAwait(false);
+
             case DocumentKinds.ClearanceCertificate:
                 return await ClearanceCertificateTextAsync(companyId, found, key, ct).ConfigureAwait(false);
 
@@ -642,6 +654,154 @@ public sealed class TextDocumentService : ITextDocumentService
         text.AppendLine();
         text.AppendLine("Signed for the employer: ____________________   Date: ____________");
         text.AppendLine("Signed by the employee:  ____________________   Date: ____________");
+        return text.ToString();
+    }
+
+    // DOC47: a stand's instalment sale agreement (brief §S "agreements"): the parties, price, deposit, financing terms and the full schedule.
+    private async Task<Result<string>> InstalmentAgreementAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.Housing.InstalmentAgreement? agreement = await _db.Set<Core.Housing.InstalmentAgreement>().AsNoTracking().Include(a => a.Lines)
+            .FirstOrDefaultAsync(a => a.CompanyId == companyId && a.AgreementNumber == number, ct).ConfigureAwait(false);
+        if (agreement is null)
+        {
+            return Missing(kind, number);
+        }
+
+        string buyer = await _db.Customers.AsNoTracking().Where(c => c.Id == agreement.BuyerCustomerId).Select(c => c.Name + " (" + c.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "-";
+        string stand = await _db.HousingStands.AsNoTracking().Where(s => s.Id == agreement.StandId).Select(s => s.StandNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "-";
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), "INSTALMENT SALE AGREEMENT"));
+        text.AppendLine($"Agreement:  {agreement.AgreementNumber}   Signed: {D(agreement.SignedOn)}   Status: {agreement.Status}");
+        text.AppendLine($"Buyer:      {buyer}");
+        text.AppendLine($"Stand:      {stand}   Tenure: {agreement.Tenure}");
+        text.AppendLine($"Cash price: {N(agreement.CashPrice)}   Deposit: {N(agreement.Deposit)}   Financed: {N(agreement.CashPrice - agreement.Deposit)}");
+        text.AppendLine($"Interest:   {agreement.AnnualRatePercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}% a year ({agreement.Method}) over {agreement.TermMonths} months"
+            + (agreement.PenaltyRatePercent > 0m ? $"; penalty interest {agreement.PenaltyRatePercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}% on arrears" : string.Empty));
+        text.AppendLine();
+        text.AppendLine($"{"No",4}  {"Due",-10}{"Instalment",14}{"Interest",12}{"Principal",12}{"Balance",14}");
+        foreach (Core.Housing.InstalmentScheduleLine line in agreement.Lines.OrderBy(l => l.Number))
+        {
+            text.AppendLine($"{line.Number,4}  {D(line.DueDate),-10}{N(line.Amount),14}{N(line.Interest),12}{N(line.Principal),12}{N(line.BalanceAfter),14}");
+        }
+
+        text.AppendLine($"{"Total",-16}{N(agreement.Lines.Sum(l => l.Amount)),14}{N(agreement.Lines.Sum(l => l.Interest)),12}{N(agreement.Lines.Sum(l => l.Principal)),12}");
+        text.AppendLine();
+        text.AppendLine("The buyer pays each instalment by its due date. Ownership passes on payment in full; if instalments fall into arrears the");
+        text.AppendLine("council may issue a reminder, then a demand, and finally cancel the agreement and repossess the stand.");
+        text.AppendLine();
+        text.AppendLine("Buyer: ____________________   For the council: ____________________   Witness: ____________________");
+        return text.ToString();
+    }
+
+    // DOC48: an instalment default notice (brief §S "notices"), as issued at its stage.
+    private async Task<Result<string>> InstalmentNoticeAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.Housing.InstalmentNotice? notice = await _db.Set<Core.Housing.InstalmentNotice>().AsNoTracking()
+            .FirstOrDefaultAsync(n => n.CompanyId == companyId && n.NoticeNumber == number, ct).ConfigureAwait(false);
+        if (notice is null)
+        {
+            return Missing(kind, number);
+        }
+
+        var agreement = await _db.Set<Core.Housing.InstalmentAgreement>().AsNoTracking().Where(a => a.Id == notice.AgreementId)
+            .Select(a => new { a.AgreementNumber, a.BuyerCustomerId }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        string buyer = agreement is null ? "-"
+            : await _db.Customers.AsNoTracking().Where(c => c.Id == agreement.BuyerCustomerId).Select(c => c.Name + " (" + c.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "-";
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), $"INSTALMENT {notice.Stage.ToString().ToUpperInvariant()} NOTICE"));
+        text.AppendLine($"Notice:     {notice.NoticeNumber}   Issued: {D(notice.IssuedOn)}");
+        text.AppendLine($"Agreement:  {agreement?.AgreementNumber ?? "-"}");
+        text.AppendLine($"To:         {buyer}");
+        text.AppendLine($"Arrears:    {N(notice.Arrears)}   Days overdue: {notice.DaysOverdue}");
+        text.AppendLine();
+        text.AppendLine(notice.Text);
+        text.AppendLine();
+        text.AppendLine("For the council: ____________________");
+        return text.ToString();
+    }
+
+    // DOC49: a budget submission form (brief §S "budget forms"): each account's budget by quarter and in total, for the budget holder's sign-off.
+    private async Task<Result<string>> BudgetFormAsync(long companyId, DocumentKind kind, string label, CancellationToken ct)
+    {
+        Core.Budgeting.Budget? budget = await _db.Budgets.AsNoTracking().Where(b => b.CompanyId == companyId && b.Label == label).OrderByDescending(b => b.VersionNumber)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (budget is null)
+        {
+            return Missing(kind, label);
+        }
+
+        string year = await _db.FiscalYears.AsNoTracking().Where(y => y.Id == budget.FiscalYearId).Select(y => y.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "-";
+        var lines = await _db.Set<Core.Budgeting.BudgetLine>().AsNoTracking().Where(l => l.BudgetId == budget.Id)
+            .Select(l => new { l.AccountCode, l.CostCentre, l.Period, l.Amount }).ToListAsync(ct).ConfigureAwait(false);
+        List<string> codes = [.. lines.Select(l => l.AccountCode).Distinct()];
+        Dictionary<string, string> names = await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && codes.Contains(a.AccountCode))
+            .ToDictionaryAsync(a => a.AccountCode, a => a.Name, StringComparer.Ordinal, ct).ConfigureAwait(false);
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), "BUDGET SUBMISSION FORM"));
+        text.AppendLine($"Budget:     {budget.Label} (version {budget.VersionNumber}, {budget.Type})   Year: {year}");
+        text.AppendLine($"Department: {budget.Department ?? "(all)"}   Status: {budget.Status}{(budget.IsActive ? ", active" : string.Empty)}");
+        text.AppendLine();
+        text.AppendLine($"{"Account",-30}{"CC",-6}{"Q1",11}{"Q2",11}{"Q3",11}{"Q4",11}{"Total",13}");
+        decimal[] grand = new decimal[5];
+        foreach (var group in lines.GroupBy(l => (l.AccountCode, CostCentre: l.CostCentre ?? string.Empty)).OrderBy(g => g.Key.AccountCode, StringComparer.Ordinal).ThenBy(g => g.Key.CostCentre, StringComparer.Ordinal))
+        {
+            decimal[] q = new decimal[5];
+            foreach (var line in group)
+            {
+                q[Math.Clamp((line.Period - 1) / 3, 0, 3)] += line.Amount;
+                q[4] += line.Amount;
+            }
+
+            for (int i = 0; i < 5; i++)
+            {
+                grand[i] += q[i];
+            }
+
+            text.AppendLine($"{Fit(group.Key.AccountCode + " " + names.GetValueOrDefault(group.Key.AccountCode, "?"), 29)} {Fit(group.Key.CostCentre, 5)} {N(q[0]),10} {N(q[1]),10} {N(q[2]),10} {N(q[3]),10} {N(q[4]),12}");
+        }
+
+        text.AppendLine($"{"Total",-36}{N(grand[0]),10} {N(grand[1]),10} {N(grand[2]),10} {N(grand[3]),10} {N(grand[4]),12}");
+        text.AppendLine();
+        text.AppendLine("Prepared by (budget holder): ____________________   Date: ____________");
+        text.AppendLine("Reviewed by (finance):       ____________________   Date: ____________");
+        text.AppendLine("Approved:                    ____________________   Date: ____________");
+        return text.ToString();
+    }
+
+    // DOC50: a school fee receipt (brief §S "student receipt"): the guardian's receipt with each student and term it was allocated to.
+    private async Task<Result<string>> StudentReceiptAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.Trading.OpenItem? receipt = await _db.OpenItems.AsNoTracking().FirstOrDefaultAsync(o => o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsReceivable
+            && o.ItemType == OpenItemType.Receipt && o.DocumentNumber == number, ct).ConfigureAwait(false);
+        if (receipt is null)
+        {
+            return Missing(kind, number);
+        }
+
+        var guardian = await _db.Customers.AsNoTracking().Where(c => c.Id == receipt.TraderId).Select(c => new { c.Code, c.Name }).FirstAsync(ct).ConfigureAwait(false);
+        var paid = await (from a in _db.Set<Core.Trading.Allocation>().AsNoTracking()
+                          join i in _db.OpenItems.AsNoTracking() on a.DebitItemId equals i.Id
+                          where a.CompanyId == companyId && a.CreditItemId == receipt.Id
+                          orderby i.DocumentDate, i.DocumentNumber
+                          select new { i.DocumentNumber, i.Narrative, a.TransactionAmount, i.OutstandingTransaction }).ToListAsync(ct).ConfigureAwait(false);
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), "SCHOOL FEES RECEIPT"));
+        text.AppendLine($"Receipt:    {receipt.DocumentNumber}   Date: {D(receipt.DocumentDate)}");
+        text.AppendLine($"Received from: {guardian.Name} ({guardian.Code})");
+        text.AppendLine($"Amount:     {receipt.Currency} {N(receipt.OriginalTransaction)}");
+        text.AppendLine();
+        text.AppendLine($"{"Invoice",-14}{"For",-42}{"Paid",12}{"Still due",12}");
+        foreach (var line in paid)
+        {
+            // Fee invoices carry "<term> fees - <student> (<admission number>)" as their narrative.
+            string what = string.IsNullOrWhiteSpace(line.Narrative) ? "-" : line.Narrative.Replace(" fees - ", ": ", StringComparison.Ordinal);
+            text.AppendLine($"{Fit(line.DocumentNumber, 13)} {Fit(what, 41)} {N(line.TransactionAmount),11} {N(line.OutstandingTransaction),11}");
+        }
+
+        decimal unallocated = receipt.OutstandingTransaction;
+        if (unallocated != 0m)
+        {
+            text.AppendLine($"{"",-14}{"Held on account (not yet allocated)",-42}{N(unallocated),12}");
+        }
+
+        text.AppendLine();
+        text.AppendLine("Received with thanks.   Bursar: ____________________");
         return text.ToString();
     }
 

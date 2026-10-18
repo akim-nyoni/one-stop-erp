@@ -1,8 +1,11 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Documents;
 using One4All.Core.FixedAssets;
+using One4All.Application.Abstractions.Budgeting;
 using One4All.Application.Abstractions.Housing;
+using One4All.Core.Budgeting;
 using One4All.Core.Housing;
 using One4All.Core.Inventory;
 using One4All.Core.JobCosting;
@@ -162,5 +165,56 @@ public sealed class DocumentsBatchTests
         (await Print("HousingAllocationLetter", certificate, new DateOnly(2026, 3, 11))).Should().Contain("ALLOCATION OF STAND DB-S1").And.Contain("recorded on 2026-03-10");
         (await Print("EmploymentContract", "DB-E2")).Should().Contain("CONTRACT OF EMPLOYMENT").And.Contain("Chipo Sibanda, ID 63-123456A70").And.Contain("Storekeeper, Stores, reporting to Rudo Ncube")
             .And.Contain("until 2026-04-30").And.Contain("1,500.00").And.Contain("30 days");
+    }
+
+    [SkippableFact]
+    public async Task Instalment_agreement_notice_budget_form_and_student_receipt_render()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Customer buyer = new(companyId, "DB-BUY", "Tafadzwa Moyo", Scenario.Usd), guardian = new(companyId, "DB-GRD", "Mr Banda", Scenario.Usd);
+        LandParcel parcel = new(companyId, $"LP-DI-{companyId}", "Instalment parcel", 5000m, 50000m);
+        db.AddRange(buyer, guardian, parcel);
+        await db.SaveChangesAsync();
+        HousingStand stand = new(companyId, parcel.Id, null, "DB-IS1", 300m, 1000m);
+        db.HousingStands.Add(stand);
+        await db.SaveChangesAsync();
+        InstalmentAgreement agreement = new(companyId, "DB-IA1", stand.Id, buyer.Id, 3_000m, 600m, 0m, InterestMethod.Zero, 2, new DateOnly(2026, 1, 1), "4000");
+        agreement.AddLine(new InstalmentScheduleLine(1, new DateOnly(2026, 2, 1), 1_200m, 0m, 1_200m, 1_200m));
+        agreement.AddLine(new InstalmentScheduleLine(2, new DateOnly(2026, 3, 1), 1_200m, 0m, 1_200m, 0m));
+        db.Add(agreement);
+        await db.SaveChangesAsync();
+        db.Add(new InstalmentNotice(companyId, agreement.Id, "DB-N1", DefaultStage.Demand, new DateOnly(2026, 4, 1), 1_200m, 31, "Pay the arrears within 14 days or the agreement may be cancelled."));
+        await db.SaveChangesAsync();
+
+        long yearId = await db.FiscalYears.Where(y => y.CompanyId == companyId).OrderBy(y => y.StartDate).Select(y => y.Id).FirstAsync();
+        (await scope.ServiceProvider.GetRequiredService<IBudgetingService>().CreateBudgetAsync(companyId, yearId, "DB-BUD", BudgetType.OriginalApproved, null,
+            [new NewBudgetLine("6800", 1, 100m, null), new NewBudgetLine("6800", 4, 200m, null), new NewBudgetLine("6000", 12, 50m, null)])).IsSuccess.Should().BeTrue();
+
+        One4All.Application.Abstractions.Trading.ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Trading.ISalesLedgerService>();
+        long invoice = (await ar.PostInvoiceAsync(new One4All.Application.Abstractions.Trading.SalesInvoiceRequest { CompanyId = companyId, CustomerId = guardian.Id, DocumentNumber = "DB-FEE1", DocumentDate = new DateOnly(2026, 1, 10),
+            Currency = Scenario.Usd, NetAmount = 400m, SalesAccountCode = "4000", Narrative = "Term 1 fees - Tino Banda (S001)" })).Value.OpenItemId;
+        long receipt = (await ar.PostReceiptAsync(new One4All.Application.Abstractions.Trading.ReceiptRequest { CompanyId = companyId, CustomerId = guardian.Id, DocumentNumber = "DB-RC1", ReceiptDate = new DateOnly(2026, 1, 20),
+            Currency = Scenario.Usd, Amount = 500m, BankAccountCode = "1100" })).Value.OpenItemId;
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Trading.IAllocationService>()
+            .AllocateAsync(companyId, One4All.Core.Trading.TradingLedger.AccountsReceivable, invoice, receipt, 300m, new DateOnly(2026, 1, 20))).IsSuccess.Should().BeTrue();
+
+        ITextDocumentService documents = scope.ServiceProvider.GetRequiredService<ITextDocumentService>();
+        async Task<string> Print(string kind, string number)
+        {
+            var printed = await documents.RenderAsync(companyId, kind, number);
+            printed.IsSuccess.Should().BeTrue(printed.IsFailure ? $"{kind}: {printed.Error.Message}" : null);
+            return printed.Value;
+        }
+
+        (await Print("InstalmentAgreement", "DB-IA1")).Should().Contain("INSTALMENT SALE AGREEMENT").And.Contain("Tafadzwa Moyo (DB-BUY)").And.Contain("Stand:      DB-IS1")
+            .And.Contain("Financed: 2,400.00").And.Contain("2026-03-01");
+        (await Print("InstalmentNotice", "DB-N1")).Should().Contain("INSTALMENT DEMAND NOTICE").And.Contain("Agreement:  DB-IA1").And.Contain("Days overdue: 31").And.Contain("within 14 days");
+        (await Print("BudgetForm", "DB-BUD")).Should().Contain("BUDGET SUBMISSION FORM").And.MatchRegex(@"6800 .*100\.00\s+200\.00\s+0\.00\s+0\.00\s+300\.00").And.MatchRegex(@"Total\s+100\.00\s+200\.00\s+0\.00\s+50\.00\s+350\.00");
+        (await Print("StudentReceipt", "DB-RC1")).Should().Contain("SCHOOL FEES RECEIPT").And.Contain("Mr Banda (DB-GRD)").And.Contain("Term 1: Tino Banda (S001)")
+            .And.MatchRegex(@"300\.00\s+100\.00").And.MatchRegex(@"Held on account \(not yet allocated\)\s+200\.00");
     }
 }
