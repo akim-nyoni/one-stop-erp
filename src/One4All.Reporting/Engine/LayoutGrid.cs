@@ -128,7 +128,7 @@ public static class LayoutGrid
         return stream.ToArray();
     }
 
-    private static bool IsText(RenderCell cell) => cell.Kind is not (ElementKind.Rectangle or ElementKind.Line or ElementKind.Image) && cell.ImageData is null && cell.Text.Length > 0;
+    private static bool IsText(RenderCell cell) => cell.Kind is not (ElementKind.Rectangle or ElementKind.Ellipse or ElementKind.Line or ElementKind.Image) && cell.ImageData is null && cell.Text.Length > 0;
 
     // Column anchors: the distinct left edges, merging those within the tolerance.
     private static List<double> Anchors(IEnumerable<double> positions)

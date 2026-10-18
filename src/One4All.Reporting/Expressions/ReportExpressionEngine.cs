@@ -21,6 +21,12 @@ public sealed class ReportExpressionContext
     /// <summary>The total number of pages (when known during a second pass).</summary>
     public int? TotalPages { get; init; }
 
+    /// <summary>The detail row's number in the report, from 1 (0 outside the detail band).</summary>
+    public int RowNumber { get; init; }
+
+    /// <summary>The detail row's number within its innermost group, from 1 (the report's row number when there are no groups).</summary>
+    public int GroupRowNumber { get; init; }
+
     /// <summary>The print timestamp.</summary>
     public DateTime PrintDate { get; init; } = DateTime.Now;
 
@@ -46,7 +52,7 @@ public sealed class ReportExpressionEngine
     public static IReadOnlyList<string> Functions { get; } = ["Upper", "Lower", "Trim", "Left", "Right", "Mid", "Replace", "Len", "Proper", "Abs", "Round", "Min", "Max", "Ceiling", "Floor", "Today", "AddDays", "AddMonths", "Year", "Month", "Day", "EndOfMonth", "DateDiff", "DateDiffIn", "FiscalPeriod", "FiscalYear", "If", "IsNull", "Coalesce", "Case", "Case2", "Case3", "Format", "NumberToWords", "AmountToWords", "NumberToWordsPt", "AmountToWordsPt"];
 
     /// <summary>The values an expression can name without brackets: the page, the print date, the user and the company.</summary>
-    public static IReadOnlyList<string> Builtins { get; } = ["PageNumber", "TotalPages", "PrintDate", "UserName", "CompanyName"];
+    public static IReadOnlyList<string> Builtins { get; } = ["PageNumber", "TotalPages", "RowNumber", "GroupRowNumber", "PrintDate", "UserName", "CompanyName"];
 
     /// <summary>The functions that read a named field or parameter: <c>Field("x")</c>, <c>Param("x")</c>, <c>ToBase(amount, "USD", date)</c>.</summary>
     public static IReadOnlyList<string> Accessors { get; } = ["Field", "Param", "ToBase"];
@@ -77,6 +83,8 @@ public sealed class ReportExpressionEngine
             // Before layout the page is not known: the variables stand as "[Page]" / "[Pages]", which pagination fills in.
             context.PageNumber is int page ? new Parameter("PageNumber", page) : new Parameter("PageNumber", "[Page]"),
             context.TotalPages is int pages ? new Parameter("TotalPages", pages) : new Parameter("TotalPages", "[Pages]"),
+            new Parameter("RowNumber", context.RowNumber),
+            new Parameter("GroupRowNumber", context.GroupRowNumber),
             new Parameter("PrintDate", context.PrintDate),
             new Parameter("UserName", context.UserName),
             new Parameter("CompanyName", context.CompanyName),

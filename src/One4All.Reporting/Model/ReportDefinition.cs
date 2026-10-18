@@ -103,7 +103,6 @@ public sealed class ReportDataSource
     public string Command { get; set; } = string.Empty;
 }
 
-/// <summary>A grouping level for a report (brief §13.1).</summary>
 /// <summary>A record sort key (brief §13.1 "sorting separate from grouping"): an expression and its direction.</summary>
 public sealed class ReportSort
 {
@@ -114,6 +113,7 @@ public sealed class ReportSort
     public bool Descending { get; set; }
 }
 
+/// <summary>A grouping level for a report (brief §13.1).</summary>
 public sealed class ReportGroup
 {
     /// <summary>The field or expression to group on.</summary>
@@ -121,6 +121,15 @@ public sealed class ReportGroup
 
     /// <summary>Whether to sort descending.</summary>
     public bool Descending { get; set; }
+
+    /// <summary>Gets or sets how many groups to keep at this level within each parent group, the largest first (null: all of them).</summary>
+    public int? TopCount { get; set; }
+
+    /// <summary>Gets or sets the field whose total ranks the groups for <see cref="TopCount"/> (blank: the number of rows).</summary>
+    public string? TopBy { get; set; }
+
+    /// <summary>Gets or sets the group the rest are gathered into, printed after the top groups (blank: the rest are left out).</summary>
+    public string? OthersLabel { get; set; }
 }
 
 /// <summary>A band and the elements placed on it.</summary>
@@ -152,6 +161,9 @@ public sealed class ReportBand
 
     /// <summary>An expression that, when true, suppresses the whole band.</summary>
     public string? SuppressWhen { get; set; }
+
+    /// <summary>Gets or sets the background every second detail row is shaded with (#RRGGBB; blank: no banding).</summary>
+    public string? AlternateBackground { get; set; }
 
     /// <summary>The elements on the band.</summary>
     public List<ReportElement> Elements { get; set; } = [];

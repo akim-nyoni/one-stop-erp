@@ -117,14 +117,18 @@ public sealed record RenderCell
     /// <summary>Gets a value indicating whether text wraps.</summary>
     public bool WordWrap { get; init; } = true;
 
-    /// <summary>Gets the rotation in degrees, clockwise (0, 90, 180, 270).</summary>
+    /// <summary>Gets the rotation in degrees, clockwise (0 to 359).</summary>
     public int Rotation { get; init; }
+
+    /// <summary>Gets the corner radius of a box in points.</summary>
+    public double CornerRadius { get; init; }
 
     /// <summary>The border widths, side by side (a rectangle always has at least a hairline).</summary>
     /// <returns>Left, top, right and bottom.</returns>
     public (double Left, double Top, double Right, double Bottom) Borders()
     {
-        double all = BorderThickness > 0 || Kind == ElementKind.Rectangle ? Math.Max(BorderThickness, Kind == ElementKind.Rectangle ? 0.5 : 0) : 0;
+        bool shape = Kind is ElementKind.Rectangle or ElementKind.Ellipse;
+        double all = BorderThickness > 0 || shape ? Math.Max(BorderThickness, shape ? 0.5 : 0) : 0;
         return (BorderLeft ?? all, BorderTop ?? all, BorderRight ?? all, BorderBottom ?? all);
     }
 

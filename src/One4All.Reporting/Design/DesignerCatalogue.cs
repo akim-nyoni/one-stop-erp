@@ -27,7 +27,8 @@ public static class DesignerCatalogue
         new("Pointer", "Pointer", "Select, move and resize elements (Esc)", null),
         new("Text", "Add Text", "Place a text label where you click", ElementKind.Label),
         new("Line", "Draw Line", "Place a line where you click", ElementKind.Line),
-        new("Box", "Draw Box", "Place a box (a bordered rectangle) where you click", ElementKind.Rectangle),
+        new("Box", "Draw Box", "Place a box (a bordered rectangle) where you click; set CornerRadius for round corners", ElementKind.Rectangle),
+        new("Ellipse", "Draw Ellipse", "Place an ellipse (a circle when square) where you click", ElementKind.Ellipse),
         new("Image", "Add Image / Logo", "Place a picture from a file where you click", ElementKind.Image),
         new("Logo", "Add Company Logo", "Place the company logo (set under System Manager) where you click", ElementKind.Image),
         new("DataField", "Add Data Field", "Place the variable selected in the Variables pane where you click", ElementKind.Field),
@@ -61,7 +62,7 @@ public static class DesignerCatalogue
     /// <returns>The category.</returns>
     public static string Category(string property) => property switch
     {
-        "X" or "Y" or "Width" or "Height" or "Rotation" or "Padding" or "AnchorRight" or "AnchorBottom" => "Layout",
+        "X" or "Y" or "Width" or "Height" or "Rotation" or "Padding" or "AnchorRight" or "AnchorBottom" or "CornerRadius" => "Layout",
         "FontFamily" or "FontSize" or "Bold" or "Italic" or "Underline" or "Foreground" or "Background" or "BackgroundGradient" or "GradientVertical" or "HAlign" or "VAlign"
             or "BorderThickness" or "BorderColor" or "BorderLeft" or "BorderTop" or "BorderRight" or "BorderBottom" or "WordWrap" or "AutoShrink" or "Format" or "NullText" => "Appearance",
         "SuppressWhen" or "DrillTarget" or "DrillField" or "Tooltip" or "GroupName" => "Behaviour",
@@ -137,7 +138,8 @@ public static class DesignerCatalogue
         ["Padding"] = "The space between the border and the text, in points.",
         ["WordWrap"] = "True wraps long text onto more lines (the section grows when it can).",
         ["AutoShrink"] = "True shrinks the font so the text fits the element.",
-        ["Rotation"] = "Degrees to turn the text: 0, 90, 180 or 270.",
+        ["Rotation"] = "Degrees to turn the text clockwise, any angle (90, 180 and 270 turn the box with it).",
+        ["CornerRadius"] = "How round a box's corners are, in points; 0 for square corners.",
         ["NullText"] = "What to print when the value is empty.",
         ["SuppressWhen"] = "An expression; when it is true the element is not printed, e.g. Balance = 0.",
         ["DrillTarget"] = "What a click opens in the viewer: Document, Account, Customer, Supplier, Item, Stand, Payslip … (blank for no drill-through).",

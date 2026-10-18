@@ -140,8 +140,11 @@ public sealed class ReportElement
     /// <summary>Gets or sets a value indicating whether the font shrinks (to 5pt at most) until the text fits the box.</summary>
     public bool AutoShrink { get; set; }
 
-    /// <summary>Gets or sets the text's rotation in degrees, clockwise (0, 90, 180 or 270).</summary>
+    /// <summary>Gets or sets the text's rotation in degrees, clockwise (any angle; 90, 180 and 270 turn the box with it).</summary>
     public int Rotation { get; set; }
+
+    /// <summary>Gets or sets the corner radius of a box in points (0: square corners).</summary>
+    public double CornerRadius { get; set; }
 
     /// <summary>Gets or sets the text shown when a field or expression has no value.</summary>
     public string? NullText { get; set; }

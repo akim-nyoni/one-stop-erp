@@ -117,6 +117,15 @@ public sealed class HtmlReportRenderer : IReportRenderer
                 sb.Append(";border-").Append(side).Append(':').Append(Px(Math.Max(width, 1))).Append("px solid ").Append(cell.BorderColor);
             }
 
+            if (cell.Kind == ElementKind.Ellipse)
+            {
+                sb.Append(";border-radius:50%");
+            }
+            else if (cell.CornerRadius > 0)
+            {
+                sb.Append(";border-radius:").Append(Px(cell.CornerRadius)).Append("px");
+            }
+
             sb.Append(";box-sizing:border-box;padding:").Append(Px(cell.Padding)).Append("pt");
             if (cell.ImageData is null)
             {

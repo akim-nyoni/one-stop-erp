@@ -58,7 +58,7 @@ public static class ReportHouseStyles
 
     private static RenderCell Style(RenderCell cell, BandType band, ReportHouseStyle theme)
     {
-        if (cell.Kind is ElementKind.Line or ElementKind.Rectangle)
+        if (cell.Kind is ElementKind.Line or ElementKind.Rectangle or ElementKind.Ellipse)
         {
             return theme.AccentColour is string accent ? cell with { Foreground = accent, BorderColor = accent } : cell;
         }

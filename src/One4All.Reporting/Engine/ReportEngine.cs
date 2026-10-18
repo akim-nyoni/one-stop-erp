@@ -12,6 +12,8 @@ public sealed class ReportEngine
 {
     private static readonly Dictionary<string, object?> EmptyRow = new();
     private readonly ReportExpressionEngine _expressions = new();
+    private int _rowNumber;
+    private int _groupRowNumber;
 
     /// <summary>Builds the render model from the input.</summary>
     /// <param name="input">The report input (definition + data + context).</param>
@@ -19,6 +21,22 @@ public sealed class ReportEngine
     public RenderModel Build(ReportInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+
+        // A sub-report builds through here too: it numbers its own rows and hands the parent's numbering back when done.
+        (int rowNumber, int groupRowNumber) = (_rowNumber, _groupRowNumber);
+        _rowNumber = _groupRowNumber = 0;
+        try
+        {
+            return BuildModel(input);
+        }
+        finally
+        {
+            (_rowNumber, _groupRowNumber) = (rowNumber, groupRowNumber);
+        }
+    }
+
+    private RenderModel BuildModel(ReportInput input)
+    {
         if (input.Definition.CrossTab is CrossTab crossTab)
         {
             input = CrossTabs.Pivot(input, crossTab);
@@ -41,7 +59,7 @@ public sealed class ReportEngine
             {
                 foreach (IReadOnlyDictionary<string, object?> row in input.Rows)
                 {
-                    AddBand(model, detail, input, row, input.Rows);
+                    AddDetail(model, def, detail, input, row);
                 }
             }
 
@@ -106,15 +124,17 @@ public sealed class ReportEngine
                 return (Row: row, Keys: values.Select(ValueToString).ToArray(), Values: values);
             })
             .ToList();
+        evaluated = TopGroups(def, evaluated);
         IOrderedEnumerable<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)>? ordered = null;
         for (int level = 0; level < def.Groups.Count; level++)
         {
             int at = level;
             Func<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values), object?> key = x => x.Values[at];
+
+            // The "others" group of a top-N level follows the groups it was ranked against, whichever way they sort.
+            ordered = ordered is null ? evaluated.OrderBy(x => x.Values[at] is OthersKey) : ordered.ThenBy(x => x.Values[at] is OthersKey);
             ordered = (ordered, def.Groups[at].Descending) switch
             {
-                (null, false) => evaluated.OrderBy(key, GroupKeyComparer.Instance),
-                (null, true) => evaluated.OrderByDescending(key, GroupKeyComparer.Instance),
                 (_, false) => ordered.ThenBy(key, GroupKeyComparer.Instance),
                 _ => ordered.ThenByDescending(key, GroupKeyComparer.Instance),
             };
@@ -147,9 +167,14 @@ public sealed class ReportEngine
                 AddBand(model, header, input, row, ScopeFor(keyed, keys, header.GroupLevel));
             }
 
+            if (current is null || changedFrom < keys.Length)
+            {
+                _groupRowNumber = 0;
+            }
+
             if (detail is not null)
             {
-                AddBand(model, detail, input, row, input.Rows);
+                AddDetail(model, def, detail, input, row);
             }
 
             current = keys;
@@ -163,6 +188,83 @@ public sealed class ReportEngine
                 IReadOnlyList<IReadOnlyDictionary<string, object?>> scope = ScopeFor(keyed, current, footer.GroupLevel);
                 AddBand(model, footer, input, keyed[^1].Row, scope);
             }
+        }
+    }
+
+    // Top-N groups (brief §13.1): at a level with a top count, only the largest groups within each parent stay, ranked by the total of a field
+    // (or their rows); the rest are left out or gathered into an "others" group, whose group field reads the others label.
+    private static List<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)> TopGroups(ReportDefinition def,
+        List<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)> evaluated)
+    {
+        for (int level = 0; level < def.Groups.Count; level++)
+        {
+            ReportGroup group = def.Groups[level];
+            if (group.TopCount is not int top || top <= 0)
+            {
+                continue;
+            }
+
+            int at = level;
+            string Parent((IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values) x) => string.Join("\u001f", x.Keys.Take(at));
+            decimal Weight(IEnumerable<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)> rows)
+                => string.IsNullOrWhiteSpace(group.TopBy) ? rows.Count() : rows.Sum(x => ToDecimal(x.Row.GetValueOrDefault(group.TopBy)));
+            HashSet<(string Parent, string Key)> kept = [];
+            foreach (var parent in evaluated.GroupBy(Parent, StringComparer.Ordinal))
+            {
+                foreach (var g in parent.GroupBy(x => x.Keys[at], StringComparer.Ordinal).OrderByDescending(g => Weight(g)).Take(top))
+                {
+                    kept.Add((parent.Key, g.Key));
+                }
+            }
+
+            string? others = string.IsNullOrWhiteSpace(group.OthersLabel) ? null : group.OthersLabel.Trim();
+            string field = group.Expression.Trim();
+            List<(IReadOnlyDictionary<string, object?> Row, string[] Keys, object?[] Values)> next = [];
+            foreach (var x in evaluated)
+            {
+                if (kept.Contains((Parent(x), x.Keys[at])))
+                {
+                    next.Add(x);
+                }
+                else if (others is not null)
+                {
+                    x.Keys[at] = others;
+                    x.Values[at] = new OthersKey(others);
+                    IReadOnlyDictionary<string, object?> row = x.Row.ContainsKey(field) ? new Dictionary<string, object?>(x.Row) { [field] = others } : x.Row;
+                    next.Add((row, x.Keys, x.Values));
+                }
+            }
+
+            evaluated = next;
+        }
+
+        return evaluated;
+    }
+
+    // A detail row: its number counted, the band (shaded on every second row when the band asks), then the detail-child bands for the same row.
+    private void AddDetail(RenderModel model, ReportDefinition def, ReportBand detail, ReportInput input, IReadOnlyDictionary<string, object?> row)
+    {
+        _rowNumber++;
+        _groupRowNumber++;
+        if (!Suppressed(detail, input, row))
+        {
+            RenderBand rendered = ResolveBand(detail, input, row, input.Rows);
+            if (!string.IsNullOrWhiteSpace(detail.AlternateBackground) && _rowNumber % 2 == 0)
+            {
+                (double paperWidth, double _) = ReportLayout.PaperSize(def.Page);
+                rendered.Cells.Insert(0, new RenderCell
+                {
+                    Kind = ElementKind.Label, X = 0, Y = 0, Width = Math.Max(1, paperWidth - def.Page.MarginLeft - def.Page.MarginRight), Height = rendered.Height,
+                    Background = detail.AlternateBackground.Trim(), Padding = 0,
+                });
+            }
+
+            model.Body.Add(rendered);
+        }
+
+        foreach (ReportBand child in def.Bands.Where(b => b.Type == BandType.DetailChild))
+        {
+            AddBand(model, child, input, row, input.Rows);
         }
     }
 
@@ -304,7 +406,8 @@ public sealed class ReportEngine
                 BorderBottom = element.BorderBottom,
                 Padding = element.Padding,
                 WordWrap = element.WordWrap,
-                Rotation = ((element.Rotation % 360) + 360) % 360 / 90 * 90,
+                Rotation = ((element.Rotation % 360) + 360) % 360,
+                CornerRadius = Math.Max(0, element.CornerRadius),
                 DrillTarget = drillTarget,
                 DrillKey = drillKey,
                 Runs = runs,
@@ -481,9 +584,11 @@ public sealed class ReportEngine
     private object? Evaluate(string expression, ReportInput input, IReadOnlyDictionary<string, object?> row) =>
         _expressions.Evaluate(expression, Context(input, row));
 
-    private static ReportExpressionContext Context(ReportInput input, IReadOnlyDictionary<string, object?>? row) => new()
+    private ReportExpressionContext Context(ReportInput input, IReadOnlyDictionary<string, object?>? row) => new()
     {
         Fields = row ?? EmptyRow,
+        RowNumber = _rowNumber,
+        GroupRowNumber = _groupRowNumber,
         Parameters = input.Parameters,
         PrintDate = input.PrintDate,
         UserName = input.UserName,
@@ -510,6 +615,12 @@ public sealed class ReportEngine
     };
 
     private static string ValueToString(object? value) => value?.ToString() ?? string.Empty;
+
+    // The key of a top-N level's "others" group.
+    private sealed record OthersKey(string Label)
+    {
+        public override string ToString() => Label;
+    }
 
     // Orders group keys by value: numbers numerically, dates by date, everything else as text ignoring case; nulls first.
     private sealed class GroupKeyComparer : IComparer<object?>

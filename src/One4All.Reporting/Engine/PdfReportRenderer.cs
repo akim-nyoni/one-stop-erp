@@ -183,6 +183,18 @@ public sealed class PdfReportRenderer : IReportRenderer
     private const string PageToken = "[Page]";
     private const string PagesToken = "[Pages]";
 
+    // The SVG of an ellipse or a round-cornered box filling the cell, in the cell's fill and border colours.
+    private static string ShapeSvg(RenderCell cell)
+    {
+        System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+        double w = Math.Max(cell.Width, 1), h = Math.Max(cell.Height, 1), stroke = Math.Max(cell.BorderThickness, 0.5), half = stroke / 2;
+        string shape = cell.Kind == ElementKind.Ellipse
+            ? string.Format(inv, "<ellipse cx=\"{0}\" cy=\"{1}\" rx=\"{2}\" ry=\"{3}\"", w / 2, h / 2, Math.Max(0.1, (w / 2) - half), Math.Max(0.1, (h / 2) - half))
+            : string.Format(inv, "<rect x=\"{0}\" y=\"{0}\" width=\"{1}\" height=\"{2}\" rx=\"{3}\"", half, Math.Max(0.1, w - stroke), Math.Max(0.1, h - stroke), cell.CornerRadius);
+        return string.Format(inv, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{0}\" height=\"{1}\" viewBox=\"0 0 {0} {1}\">{2} fill=\"{3}\" stroke=\"{4}\" stroke-width=\"{5}\"/></svg>",
+            w, h, shape, cell.Background ?? "none", cell.BorderColor, stroke);
+    }
+
     // A run split around "[Page]" and "[Pages]", so the page number and count are drawn by the page.
     private static IEnumerable<RichRun> PageTokens(RichRun run)
     {
@@ -203,6 +215,13 @@ public sealed class PdfReportRenderer : IReportRenderer
 
     private static void RenderCell(IContainer container, RenderCell cell)
     {
+        // An ellipse or a box with round corners is drawn as a picture of the shape.
+        if (cell.Kind == ElementKind.Ellipse || (cell.Kind == ElementKind.Rectangle && cell.CornerRadius > 0))
+        {
+            container.Height((float)Math.Max(cell.Height, 1)).Svg(ShapeSvg(cell));
+            return;
+        }
+
         (double left, double top, double right, double bottom) = cell.Borders();
         if (left + top + right + bottom > 0)
         {
@@ -239,7 +258,8 @@ public sealed class PdfReportRenderer : IReportRenderer
             90 => container.RotateRight(),
             180 => container.RotateRight().RotateRight(),
             270 => container.RotateLeft(),
-            _ => container,
+            0 => container,
+            _ => container.Rotate(cell.Rotation),
         };
         container = cell.VAlign switch
         {

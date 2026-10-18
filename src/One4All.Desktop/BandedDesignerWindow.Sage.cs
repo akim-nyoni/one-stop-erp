@@ -97,6 +97,7 @@ public partial class BandedDesignerWindow
                 case "Text": AddLabel_Click(this, args); break;
                 case "Line": AddLine_Click(this, args); break;
                 case "Box": Add(ElementKind.Label, null, ElementKind.Rectangle, 120, 40); break;
+                case "Ellipse": Add(ElementKind.Label, null, ElementKind.Ellipse, 60, 40); break;
                 case "Image": AddImage_Click(this, args); break;
                 case "Logo": AddLogo_Click(this, args); break;
                 case "DataField": AddField_Click(this, args); break;

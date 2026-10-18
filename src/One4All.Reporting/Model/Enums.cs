@@ -61,6 +61,9 @@ public enum BandType
 
     /// <summary>An overlay/watermark band.</summary>
     Overlay = 7,
+
+    /// <summary>A band printed under each detail row for the same row (a second line, a narrative, sub-lines), with its own suppress-when.</summary>
+    DetailChild = 8,
 }
 
 /// <summary>The kinds of element that can be placed on a band (brief §13.1).</summary>
@@ -116,6 +119,9 @@ public enum ElementKind
     /// <see cref="ReportElement.ChartSeriesField"/>, cells summing <see cref="ReportElement.AggregateField"/>, with row and column totals.
     /// </summary>
     CrossTab = 14,
+
+    /// <summary>An ellipse (a circle when square) in the element's box, filled with its background and drawn with its border.</summary>
+    Ellipse = 15,
 }
 
 /// <summary>Horizontal text alignment.</summary>

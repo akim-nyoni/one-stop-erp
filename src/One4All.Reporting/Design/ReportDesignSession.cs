@@ -496,7 +496,7 @@ public sealed class ReportDesignSession
         Checkpoint();
         foreach (ReportBand band in Definition.Bands)
         {
-            foreach (ReportElement element in band.Elements.Where(e => e.Kind is not (ElementKind.Line or ElementKind.Rectangle or ElementKind.Image)))
+            foreach (ReportElement element in band.Elements.Where(e => e.Kind is not (ElementKind.Line or ElementKind.Rectangle or ElementKind.Ellipse or ElementKind.Image)))
             {
                 element.FontFamily = theme.FontFamily;
                 element.FontSize = band.Type switch
