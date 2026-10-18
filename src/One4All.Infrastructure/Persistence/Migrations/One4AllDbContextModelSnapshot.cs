@@ -6558,6 +6558,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("applicant_id");
 
+                    b.Property<string>("Channel")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("channel");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -6581,6 +6586,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("NoticeType")
                         .HasColumnType("integer")
                         .HasColumnName("notice_type");
+
+                    b.Property<string>("Recipient")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("recipient");
 
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")

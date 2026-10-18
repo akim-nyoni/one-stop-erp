@@ -1193,10 +1193,10 @@ public static partial class OperationCatalogue
                         return Check(await control.ConfirmAsync(c.CompanyId, applicant, i.Date("Date")).ConfigureAwait(true), "Interest confirmed.");
                     case "Run renewals":
                         RenewalRunResult run = await control.RunRenewalsAsync(c.CompanyId, i.Date("Date"), i.Whole("Cycle"), i.Whole("Grace")).ConfigureAwait(true);
-                        return $"{run.Suspended} suspended, {run.Removed} removed.";
+                        return $"{run.Reminded} reminded, {run.Suspended} suspended, {run.Removed} removed; {run.ByLetter} notice(s) to send by letter (no phone number).";
                     default:
                         IReadOnlyList<ApplicantNoticeEntry> notices = await control.NoticesAsync(c.CompanyId, applicant).ConfigureAwait(true);
-                        return notices.Count == 0 ? "No notices." : string.Join(Environment.NewLine, notices.Select(n => $"{D(n.SentOn)}  {n.NoticeType}"));
+                        return notices.Count == 0 ? "No notices." : string.Join(Environment.NewLine, notices.Select(n => $"{D(n.SentOn)}  {n.NoticeType}  {n.Channel} {n.Recipient}"));
                 }
             },
             List = ApplicantsAsync,

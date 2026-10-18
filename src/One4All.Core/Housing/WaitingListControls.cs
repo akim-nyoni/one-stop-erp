@@ -128,4 +128,10 @@ public sealed class ApplicantNotice : AuditableEntity, ICompanyScoped
 
     /// <summary>When it was sent.</summary>
     public DateOnly SentOn { get; private set; }
+
+    /// <summary>Gets how it went out: SMS, or Letter (printed for the address on file) when there is no phone number.</summary>
+    public string? Channel { get; init; }
+
+    /// <summary>Gets where it went: the phone number or the address.</summary>
+    public string? Recipient { get; init; }
 }

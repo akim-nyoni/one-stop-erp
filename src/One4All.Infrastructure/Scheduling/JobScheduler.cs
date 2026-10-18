@@ -220,7 +220,7 @@ public sealed class WaitingListRenewalsTask : IScheduledTask
     public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
     {
         Application.Abstractions.Housing.RenewalRunResult run = await _waitingList.RunRenewalsAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), 12, 30, ct).ConfigureAwait(false);
-        return $"{run.Suspended} applicant(s) suspended for not renewing, {run.Removed} removed after the grace period.";
+        return $"{run.Reminded} applicant(s) reminded, {run.Suspended} suspended for not renewing, {run.Removed} removed after the grace period; {run.ByLetter} notice(s) to send by letter.";
     }
 }
 

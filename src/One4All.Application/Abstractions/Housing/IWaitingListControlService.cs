@@ -6,12 +6,16 @@ namespace One4All.Application.Abstractions.Housing;
 /// <summary>The result of a renewal run.</summary>
 /// <param name="Suspended">Applicants suspended for not confirming.</param>
 /// <param name="Removed">Applicants removed after the grace period.</param>
-public sealed record RenewalRunResult(int Suspended, int Removed);
+/// <param name="Reminded">Applicants reminded that their renewal falls due.</param>
+/// <param name="ByLetter">Notices to send by letter (no phone number on file).</param>
+public sealed record RenewalRunResult(int Suspended, int Removed, int Reminded = 0, int ByLetter = 0);
 
 /// <summary>A notice in an applicant's history.</summary>
 /// <param name="NoticeType">The kind of notice.</param>
 /// <param name="SentOn">When it was sent.</param>
-public sealed record ApplicantNoticeEntry(ApplicantNoticeType NoticeType, DateOnly SentOn);
+/// <param name="Channel">How it went out (SMS or Letter).</param>
+/// <param name="Recipient">Where it went.</param>
+public sealed record ApplicantNoticeEntry(ApplicantNoticeType NoticeType, DateOnly SentOn, string? Channel = null, string? Recipient = null);
 
 /// <summary>
 /// Waiting-list integrity controls (brief §4.10.3): dual-authorised registration-date changes, renewal confirmations,

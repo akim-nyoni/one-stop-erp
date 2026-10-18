@@ -413,6 +413,8 @@ internal sealed class ApplicantNoticeConfiguration : IEntityTypeConfiguration<Ap
         b.ToTable("applicant_notice", Schemas.Housing);
         b.HasKey(x => x.Id);
         b.Property(x => x.NoticeType).HasConversion<int>();
+        b.Property(x => x.Channel).HasMaxLength(20);
+        b.Property(x => x.Recipient).HasMaxLength(300);
         b.HasOne<HousingApplicant>().WithMany().HasForeignKey(x => x.ApplicantId).OnDelete(DeleteBehavior.Restrict);
         b.HasIndex(x => new { x.ApplicantId, x.SentOn });
     }

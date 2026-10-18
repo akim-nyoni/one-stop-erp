@@ -53,18 +53,22 @@ public sealed class WaitingListControlTests
         (await controls.DecideDateChangeAsync(companyId, rejected, approve: true, 73)).Error.Code.Should().Be("Hse.DateChangeDecided");
 
         (await controls.ConfirmAsync(companyId, keen, new DateOnly(2026, 2, 1))).IsSuccess.Should().BeTrue();
-        // Annual cycle, 30 days' grace, run on 10 March 2026: quiet (registration moved to June 2023, so due June 2024) is long overdue → removed;
-        // lapsed (due 10 January 2025) → removed; keen confirmed in February → untouched.
-        (await controls.RunRenewalsAsync(companyId, new DateOnly(2026, 3, 10), 12, 30)).Should().Be(new RenewalRunResult(0, 2));
+        // Annual cycle, 30 days' grace, run on 10 March 2026: quiet (registration moved to June 2023, so due June 2024) and lapsed (due 10 January 2025)
+        // are overdue - suspended and told first, never removed in one step; keen confirmed in February → untouched. No phone numbers: letters.
+        (await controls.RunRenewalsAsync(companyId, new DateOnly(2026, 3, 10), 12, 30)).Should().Be(new RenewalRunResult(2, 0, 0, 2));
 
         string fresh = await Register("WC-FRESH", new DateOnly(2025, 2, 20));
-        (await controls.RunRenewalsAsync(companyId, new DateOnly(2026, 3, 1), 12, 30)).Should().Be(new RenewalRunResult(1, 0));
+        (await controls.RunRenewalsAsync(companyId, new DateOnly(2026, 3, 1), 12, 30)).Should().Be(new RenewalRunResult(1, 0, 0, 1));
         (await list.EnquireAsync(companyId, fresh, new DateOnly(2026, 3, 1))).Value.Status.Should().Be(ApplicantStatus.Suspended);
         (await controls.ConfirmAsync(companyId, fresh, new DateOnly(2026, 3, 5))).IsSuccess.Should().BeTrue();
         (await list.EnquireAsync(companyId, fresh, new DateOnly(2026, 3, 5))).Value.Status.Should().Be(ApplicantStatus.Active);
-        (await controls.ConfirmAsync(companyId, lapsed, new DateOnly(2026, 3, 11))).Error.Code.Should().Be("Hse.NotOnList");
+        // Thirty days after their suspension notices, quiet and lapsed are removed - and told.
+        (await controls.RunRenewalsAsync(companyId, new DateOnly(2026, 4, 9), 12, 30)).Should().Be(new RenewalRunResult(0, 2, 0, 2));
+        (await controls.ConfirmAsync(companyId, lapsed, new DateOnly(2026, 4, 10))).Error.Code.Should().Be("Hse.NotOnList");
 
-        (await controls.NoticesAsync(companyId, fresh)).Should().Equal(new ApplicantNoticeEntry(ApplicantNoticeType.Suspended, new DateOnly(2026, 3, 1)));
-        (await controls.NoticesAsync(companyId, lapsed)).Should().Equal(new ApplicantNoticeEntry(ApplicantNoticeType.Removed, new DateOnly(2026, 3, 10)));
+        const string letter = "Letter";
+        (await controls.NoticesAsync(companyId, fresh)).Should().Equal(new ApplicantNoticeEntry(ApplicantNoticeType.Suspended, new DateOnly(2026, 3, 1), letter, "(no address on file)"));
+        (await controls.NoticesAsync(companyId, lapsed)).Should().Equal(new ApplicantNoticeEntry(ApplicantNoticeType.Suspended, new DateOnly(2026, 3, 10), letter, "(no address on file)"),
+            new ApplicantNoticeEntry(ApplicantNoticeType.Removed, new DateOnly(2026, 4, 9), letter, "(no address on file)"));
     }
 }
