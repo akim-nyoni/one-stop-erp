@@ -320,6 +320,16 @@ public interface IPayrollSetupService
     /// <returns>The amount, or why the formula fails.</returns>
     Task<Result<decimal>> PreviewFormulaAsync(long companyId, string formula, string? employeeNumber, IReadOnlyDictionary<string, decimal> values, CancellationToken ct = default);
 
+    /// <summary>
+    /// Changes a pay element in full (brief §4.15.2): everything it was created with but its code and type - name, basis, sequence, account, amounts, formula, tax table,
+    /// the bases it counts in, group, limits, rounding, lookup table and options - checked as a new element is. Runs already closed keep what they paid.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="element">The element as it should be, found by its code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> EditPayElementAsync(long companyId, NewPayElement element, CancellationToken ct = default);
+
     /// <summary>Changes a pay element's amount, rate, formula or taxability.</summary>
     Task<Result> UpdatePayElementAsync(long companyId, string code, decimal? fixedAmount, decimal? rate, string? formula, bool? taxable, CancellationToken ct = default);
 

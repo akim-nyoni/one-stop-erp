@@ -221,6 +221,96 @@ public sealed class PayrollSetupService : IPayrollSetupService
     public async Task<Result<long>> CreatePayElementAsync(long companyId, NewPayElement element, CancellationToken ct = default)
     {
         string code = (element.Code ?? string.Empty).Trim().ToUpperInvariant();
+        if (await ElementProblemAsync(companyId, element, ct).ConfigureAwait(false) is Error problem)
+        {
+            return problem;
+        }
+
+        string account = element.AccountCode.Trim().ToUpperInvariant();
+        if (await _db.PayElements.AnyAsync(p => p.CompanyId == companyId && p.Code == code, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Payroll.ElementExists", $"Pay element {code} already exists.");
+        }
+
+        PayElement created = new(companyId, code, element.Name.Trim(), element.Type, element.Basis, element.Sequence, account);
+        Result applied = Configure(created, element);
+        if (applied.IsFailure)
+        {
+            return applied.Error;
+        }
+
+        _db.PayElements.Add(created);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return created.Id;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> EditPayElementAsync(long companyId, NewPayElement element, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        string code = (element.Code ?? string.Empty).Trim().ToUpperInvariant();
+        PayElement? existing = await _db.PayElements.FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == code, ct).ConfigureAwait(false);
+        if (existing is null)
+        {
+            return Result.Failure(Error.NotFound("Payroll.ElementNotFound", $"Pay element {code} not found."));
+        }
+
+        if (existing.Type != element.Type)
+        {
+            return Result.Failure(Error.Rule("Payroll.ElementTypeFixed", $"{code} is {existing.Type}; an element's type cannot change - create a new element instead."));
+        }
+
+        if (await ElementProblemAsync(companyId, element, ct).ConfigureAwait(false) is Error problem)
+        {
+            return Result.Failure(problem);
+        }
+
+        existing.Name = element.Name.Trim();
+        existing.Reconfigure(element.Basis, element.Sequence, element.AccountCode.Trim().ToUpperInvariant());
+        Result applied = Configure(existing, element);
+        if (applied.IsFailure)
+        {
+            return applied;
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // Everything but the code, type, name, basis, sequence and account, as given.
+    private static Result Configure(PayElement target, NewPayElement element)
+    {
+        target.FixedAmount = element.FixedAmount;
+        target.Rate = element.Rate;
+        target.Formula = Clean(element.Formula);
+        target.Taxable = element.Taxable;
+        target.TaxTableCode = Clean(element.TaxTableCode)?.ToUpperInvariant();
+        target.ContributionExpenseAccountCode = Clean(element.ContributionExpenseAccountCode)?.ToUpperInvariant();
+        target.Pensionable = element.Pensionable;
+        target.SubjectToSocialSecurity = element.SubjectToSocialSecurity;
+        target.OvertimeBase = element.OvertimeBase;
+        target.LeavePayBase = element.LeavePayBase;
+        target.ProRated = element.ProRated;
+        target.ArrearsRecoverable = element.ArrearsRecoverable;
+        target.TerminalBenefit = element.TerminalBenefit;
+        target.UnionDues = element.UnionDues;
+        target.Group = Clean(element.Group)?.ToUpperInvariant();
+        target.BasisGroup = Clean(element.BasisGroup)?.ToUpperInvariant();
+        target.Floor = element.Floor;
+        target.Ceiling = element.Ceiling;
+        target.RoundTo = element.RoundTo;
+        target.Rounding = element.Rounding;
+        target.DepartmentAccounts = Clean(element.DepartmentAccounts);
+        target.LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant();
+        target.LookupBands = Clean(element.LookupBands);
+        return Apply(target, new PayElementOptions(element.Recovers, element.BenefitCategory, element.PaidInCurrency, element.CumulativeTax, element.SplitCurrencyTax, element.IsAnnualPayment));
+    }
+
+    // What a new or edited element must satisfy: a name and account, a formula for a formula element, the contribution's expense account, a readable lookup
+    // table, the group a percent-of-group element takes, a floor not above the ceiling, and an account that exists.
+    private async Task<Error?> ElementProblemAsync(long companyId, NewPayElement element, CancellationToken ct)
+    {
+        string code = (element.Code ?? string.Empty).Trim().ToUpperInvariant();
         if (code.Length == 0 || string.IsNullOrWhiteSpace(element.Name) || string.IsNullOrWhiteSpace(element.AccountCode))
         {
             return Error.Validation("Payroll.ElementRequired", "A pay element needs a code, a name and the account it posts to.");
@@ -257,30 +347,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.NotFound("Payroll.AccountNotFound", $"Account {account} does not exist.");
         }
 
-        if (await _db.PayElements.AnyAsync(p => p.CompanyId == companyId && p.Code == code, ct).ConfigureAwait(false))
-        {
-            return Error.Conflict("Payroll.ElementExists", $"Pay element {code} already exists.");
-        }
-
-        PayElement created = new(companyId, code, element.Name.Trim(), element.Type, element.Basis, element.Sequence, account)
-        {
-            FixedAmount = element.FixedAmount, Rate = element.Rate, Formula = Clean(element.Formula), Taxable = element.Taxable, TaxTableCode = Clean(element.TaxTableCode)?.ToUpperInvariant(),
-            ContributionExpenseAccountCode = Clean(element.ContributionExpenseAccountCode)?.ToUpperInvariant(), Pensionable = element.Pensionable,
-            SubjectToSocialSecurity = element.SubjectToSocialSecurity, OvertimeBase = element.OvertimeBase, LeavePayBase = element.LeavePayBase,
-            ProRated = element.ProRated, ArrearsRecoverable = element.ArrearsRecoverable, TerminalBenefit = element.TerminalBenefit, UnionDues = element.UnionDues,
-            Group = Clean(element.Group)?.ToUpperInvariant(), BasisGroup = Clean(element.BasisGroup)?.ToUpperInvariant(), Floor = element.Floor, Ceiling = element.Ceiling,
-            RoundTo = element.RoundTo, Rounding = element.Rounding, DepartmentAccounts = Clean(element.DepartmentAccounts),
-            LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant(), LookupBands = Clean(element.LookupBands),
-        };
-        Result options = Apply(created, new PayElementOptions(element.Recovers, element.BenefitCategory, element.PaidInCurrency, element.CumulativeTax, element.SplitCurrencyTax, element.IsAnnualPayment));
-        if (options.IsFailure)
-        {
-            return options.Error;
-        }
-
-        _db.PayElements.Add(created);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return created.Id;
+        return null;
     }
 
     /// <inheritdoc />

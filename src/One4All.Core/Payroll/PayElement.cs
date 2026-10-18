@@ -87,6 +87,17 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
         AccountCode = accountCode;
     }
 
+    /// <summary>Changes how the element is worked out, where it sits in the run and the account it posts to (its code and type stay as they are).</summary>
+    /// <param name="basis">The calculation basis.</param>
+    /// <param name="sequence">The calculation sequence.</param>
+    /// <param name="accountCode">The GL account.</param>
+    public void Reconfigure(CalculationBasis basis, int sequence, string accountCode)
+    {
+        Basis = basis;
+        Sequence = sequence;
+        AccountCode = accountCode;
+    }
+
     /// <inheritdoc />
     public long CompanyId { get; private set; }
 

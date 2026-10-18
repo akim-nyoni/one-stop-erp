@@ -268,9 +268,11 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Pay elements and tax tables", ListTitle = "Pay elements",
-            Description = "Create a pay element, assign one to (or end one for) an employee, create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
+            Description = "Create a pay element or edit one (every field but its code and type, entered in full as for a new one), assign one to (or end one for) an employee, "
+                + "create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
                 + "'0-100:0; 100-300:20; 300-:30' - or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
-            Fields = [Pick("Step", "Step", ["Create element", "Set element options", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]), Opt("Code", "Element / table code"),
+            Fields = [Pick("Step", "Step", ["Create element", "Edit element", "Set element options", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]),
+                Opt("Code", "Element / table code"),
                 Opt("Name", "Element name"), Pick("Type", "Element type", Enum.GetNames<PayElementType>()), Pick("Basis", "Calculation", Enum.GetNames<CalculationBasis>()), OptNum("Sequence", "Sequence"),
                 Opt("Account", "Account (salaries expense for the standard set)"), Opt("Liability", "PAYE liability account (standard set)"), OptNum("Amount", "Fixed / override amount"),
                 OptNum("Rate", "Rate / override rate"), OptNum("Units", "Units"), Opt("Formula", "Formula"), Tick("Taxable", "Taxable"), Opt("TaxTable", "Tax table code"),
@@ -336,19 +338,11 @@ public static partial class OperationCatalogue
                         IReadOnlyList<string> added = Check(await setup.SeedStandardElementsAsync(c.CompanyId, i.Optional("Account") ?? string.Empty, i.Optional("Liability") ?? string.Empty,
                             i.Optional("TaxTable") ?? "PAYE").ConfigureAwait(true));
                         return added.Count == 0 ? "The standard elements are all there already." : $"Added {string.Join(", ", added)}.";
+                    case "Edit element":
+                        _ = Check(await setup.EditPayElementAsync(c.CompanyId, ElementFrom(i)).ConfigureAwait(true), string.Empty);
+                        return $"Pay element {i.Optional("Code")?.ToUpperInvariant()} changed.";
                     default:
-                        long element = Check(await setup.CreatePayElementAsync(c.CompanyId, new NewPayElement(i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty,
-                            Enum.Parse<PayElementType>(i.Text("Type")), Enum.Parse<CalculationBasis>(i.Text("Basis")), (int)(i.OptionalNumber("Sequence") ?? 10), i.Optional("Account") ?? string.Empty)
-                        {
-                            FixedAmount = i.OptionalNumber("Amount") ?? 0m, Rate = i.OptionalNumber("Rate") ?? 0m, Formula = i.Optional("Formula"), Taxable = i.Flag("Taxable"), TaxTableCode = i.Optional("TaxTable"),
-                            Pensionable = i.Flag("Pensionable"), SubjectToSocialSecurity = i.Flag("SocialSecurity"), OvertimeBase = i.Flag("OvertimeBase"), LeavePayBase = i.Flag("LeaveBase"),
-                            ProRated = i.Flag("ProRated"), ArrearsRecoverable = !i.Flag("NoArrears"), TerminalBenefit = i.Flag("Terminal"), UnionDues = i.Flag("Union"),
-                            Group = i.Optional("Group"), BasisGroup = i.Optional("BasisGroup"), Floor = i.OptionalNumber("Floor"), Ceiling = i.OptionalNumber("Ceiling"), RoundTo = i.OptionalNumber("RoundTo"),
-                            Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
-                            LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
-                            Recovers = Enum.Parse<PayRecovery>(i.Text("Recovers")), BenefitCategory = i.Optional("BenefitCategory"), PaidInCurrency = i.Optional("PaidIn"),
-                            CumulativeTax = i.Flag("CumulativeTax"), SplitCurrencyTax = i.Flag("SplitTax"), IsAnnualPayment = i.Flag("Annual"),
-                        }).ConfigureAwait(true));
+                        long element = Check(await setup.CreatePayElementAsync(c.CompanyId, ElementFrom(i)).ConfigureAwait(true));
                         return $"Pay element created (id {element}).";
                 }
             },
@@ -2070,4 +2064,18 @@ public static partial class OperationCatalogue
             },
         };
     }
+
+    // A pay element as keyed on the pay elements form (for a new one or an edit).
+    private static NewPayElement ElementFrom(OperationInput i) => new NewPayElement(i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty,
+            Enum.Parse<PayElementType>(i.Text("Type")), Enum.Parse<CalculationBasis>(i.Text("Basis")), (int)(i.OptionalNumber("Sequence") ?? 10), i.Optional("Account") ?? string.Empty)
+        {
+            FixedAmount = i.OptionalNumber("Amount") ?? 0m, Rate = i.OptionalNumber("Rate") ?? 0m, Formula = i.Optional("Formula"), Taxable = i.Flag("Taxable"), TaxTableCode = i.Optional("TaxTable"),
+            Pensionable = i.Flag("Pensionable"), SubjectToSocialSecurity = i.Flag("SocialSecurity"), OvertimeBase = i.Flag("OvertimeBase"), LeavePayBase = i.Flag("LeaveBase"),
+            ProRated = i.Flag("ProRated"), ArrearsRecoverable = !i.Flag("NoArrears"), TerminalBenefit = i.Flag("Terminal"), UnionDues = i.Flag("Union"),
+            Group = i.Optional("Group"), BasisGroup = i.Optional("BasisGroup"), Floor = i.OptionalNumber("Floor"), Ceiling = i.OptionalNumber("Ceiling"), RoundTo = i.OptionalNumber("RoundTo"),
+            Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
+            LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
+            Recovers = Enum.Parse<PayRecovery>(i.Text("Recovers")), BenefitCategory = i.Optional("BenefitCategory"), PaidInCurrency = i.Optional("PaidIn"),
+            CumulativeTax = i.Flag("CumulativeTax"), SplitCurrencyTax = i.Flag("SplitTax"), IsAnnualPayment = i.Flag("Annual"),
+        };
 }
