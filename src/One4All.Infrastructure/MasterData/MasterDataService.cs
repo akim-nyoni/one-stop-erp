@@ -417,6 +417,41 @@ public sealed class MasterDataService : IMasterDataService
     }
 
     /// <inheritdoc />
+    public async Task<Result> UpdateItemAsync(long companyId, ItemUpdate update, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        string code = (update.Code ?? string.Empty).Trim().ToUpperInvariant();
+        Item? item = await _db.Items.FirstOrDefaultAsync(i => i.CompanyId == companyId && i.Code == code, ct).ConfigureAwait(false);
+        if (item is null)
+        {
+            return Result.Failure(Error.NotFound("Master.ItemNotFound", $"No item {code}."));
+        }
+
+        if (string.IsNullOrWhiteSpace(update.Description))
+        {
+            return Result.Failure(Error.Validation("Master.ItemDescription", "An item needs a description."));
+        }
+
+        // A standard cost change on stock on hand is a revaluation (Dr / Cr stock control), not an edit: the stock register and the ledger would part ways.
+        if (item.CostingMethod == CostingMethod.Standard && update.StandardCost != item.StandardCost
+            && await _db.StockBalances.AnyAsync(b => b.CompanyId == companyId && b.ItemId == item.Id && b.QuantityOnHand != 0m, ct).ConfigureAwait(false))
+        {
+            return Result.Failure(Error.Rule("Master.StandardCostRevalue",
+                $"{item.Code} has stock on hand at its standard cost; change the standard cost with \"Revalue an item's standard cost\" so the stock is revalued with it."));
+        }
+
+        item.Description = update.Description.Trim();
+        item.RevenueAccountCode = Code(update.RevenueAccountCode);
+        item.CostOfSalesAccountCode = Code(update.CostOfSalesAccountCode);
+        item.StandardCost = update.StandardCost;
+        item.PriceVarianceAccountCode = Code(update.PriceVarianceAccountCode);
+        item.UsageVarianceAccountCode = Code(update.UsageVarianceAccountCode);
+        item.Category = string.IsNullOrWhiteSpace(update.Category) ? null : update.Category.Trim().ToUpperInvariant();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> CreateItemAsync(NewItem item, CancellationToken ct = default)
     {
         if (Key(item.Code, 40) is not string key || string.IsNullOrWhiteSpace(item.Description) || item.StandardCost < 0m)

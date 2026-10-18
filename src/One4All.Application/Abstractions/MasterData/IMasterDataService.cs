@@ -30,6 +30,18 @@ public sealed record NewAccount(long CompanyId, string Code, string Name, Accoun
 public sealed record NewTaxCode(long CompanyId, string Code, string Name, TaxType Type, decimal RatePercent, DateOnly EffectiveFrom, string? OutputAccountCode, string? InputAccountCode,
     TaxAppliesTo AppliesTo = TaxAppliesTo.Both, string? Jurisdiction = null, string? ReturnBox = null);
 
+/// <summary>An existing item's changeable details.</summary>
+/// <param name="Code">The item code.</param>
+/// <param name="Description">The description.</param>
+/// <param name="RevenueAccountCode">Where its sales post.</param>
+/// <param name="CostOfSalesAccountCode">Where its cost of sales posts.</param>
+/// <param name="StandardCost">The standard cost.</param>
+/// <param name="PriceVarianceAccountCode">Where purchase price variances go.</param>
+/// <param name="UsageVarianceAccountCode">Where usage variances go.</param>
+/// <param name="Category">The item category.</param>
+public sealed record ItemUpdate(string Code, string Description, string? RevenueAccountCode, string? CostOfSalesAccountCode, decimal? StandardCost, string? PriceVarianceAccountCode,
+    string? UsageVarianceAccountCode, string? Category);
+
 /// <summary>A new stock or service item.</summary>
 /// <param name="CompanyId">The company.</param>
 /// <param name="Code">The item code.</param>
@@ -193,4 +205,15 @@ public interface IMasterDataService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The item id.</returns>
     Task<Result<long>> CreateItemAsync(NewItem item, CancellationToken ct = default);
+
+    /// <summary>
+    /// Changes an existing item's description, accounts, standard cost and category (its type, costing method and tracking stay as they are). A standard-costed item
+    /// with stock on hand keeps its standard cost here: that change revalues the stock and goes through the standard-cost revaluation (brief §3.6), so the stock register
+    /// and the stock control account stay equal.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="update">The item as it should be, found by its code.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> UpdateItemAsync(long companyId, ItemUpdate update, CancellationToken ct = default);
 }

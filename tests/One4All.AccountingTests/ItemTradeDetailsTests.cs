@@ -43,4 +43,31 @@ public sealed class ItemTradeDetailsTests
         saved = await db.Items.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.Code == "ITD-CEM");
         (saved.HsCode, saved.CountryOfOrigin, saved.Brand).Should().Be(((string?)null, "Zimbabwe", (string?)null), "blank clears, null leaves as it is");
     }
+
+    [SkippableFact]
+    public async Task A_standard_cost_on_stock_on_hand_changes_only_by_revaluation()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        IMasterDataService master = scope.ServiceProvider.GetRequiredService<IMasterDataService>();
+        Item std = new(companyId, "ITD-STD", "Standard bolt", ItemType.Stock, CostingMethod.Standard) { StandardCost = 2m, PriceVarianceAccountCode = "6000" };
+        Warehouse store = new(companyId, "ITD-WH", "Store");
+        db.AddRange(std, store);
+        await db.SaveChangesAsync();
+        ItemUpdate update = new("itd-std", "Standard bolt M8", null, null, 2.5m, "6000", null, null);
+
+        (await master.UpdateItemAsync(companyId, update)).IsSuccess.Should().BeTrue("with nothing on hand there is nothing to revalue");
+        (await db.Items.AsNoTracking().SingleAsync(i => i.Id == std.Id)).StandardCost.Should().Be(2.5m);
+
+        StockBalance balance = new(companyId, std.Id, store.Id);
+        balance.ReceiveAtValue(10m, 25m);
+        db.Add(balance);
+        await db.SaveChangesAsync();
+        (await master.UpdateItemAsync(companyId, update with { StandardCost = 3m })).Error.Code.Should().Be("Master.StandardCostRevalue");
+        (await master.UpdateItemAsync(companyId, update with { Description = "Standard bolt M8 zinc" })).IsSuccess.Should().BeTrue("the standard cost is unchanged");
+        (await master.UpdateItemAsync(companyId, update with { Code = "NONE" })).Error.Code.Should().Be("Master.ItemNotFound");
+    }
 }

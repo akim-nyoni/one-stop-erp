@@ -854,15 +854,10 @@ public static partial class OperationCatalogue
             {
                 if (await ExistingAsync<Core.Inventory.Item>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
                 {
-                    // The description, accounts, standard cost and category can change; the type, costing method and tracking are fixed once there is stock history.
-                    existing.Description = i.Text("Description");
-                    existing.RevenueAccountCode = i.Optional("Revenue");
-                    existing.CostOfSalesAccountCode = i.Optional("Cost");
-                    existing.StandardCost = i.OptionalNumber("Standard");
-                    existing.PriceVarianceAccountCode = i.Optional("PriceVariance");
-                    existing.UsageVarianceAccountCode = i.Optional("UsageVariance");
-                    existing.Category = i.Optional("Category");
-                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    // The description, accounts, standard cost and category can change; the type, costing method and tracking are fixed once there is stock history,
+                    // and a standard cost on stock on hand changes only by revaluation.
+                    _ = Check(await c.Get<IMasterDataService>().UpdateItemAsync(c.CompanyId, new ItemUpdate(existing.Code, i.Text("Description"), i.Optional("Revenue"), i.Optional("Cost"),
+                        i.OptionalNumber("Standard"), i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"))).ConfigureAwait(true), string.Empty);
                     return $"Item {existing.Code} changed.";
                 }
 
