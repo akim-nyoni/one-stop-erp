@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-617 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+621 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -120,6 +120,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | DOC36 | Leave Application (designable) | A leave application by employee number/start date - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 | DOC37 | Leave Balance Certificate (designable) | An employee's leave balances as at a date - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional), Date (Date, optional) | Title, Number, Date, LineNo, Line | - | - |
 | DOC38 | Loan Agreement & Statement (designable) | An employee loan's terms, balance and repayment schedule by its reference - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC39 | Gift Voucher (designable) | A gift voucher by its card number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC40 | EFT Advice (designable) | The bank's EFT advice for a payment run by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC41 | Subcontractor Payment Certificate (designable) | A subcontractor's payment certificate by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC42 | Licence / Permit Certificate (designable) | A council licence or permit by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 
 ## Expenses
 

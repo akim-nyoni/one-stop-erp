@@ -132,6 +132,18 @@ public static class DocumentKinds
     /// <summary>An employee loan's agreement and statement.</summary>
     public const string LoanStatement = "LoanStatement";
 
+    /// <summary>A gift voucher (brief §S).</summary>
+    public const string GiftVoucher = "GiftVoucher";
+
+    /// <summary>The EFT advice for a payment run (brief §S).</summary>
+    public const string EftAdvice = "EftAdvice";
+
+    /// <summary>A subcontractor's payment certificate (brief §S).</summary>
+    public const string SubcontractCertificate = "SubcontractCertificate";
+
+    /// <summary>A council licence or permit certificate (brief §S).</summary>
+    public const string LicenceCertificate = "LicenceCertificate";
+
     /// <summary>Every kind, in catalogue order.</summary>
     public static IReadOnlyList<DocumentKind> All { get; } =
     [
@@ -173,6 +185,10 @@ public static class DocumentKinds
         new(LeaveApplication, "Leave application", "DOC36", "Employee number/start date (yyyy-MM-dd)", Text: true),
         new(LeaveBalanceCertificate, "Leave balance certificate", "DOC37", "Employee number", NeedsDate: true, Text: true),
         new(LoanStatement, "Loan agreement and statement", "DOC38", "Loan reference", Text: true),
+        new(GiftVoucher, "Gift voucher", "DOC39", "Card number", Text: true),
+        new(EftAdvice, "EFT advice", "DOC40", "Payment run number", Text: true),
+        new(SubcontractCertificate, "Subcontractor payment certificate", "DOC41", "Certificate number", Text: true),
+        new(LicenceCertificate, "Licence / permit certificate", "DOC42", "Licence number", Text: true),
     ];
 
     /// <summary>Finds a kind by key or name (case-insensitive).</summary>

@@ -197,6 +197,18 @@ public sealed class TextDocumentService : ITextDocumentService
             case DocumentKinds.LoanStatement:
                 return await LoanStatementAsync(companyId, found, key, ct).ConfigureAwait(false);
 
+            case DocumentKinds.GiftVoucher:
+                return await GiftVoucherAsync(companyId, found, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.EftAdvice:
+                return await EftAdviceAsync(companyId, found, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.SubcontractCertificate:
+                return await SubcontractCertificateAsync(companyId, found, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.LicenceCertificate:
+                return await LicenceCertificateAsync(companyId, found, key, ct).ConfigureAwait(false);
+
             case DocumentKinds.ClearanceCertificate:
                 return await ClearanceCertificateTextAsync(companyId, found, key, ct).ConfigureAwait(false);
 
@@ -422,6 +434,146 @@ public sealed class TextDocumentService : ITextDocumentService
         text.AppendLine();
         text.AppendLine("I agree to repay this loan on the terms above.");
         text.AppendLine("Employee: ____________________   Employer: ____________________   Date: ____________");
+        return text.ToString();
+    }
+
+    // DOC39: a gift voucher as handed to the customer (brief §S "gift voucher").
+    private async Task<Result<string>> GiftVoucherAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        string cardNumber = number.ToUpperInvariant(); // card numbers are kept in upper case
+        Core.Vouchers.GiftCard? card = await _db.GiftCards.AsNoTracking().FirstOrDefaultAsync(c => c.CompanyId == companyId && c.CardNumber == cardNumber, ct).ConfigureAwait(false);
+        if (card is null)
+        {
+            return Missing(kind, number);
+        }
+
+        string company = await CompanyNameAsync(companyId, ct).ConfigureAwait(false);
+        System.Text.StringBuilder text = new();
+        text.AppendLine("+" + new string('=', 46) + "+");
+        text.AppendLine($"| {Fit(company.ToUpperInvariant(), 44)} |");
+        text.AppendLine($"| {Fit("GIFT VOUCHER", 44)} |");
+        text.AppendLine($"| {Fit(string.Empty, 44)} |");
+        text.AppendLine($"| {Fit($"Value:   {card.Currency} {N(card.OriginalValue)}", 44)} |");
+        text.AppendLine($"| {Fit($"Balance: {card.Currency} {N(card.Balance)}", 44)} |");
+        text.AppendLine($"| {Fit($"Card:    {card.CardNumber}", 44)} |");
+        text.AppendLine($"| {Fit($"Issued:  {D(card.IssuedDate)}", 44)} |");
+        text.AppendLine($"| {Fit(card.ExpiryDate is DateOnly expires ? $"Valid until {D(expires)}" : "No expiry date", 44)} |");
+        text.AppendLine($"| {Fit($"Status:  {card.Status}", 44)} |");
+        text.AppendLine($"| {Fit("*" + card.CardNumber + "*", 44)} |");
+        text.AppendLine($"| {Fit("Redeemable at any till. Not exchangeable for cash.", 44)} |");
+        text.AppendLine("+" + new string('=', 46) + "+");
+        return text.ToString();
+    }
+
+    // DOC40: the advice that goes to the bank with a payment run's EFT file (brief §S "EFT advice"): each included supplier, the account paid into and the amount.
+    private async Task<Result<string>> EftAdviceAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.Trading.PaymentRunBatch? run = await _db.Set<Core.Trading.PaymentRunBatch>().AsNoTracking().Include(b => b.Lines)
+            .FirstOrDefaultAsync(b => b.CompanyId == companyId && b.Number == number, ct).ConfigureAwait(false);
+        if (run is null)
+        {
+            return Missing(kind, number);
+        }
+
+        List<Core.Trading.PaymentRunBatchLine> lines = [.. run.Lines.Where(l => l.Included).OrderBy(l => l.SupplierCode, StringComparer.Ordinal)];
+        List<long> supplierIds = [.. lines.Select(l => l.SupplierId).Distinct()];
+        Dictionary<long, Core.Trading.Supplier> suppliers = await _db.Suppliers.AsNoTracking().Where(s => supplierIds.Contains(s.Id)).ToDictionaryAsync(s => s.Id, ct).ConfigureAwait(false);
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), "EFT PAYMENT ADVICE"));
+        text.AppendLine($"Payment run: {run.Number}   Payment date: {D(run.PaymentDate)}   Status: {run.Status}");
+        text.AppendLine($"Paid from:   {run.BankAccountCode}   Method: {run.Method}{(string.IsNullOrWhiteSpace(run.EftLayoutCode) ? string.Empty : "   File layout: " + run.EftLayoutCode)}");
+        text.AppendLine();
+        text.AppendLine($"{"Supplier",-26}{"Bank",-16}{"Account",-18}{"Cur",4}{"Amount",14}");
+        foreach (Core.Trading.PaymentRunBatchLine line in lines)
+        {
+            Core.Trading.Supplier? supplier = suppliers.GetValueOrDefault(line.SupplierId);
+            text.AppendLine($"{Fit(line.SupplierCode + " " + (supplier?.Name ?? string.Empty), 25)} {Fit(supplier?.BankName ?? "-", 15)} {Fit(supplier?.BankAccountNumber ?? "(no account)", 17)} {line.Currency,4}{N(line.Amount),14}");
+        }
+
+        foreach (var total in lines.GroupBy(l => l.Currency).OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            text.AppendLine($"{"Total " + total.Key + $" ({total.Count()} payment(s))",-64}{N(total.Sum(l => l.Amount)),14}");
+        }
+
+        if (lines.Count == 0)
+        {
+            text.AppendLine("No payments are included in this run.");
+        }
+
+        text.AppendLine();
+        text.AppendLine("Authorised signatory 1: ____________________   Authorised signatory 2: ____________________");
+        return text.ToString();
+    }
+
+    // DOC41: a subcontractor's payment certificate (brief §S "subcontractor certificate"): work done to date, previously certified, retention, advance recovery and tax withheld.
+    private async Task<Result<string>> SubcontractCertificateAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.JobCosting.Subcontract? subcontract = await _db.Subcontracts.AsNoTracking().Include(s => s.Certificates)
+            .FirstOrDefaultAsync(s => s.CompanyId == companyId && s.Certificates.Any(c => c.Number == number), ct).ConfigureAwait(false);
+        Core.JobCosting.SubcontractCertificate? certificate = subcontract?.Certificates.FirstOrDefault(c => c.Number == number);
+        if (subcontract is null || certificate is null)
+        {
+            return Missing(kind, number);
+        }
+
+        var job = await _db.JobContracts.AsNoTracking().Where(j => j.Id == subcontract.JobContractId).Select(j => new { j.ContractNumber, j.Name }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var supplier = await _db.Suppliers.AsNoTracking().Where(s => s.Id == subcontract.SupplierId).Select(s => new { s.Code, s.Name }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        decimal previous = subcontract.Certificates.Where(c => c.Date < certificate.Date || (c.Date == certificate.Date && c.Id < certificate.Id)).Sum(c => c.Gross);
+        decimal payable = certificate.Gross - certificate.Retention - certificate.AdvanceRecovered - certificate.Withheld;
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), "SUBCONTRACTOR PAYMENT CERTIFICATE"));
+        text.AppendLine($"Certificate:   {certificate.Number}   Date: {D(certificate.Date)}   Invoice: {certificate.InvoiceNumber}");
+        text.AppendLine($"Contract:      {job?.ContractNumber} {job?.Name}");
+        text.AppendLine($"Subcontract:   {subcontract.Reference} {subcontract.Description}");
+        text.AppendLine($"Subcontractor: {supplier?.Code} {supplier?.Name}");
+        text.AppendLine();
+        text.AppendLine($"{"Subcontract value",-40}{N(subcontract.Value),16}");
+        text.AppendLine($"{"Work done to date",-40}{N(certificate.WorkDoneToDate),16}");
+        text.AppendLine($"{"Less previously certified",-40}{N(previous),16}");
+        text.AppendLine($"{"Gross this certificate",-40}{N(certificate.Gross),16}");
+        text.AppendLine($"{$"Less retention ({subcontract.RetentionPercent.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)}%)",-40}{N(certificate.Retention),16}");
+        text.AppendLine($"{"Less advance recovered",-40}{N(certificate.AdvanceRecovered),16}");
+        text.AppendLine($"{"Less tax withheld",-40}{N(certificate.Withheld),16}");
+        text.AppendLine($"{"Amount payable",-40}{N(payable),16}");
+        text.AppendLine();
+        text.AppendLine($"Retention held to date: {N(subcontract.Certificates.Sum(c => c.Retention) - subcontract.RetentionReleased)}");
+        text.AppendLine();
+        text.AppendLine("Certified by (site engineer): ____________________   Approved: ____________________");
+        return text.ToString();
+    }
+
+    // DOC42: a council licence or permit to display at the premises (brief §S "permits and licence certificates").
+    private async Task<Result<string>> LicenceCertificateAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.Municipal.CouncilLicence? licence = await _db.Set<Core.Municipal.CouncilLicence>().AsNoTracking()
+            .FirstOrDefaultAsync(l => l.CompanyId == companyId && l.LicenceNumber == number, ct).ConfigureAwait(false);
+        if (licence is null)
+        {
+            return Missing(kind, number);
+        }
+
+        string holder = await _db.Customers.AsNoTracking().Where(c => c.Id == licence.HolderCustomerId).Select(c => c.Name + " (" + c.Code + ")").FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? "-";
+        string? stand = licence.PropertyId is long propertyId
+            ? await _db.Properties.AsNoTracking().Where(p => p.Id == propertyId).Select(p => p.StandNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null;
+        System.Text.StringBuilder text = new(Heading(await CompanyNameAsync(companyId, ct).ConfigureAwait(false), $"{licence.Kind.ToString().ToUpperInvariant()} LICENCE"));
+        text.AppendLine($"Licence:     {licence.LicenceNumber}");
+        text.AppendLine($"Holder:      {holder}");
+        if (stand is not null)
+        {
+            text.AppendLine($"Premises:    stand {stand}");
+        }
+
+        text.AppendLine($"Activity:    {licence.Description}");
+        text.AppendLine($"Issued:      {D(licence.IssuedOn)}   Expires: {D(licence.ExpiresOn)}   Renewals: {licence.Renewals}");
+        text.AppendLine($"Fee paid:    {N(licence.Fee)}   Status: {licence.Status}");
+        if (!string.IsNullOrWhiteSpace(licence.RevokedReason))
+        {
+            text.AppendLine($"Revoked:     {licence.RevokedReason}");
+        }
+
+        text.AppendLine();
+        text.AppendLine("This licence must be displayed in a conspicuous place at the premises.");
+        text.AppendLine("It is not transferable and lapses on the expiry date unless renewed.");
+        text.AppendLine();
+        text.AppendLine("Licensing officer: ____________________   Official stamp:");
         return text.ToString();
     }
 

@@ -6,7 +6,7 @@ namespace One4All.Reporting;
 /// <summary>
 /// The designable documents (brief §S): DOC01–DOC12 give one business document's heading, party, reference fields, lines and totals as rows, as the data
 /// source a company copies and lays out as its own quotation, delivery note, invoice or purchase order in the report designer; the company then names its
-/// layout under System Manager › Document layouts and the document prints through it. DOC13–DOC38 give the text-backed documents (statements, reminders,
+/// layout under System Manager › Document layouts and the document prints through it. DOC13–DOC42 give the text-backed documents (statements, reminders,
 /// remittances, payslips, vouchers, certificates, tickets, pick lists, RFQs, the chain of title, cheques and shelf labels) one row per line of their
 /// standard text, so a company frames them with its logo, header, footer and fonts.
 /// </summary>
@@ -79,6 +79,10 @@ public static class DocumentReports
         yield return Text("DOC36", "Leave Application (designable)", "A leave application by employee number/start date");
         yield return Text("DOC37", "Leave Balance Certificate (designable)", "An employee's leave balances as at a date", withDate: true);
         yield return Text("DOC38", "Loan Agreement & Statement (designable)", "An employee loan's terms, balance and repayment schedule by its reference");
+        yield return Text("DOC39", "Gift Voucher (designable)", "A gift voucher by its card number");
+        yield return Text("DOC40", "EFT Advice (designable)", "The bank's EFT advice for a payment run by its number");
+        yield return Text("DOC41", "Subcontractor Payment Certificate (designable)", "A subcontractor's payment certificate by its number");
+        yield return Text("DOC42", "Licence / Permit Certificate (designable)", "A council licence or permit by its number");
     }
 
     // The document kind behind each code (the data-source command is "Doc" + kind, as DocumentKinds in the application layer names them).
@@ -86,7 +90,7 @@ public static class DocumentReports
     {
         ["DOC01"] = "Quotation", ["DOC02"] = "OrderConfirmation", ["DOC03"] = "DeliveryNote", ["DOC04"] = "PackingSlip", ["DOC05"] = "Requisition", ["DOC06"] = "GoodsReceivedNote",
         ["DOC07"] = "SupplierDebitNote", ["DOC08"] = "FeeInvoice", ["DOC09"] = "PaymentCertificate", ["DOC10"] = "MunicipalBill",
-        ["DOC13"] = "PosReceipt", ["DOC14"] = "CustomerStatement", ["DOC15"] = "BalanceForwardStatement", ["DOC16"] = "SupplierStatement", ["DOC17"] = "DunningLetter", ["DOC18"] = "RemittanceAdvice", ["DOC19"] = "Payslip", ["DOC20"] = "PaymentVoucher", ["DOC21"] = "ReceiptVoucher", ["DOC22"] = "JournalVoucher", ["DOC23"] = "PettyCashVoucher", ["DOC24"] = "WithholdingCertificate", ["DOC25"] = "WeighbridgeTicket", ["DOC26"] = "PickList", ["DOC27"] = "Rfq", ["DOC28"] = "CertificateOfService", ["DOC29"] = "BudgetHolderStatement", ["DOC30"] = "ChainOfTitle", ["DOC31"] = "Cheque", ["DOC32"] = "ShelfLabels", ["DOC33"] = "ClearanceCertificate", ["DOC34"] = "StockTransferNote", ["DOC35"] = "AssetTag", ["DOC36"] = "LeaveApplication", ["DOC37"] = "LeaveBalanceCertificate", ["DOC38"] = "LoanStatement",
+        ["DOC13"] = "PosReceipt", ["DOC14"] = "CustomerStatement", ["DOC15"] = "BalanceForwardStatement", ["DOC16"] = "SupplierStatement", ["DOC17"] = "DunningLetter", ["DOC18"] = "RemittanceAdvice", ["DOC19"] = "Payslip", ["DOC20"] = "PaymentVoucher", ["DOC21"] = "ReceiptVoucher", ["DOC22"] = "JournalVoucher", ["DOC23"] = "PettyCashVoucher", ["DOC24"] = "WithholdingCertificate", ["DOC25"] = "WeighbridgeTicket", ["DOC26"] = "PickList", ["DOC27"] = "Rfq", ["DOC28"] = "CertificateOfService", ["DOC29"] = "BudgetHolderStatement", ["DOC30"] = "ChainOfTitle", ["DOC31"] = "Cheque", ["DOC32"] = "ShelfLabels", ["DOC33"] = "ClearanceCertificate", ["DOC34"] = "StockTransferNote", ["DOC35"] = "AssetTag", ["DOC36"] = "LeaveApplication", ["DOC37"] = "LeaveBalanceCertificate", ["DOC38"] = "LoanStatement", ["DOC39"] = "GiftVoucher", ["DOC40"] = "EftAdvice", ["DOC41"] = "SubcontractCertificate", ["DOC42"] = "LicenceCertificate",
     };
 
     private static ReportDefinition Business(string code, string name, string what, (string Name, ParameterType Type)[] parameters)
