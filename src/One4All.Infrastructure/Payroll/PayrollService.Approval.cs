@@ -225,6 +225,17 @@ public sealed partial class PayrollService : IPayrollApprovalService
                     bankChanged[employee] = change.OccurredOnUtc;
                 }
             }
+
+            // A split of net pay approved since the last run sends pay somewhere new as surely as a new account does.
+            foreach (var split in await _db.DetailChangeRequests.AsNoTracking().Where(r => r.CompanyId == companyId && ids.Contains(r.EmployeeId) && r.Field == PayrollSetupService.PaymentSplitField
+                         && r.Status == SelfServiceStatus.Approved && (r.ModifiedOnUtc ?? r.CreatedOnUtc) > after).Select(r => new { r.EmployeeId, At = r.ModifiedOnUtc ?? r.CreatedOnUtc })
+                         .ToListAsync(ct).ConfigureAwait(false))
+            {
+                if (!bankChanged.TryGetValue(split.EmployeeId, out DateTimeOffset seen) || split.At > seen)
+                {
+                    bankChanged[split.EmployeeId] = split.At;
+                }
+            }
         }
 
         List<RunEmployee> facts = [.. employees.Select(e => new RunEmployee(e.EmployeeNumber, e.NationalIdNumber, e.TaxNumber, e.PaymentMethod, e.BankAccountNumber, e.MobileMoneyNumber,

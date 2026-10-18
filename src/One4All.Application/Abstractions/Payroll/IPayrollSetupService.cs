@@ -293,6 +293,16 @@ public sealed record TaxBandInput(decimal From, decimal? To, decimal RatePercent
 /// <summary>A request to change an employee's bank or mobile-money details, waiting for a second person.</summary>
 public sealed record BankChangeRequest(long RequestId, string EmployeeNumber, string Field, string? OldValue, string NewValue, long? RequestedByUserId);
 
+/// <summary>A split of net pay to add, change or take off, asked for and approved like any other bank-detail change (brief §4.15.1).</summary>
+/// <param name="Method">How that part is paid.</param>
+/// <param name="Destination">The account or wallet number.</param>
+/// <param name="Amount">A fixed amount each period (or null with a percentage).</param>
+/// <param name="Percent">A share of net pay (or null with an amount).</param>
+/// <param name="BankName">The bank of that account (null: the employee's bank).</param>
+/// <param name="BankBranch">Its branch.</param>
+/// <param name="Remove">True to take the split to that destination off.</param>
+public sealed record PaymentSplitChange(PayMethod Method, string Destination, decimal? Amount, decimal? Percent, string? BankName, string? BankBranch, bool Remove = false);
+
 /// <summary>
 /// Payroll master data (brief §4.15.1–4.15.2): employees, pay elements and their assignment, tax tables, a standard element set, and bank
 /// detail changes that need a second person's approval.
@@ -393,6 +403,18 @@ public interface IPayrollSetupService
 
     /// <summary>Bank-detail changes waiting for approval.</summary>
     Task<IReadOnlyList<BankChangeRequest>> PendingBankChangesAsync(long companyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Asks for a split of an employee's net pay to be added, changed or taken off. Like a bank-detail change it waits for a different user to approve it
+    /// (through <see cref="DecideBankChangeAsync"/>) before the pay is sent anywhere new, and the run's bank-details-changed check sees it.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeNumber">The employee.</param>
+    /// <param name="change">The split.</param>
+    /// <param name="requestedByUserId">Who asks; they cannot approve it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The request id, or why not.</returns>
+    Task<Result<long>> RequestPaymentSplitAsync(long companyId, string employeeNumber, PaymentSplitChange change, long requestedByUserId, CancellationToken ct = default);
 
     /// <summary>Approves (applies) or rejects a bank-detail change; the person who asked cannot decide it.</summary>
     Task<Result> DecideBankChangeAsync(long companyId, long requestId, bool approve, long decidedByUserId, string? note, CancellationToken ct = default);

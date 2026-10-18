@@ -682,22 +682,95 @@ public sealed class PayrollSetupService : IPayrollSetupService
         return requests.Select(r => r.Id).ToList();
     }
 
+    /// <summary>The change-request field a net-pay split travels under.</summary>
+    public const string PaymentSplitField = "PaymentSplit";
+
+    /// <inheritdoc />
+    public async Task<Result<long>> RequestPaymentSplitAsync(long companyId, string employeeNumber, PaymentSplitChange change, long requestedByUserId, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(change);
+        if (await EmployeeAsync(companyId, employeeNumber, ct).ConfigureAwait(false) is not Employee employee)
+        {
+            return EmployeeNotFound(employeeNumber);
+        }
+
+        string destination = (change.Destination ?? string.Empty).Trim();
+        if (destination.Length == 0)
+        {
+            return Error.Validation("Payroll.SplitDestination", "Give the account or wallet number the split goes to.");
+        }
+
+        List<EmployeePaymentSplit> existing = await _db.PaymentSplits.AsNoTracking().Where(s => s.EmployeeId == employee.Id).ToListAsync(ct).ConfigureAwait(false);
+        EmployeePaymentSplit? same = existing.FirstOrDefault(s => s.Method == change.Method && s.Destination == destination);
+        if (change.Remove && same is null)
+        {
+            return Error.NotFound("Payroll.SplitNotFound", $"{employee.EmployeeNumber} has no split to {destination}.");
+        }
+
+        if (!change.Remove && EmployeePaymentSplit.Problem(change.Amount, change.Percent, existing.Where(s => s != same).Sum(s => s.Percent ?? 0m)) is string problem)
+        {
+            return Error.Validation("Payroll.Split", problem);
+        }
+
+        if (await _db.DetailChangeRequests.AnyAsync(r => r.CompanyId == companyId && r.EmployeeId == employee.Id && r.Field == PaymentSplitField && r.Status == SelfServiceStatus.Pending, ct)
+            .ConfigureAwait(false))
+        {
+            return Error.Conflict("Payroll.SplitPending", $"{employee.EmployeeNumber} already has a split change waiting for approval.");
+        }
+
+        PaymentSplitChange clean = change with { Destination = destination, BankName = Clean(change.BankName), BankBranch = Clean(change.BankBranch) };
+        DetailChangeRequest request = new(companyId, employee.Id, PaymentSplitField, same is null ? null : DescribeSplit(same), System.Text.Json.JsonSerializer.Serialize(clean))
+        {
+            RequestedByUserId = requestedByUserId,
+        };
+        _db.DetailChangeRequests.Add(request);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return request.Id;
+    }
+
+    // An approved split request applied: the split to that destination replaced, or taken off.
+    private async Task ApplySplitAsync(long companyId, long employeeId, string json, CancellationToken ct)
+    {
+        PaymentSplitChange change = System.Text.Json.JsonSerializer.Deserialize<PaymentSplitChange>(json) ?? throw new InvalidOperationException("Unreadable split request.");
+        _db.PaymentSplits.RemoveRange(await _db.PaymentSplits.Where(s => s.EmployeeId == employeeId && s.Method == change.Method && s.Destination == change.Destination).ToListAsync(ct).ConfigureAwait(false));
+        if (!change.Remove)
+        {
+            _db.PaymentSplits.Add(new EmployeePaymentSplit(companyId, employeeId, change.Method, change.Destination, change.Amount ?? 0m, change.Percent)
+            {
+                BankName = change.BankName, BankBranch = change.BankBranch,
+            });
+        }
+    }
+
+    private static string DescribeSplit(EmployeePaymentSplit split)
+        => $"{split.Method} {split.Destination} " + (split.Percent is decimal p ? p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%" : split.Amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture));
+
+    private static string DescribeSplitRequest(string json)
+    {
+        PaymentSplitChange? change = System.Text.Json.JsonSerializer.Deserialize<PaymentSplitChange>(json);
+        return change is null ? json
+            : change.Remove ? $"Remove {change.Method} {change.Destination}"
+            : $"{change.Method} {change.Destination} " + (change.Percent is decimal p ? p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%"
+                : (change.Amount ?? 0m).ToString("N2", System.Globalization.CultureInfo.InvariantCulture)) + (change.BankName is null ? string.Empty : $" at {change.BankName}");
+    }
+
     /// <inheritdoc />
     public async Task<IReadOnlyList<BankChangeRequest>> PendingBankChangesAsync(long companyId, CancellationToken ct = default)
     {
-        List<string> fields = [.. BankFields];
-        return await (from r in _db.DetailChangeRequests.AsNoTracking()
+        List<string> fields = [.. BankFields, PaymentSplitField];
+        List<BankChangeRequest> pending = await (from r in _db.DetailChangeRequests.AsNoTracking()
                       join e in _db.Employees.AsNoTracking() on r.EmployeeId equals e.Id
                       where r.CompanyId == companyId && r.Status == SelfServiceStatus.Pending && fields.Contains(r.Field)
                       orderby r.Id
                       select new BankChangeRequest(r.Id, e.EmployeeNumber, r.Field, r.OldValue, r.NewValue, r.RequestedByUserId)).ToListAsync(ct).ConfigureAwait(false);
+        return [.. pending.Select(r => r.Field == PaymentSplitField ? r with { NewValue = DescribeSplitRequest(r.NewValue) } : r)];
     }
 
     /// <inheritdoc />
     public async Task<Result> DecideBankChangeAsync(long companyId, long requestId, bool approve, long decidedByUserId, string? note, CancellationToken ct = default)
     {
         DetailChangeRequest? request = await _db.DetailChangeRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId, ct).ConfigureAwait(false);
-        if (request is null || request.Status != SelfServiceStatus.Pending || !BankFields.Contains(request.Field))
+        if (request is null || request.Status != SelfServiceStatus.Pending || !(BankFields.Contains(request.Field) || request.Field == PaymentSplitField))
         {
             return Result.Failure(Error.NotFound("Payroll.ChangeNotPending", $"No pending bank-detail change {requestId}."));
         }
@@ -708,7 +781,11 @@ public sealed class PayrollSetupService : IPayrollSetupService
         }
 
         request.Decide(approve, decidedByUserId, note);
-        if (approve)
+        if (approve && request.Field == PaymentSplitField)
+        {
+            await ApplySplitAsync(companyId, request.EmployeeId, request.NewValue, ct).ConfigureAwait(false);
+        }
+        else if (approve)
         {
             Employee employee = await _db.Employees.SingleAsync(e => e.Id == request.EmployeeId, ct).ConfigureAwait(false);
             Apply(employee, request.Field, request.NewValue);

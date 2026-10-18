@@ -945,39 +945,15 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Split net pay", ListTitle = "Pay splits",
-            Description = "Sends part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. "
-                + "Remove takes a split off.",
+            Description = "Asks to send part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their "
+                + "main account. Remove asks to take a split off. Like any bank-detail change, a different person approves it under Bank detail change before pay goes anywhere new.",
             Fields = [EmployeePick("Employee", "Employee"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()), Req("Destination", "Account or wallet number"), OptNum("Amount", "Fixed amount"),
                 OptNum("Percent", "Percent of net pay"), Opt("Bank", "Bank of that account (blank: the employee's bank)"), Opt("Branch", "Branch of that account"), Tick("Remove", "Remove this split")],
             Run = async (c, i) =>
             {
-                long id = await EmployeeAsync(c, i.Text("Employee")).ConfigureAwait(true);
-                PayMethod method = Enum.Parse<PayMethod>(i.Text("Method"));
-                string destination = i.Text("Destination").Trim();
-                List<EmployeePaymentSplit> existing = await c.Db.PaymentSplits.Where(s => s.EmployeeId == id).ToListAsync().ConfigureAwait(true);
-                EmployeePaymentSplit? same = existing.FirstOrDefault(s => s.Method == method && s.Destination == destination);
-                if (same is not null)
-                {
-                    c.Db.PaymentSplits.Remove(same);
-                }
-
-                if (i.Flag("Remove"))
-                {
-                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                    return same is null ? "No such split." : "Split removed.";
-                }
-
-                if (EmployeePaymentSplit.Problem(i.OptionalNumber("Amount"), i.OptionalNumber("Percent"), existing.Where(s => s != same).Sum(s => s.Percent ?? 0m)) is string problem)
-                {
-                    throw new OperationException(problem);
-                }
-
-                c.Db.PaymentSplits.Add(new EmployeePaymentSplit(c.CompanyId, id, method, destination, i.OptionalNumber("Amount") ?? 0m, i.OptionalNumber("Percent"))
-                {
-                    BankName = i.Optional("Bank")?.Trim(), BankBranch = i.Optional("Branch")?.Trim(),
-                });
-                await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                return "Split saved.";
+                long request = Check(await c.Get<IPayrollSetupService>().RequestPaymentSplitAsync(c.CompanyId, i.Text("Employee"), new PaymentSplitChange(Enum.Parse<PayMethod>(i.Text("Method")),
+                    i.Text("Destination"), i.OptionalNumber("Amount"), i.OptionalNumber("Percent"), i.Optional("Bank"), i.Optional("Branch"), i.Flag("Remove")), c.UserId).ConfigureAwait(true));
+                return $"Split change requested ({request}); someone else approves it under Bank detail change.";
             },
             List = async c => Table(await (from s in c.Db.PaymentSplits.AsNoTracking()
                                            join e in c.Db.Employees.AsNoTracking() on s.EmployeeId equals e.Id
