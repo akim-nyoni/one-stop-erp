@@ -6,6 +6,7 @@ using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Abstractions.Pos;
 using One4All.Application.Abstractions.Reporting;
+using One4All.Application.Payroll;
 using One4All.Core.Accounting;
 using One4All.Core.Housing;
 using One4All.Core.Inventory;
@@ -139,5 +140,16 @@ public sealed class PayrollRecoveryTests
 
         (await Render("PR23")).Should().Contain("RC-1 Rae Tenant,0.00,33.00,23.00,10").And.NotContain("Sam Other");
         (await Render("PR24")).Should().Contain($"RC-1 Rae Tenant,{tenancyNumber},RR-1,300.00,600.00,300.00,300.00,300.00,0").And.NotContain("Sam Other");
+
+        // Rae leaves with 10 still on the staff account: the clearance checklist holds the final pay until it is collected; Sam owes nothing there.
+        ITerminationService terminations = scope.ServiceProvider.GetRequiredService<ITerminationService>();
+        TerminationRequest Leaving(string number) => new(companyId, number, TerminationType.Resignation, new DateOnly(2026, 4, 30), "Moving away")
+        {
+            Policy = new TerminalPolicy(1m, 22m, 2m, 4m, 10m), SalaryExpenseAccount = "6100", TerminalBenefitsAccount = "6100", PayeLiabilityAccount = "2400", NetPayAccount = "2420", ApprovedByUserId = approver.Id,
+        };
+        var gone = await terminations.TerminateAsync(Leaving("RC-1"));
+        gone.IsSuccess.Should().BeTrue(gone.IsFailure ? gone.Error.ToString() : null);
+        gone.Value.Clearance.Should().ContainSingle(i => i.Description.StartsWith("Staff account (till purchases) still owed: 10.00", StringComparison.Ordinal) && !i.IsCleared);
+        (await terminations.TerminateAsync(Leaving("RC-2"))).Value.Clearance.Should().NotContain(i => i.Description.StartsWith("Staff account", StringComparison.Ordinal));
     }
 }

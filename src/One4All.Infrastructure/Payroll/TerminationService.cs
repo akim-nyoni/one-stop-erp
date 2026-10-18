@@ -133,6 +133,13 @@ public sealed class TerminationService : ITerminationService
                 + (issued.Value > 0m ? $", worth {issued.Value:N2}" : string.Empty), cleared: false);
         }
 
+        // Till purchases charged to the staff account and not yet deducted from pay (brief §4.15.8): payroll no longer recovers them once the employee has gone.
+        decimal staffAccount = await StaffAccountOwedAsync(request.CompanyId, employee.Id, request.LastDay, ct).ConfigureAwait(false);
+        if (staffAccount > 0m)
+        {
+            termination.AddClearance($"Staff account (till purchases) still owed: {staffAccount:N2} - collect or recover", cleared: false);
+        }
+
         termination.AddClearance("System access withdrawn", cleared: employee.UserId is null);
         if (employee.HousingTenancyId is not null)
         {
@@ -315,6 +322,22 @@ public sealed class TerminationService : ITerminationService
                 where t.CompanyId == companyId && e.EmployeeNumber.ToUpper() == number
                 orderby t.Id descending
                 select t).FirstOrDefaultAsync(ct);
+    }
+
+    // Staff tenders at the till less what payroll has already deducted for staff purchases.
+    private async Task<decimal> StaffAccountOwedAsync(long companyId, long employeeId, DateOnly asAt, CancellationToken ct)
+    {
+        decimal charged = await _db.Set<Core.Pos.Sale>().Where(s => s.CompanyId == companyId && s.Status == Core.Pos.SaleStatus.Completed && s.SaleDate <= asAt)
+            .SelectMany(s => s.Tenders).Where(t => t.StaffEmployeeId == employeeId).SumAsync(t => t.BaseAmount, ct).ConfigureAwait(false);
+        if (charged == 0m)
+        {
+            return 0m;
+        }
+
+        List<string> staffCodes = await _db.PayElements.Where(e => e.CompanyId == companyId && e.Recovers == PayRecovery.StaffPurchases).Select(e => e.Code).ToListAsync(ct).ConfigureAwait(false);
+        decimal recovered = await _db.Set<Payslip>().Where(p => p.CompanyId == companyId && p.EmployeeId == employeeId)
+            .SelectMany(p => p.Lines.Where(l => staffCodes.Contains(l.ElementCode))).SumAsync(l => l.Amount, ct).ConfigureAwait(false);
+        return charged - recovered;
     }
 
     private static List<ClearanceItem> Items(Termination termination)
