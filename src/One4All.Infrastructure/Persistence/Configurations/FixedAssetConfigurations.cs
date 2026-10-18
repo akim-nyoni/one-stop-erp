@@ -20,6 +20,9 @@ internal sealed class FixedAssetConfiguration : IEntityTypeConfiguration<FixedAs
         b.HasIndex(x => x.ParentAssetId);
         b.HasKey(x => x.Id);
         b.Property(x => x.AccumulatedImpairment).HasPrecision(19, 4);
+        b.Property(x => x.RevaluationSurplus).HasPrecision(19, 4);
+        b.Property(x => x.RevaluationLossInProfit).HasPrecision(19, 4);
+        b.Property(x => x.RevaluationReserveAccountCode).HasMaxLength(20);
         b.Property(x => x.Insurer).HasMaxLength(120);
         b.Property(x => x.PolicyNumber).HasMaxLength(60);
         b.Property(x => x.InsuredValue).HasPrecision(19, 4);

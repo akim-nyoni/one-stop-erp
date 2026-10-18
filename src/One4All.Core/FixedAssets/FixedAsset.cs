@@ -344,6 +344,58 @@ public sealed class FixedAsset : SoftDeletableEntity, ICompanyScoped
     /// <param name="delta">The change to the carrying amount (+ up, − down).</param>
     public void Revalue(decimal delta) => Cost += delta;
 
+    /// <summary>Gets the revaluation surplus held in equity for this asset (IAS 16.39-40): uplifts credited to the reserve, less decreases charged against it.</summary>
+    public decimal RevaluationSurplus { get; private set; }
+
+    /// <summary>Gets the revaluation decreases charged to profit and not yet reversed by a later uplift (IAS 16.39).</summary>
+    public decimal RevaluationLossInProfit { get; private set; }
+
+    /// <summary>Gets the equity account the asset's revaluation surplus is held in.</summary>
+    public string? RevaluationReserveAccountCode { get; private set; }
+
+    /// <summary>
+    /// Splits a change in carrying amount the way IAS 16.39-40 requires, per asset: an increase first reverses decreases this asset charged to profit
+    /// (credited to profit), the rest goes to the revaluation surplus; a decrease first uses up this asset's surplus, the rest is charged to profit.
+    /// </summary>
+    /// <param name="delta">The change to the carrying amount (+ up, - down).</param>
+    /// <returns>To the reserve (+ credit, - debit) and to profit (+ a loss, - a gain); they add up to the change.</returns>
+    public (decimal ToReserve, decimal ToProfit) SplitRevaluation(decimal delta)
+    {
+        if (delta >= 0m)
+        {
+            decimal reversal = Math.Min(delta, RevaluationLossInProfit);
+            return (delta - reversal, -reversal);
+        }
+
+        decimal fromReserve = Math.Min(-delta, RevaluationSurplus);
+        return (-fromReserve, -delta - fromReserve);
+    }
+
+    /// <summary>Applies a revaluation split by <see cref="SplitRevaluation"/>: the cost moves by the change, the surplus and the loss in profit by their shares.</summary>
+    /// <param name="delta">The change to the carrying amount.</param>
+    /// <param name="toReserve">The reserve's share (+ credit).</param>
+    /// <param name="toProfit">Profit's share (+ a loss).</param>
+    /// <param name="reserveAccountCode">The reserve account, kept for the transfer on disposal.</param>
+    public void ApplyRevaluation(decimal delta, decimal toReserve, decimal toProfit, string? reserveAccountCode)
+    {
+        Cost += delta;
+        RevaluationSurplus += toReserve;
+        RevaluationLossInProfit += toProfit;
+        if (toReserve != 0m && !string.IsNullOrWhiteSpace(reserveAccountCode))
+        {
+            RevaluationReserveAccountCode = reserveAccountCode.Trim();
+        }
+    }
+
+    /// <summary>Takes the surplus out of the reserve as the asset is derecognised (IAS 16.41), returning what was held.</summary>
+    /// <returns>The surplus transferred.</returns>
+    public decimal RealiseSurplus()
+    {
+        decimal surplus = RevaluationSurplus;
+        RevaluationSurplus = 0m;
+        return surplus;
+    }
+
     /// <summary>The impairment losses held (net of reversals), included in <see cref="AccumulatedDepreciation"/> (IAS 36).</summary>
     public decimal AccumulatedImpairment { get; private set; }
 

@@ -5607,6 +5607,21 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("residual_value");
 
+                    b.Property<decimal>("RevaluationLossInProfit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("revaluation_loss_in_profit");
+
+                    b.Property<string>("RevaluationReserveAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("revaluation_reserve_account_code");
+
+                    b.Property<decimal>("RevaluationSurplus")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("revaluation_surplus");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

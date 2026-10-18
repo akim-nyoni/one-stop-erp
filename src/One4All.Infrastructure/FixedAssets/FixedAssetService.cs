@@ -459,6 +459,17 @@ public sealed class FixedAssetService : IFixedAssetService
             lines.Add(new JournalLineRequest { AccountCode = lossAccountCode, Side = JournalSide.Debit, TransactionAmount = -gainOrLoss });
         }
 
+        // The asset's revaluation surplus is realised on disposal: moved straight to retained earnings, never through profit (IAS 16.41).
+        // Without a retained earnings account it stays in the reserve (the transfer is permitted, not required).
+        if (asset.RevaluationSurplus > 0m && asset.RevaluationReserveAccountCode is string reserve
+            && await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && a.ControlAccountType == Core.Accounting.ControlAccountType.RetainedEarnings).OrderBy(a => a.AccountCode)
+                .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false) is string retained)
+        {
+            decimal surplus = asset.RealiseSurplus();
+            lines.Add(new JournalLineRequest { AccountCode = reserve, Side = JournalSide.Debit, TransactionAmount = surplus, Narrative = "Revaluation surplus realised" });
+            lines.Add(new JournalLineRequest { AccountCode = retained, Side = JournalSide.Credit, TransactionAmount = surplus, Narrative = "Revaluation surplus realised" });
+        }
+
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
         {
             CompanyId = companyId,
@@ -511,18 +522,34 @@ public sealed class FixedAssetService : IFixedAssetService
             return new RevaluationResult(0m, newCarryingAmount, string.Empty);
         }
 
-        // Uplift → Dr asset cost / Cr revaluation reserve; write-down → Dr impairment expense / Cr asset cost.
-        List<JournalLineRequest> lines = delta > 0m
-            ?
-            [
-                new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Debit, TransactionAmount = delta },
-                new JournalLineRequest { AccountCode = revaluationReserveAccountCode, Side = JournalSide.Credit, TransactionAmount = delta },
-            ]
-            :
-            [
-                new JournalLineRequest { AccountCode = impairmentExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = -delta },
-                new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = JournalSide.Credit, TransactionAmount = -delta },
-            ];
+        // The asset cost moves by the change; the other side is split per asset (IAS 16.39-40) between this asset's surplus in the reserve and profit.
+        (decimal toReserve, decimal toProfit) = asset.SplitRevaluation(delta);
+        if ((toReserve != 0m && string.IsNullOrWhiteSpace(revaluationReserveAccountCode)) || (toProfit != 0m && string.IsNullOrWhiteSpace(impairmentExpenseAccountCode)))
+        {
+            return Error.Validation("Fa.RevaluationAccounts", $"Revaluing {asset.AssetNumber} moves {(toReserve != 0m ? "the revaluation reserve" : "profit")}: give its account.");
+        }
+
+        List<JournalLineRequest> lines =
+        [
+            new JournalLineRequest { AccountCode = asset.CostAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = delta > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(delta) },
+        ];
+        if (toReserve != 0m)
+        {
+            lines.Add(new JournalLineRequest
+            {
+                AccountCode = revaluationReserveAccountCode, Side = toReserve > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(toReserve),
+                Narrative = toReserve > 0m ? "Revaluation surplus" : "Decrease against this asset's revaluation surplus",
+            });
+        }
+
+        if (toProfit != 0m)
+        {
+            lines.Add(new JournalLineRequest
+            {
+                AccountCode = impairmentExpenseAccountCode, CostCentre = asset.CostCentre, Department = asset.Department, Side = toProfit > 0m ? JournalSide.Debit : JournalSide.Credit,
+                TransactionAmount = Math.Abs(toProfit), Narrative = toProfit > 0m ? "Revaluation decrease charged to profit" : "Reversal of an earlier revaluation decrease",
+            });
+        }
 
         Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
@@ -542,9 +569,9 @@ public sealed class FixedAssetService : IFixedAssetService
             return posted.Error;
         }
 
-        asset.Revalue(delta);
+        asset.ApplyRevaluation(delta, toReserve, toProfit, revaluationReserveAccountCode);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new RevaluationResult(delta, asset.NetBookValue, posted.Value.JournalNumber);
+        return new RevaluationResult(delta, asset.NetBookValue, posted.Value.JournalNumber, toReserve, toProfit);
     }
 
     /// <inheritdoc />

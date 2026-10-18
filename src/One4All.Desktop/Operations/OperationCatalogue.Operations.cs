@@ -189,7 +189,8 @@ public static partial class OperationCatalogue
                     case "Revalue":
                         RevaluationResult revaluation = Check(await assets.RevalueAsync(c.CompanyId, asset, i.OptionalNumber("Amount") ?? throw new OperationException("Give the new carrying amount."),
                             date, i.Optional("Reserve") ?? string.Empty, i.Optional("WriteDown") ?? string.Empty, document).ConfigureAwait(true));
-                        return $"{number} revalued to {M(revaluation.NewCarryingAmount)} ({(revaluation.Delta >= 0m ? "uplift" : "write-down")} {M(Math.Abs(revaluation.Delta))}, journal {revaluation.JournalNumber}).";
+                        return $"{number} revalued to {M(revaluation.NewCarryingAmount)} ({(revaluation.Delta >= 0m ? "uplift" : "write-down")} {M(Math.Abs(revaluation.Delta))}: "
+                            + $"reserve {M(revaluation.ToReserve)}, profit {M(-revaluation.ToProfit)}; journal {revaluation.JournalNumber}).";
                     case "Move":
                         _ = Check(await assets.TransferAsync(c.CompanyId, asset, i.Optional("Location"), i.Optional("Custodian")).ConfigureAwait(true), string.Empty);
                         await TagAsync(c, asset, i.Optional("Tag")).ConfigureAwait(true);

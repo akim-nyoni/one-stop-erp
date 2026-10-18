@@ -126,7 +126,7 @@ public readonly record struct DisposalResult(decimal Proceeds, decimal NetBookVa
 /// <param name="Delta">The change to the carrying amount (+ uplift to reserve, − write-down to expense).</param>
 /// <param name="NewCarryingAmount">The net book value after the revaluation.</param>
 /// <param name="JournalNumber">The revaluation journal number.</param>
-public readonly record struct RevaluationResult(decimal Delta, decimal NewCarryingAmount, string JournalNumber);
+public readonly record struct RevaluationResult(decimal Delta, decimal NewCarryingAmount, string JournalNumber, decimal ToReserve = 0m, decimal ToProfit = 0m);
 
 /// <summary>
 /// Fixed Assets (brief §4.14). Registers assets, runs monthly depreciation posting to the GL, and disposes
@@ -205,10 +205,11 @@ public interface IFixedAssetService
     Task<Result<DisposalResult>> DisposeAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct = default);
 
     /// <summary>
-    /// Revalues an active asset to a new carrying amount (IAS 16): an uplift increases the asset cost against a
-    /// revaluation-reserve equity account (Dr asset cost / Cr reserve); a write-down reduces the asset cost
-    /// against an impairment-expense account (Dr expense / Cr asset cost). Future depreciation follows the
-    /// revalued amount. Refuses a disposed asset or a negative carrying amount.
+    /// Revalues an active asset to a new carrying amount (IAS 16.39-40, per asset): an uplift first reverses decreases this asset charged to
+    /// profit (credited to the impairment account) and credits the rest to the revaluation reserve; a write-down first uses up this asset's
+    /// surplus in the reserve and charges the rest to the impairment account. The asset cost moves by the change, future depreciation
+    /// follows the revalued amount, and the surplus left is transferred to retained earnings when the asset is disposed of (IAS 16.41).
+    /// Refuses a disposed asset or a negative carrying amount.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="assetId">The asset.</param>

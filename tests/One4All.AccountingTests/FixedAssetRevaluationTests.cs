@@ -49,10 +49,17 @@ public sealed class FixedAssetRevaluationTests
             up.Value.Delta.Should().Be(30_000m);
             up.Value.NewCarryingAmount.Should().Be(130_000m);
 
-            // Later write-down to 120,000 → −10,000 impairment expense.
+            // Later write-down to 120,000: -10,000 comes out of this asset's 30,000 surplus, not profit (IAS 16.40).
             var down = await fa.RevalueAsync(companyId, assetId, 120_000m, new DateOnly(2026, 9, 30), "3300", "6500", "REV-2");
             down.IsSuccess.Should().BeTrue(down.IsFailure ? down.Error.ToString() : null);
-            down.Value.Delta.Should().Be(-10_000m);
+            (down.Value.Delta, down.Value.ToReserve, down.Value.ToProfit).Should().Be((-10_000m, -10_000m, 0m));
+
+            // Down to 90,000: the 20,000 surplus left is used up and the other 10,000 is a loss in profit; back up to 100,000 reverses that loss first.
+            (await fa.RevalueAsync(companyId, assetId, 90_000m, new DateOnly(2026, 10, 31), "3300", "6500", "REV-3")).Value.Should()
+                .Match<RevaluationResult>(r => r.ToReserve == -20_000m && r.ToProfit == 10_000m);
+            (await fa.RevalueAsync(companyId, assetId, 100_000m, new DateOnly(2026, 11, 30), "3300", "6500", "REV-4")).Value.Should()
+                .Match<RevaluationResult>(r => r.ToReserve == 0m && r.ToProfit == -10_000m);
+            (await fa.RevalueAsync(companyId, assetId, 120_000m, new DateOnly(2026, 12, 15), "3300", "6500", "REV-5")).Value.ToReserve.Should().Be(20_000m);
 
             // A negative carrying amount is refused.
             (await fa.RevalueAsync(companyId, assetId, -1m, new DateOnly(2026, 9, 30), "3300", "6500", "REV-X")).IsFailure.Should().BeTrue();
@@ -67,8 +74,10 @@ public sealed class FixedAssetRevaluationTests
             TrialBalanceReport tb = await gl.TrialBalanceAsync(companyId, new DateOnly(2026, 12, 31));
             tb.IsBalanced.Should().BeTrue();
             tb.Rows.Should().Contain(r => r.AccountCode == "1600" && r.Debit == 120_000m); // asset cost after revaluations
-            tb.Rows.Should().Contain(r => r.AccountCode == "3300" && r.Credit == 30_000m); // revaluation reserve (uplift)
-            tb.Rows.Should().Contain(r => r.AccountCode == "6500" && r.Debit == 10_000m);  // impairment loss (write-down)
+            tb.Rows.Should().Contain(r => r.AccountCode == "3300" && r.Credit == 20_000m); // this asset's surplus: 30,000 - 10,000 - 20,000 + 20,000
+            tb.Rows.Where(r => r.AccountCode == "6500").Sum(r => r.Debit - r.Credit).Should().Be(0m, "the 10,000 loss in profit was reversed by the next uplift");
+            FixedAsset land = await db.Set<FixedAsset>().AsNoTracking().FirstAsync(a => a.Id == assetId);
+            (land.RevaluationSurplus, land.RevaluationLossInProfit, land.RevaluationReserveAccountCode).Should().Be((20_000m, 0m, "3300"));
         }
     }
 }
