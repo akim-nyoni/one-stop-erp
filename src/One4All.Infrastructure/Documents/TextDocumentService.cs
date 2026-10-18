@@ -60,7 +60,7 @@ public sealed class TextDocumentService : ITextDocumentService
             case DocumentKinds.TaxInvoice:
             {
                 long? item = await _db.OpenItems.AsNoTracking().Where(o => o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsReceivable && o.DocumentNumber == key
-                        && (o.ItemType == OpenItemType.Invoice || o.ItemType == OpenItemType.CreditNote)).Select(o => (long?)o.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                        && (o.ItemType == OpenItemType.Invoice || o.ItemType == OpenItemType.CreditNote || o.ItemType == OpenItemType.DebitNote)).Select(o => (long?)o.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
                 return item is null ? Missing(found, key) : await Get<IInvoiceDocumentService>().RenderTextAsync(companyId, item.Value, ct: ct).ConfigureAwait(false);
             }
 

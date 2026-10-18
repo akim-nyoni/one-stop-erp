@@ -217,4 +217,27 @@ public sealed class DocumentsBatchTests
         (await Print("StudentReceipt", "DB-RC1")).Should().Contain("SCHOOL FEES RECEIPT").And.Contain("Mr Banda (DB-GRD)").And.Contain("Term 1: Tino Banda (S001)")
             .And.MatchRegex(@"300\.00\s+100\.00").And.MatchRegex(@"Held on account \(not yet allocated\)\s+200\.00");
     }
+
+    [SkippableFact]
+    public async Task A_customer_debit_note_prints_as_a_debit_note()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Customer customer = new(companyId, "DB-DN", "Gweru Motors", Scenario.Usd);
+        db.Customers.Add(customer);
+        await db.SaveChangesAsync();
+        One4All.Application.Abstractions.Trading.ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Trading.ISalesLedgerService>();
+        (await ar.PostInvoiceAsync(new One4All.Application.Abstractions.Trading.SalesInvoiceRequest { CompanyId = companyId, CustomerId = customer.Id, DocumentNumber = "DB-INV9",
+            DocumentDate = new DateOnly(2026, 5, 1), Currency = Scenario.Usd, NetAmount = 1_000m, SalesAccountCode = "4000" })).IsSuccess.Should().BeTrue();
+        var note = await ar.PostDebitNoteAsync(new One4All.Application.Abstractions.Trading.SalesInvoiceRequest { CompanyId = companyId, CustomerId = customer.Id, DocumentNumber = "DB-DN1",
+            DocumentDate = new DateOnly(2026, 5, 9), Currency = Scenario.Usd, NetAmount = 75m, SalesAccountCode = "4000", Narrative = "Freight not invoiced" }, "DB-INV9");
+        note.IsSuccess.Should().BeTrue(note.IsFailure ? note.Error.Message : null);
+
+        var printed = await scope.ServiceProvider.GetRequiredService<ITextDocumentService>().RenderAsync(companyId, "TaxInvoice", "DB-DN1");
+        printed.IsSuccess.Should().BeTrue(printed.IsFailure ? printed.Error.Message : null);
+        printed.Value.Should().Contain("DEBIT NOTE").And.Contain("Gweru Motors").And.Contain("75.00").And.NotContain("CREDIT NOTE");
+    }
 }

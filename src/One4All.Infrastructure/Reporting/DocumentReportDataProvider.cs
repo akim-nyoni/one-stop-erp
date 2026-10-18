@@ -73,7 +73,7 @@ public sealed class DocumentReportDataProvider : IReportDataProvider
             case DocumentKinds.TaxInvoice:
             {
                 long? item = await _db.OpenItems.AsNoTracking().Where(o => o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsReceivable && o.DocumentNumber == number
-                        && (o.ItemType == OpenItemType.Invoice || o.ItemType == OpenItemType.CreditNote)).Select(o => (long?)o.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                        && (o.ItemType == OpenItemType.Invoice || o.ItemType == OpenItemType.CreditNote || o.ItemType == OpenItemType.DebitNote)).Select(o => (long?)o.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
                 Result<InvoiceDocument> invoice = item is null ? Error.NotFound("Doc.InvoiceNotFound", $"No invoice {number}.") : await _invoices.BuildAsync(companyId, item.Value, ct).ConfigureAwait(false);
                 return invoice.IsSuccess ? InvoiceRows(invoice.Value) : [];
             }
@@ -108,7 +108,7 @@ public sealed class DocumentReportDataProvider : IReportDataProvider
         IReadOnlyList<InvoiceDocumentLine> lines = invoice.Lines.Count == 0 ? [new InvoiceDocumentLine(invoice.Narrative ?? string.Empty, invoice.Net)] : invoice.Lines;
         return [.. lines.Select((line, index) => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
         {
-            ["Kind"] = invoice.IsCreditNote ? "Credit note" : "Tax invoice", ["CompanyName"] = invoice.CompanyName, ["CompanyTaxNumber"] = invoice.CompanyTaxNumber,
+            ["Kind"] = invoice.IsCreditNote ? "Credit note" : invoice.IsDebitNote ? "Debit note" : "Tax invoice", ["CompanyName"] = invoice.CompanyName, ["CompanyTaxNumber"] = invoice.CompanyTaxNumber,
             ["CustomerCode"] = invoice.CustomerCode, ["CustomerName"] = invoice.CustomerName, ["CustomerTaxNumber"] = invoice.CustomerTaxNumber,
             ["CustomerAddress"] = string.Join(", ", invoice.CustomerAddress ?? []), ["Number"] = invoice.DocumentNumber, ["Date"] = invoice.DocumentDate, ["DueDate"] = invoice.DueDate,
             ["Currency"] = invoice.Currency, ["LineNo"] = index + 1, ["Description"] = line.Description, ["Amount"] = line.Amount,

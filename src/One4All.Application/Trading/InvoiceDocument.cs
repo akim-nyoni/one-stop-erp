@@ -8,7 +8,7 @@ namespace One4All.Application.Trading;
 /// <param name="Amount">The net amount in document currency.</param>
 public sealed record InvoiceDocumentLine(string Description, decimal Amount);
 
-/// <summary>The data behind a customer tax invoice or credit note.</summary>
+/// <summary>The data behind a customer tax invoice, credit note or debit note.</summary>
 /// <param name="IsCreditNote">True for a credit note, false for an invoice.</param>
 /// <param name="CompanyName">The issuing company.</param>
 /// <param name="CompanyTaxNumber">The issuer's tax / VAT registration (optional).</param>
@@ -23,9 +23,11 @@ public sealed record InvoiceDocumentLine(string Description, decimal Amount);
 /// <param name="Tax">The tax (VAT) on the document.</param>
 /// <param name="Outstanding">The amount still unpaid / unapplied.</param>
 /// <param name="Narrative">An optional narrative.</param>
+/// <param name="CustomerAddress">The customer's correspondence address lines (optional).</param>
+/// <param name="IsDebitNote">True for a debit note: a further charge on an invoice already issued.</param>
 public sealed record InvoiceDocument(bool IsCreditNote, string CompanyName, string? CompanyTaxNumber, string CustomerCode, string CustomerName, string? CustomerTaxNumber,
     string DocumentNumber, DateOnly DocumentDate, DateOnly DueDate, string Currency, IReadOnlyList<InvoiceDocumentLine> Lines, decimal Tax, decimal Outstanding, string? Narrative,
-    IReadOnlyList<string>? CustomerAddress = null)
+    IReadOnlyList<string>? CustomerAddress = null, bool IsDebitNote = false)
 {
     /// <summary>The net total.</summary>
     public decimal Net => Lines.Sum(l => l.Amount);
@@ -57,7 +59,7 @@ public static class InvoiceFormatter
 
         StringBuilder sb = new();
         string rule = new('-', width);
-        string title = document.IsCreditNote ? "CREDIT NOTE" : document.CompanyTaxNumber is null ? "INVOICE" : "TAX INVOICE";
+        string title = document.IsCreditNote ? "CREDIT NOTE" : document.IsDebitNote ? "DEBIT NOTE" : document.CompanyTaxNumber is null ? "INVOICE" : "TAX INVOICE";
 
         AppendCentered(sb, document.CompanyName, width);
         if (document.CompanyTaxNumber is not null)

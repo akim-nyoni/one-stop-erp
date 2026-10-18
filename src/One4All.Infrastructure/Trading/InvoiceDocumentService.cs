@@ -28,9 +28,9 @@ public sealed class InvoiceDocumentService : IInvoiceDocumentService
             return Error.NotFound("Ar.ItemNotFound", $"AR open item {openItemId} not found.");
         }
 
-        if (item.ItemType is not (OpenItemType.Invoice or OpenItemType.CreditNote or OpenItemType.Interest))
+        if (item.ItemType is not (OpenItemType.Invoice or OpenItemType.CreditNote or OpenItemType.DebitNote or OpenItemType.Interest))
         {
-            return Error.Rule("Ar.NotADocument", $"{item.DocumentNumber} is a {item.ItemType}, not an invoice or credit note.");
+            return Error.Rule("Ar.NotADocument", $"{item.DocumentNumber} is a {item.ItemType}, not an invoice, credit note or debit note.");
         }
 
         if (item.JournalEntryId is not { } journalId)
@@ -93,7 +93,8 @@ public sealed class InvoiceDocumentService : IInvoiceDocumentService
             tax,
             item.OutstandingTransaction,
             item.Narrative,
-            await TraderDirectory.CorrespondenceAsync(_db, companyId, TradingLedger.AccountsReceivable, item.TraderId, ct).ConfigureAwait(false));
+            await TraderDirectory.CorrespondenceAsync(_db, companyId, TradingLedger.AccountsReceivable, item.TraderId, ct).ConfigureAwait(false),
+            item.ItemType == OpenItemType.DebitNote);
     }
 
     /// <inheritdoc />

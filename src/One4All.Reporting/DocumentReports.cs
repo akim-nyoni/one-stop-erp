@@ -42,7 +42,7 @@ public static class DocumentReports
         yield return Business("DOC09", "Payment Certificate (designable)", "An interim payment certificate by its number", number);
         yield return Business("DOC10", "Municipal Bill (designable)", "A stand's monthly municipal bill by stand number and any day in the month", [("Number", ParameterType.String), ("Date", ParameterType.Date)]);
         yield return Listing("DOC11", "Tax Invoice / Credit Note (designable)", Module,
-            "A customer tax invoice or credit note by its number - company, customer and address, dates, each line, net, tax, gross and what is still outstanding - as the data source for a company's own invoice layout.",
+            "A customer tax invoice, credit note or debit note by its number - company, customer and address, dates, each line, net, tax, gross and what is still outstanding - as the data source for a company's own invoice layout.",
             "DocTaxInvoice",
             [new Column("Kind", "Document", 80), new Column("CustomerCode", "Customer", 70), new Column("CustomerName", "Name", 150), new Column("Number", "Number", 80), new Column("Date", "Date", 70),
              new Column("DueDate", "Due", 70), new Column("Description", "Description", 200), new Column("Amount", "Amount", 85, true), new Column("Net", "Net", 85), new Column("Tax", "Tax", 85),

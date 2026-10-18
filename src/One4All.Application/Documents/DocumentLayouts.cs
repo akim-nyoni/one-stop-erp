@@ -48,7 +48,7 @@ public static class DocumentKinds
     /// <summary>A stand's monthly municipal bill.</summary>
     public const string MunicipalBill = "MunicipalBill";
 
-    /// <summary>A customer tax invoice or credit note.</summary>
+    /// <summary>A customer tax invoice, credit note or debit note.</summary>
     public const string TaxInvoice = "TaxInvoice";
 
     /// <summary>A purchase order.</summary>
@@ -181,7 +181,7 @@ public static class DocumentKinds
         new(FeeInvoice, "Fee invoice", "DOC08", "Invoice number"),
         new(PaymentCertificate, "Payment certificate", "DOC09", "Certificate number"),
         new(MunicipalBill, "Municipal bill", "DOC10", "Stand number", NeedsDate: true),
-        new(TaxInvoice, "Tax invoice / credit note", "DOC11", "Invoice or credit note number"),
+        new(TaxInvoice, "Tax invoice / credit / debit note", "DOC11", "Invoice, credit or debit note number"),
         new(PurchaseOrder, "Purchase order", "DOC12", "Order number"),
         new(PosReceipt, "Till receipt", "DOC13", "Sale number", Text: true),
         new(CustomerStatement, "Customer statement", "DOC14", "Customer code", NeedsDate: true, Text: true),
