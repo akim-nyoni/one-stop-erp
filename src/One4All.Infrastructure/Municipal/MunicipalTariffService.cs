@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Municipal;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Core.Common;
 using One4All.Core.Municipal;
 using One4All.Infrastructure.Persistence;
@@ -10,13 +11,32 @@ namespace One4All.Infrastructure.Municipal;
 public sealed class MunicipalTariffService : IMunicipalTariffService
 {
     private readonly One4AllDbContext _db;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public MunicipalTariffService(One4AllDbContext db) => _db = db;
+    /// <param name="workflow">The approval workflow tariff changes go through when the company defines one.</param>
+    public MunicipalTariffService(One4AllDbContext db, Lazy<IWorkflowService>? workflow = null)
+    {
+        _db = db;
+        _workflow = workflow;
+    }
+
+    /// <summary>The workflow reference of a tariff version.</summary>
+    /// <param name="versionId">The version.</param>
+    /// <returns>The reference.</returns>
+    public static string Reference(long versionId) => "TV-" + versionId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    // The last day of the latest period billed (posted) for a service, or null when none has been.
+    private async Task<DateOnly?> BilledThroughAsync(long companyId, ServiceType service, CancellationToken ct)
+        => await _db.Set<BillingRun>().AsNoTracking().Where(r => r.CompanyId == companyId && r.ServiceType == service && r.Status == BillingRunStatus.Posted)
+            .MaxAsync(r => (DateOnly?)r.Period, ct).ConfigureAwait(false) is DateOnly period ? period.AddMonths(1).AddDays(-1) : null;
 
     /// <inheritdoc />
-    public async Task<Result<long>> SaveVersionAsync(long companyId, TariffInput input, CancellationToken ct = default)
+    public Task<Result<long>> SaveVersionAsync(long companyId, TariffInput input, CancellationToken ct = default)
+        => _db.AtomicAsync(() => SaveVersionCoreAsync(companyId, input, ct), ct);
+
+    private async Task<Result<long>> SaveVersionCoreAsync(long companyId, TariffInput input, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(input);
         string code = (input.Code ?? string.Empty).Trim().ToUpperInvariant();
@@ -72,9 +92,49 @@ public sealed class MunicipalTariffService : IMunicipalTariffService
             version.AddSeason(season.FromMonth, season.ToMonth, season.PerUnitRate);
         }
 
+        // Not back into a billed period: those bills were raised under the version then in force and must stay explainable by it.
+        if (await BilledThroughAsync(companyId, version.ServiceType, ct).ConfigureAwait(false) is DateOnly billed && input.EffectiveFrom <= billed)
+        {
+            return Error.Rule("Mun.TariffBackdated", $"{version.ServiceType} is billed to {billed:yyyy-MM-dd}; a new version of {code} takes effect after that.");
+        }
+
+        // With a tariff workflow, the version waits out of force until it is approved.
+        bool governed = _workflow is not null && await _db.WorkflowDefinitions.AnyAsync(d => d.CompanyId == companyId && d.DocumentType == WorkflowDocumentTypes.TariffVersion && d.IsActive, ct)
+            .ConfigureAwait(false);
+        version.IsActive = !governed;
         _db.Tariffs.Add(version);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (governed)
+        {
+            Result<bool> started = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.TariffVersion, Reference(version.Id), 0m, input.RequestedByUserId,
+                [("Tariff", code), ("Service", version.ServiceType.ToString())], ct).ConfigureAwait(false);
+            if (started.IsFailure)
+            {
+                return started.Error;
+            }
+        }
+
         return version.Id;
+    }
+
+    /// <summary>Applies the end of a tariff version's workflow: approved puts it in force; otherwise it stays out of force.</summary>
+    internal async Task<Result> ConcludeAsync(long companyId, string reference, bool approved, CancellationToken ct)
+    {
+        if (!reference.StartsWith("TV-", StringComparison.Ordinal)
+            || !long.TryParse(reference.AsSpan(3), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long id))
+        {
+            return Result.Failure(Error.Validation("Mun.TariffReference", $"{reference} is not a tariff version reference."));
+        }
+
+        Tariff? version = await _db.Tariffs.FirstOrDefaultAsync(t => t.Id == id && t.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (version is null)
+        {
+            return Result.Failure(Error.NotFound("Mun.TariffVersionNotFound", $"Tariff version {id} not found."));
+        }
+
+        version.IsActive = approved;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -87,8 +147,27 @@ public sealed class MunicipalTariffService : IMunicipalTariffService
             return Result.Failure(Error.NotFound("Mun.TariffVersionNotFound", $"Tariff {key} has no version from {effectiveFrom:yyyy-MM-dd}."));
         }
 
+        // A version bills have been raised under stays: withdrawing it would leave those bills unexplained.
+        if (await BilledThroughAsync(companyId, version.ServiceType, ct).ConfigureAwait(false) is DateOnly billed && version.EffectiveFrom <= billed)
+        {
+            return Result.Failure(Error.Rule("Mun.TariffVersionUsed", $"{version.ServiceType} has been billed to {billed:yyyy-MM-dd} under {key} from {effectiveFrom:yyyy-MM-dd}; it cannot be withdrawn."));
+        }
+
         version.IsActive = false;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
+}
+
+/// <summary>Applies the end of a tariff version's workflow.</summary>
+internal sealed class TariffVersionWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly MunicipalTariffService _tariffs;
+
+    public TariffVersionWorkflowHandler(MunicipalTariffService tariffs) => _tariffs = tariffs;
+
+    public string DocumentType => WorkflowDocumentTypes.TariffVersion;
+
+    public Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+        => _tariffs.ConcludeAsync(companyId, documentReference, outcome == Core.Workflow.WorkflowStatus.Approved, ct);
 }

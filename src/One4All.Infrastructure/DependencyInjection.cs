@@ -125,7 +125,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Municipal.IReadingRouteService, Municipal.ReadingRouteService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDepositService, Municipal.ServiceDepositService>();
         services.AddScoped<Application.Abstractions.Municipal.ITariffCatalogueService, Municipal.TariffCatalogueService>();
-        services.AddScoped<Application.Abstractions.Municipal.IMunicipalTariffService, Municipal.MunicipalTariffService>();
+        services.AddScoped<Municipal.MunicipalTariffService>();
+        services.AddScoped<Application.Abstractions.Municipal.IMunicipalTariffService>(sp => sp.GetRequiredService<Municipal.MunicipalTariffService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Municipal.TariffVersionWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Municipal.IFacilityBookingService, Municipal.FacilityBookingService>();
         services.AddScoped<Application.Abstractions.Municipal.ICemeteryService, Municipal.CemeteryService>();
         services.AddScoped<Application.Abstractions.Municipal.IServiceDeskService, Municipal.ServiceDeskService>();

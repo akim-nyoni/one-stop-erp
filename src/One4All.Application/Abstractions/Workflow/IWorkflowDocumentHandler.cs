@@ -77,4 +77,7 @@ public static class WorkflowDocumentTypes
 
     /// <summary>A requested change of a supplier's bank details (reference: <c>SBC-</c> and the change id); approval applies it to the supplier.</summary>
     public const string SupplierBankChange = "SupplierBankChange";
+
+    /// <summary>A new municipal tariff version (reference: <c>TV-</c> and the version id); approval puts it in force.</summary>
+    public const string TariffVersion = "TariffVersion";
 }

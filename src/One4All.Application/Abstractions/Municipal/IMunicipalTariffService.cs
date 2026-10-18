@@ -36,19 +36,23 @@ public sealed record TariffSeasonInput(int FromMonth, int ToMonth, decimal PerUn
 /// <param name="Seasons">The seasonal rates (null: as before).</param>
 public sealed record TariffInput(string Code, DateOnly EffectiveFrom, string? Name = null, ServiceType? ServiceType = null, TariffType? TariffType = null, string? RevenueAccountCode = null,
     decimal? FixedCharge = null, decimal? PerUnitRate = null, decimal? MinimumCharge = null, decimal? RatePerValuationCents = null, decimal? RatePerSquareMetre = null, ConsumerCategory? Category = null,
-    string? Ward = null, IReadOnlyList<TariffBlockInput>? Blocks = null, IReadOnlyList<TariffSeasonInput>? Seasons = null);
+    string? Ward = null, IReadOnlyList<TariffBlockInput>? Blocks = null, IReadOnlyList<TariffSeasonInput>? Seasons = null, long RequestedByUserId = 0);
 
 /// <summary>Creates tariffs and their effective-dated versions; what an approved tariff change and the tariff screen go through.</summary>
 public interface IMunicipalTariffService
 {
-    /// <summary>Saves a tariff version: a new code with everything given, or a new version of an existing code from its date.</summary>
+    /// <summary>
+    /// Saves a tariff version: a new code with everything given, or a new version of an existing code from its date. A version may not take effect on or before the
+    /// end of a period already billed for its service (bills are explained by the tariff they were raised under, brief §4.9); where the company has a tariff workflow
+    /// (brief §7) the version is saved out of force and its approval puts it in force.
+    /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="input">The version.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The version's id, or why not (<c>Mun.TariffInvalid</c>, <c>Mun.TariffVersionExists</c>, <c>Mun.AccountNotFound</c>).</returns>
+    /// <returns>The version's id, or why not (<c>Mun.TariffInvalid</c>, <c>Mun.TariffVersionExists</c>, <c>Mun.AccountNotFound</c>, <c>Mun.TariffBackdated</c>).</returns>
     Task<Result<long>> SaveVersionAsync(long companyId, TariffInput input, CancellationToken ct = default);
 
-    /// <summary>Withdraws a version (it no longer bills; the version before it is in force again from that date).</summary>
+    /// <summary>Withdraws a version (it no longer bills; the version before it is in force again from that date) - not one bills have been raised under.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="code">The tariff.</param>
     /// <param name="effectiveFrom">The version's date.</param>

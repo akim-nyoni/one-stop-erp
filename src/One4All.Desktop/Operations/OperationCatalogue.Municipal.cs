@@ -197,7 +197,12 @@ public static partial class OperationCatalogue
                 long id = Check(await tariffs.SaveVersionAsync(c.CompanyId, new TariffInput(i.Text("Code"), i.Date("From"), i.Optional("Name"),
                     isNew ? Enum.Parse<ServiceType>(i.Text("Service")) : null, isNew ? Enum.Parse<TariffType>(i.Text("Type")) : null, i.Optional("Account"), i.OptionalNumber("Fixed"), i.OptionalNumber("Rate"),
                     i.OptionalNumber("Minimum"), i.OptionalNumber("Cents"), i.OptionalNumber("PerSqm"), i.Text("Category") == "(as before)" ? null : Enum.Parse<ConsumerCategory>(i.Text("Category")),
-                    i.Optional("Ward") is string ward ? (ward.Trim() == "-" ? string.Empty : ward) : null, Blocks(i.Optional("Blocks")), Seasons(i.Optional("Seasons")))).ConfigureAwait(true));
+                    i.Optional("Ward") is string ward ? (ward.Trim() == "-" ? string.Empty : ward) : null, Blocks(i.Optional("Blocks")), Seasons(i.Optional("Seasons")), c.UserId)).ConfigureAwait(true));
+                if (!await c.Db.Tariffs.AsNoTracking().Where(t => t.Id == id).Select(t => t.IsActive).FirstAsync().ConfigureAwait(true))
+                {
+                    return $"Version of {i.Text("Code").ToUpperInvariant()} from {i.Date("From"):yyyy-MM-dd} saved (id {id}); it bills once its approval (TV-{id}) is complete.";
+                }
+
                 return isNew ? $"Tariff {i.Text("Code").ToUpperInvariant()} created (id {id})." : $"Version of {i.Text("Code").ToUpperInvariant()} from {i.Date("From"):yyyy-MM-dd} saved (id {id}).";
             },
             List = async c => Table(await c.Db.Tariffs.AsNoTracking().Include(t => t.Blocks).Include(t => t.Seasons).Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ThenByDescending(t => t.EffectiveFrom)
