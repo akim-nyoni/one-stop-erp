@@ -20,14 +20,18 @@ public sealed record DuplicateMatch(PersonRecord First, PersonRecord Second, str
 /// <summary>
 /// Duplicate and suspected fraudulent applicants (brief §14 H23): fuzzy matching on name, ID number and date of birth across
 /// the waiting list, stand holders and the property register. ID numbers compare with punctuation and case removed; names
-/// compare with case, punctuation and word order removed, and are "close" within two edits. A pair is reported when
+/// compare with case, punctuation and word order removed, and are "close" within one edit for a short name and two otherwise, when they
+/// sound the same (Tendai / Tendayi), or when one gives an initial for a word the other spells out (T Dube / Tendai Dube). A pair is reported when
 /// <list type="bullet">
 /// <item>one ID is registered twice on the waiting list;</item>
 /// <item>one ID carries clearly different names;</item>
+/// <item>one phone number carries different IDs;</item>
 /// <item>close names share a date of birth under different IDs;</item>
+/// <item>close names carry dates of birth with the day and month swapped;</item>
 /// <item>close names carry IDs one edit apart (a mistyped or altered ID).</item>
 /// </list>
-/// Records are bucketed by ID, date of birth and name, so the work stays near-linear. Pure and unit-tested.
+/// Records are bucketed by ID (and every ID with one character left out, so IDs one edit apart meet), date of birth (day and month in
+/// either order), name, the name's sound and phone, so the work stays near-linear. Pure and unit-tested.
 /// </summary>
 public static class DuplicateApplicants
 {
@@ -60,7 +64,10 @@ public static class DuplicateApplicants
         foreach (IEnumerable<int> bucket in Buckets(people, p => p.IdNumber is null ? null : NormaliseId(p.IdNumber))
                      .Concat(Buckets(people, p => p.DateOfBirth?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)))
                      .Concat(Buckets(people, p => NameKey(p.Name)))
-                     .Concat(Buckets(people, p => PhoneKey(p.Phone))))
+                     .Concat(Buckets(people, p => PhoneKey(p.Phone)))
+                     .Concat(Buckets(people, p => SoundKey(p.Name)))
+                     .Concat(Buckets(people, p => p.DateOfBirth is DateOnly d ? DayMonthKey(d) : null))
+                     .Concat(MultiBuckets(people, p => p.IdNumber is null ? [] : OneLeftOut(NormaliseId(p.IdNumber)))))
         {
             int[] members = [.. bucket];
             for (int x = 0; x < members.Length; x++)
@@ -88,7 +95,7 @@ public static class DuplicateApplicants
 
         string? idA = a.IdNumber is null ? null : NormaliseId(a.IdNumber);
         string? idB = b.IdNumber is null ? null : NormaliseId(b.IdNumber);
-        bool namesClose = Distance(NameKey(a.Name), NameKey(b.Name)) <= 2;
+        bool namesClose = NamesClose(a.Name, b.Name);
         if (idA is { Length: > 0 } && idA == idB)
         {
             return a.Source == WaitingList && b.Source == WaitingList ? "Same ID registered twice on the waiting list"
@@ -108,6 +115,11 @@ public static class DuplicateApplicants
         if (a.DateOfBirth is not null && a.DateOfBirth == b.DateOfBirth)
         {
             return "Similar name and same date of birth under different ID numbers";
+        }
+
+        if (a.DateOfBirth is DateOnly da && b.DateOfBirth is DateOnly db && da.Year == db.Year && da.Day == db.Month && da.Month == db.Day)
+        {
+            return "Similar name with the date of birth's day and month swapped";
         }
 
         return idA is { Length: > 0 } && idB is { Length: > 0 } && Distance(idA, idB) == 1 ? "Similar name with ID numbers one character apart" : null;
@@ -139,6 +151,56 @@ public static class DuplicateApplicants
         return string.Join(' ', cleaned.ToString().Split(' ', StringSplitOptions.RemoveEmptyEntries).Order(StringComparer.Ordinal));
     }
 
+    /// <summary>
+    /// Whether two names are close: within one edit when the shorter is under eight letters and two otherwise, sounding the same word by word,
+    /// or matching when one gives only an initial for a word the other spells out.
+    /// </summary>
+    /// <param name="a">One name.</param>
+    /// <param name="b">The other.</param>
+    /// <returns>True when they may be the same person's name.</returns>
+    public static bool NamesClose(string a, string b)
+    {
+        string ka = NameKey(a), kb = NameKey(b);
+        if (ka.Length == 0 || kb.Length == 0)
+        {
+            return false;
+        }
+
+        int letters = Math.Min(ka.Count(char.IsLetter), kb.Count(char.IsLetter));
+        if (Distance(ka, kb) <= (letters < 8 ? 1 : 2) || SoundKey(a) == SoundKey(b))
+        {
+            return true;
+        }
+
+        // Initials: every word of the one with fewer letters is either in the other or the initial of a word left in it.
+        string[] wa = ka.Split(' '), wb = kb.Split(' ');
+        (string[] shorter, string[] longer) = wa.Sum(w => w.Length) <= wb.Sum(w => w.Length) ? (wa, wb) : (wb, wa);
+        if (shorter.Length != longer.Length || !shorter.Any(w => w.Length == 1) || shorter.All(w => w.Length == 1))
+        {
+            return false;
+        }
+
+        List<string> left = [.. longer];
+        foreach (string word in shorter.OrderByDescending(w => w.Length))
+        {
+            string? hit = word.Length == 1 ? left.FirstOrDefault(w => w[0] == word[0]) : left.FirstOrDefault(w => w == word);
+            if (hit is null)
+            {
+                return false;
+            }
+
+            left.Remove(hit);
+        }
+
+        return true;
+    }
+
+    /// <summary>A name's sound: each word coded the Soundex way (first letter, then consonant groups, vowels and H, W, Y dropped), sorted.</summary>
+    /// <param name="name">The name as captured.</param>
+    /// <returns>The sound key ("" when there is no name).</returns>
+    public static string SoundKey(string name)
+        => string.Join(' ', NameKey(name).Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(Sound).Order(StringComparer.Ordinal));
+
     /// <summary>The Levenshtein edit distance between two strings.</summary>
     /// <param name="a">One string.</param>
     /// <param name="b">The other.</param>
@@ -160,6 +222,58 @@ public static class DuplicateApplicants
 
         return previous[b.Length];
     }
+
+    // A word's sound code: PH as F, the first letter kept (a vowel as A), then B F P V=1, C G J K Q S X Z=2, D T=3, L=4, M N=5, R=6, repeats collapsed.
+    private static string Sound(string word)
+    {
+        string w = word.Replace("PH", "F", StringComparison.Ordinal);
+        if (w.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        static char Code(char c) => c switch
+        {
+            'B' or 'F' or 'P' or 'V' => '1',
+            'C' or 'G' or 'J' or 'K' or 'Q' or 'S' or 'X' or 'Z' => '2',
+            'D' or 'T' => '3',
+            'L' => '4',
+            'M' or 'N' => '5',
+            'R' => '6',
+            _ => '0',
+        };
+
+        StringBuilder code = new();
+        code.Append("AEIOU".Contains(w[0], StringComparison.Ordinal) ? 'A' : w[0]);
+        char last = Code(w[0]);
+        foreach (char c in w.Skip(1))
+        {
+            char digit = Code(c);
+            if (digit != '0' && digit != last)
+            {
+                code.Append(digit);
+            }
+
+            if (c is not ('H' or 'W'))
+            {
+                last = digit;
+            }
+        }
+
+        return code.ToString();
+    }
+
+    // A date of birth with its day and month in either order, so a swapped date meets the right one.
+    private static string DayMonthKey(DateOnly date)
+        => string.Create(CultureInfo.InvariantCulture, $"{date.Year}:{Math.Min(date.Day, date.Month)}:{Math.Max(date.Day, date.Month)}");
+
+    // An ID with each character left out in turn: two IDs one edit apart share one of these.
+    private static IEnumerable<string> OneLeftOut(string id) => id.Length < 4 ? [] : Enumerable.Range(0, id.Length).Select(i => "-" + id.Remove(i, 1)).Append("=" + id);
+
+    // Buckets where a record may sit under several keys.
+    private static IEnumerable<IEnumerable<int>> MultiBuckets(IReadOnlyList<PersonRecord> people, Func<PersonRecord, IEnumerable<string>> keys)
+        => Enumerable.Range(0, people.Count).SelectMany(i => keys(people[i]).Distinct(StringComparer.Ordinal).Select(k => (Index: i, Key: k)))
+            .GroupBy(x => x.Key, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Select(x => x.Index).Distinct());
 
     private static IEnumerable<IEnumerable<int>> Buckets(IReadOnlyList<PersonRecord> people, Func<PersonRecord, string?> key)
         => Enumerable.Range(0, people.Count).Select(i => (Index: i, Key: key(people[i]))).Where(x => !string.IsNullOrEmpty(x.Key))

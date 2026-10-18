@@ -12,7 +12,7 @@ Develop the system against `docs/BRIEF.md` non-stop, one increment at a time, wo
 1. Build Debug and Release and run every test suite with the verify script (see below).
 2. Add a row to `docs/PROGRESS.md` (`python -I tools/dev/progress_row.py <rowfile>`: line 1 of the row file is the prefix of the row it goes after, line 2 is the new row).
 3. Commit locally with the trailer the harness gives for the current model (Opus 5.5 since 2026-10-17: `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`).
-   The repository is on GitHub (`origin` = github.com/akim-nyoni/onestoperp, branch `main`); the user pushes. Do not push unless asked, and never
+   The repository is on GitHub (`origin` = github.com/akim-nyoni/one-stop-erp, branch `main`); the user pushes. Do not push unless asked, and never
    rewrite commits already on origin (the user's d032d334 "initial commit" is pushed).
 4. Apply migrations to the dev database, update the memory files, post a brief progress note to the user, and carry on.
 
