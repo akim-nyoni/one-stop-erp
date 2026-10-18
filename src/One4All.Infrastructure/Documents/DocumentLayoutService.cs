@@ -255,7 +255,7 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         var lines = await (from l in _db.Set<Core.Municipal.BillingRunLine>().AsNoTracking()
                            join r in _db.Set<Core.Municipal.BillingRun>().AsNoTracking() on l.BillingRunId equals r.Id
                            where r.CompanyId == companyId && l.StandNumber == standNumber && l.Included && r.Period >= first && r.Period <= last
-                           select new { l.InvoiceNumber, l.Narrative, l.Charge, l.RatepayerCustomerId, r.ServiceType, r.BillDate }).ToListAsync(ct).ConfigureAwait(false);
+                           select new { l.InvoiceNumber, l.Narrative, l.Charge, l.RatepayerCustomerId, r.ServiceType, r.BillDate, l.PropertyId, l.Consumption, l.ReadingIds }).ToListAsync(ct).ConfigureAwait(false);
         if (lines.Count == 0)
         {
             return Error.NotFound("Doc.BillNotFound", $"Stand {standNumber} was not billed in {first:yyyy-MM}.");
@@ -268,13 +268,64 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
             .Where(o => o.Item.TraderId == ratepayer && !invoices.Contains(o.Item.DocumentNumber)).Sum(o => o.Signed(Core.Trading.LedgerSign.Debit));
         decimal current = lines.Sum(l => l.Charge);
         Company company = await CompanyAsync(companyId, ct).ConfigureAwait(false);
+
+        // The due date is the bills' own (the ratepayer's terms when the run posted them), not a fixed month from the bill date.
+        DateOnly? due = await _db.OpenItems.AsNoTracking()
+            .Where(o => o.CompanyId == companyId && o.Ledger == Core.Trading.TradingLedger.AccountsReceivable && o.TraderId == ratepayer && invoices.Contains(o.DocumentNumber))
+            .MaxAsync(o => (DateOnly?)o.DueDate, ct).ConfigureAwait(false);
+
+        // A metered service shows its readings and consumption (brief §4.9 bill content) and splits the charge into the tariff's fixed charge and the usage.
+        List<long> readingIds = [.. lines.SelectMany(l => string.IsNullOrEmpty(l.ReadingIds) ? [] : l.ReadingIds.Split(',').Select(s => long.Parse(s, CultureInfo.InvariantCulture)))];
+        var readings = await (from m in _db.Set<Core.Municipal.MeterReading>().AsNoTracking()
+                                                          join meter in _db.Set<Core.Municipal.Meter>().AsNoTracking() on m.MeterId equals meter.Id
+                                                          where readingIds.Contains(m.Id)
+                                                          select new { m.Id, meter.Serial, m.ReadingDate, m.PreviousReading, m.Reading, m.BilledConsumption, m.Kind }).ToListAsync(ct).ConfigureAwait(false);
+        List<long> propertyIds = [.. lines.Select(l => l.PropertyId).Distinct()];
+        var tariffs = await (from s in _db.Set<Core.Municipal.PropertyServiceLink>().AsNoTracking()
+                             join t in _db.Tariffs.AsNoTracking() on s.TariffId equals t.Id
+                             where propertyIds.Contains(s.PropertyId) && s.IsActive
+                             select new { s.PropertyId, s.ServiceType, t.Code, t.Name, t.FixedCharge }).ToListAsync(ct).ConfigureAwait(false);
+        List<BusinessDocumentLine> billLines = [];
+        List<string> notes = [];
+        foreach (var line in lines.OrderBy(l => l.ServiceType))
+        {
+            var tariff = tariffs.FirstOrDefault(t => t.PropertyId == line.PropertyId && t.ServiceType == line.ServiceType);
+            string service = tariff is null ? line.ServiceType.ToString() : $"{line.ServiceType} ({tariff.Code})";
+            if (line.Consumption > 0m && tariff is not null && tariff.FixedCharge > 0m && tariff.FixedCharge < line.Charge)
+            {
+                decimal usage = line.Charge - tariff.FixedCharge;
+                billLines.Add(new BusinessDocumentLine(service, "Fixed charge", 1m, tariff.FixedCharge, tariff.FixedCharge));
+                billLines.Add(new BusinessDocumentLine(service, "Consumption", line.Consumption, decimal.Round(usage / line.Consumption, 4), usage));
+            }
+            else if (line.Consumption > 0m)
+            {
+                billLines.Add(new BusinessDocumentLine(service, $"{line.Narrative} - consumption", line.Consumption, decimal.Round(line.Charge / line.Consumption, 4), line.Charge));
+            }
+            else
+            {
+                billLines.Add(new BusinessDocumentLine(service, line.Narrative, 1m, line.Charge, line.Charge));
+            }
+
+            List<long> mine = string.IsNullOrEmpty(line.ReadingIds) ? [] : [.. line.ReadingIds.Split(',').Select(s => long.Parse(s, CultureInfo.InvariantCulture))];
+            foreach (var meter in readings.Where(r => mine.Contains(r.Id)).GroupBy(r => r.Serial))
+            {
+                var firstRead = meter.OrderBy(r => r.ReadingDate).First();
+                var lastRead = meter.OrderBy(r => r.ReadingDate).Last();
+                bool estimated = meter.Any(r => r.Kind == Core.Municipal.MeterReadingKind.Estimated);
+                notes.Add(string.Create(CultureInfo.InvariantCulture, $"{line.ServiceType} meter {meter.Key}: {firstRead.PreviousReading:0.###} to {lastRead.Reading:0.###}"));
+                notes.Add(string.Create(CultureInfo.InvariantCulture,
+                    $"  {meter.Sum(r => r.BilledConsumption):0.###} units, read {D(lastRead.ReadingDate)}{(estimated ? " (estimated)" : string.Empty)}"));
+            }
+        }
+
+        notes.Add("Pay by the due date to avoid interest and restriction of services. Quote your stand number with every payment.");
         return new BusinessDocument
         {
             Title = "Municipal Account", CompanyName = company.Name, CompanyTaxNumber = company.TaxNumber, PartyLabel = "Ratepayer", PartyName = await CustomerAsync(ratepayer, ct).ConfigureAwait(false),
-            Fields = [("Stand", standNumber), ("Billing month", first.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Bill date", D(billDate)), ("Due by", D(billDate.AddDays(30)))],
-            Lines = [.. lines.OrderBy(l => l.ServiceType).Select(l => new BusinessDocumentLine(l.ServiceType.ToString(), l.Narrative, 1m, l.Charge, l.Charge))],
+            Fields = [("Stand", standNumber), ("Billing month", first.ToString("yyyy-MM", CultureInfo.InvariantCulture)), ("Bill date", D(billDate)), ("Due by", D(due ?? billDate.AddDays(30)))],
+            Lines = billLines,
             Totals = [("Balance brought forward", broughtForward), ("Current charges", current), ("TOTAL DUE", broughtForward + current)],
-            Notes = ["Pay by the due date to avoid interest and restriction of services. Quote your stand number with every payment."],
+            Notes = notes,
         };
     }
 

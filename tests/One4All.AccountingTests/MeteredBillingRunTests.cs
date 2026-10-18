@@ -51,6 +51,12 @@ public sealed class MeteredBillingRunTests
         MeterReading read = await db.Set<MeterReading>().AsNoTracking().SingleAsync(r => r.MeterId == meterId && r.ReadingDate == new DateOnly(2026, 1, 28));
         (read.BilledOn, read.BillingRunId is not null).Should().Be((new DateOnly(2026, 1, 31), true), "the reading is marked billed by the run");
 
+        // The bill shows the meter, its readings and consumption, the tariff's fixed charge and usage, and the bill's own due date.
+        DateOnly due = await db.OpenItems.AsNoTracking().Where(o => o.CompanyId == companyId && o.TraderId == owner.Id && o.Ledger == TradingLedger.AccountsReceivable).Select(o => o.DueDate).SingleAsync();
+        string bill = (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Documents.IDocumentLayoutService>().MunicipalBillAsync(companyId, "MB1", new DateOnly(2026, 1, 1))).Value;
+        bill.Should().Contain($"Water meter MB-{companyId}: 100 to 120").And.Contain("20 units, read 2026-01-28").And.Contain("Fixed charge").And.Contain("Consumption")
+            .And.Contain("40.00").And.Contain("Water (WAT-MB)").And.Contain($"Due by: {due:yyyy-MM-dd}");
+
         // February has no reading: the fixed charge only. March's reading of 40 units is billed once, by March's run.
         BillingRunSummary february = (await runs.ProposeAsync(new BillingRunProposal { CompanyId = companyId, ServiceType = ServiceType.Water, BillDate = new DateOnly(2026, 2, 28), Ward = "Ward 7", InvoicePrefix = "MBW", UserId = 81 })).Value;
         (await runs.LinesAsync(companyId, february.RunNumber, exceptionsOnly: false)).Value.Single().Charge.Should().Be(5m, "January's reading is not billed twice");
