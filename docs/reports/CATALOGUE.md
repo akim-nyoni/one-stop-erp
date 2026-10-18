@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-621 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+625 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -124,6 +124,10 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | DOC40 | EFT Advice (designable) | The bank's EFT advice for a payment run by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 | DOC41 | Subcontractor Payment Certificate (designable) | A subcontractor's payment certificate by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 | DOC42 | Licence / Permit Certificate (designable) | A council licence or permit by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC43 | Proforma Invoice (designable) | A proforma invoice for a sales order by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC44 | Housing Offer Letter (designable) | The offer of a stand by its certificate number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional), Date (Date, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC45 | Housing Allocation Letter (designable) | The confirmation of an accepted stand by its certificate number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional), Date (Date, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC46 | Employment Contract (designable) | An employee's contract of employment by employee number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 
 ## Expenses
 

@@ -209,6 +209,16 @@ public sealed class TextDocumentService : ITextDocumentService
             case DocumentKinds.LicenceCertificate:
                 return await LicenceCertificateAsync(companyId, found, key, ct).ConfigureAwait(false);
 
+            case DocumentKinds.ProformaInvoice:
+                return await ProformaInvoiceAsync(companyId, key, ct).ConfigureAwait(false);
+
+            case DocumentKinds.HousingOfferLetter:
+            case DocumentKinds.HousingAllocationLetter:
+                return await HousingLetters.RenderAsync(_db, companyId, key, found.Kind == DocumentKinds.HousingOfferLetter, asAt, HousingLetters.DefaultDepositPercent, ct).ConfigureAwait(false);
+
+            case DocumentKinds.EmploymentContract:
+                return await EmploymentContractAsync(companyId, found, key, ct).ConfigureAwait(false);
+
             case DocumentKinds.ClearanceCertificate:
                 return await ClearanceCertificateTextAsync(companyId, found, key, ct).ConfigureAwait(false);
 
@@ -574,6 +584,64 @@ public sealed class TextDocumentService : ITextDocumentService
         text.AppendLine("It is not transferable and lapses on the expiry date unless renewed.");
         text.AppendLine();
         text.AppendLine("Licensing officer: ____________________   Official stamp:");
+        return text.ToString();
+    }
+
+    // DOC43: a proforma invoice (brief §S): the sales order's lines and total, asked for in advance of a tax invoice.
+    private async Task<Result<string>> ProformaInvoiceAsync(long companyId, string number, CancellationToken ct)
+    {
+        Result<BusinessDocument> order = await Get<IDocumentLayoutService>().BuildAsync(companyId, DocumentKinds.OrderConfirmation, number, null, ct).ConfigureAwait(false);
+        if (order.IsFailure)
+        {
+            return order.Error;
+        }
+
+        BusinessDocument o = order.Value;
+        BusinessDocument proforma = new()
+        {
+            Title = "Proforma Invoice", CompanyName = o.CompanyName, CompanyTaxNumber = o.CompanyTaxNumber, PartyLabel = "Bill to", PartyName = o.PartyName,
+            Fields = [.. o.Fields.Select(f => f.Label == "Order" ? ("Proforma", f.Value) : f)], ShowPrices = true, Lines = o.Lines,
+            Totals = [.. o.Totals.Select(t => (t.Label.Replace("ORDER TOTAL", "AMOUNT DUE", StringComparison.Ordinal), t.Amount))],
+            Notes = ["This is not a tax invoice. A tax invoice is issued when the goods are delivered.", "Please quote the proforma number with your payment."],
+        };
+        return BusinessDocumentFormatter.ToPlainText(proforma);
+    }
+
+    // DOC46: an employee's contract of employment (brief §S "employment contract") from the employee record.
+    private async Task<Result<string>> EmploymentContractAsync(long companyId, DocumentKind kind, string number, CancellationToken ct)
+    {
+        Core.Payroll.Employee? employee = await _db.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.CompanyId == companyId && e.EmployeeNumber == number, ct).ConfigureAwait(false);
+        if (employee is null)
+        {
+            return Missing(kind, number);
+        }
+
+        string company = await CompanyNameAsync(companyId, ct).ConfigureAwait(false);
+        string? manager = employee.ReportsToEmployeeId is long managerId
+            ? await _db.Employees.AsNoTracking().Where(e => e.Id == managerId).Select(e => e.FullName).FirstOrDefaultAsync(ct).ConfigureAwait(false) : null;
+        System.Text.StringBuilder text = new(Heading(company, "CONTRACT OF EMPLOYMENT"));
+        text.AppendLine($"Between {company} (the employer)");
+        text.AppendLine($"and     {employee.FullName}{(string.IsNullOrWhiteSpace(employee.NationalIdNumber) ? string.Empty : ", ID " + employee.NationalIdNumber)} (the employee),");
+        if (!string.IsNullOrWhiteSpace(employee.PhysicalAddress))
+        {
+            text.AppendLine($"        of {employee.PhysicalAddress}");
+        }
+
+        text.AppendLine();
+        text.AppendLine($"1. Position:      {employee.JobTitle ?? "(as assigned)"}{(string.IsNullOrWhiteSpace(employee.Department) ? string.Empty : ", " + employee.Department)}"
+            + (manager is null ? string.Empty : $", reporting to {manager}"));
+        text.AppendLine($"2. Employment:    {employee.EmploymentType}, starting {D(employee.EngagementDate)}"
+            + (employee.ContractEndDate is DateOnly end ? $" and ending {D(end)}" : " for an indefinite period"));
+        text.AppendLine(employee.ProbationEndDate is DateOnly probation ? $"3. Probation:     until {D(probation)}" : "3. Probation:     none");
+        text.AppendLine($"4. Remuneration:  basic salary {N(employee.BasicSalary)} paid {employee.PayFrequency.ToString().ToLowerInvariant()}"
+            + (string.IsNullOrWhiteSpace(employee.Grade) ? string.Empty : $", grade {employee.Grade}{(employee.Notch is int notch ? " notch " + notch.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty)}"));
+        text.AppendLine($"5. Payment:       {employee.PaymentMethod}{(string.IsNullOrWhiteSpace(employee.BankName) ? string.Empty : " to " + employee.BankName)}");
+        text.AppendLine($"6. Notice:        {(employee.NoticePeriodDays is int days ? days.ToString(System.Globalization.CultureInfo.InvariantCulture) + " days" : "as provided by law")} in writing by either party");
+        text.AppendLine("7. Leave, hours and conduct follow the employer's conditions of service and the applicable labour law.");
+        text.AppendLine("8. The employee keeps the employer's information confidential during and after employment.");
+        text.AppendLine();
+        text.AppendLine("Signed for the employer: ____________________   Date: ____________");
+        text.AppendLine("Signed by the employee:  ____________________   Date: ____________");
         return text.ToString();
     }
 

@@ -144,6 +144,18 @@ public static class DocumentKinds
     /// <summary>A council licence or permit certificate (brief §S).</summary>
     public const string LicenceCertificate = "LicenceCertificate";
 
+    /// <summary>A proforma invoice for a sales order (brief §S).</summary>
+    public const string ProformaInvoice = "ProformaInvoice";
+
+    /// <summary>A housing offer letter (brief §S, §4.10.4).</summary>
+    public const string HousingOfferLetter = "HousingOfferLetter";
+
+    /// <summary>A housing allocation letter (brief §S, §4.10.4).</summary>
+    public const string HousingAllocationLetter = "HousingAllocationLetter";
+
+    /// <summary>An employment contract (brief §S).</summary>
+    public const string EmploymentContract = "EmploymentContract";
+
     /// <summary>Every kind, in catalogue order.</summary>
     public static IReadOnlyList<DocumentKind> All { get; } =
     [
@@ -189,6 +201,10 @@ public static class DocumentKinds
         new(EftAdvice, "EFT advice", "DOC40", "Payment run number", Text: true),
         new(SubcontractCertificate, "Subcontractor payment certificate", "DOC41", "Certificate number", Text: true),
         new(LicenceCertificate, "Licence / permit certificate", "DOC42", "Licence number", Text: true),
+        new(ProformaInvoice, "Proforma invoice", "DOC43", "Sales order number", Text: true),
+        new(HousingOfferLetter, "Housing offer letter", "DOC44", "Certificate number", NeedsDate: true, Text: true),
+        new(HousingAllocationLetter, "Housing allocation letter", "DOC45", "Certificate number", NeedsDate: true, Text: true),
+        new(EmploymentContract, "Employment contract", "DOC46", "Employee number", Text: true),
     ];
 
     /// <summary>Finds a kind by key or name (case-insensitive).</summary>

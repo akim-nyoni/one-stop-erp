@@ -2,10 +2,13 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Documents;
 using One4All.Core.FixedAssets;
+using One4All.Application.Abstractions.Housing;
+using One4All.Core.Housing;
 using One4All.Core.Inventory;
 using One4All.Core.JobCosting;
 using One4All.Core.Municipal;
 using One4All.Core.Payroll;
+using One4All.Core.SalesOrders;
 using One4All.Core.Trading;
 using One4All.Core.Vouchers;
 using One4All.Infrastructure.Persistence;
@@ -104,5 +107,60 @@ public sealed class DocumentsBatchTests
         certificate.Should().MatchRegex(@"Less previously certified\s+6,000\.00").And.MatchRegex(@"Amount payable\s+3,600\.00").And.MatchRegex(@"Retention held to date: 1,000\.00");
         (await Print("LicenceCertificate", "DB-LIC1")).Should().Contain("LIQUOR LICENCE").And.Contain("Harare Traders (DB-CLI)").And.Contain("Bottle store").And.Contain("Expires: 2026-12-31");
         (await documents.RenderAsync(companyId, "EftAdvice", "NOPE")).Error.Code.Should().Be("Doc.NotFound");
+    }
+
+    [SkippableFact]
+    public async Task Proforma_housing_letters_and_employment_contract_render()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Customer client = new(companyId, "DB-PF", "Bulawayo Hardware", Scenario.Usd);
+        Item bricks = new(companyId, "DB-BRK", "Bricks (1000)") { CostOfSalesAccountCode = "5000" };
+        Employee manager = new(companyId, "DB-M1", "Rudo Ncube", 3000m, new DateOnly(2020, 1, 1));
+        db.AddRange(client, bricks, manager);
+        LandParcel parcel = new(companyId, $"LP-DB-{companyId}", "Documents parcel", 5000m, 50000m);
+        HousingScheme scheme = new(companyId, $"SCH-DB-{companyId}", "Documents Scheme", SchemeType.CouncilDelivered);
+        db.LandParcels.Add(parcel);
+        db.HousingSchemes.Add(scheme);
+        HousingApplicant applicant = new(companyId, $"DB-ID-{companyId}", "Farai Dube", new DateOnly(2015, 1, 1));
+        db.HousingApplicants.Add(applicant);
+        await db.SaveChangesAsync();
+        SalesOrder order = new(companyId, client.Id, "DB-SO1", new DateOnly(2026, 6, 1), Scenario.Usd);
+        order.AddLine(bricks.Id, "Bricks (1000)", 3m, 250m, null, "4000");
+        db.Add(order);
+        db.Add(new Employee(companyId, "DB-E2", "Chipo Sibanda", 1500m, new DateOnly(2026, 2, 1))
+        {
+            JobTitle = "Storekeeper", Department = "Stores", ReportsToEmployeeId = manager.Id, ProbationEndDate = new DateOnly(2026, 4, 30), NoticePeriodDays = 30, NationalIdNumber = "63-123456A70",
+        });
+        db.HousingStands.Add(new HousingStand(companyId, parcel.Id, scheme.Id, "DB-S1", 300m, 1000m));
+        applicant.SetDetails(HousingCategory.HighDensity, new DateOnly(1985, 1, 1), new DateOnly(2000, 1, 1), 2, false, 400m, CurrentTenure.Lodger);
+        applicant.Register($"WL-DB-{companyId}", applicant.RegistrationDate);
+        await db.SaveChangesAsync();
+
+        IAllocationService allocations = scope.ServiceProvider.GetRequiredService<IAllocationService>();
+        AllocationRunView run = (await allocations.ProposeAsync(new AllocationProposal
+        {
+            CompanyId = companyId, SchemeId = scheme.Id, Category = HousingCategory.HighDensity, Method = AllocationMethod.Ballot, Seed = 7, AsAtDate = new DateOnly(2026, 3, 1), UserId = 71,
+        })).Value;
+        string certificate = (await allocations.ApproveAsync(companyId, run.RunNumber, 72, new DateOnly(2026, 3, 1), 30)).Value.Lines[0].CertificateNumber!;
+
+        ITextDocumentService documents = scope.ServiceProvider.GetRequiredService<ITextDocumentService>();
+        async Task<string> Print(string kind, string number, DateOnly? date = null)
+        {
+            var printed = await documents.RenderAsync(companyId, kind, number, date);
+            printed.IsSuccess.Should().BeTrue(printed.IsFailure ? $"{kind}: {printed.Error.Message}" : null);
+            return printed.Value;
+        }
+
+        (await Print("ProformaInvoice", "DB-SO1")).Should().Contain("PROFORMA INVOICE").And.Contain("Bulawayo Hardware").And.Contain("750.00").And.Contain("AMOUNT DUE").And.Contain("not a tax invoice");
+        (await Print("HousingOfferLetter", certificate, new DateOnly(2026, 3, 2))).Should().Contain("OFFER OF STAND DB-S1").And.Contain("Farai Dube").And.Contain("2026-03-31");
+        (await documents.RenderAsync(companyId, "HousingAllocationLetter", certificate, new DateOnly(2026, 3, 2))).Error.Code.Should().Be("Doc.NotAccepted");
+        (await allocations.AcceptAsync(companyId, certificate, new DateOnly(2026, 3, 10))).IsSuccess.Should().BeTrue();
+        (await Print("HousingAllocationLetter", certificate, new DateOnly(2026, 3, 11))).Should().Contain("ALLOCATION OF STAND DB-S1").And.Contain("recorded on 2026-03-10");
+        (await Print("EmploymentContract", "DB-E2")).Should().Contain("CONTRACT OF EMPLOYMENT").And.Contain("Chipo Sibanda, ID 63-123456A70").And.Contain("Storekeeper, Stores, reporting to Rudo Ncube")
+            .And.Contain("until 2026-04-30").And.Contain("1,500.00").And.Contain("30 days");
     }
 }

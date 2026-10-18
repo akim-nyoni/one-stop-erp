@@ -14,7 +14,7 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Infrastructure.Reporting;
 
 /// <summary>
-/// Rows for the designable document reports (DOC01–DOC42): one business document, tax invoice or purchase order by its number, one row per line with
+/// Rows for the designable document reports (DOC01–DOC46): one business document, tax invoice or purchase order by its number, one row per line with
 /// the heading, party, reference fields and totals on every row, so a company lays out its own invoice, quotation or delivery note in the designer; and,
 /// for the text-backed documents (statements, payslips, vouchers, certificates, tickets …), one row per line of the standard text to frame.
 /// </summary>
