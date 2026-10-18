@@ -49,5 +49,16 @@ public sealed class MasterDataExportTests
         ImportReport chart = await scope.ServiceProvider.GetRequiredService<IVerticalImportService>().ImportAccountsAsync(target, accounts, commit: false);
         chart.Errors.Should().BeEmpty();
         chart.Skipped.Should().Be(chart.Rows, "the seeded chart already has every account");
+
+        // The registers added later export in their import layouts too: dimensions, assets, loans, stock.
+        db.CostCentres.Add(new Core.Accounting.CostCentre(source, "MDX", "Head office"));
+        db.FixedAssets.Add(new Core.FixedAssets.FixedAsset(source, "MDX-FA1", "Toyota Hilux", "Vehicles", 30_000m, 5_000m, new DateOnly(2026, 1, 15), Core.FixedAssets.DepreciationMethod.StraightLine,
+            60, 0m, "1600", "1610", "6000"));
+        await db.SaveChangesAsync();
+        (await export.ExportAsync(source, "CostCentres")).Value.Should().StartWith("code,name").And.Contain("MDX,Head office");
+        (await export.ExportAsync(source, "fixedassets")).Value.Should().Contain("MDX-FA1,Toyota Hilux,Vehicles,2026-01-15,30000");
+        (await export.ExportAsync(source, "StaffLoans")).Value.Should().StartWith("employee_number,reference,outstanding,instalment,loan_account");
+        (await export.ExportAsync(source, "Stock")).Value.Should().StartWith("item,warehouse,quantity,unit_cost");
+        export.Kinds.Should().Contain(["Stock", "FixedAssets", "StaffLoans", "CostCentres", "Departments", "Students", "Stands"]);
     }
 }

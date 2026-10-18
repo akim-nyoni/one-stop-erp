@@ -261,7 +261,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Import templates and master data export", ListTitle = "Import templates",
             Description = "Template: saves the CSV template for an import (its header row and an example row) to fill in. Export: saves a register (accounts, warehouses, customers, "
-                + "suppliers, items, employees) in its import layout, to correct in a spreadsheet or load into another company.",
+                + "suppliers, items, employees, stock on hand, fixed assets, staff loans, cost centres, departments, students, stands) in its import layout, to correct in a spreadsheet "
+                + "or load into another company.",
             Fields = [Pick("Action", "Action", ["Template", "Export"]), Pick("Kind", "What", imports.Concat(["Employees"]).Distinct().ToArray()), Req("File", "Save to (.csv path)")],
             Run = async (c, i) =>
             {
