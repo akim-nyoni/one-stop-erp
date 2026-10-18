@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-612 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+617 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -115,6 +115,11 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | DOC31 | Cheque (designable) | A cheque by bank account code/cheque number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 | DOC32 | Shelf Labels (designable) | A price list's shelf labels by price list code - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 | DOC33 | Rates Clearance Certificate (designable) | A property's rates clearance certificate by its number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC34 | Stock Transfer Note (designable) | A stock transfer note by its transfer number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC35 | Asset Tag (designable) | A fixed asset's tag by its asset number - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC36 | Leave Application (designable) | A leave application by employee number/start date - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC37 | Leave Balance Certificate (designable) | An employee's leave balances as at a date - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional), Date (Date, optional) | Title, Number, Date, LineNo, Line | - | - |
+| DOC38 | Loan Agreement & Statement (designable) | An employee loan's terms, balance and repayment schedule by its reference - one row per line of the standard document (Title, Number, Date, LineNo, Line), as the data source for a company's own framed layout in the report designer: put the Line field in a monospaced font on the detail band and add the logo, header and footer. | Number (String, optional) | Title, Number, Date, LineNo, Line | - | - |
 
 ## Expenses
 

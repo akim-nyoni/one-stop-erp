@@ -117,6 +117,21 @@ public static class DocumentKinds
     /// <summary>A property's rates clearance certificate (brief §14 report 153).</summary>
     public const string ClearanceCertificate = "ClearanceCertificate";
 
+    /// <summary>A stock transfer note.</summary>
+    public const string StockTransferNote = "StockTransferNote";
+
+    /// <summary>A fixed asset's tag.</summary>
+    public const string AssetTag = "AssetTag";
+
+    /// <summary>An employee's leave application.</summary>
+    public const string LeaveApplication = "LeaveApplication";
+
+    /// <summary>An employee's leave balance certificate.</summary>
+    public const string LeaveBalanceCertificate = "LeaveBalanceCertificate";
+
+    /// <summary>An employee loan's agreement and statement.</summary>
+    public const string LoanStatement = "LoanStatement";
+
     /// <summary>Every kind, in catalogue order.</summary>
     public static IReadOnlyList<DocumentKind> All { get; } =
     [
@@ -153,6 +168,11 @@ public static class DocumentKinds
         new(Cheque, "Cheque", "DOC31", "Bank account code/cheque number", Text: true),
         new(ShelfLabels, "Shelf labels", "DOC32", "Price list code", Text: true),
         new(ClearanceCertificate, "Rates clearance certificate", "DOC33", "Certificate number", Text: true),
+        new(StockTransferNote, "Stock transfer note", "DOC34", "Transfer number", Text: true),
+        new(AssetTag, "Asset tag", "DOC35", "Asset number", Text: true),
+        new(LeaveApplication, "Leave application", "DOC36", "Employee number/start date (yyyy-MM-dd)", Text: true),
+        new(LeaveBalanceCertificate, "Leave balance certificate", "DOC37", "Employee number", NeedsDate: true, Text: true),
+        new(LoanStatement, "Loan agreement and statement", "DOC38", "Loan reference", Text: true),
     ];
 
     /// <summary>Finds a kind by key or name (case-insensitive).</summary>
