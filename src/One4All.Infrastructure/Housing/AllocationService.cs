@@ -306,31 +306,69 @@ public sealed class AllocationService : IAllocationService
     }
 
     /// <inheritdoc />
-    public Task<Result> SwapAsync(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long userId, CancellationToken ct = default)
+    public async Task<Result<long>> SwapAsync(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long userId,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reference) || string.IsNullOrWhiteSpace(reason))
+        {
+            return Error.Validation("Hse.SwapDocument", "A swap needs its document reference and the reason.");
+        }
+
+        string first = (firstCertificate ?? string.Empty).Trim(), second = (secondCertificate ?? string.Empty).Trim();
+        Result<(StandAllocation, StandAllocation)> pair = await SwapPairAsync(companyId, first, second, ct).ConfigureAwait(false);
+        if (pair.IsFailure)
+        {
+            return pair.Error;
+        }
+
+        if (await _db.Set<StandSwap>().AnyAsync(s => s.CompanyId == companyId && s.Status == StandSwapStatus.Pending
+                && (s.FirstCertificate == first || s.SecondCertificate == first || s.FirstCertificate == second || s.SecondCertificate == second), ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Hse.SwapPending", "One of these offers already has a swap waiting for approval.");
+        }
+
+        StandSwap swap = new(companyId, first, second, date, reference.Trim(), reason.Trim(), userId);
+        _db.Set<StandSwap>().Add(swap);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return swap.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result> DecideSwapAsync(long companyId, long swapId, bool approve, long userId, DateOnly date, string? reason, CancellationToken ct = default)
         => _db.AtomicAsync(async () =>
         {
-            if (string.IsNullOrWhiteSpace(reference) || string.IsNullOrWhiteSpace(reason))
+            StandSwap? swap = await _db.Set<StandSwap>().FirstOrDefaultAsync(s => s.Id == swapId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (swap is null || swap.Status != StandSwapStatus.Pending)
             {
-                return Result.Failure(Error.Validation("Hse.SwapDocument", "A swap needs its document reference and the reason."));
+                return Result.Failure(Error.NotFound("Hse.SwapNotPending", $"No swap {swapId} waiting for approval."));
             }
 
-            string first = (firstCertificate ?? string.Empty).Trim(), second = (secondCertificate ?? string.Empty).Trim();
-            List<StandAllocation> pair = await _db.Set<StandAllocation>().Where(a => a.CompanyId == companyId && (a.CertificateNumber == first || a.CertificateNumber == second)
-                && (a.Status == AllocationStatus.Offered || a.Status == AllocationStatus.Accepted)).ToListAsync(ct).ConfigureAwait(false);
-            if (first == second || pair.Count != 2)
+            if (swap.RequestedByUserId == userId)
             {
-                return Result.Failure(Error.NotFound("Hse.SwapOffers", "Both certificates must be different live offers."));
+                return Result.Failure(Error.Rule("Hse.SwapSelfApproval", "Someone other than who asked for the swap decides it."));
             }
 
-            List<long> standIds = [.. pair.Select(a => a.StandId)];
-            List<HousingStand> stands = await _db.Set<HousingStand>().AsNoTracking().Where(s => standIds.Contains(s.Id)).ToListAsync(ct).ConfigureAwait(false);
-            if (stands.Any(s => s.Status != StandStatus.Allocated) || stands.Select(s => s.SchemeId).Distinct().Count() != 1)
+            if (!approve)
             {
-                return Result.Failure(Error.Rule("Hse.SwapStands", "Only allocated, unsold stands in the same scheme can be swapped."));
+                if (string.IsNullOrWhiteSpace(reason))
+                {
+                    return Result.Failure(Error.Validation("Hse.SwapReason", "Give the reason for turning the swap down."));
+                }
+
+                swap.Reject(userId, reason.Trim());
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+                return Result.Success();
+            }
+
+            // Checked again: the offers may have lapsed or a stand been sold since the swap was asked for.
+            Result<(StandAllocation, StandAllocation)> pair = await SwapPairAsync(companyId, swap.FirstCertificate, swap.SecondCertificate, ct).ConfigureAwait(false);
+            if (pair.IsFailure)
+            {
+                return Result.Failure(pair.Error);
             }
 
             // One live offer per stand: the first steps aside while the second moves onto its stand, then takes the second's.
-            (StandAllocation one, StandAllocation two) = (pair[0], pair[1]);
+            (StandAllocation one, StandAllocation two) = pair.Value;
             (long oneStand, decimal? onePrice, AllocationStatus oneStatus) = (one.StandId, one.OfferedPrice, one.Status);
             one.HoldForSwap();
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -338,10 +376,30 @@ public sealed class AllocationService : IAllocationService
             two.TakeStand(oneStand, onePrice, two.Status);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             one.TakeStand(twoStand, twoPrice, oneStatus);
-            _db.Set<StandSwap>().Add(new StandSwap(companyId, first, second, date, reference.Trim(), reason.Trim(), userId));
+            swap.Approve(userId, date);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return Result.Success();
         }, ct);
+
+    // The two live offers a swap is between, on allocated, unsold stands of one scheme.
+    private async Task<Result<(StandAllocation, StandAllocation)>> SwapPairAsync(long companyId, string first, string second, CancellationToken ct)
+    {
+        List<StandAllocation> pair = await _db.Set<StandAllocation>().Where(a => a.CompanyId == companyId && (a.CertificateNumber == first || a.CertificateNumber == second)
+            && (a.Status == AllocationStatus.Offered || a.Status == AllocationStatus.Accepted)).ToListAsync(ct).ConfigureAwait(false);
+        if (first == second || pair.Count != 2)
+        {
+            return Error.NotFound("Hse.SwapOffers", "Both certificates must be different live offers.");
+        }
+
+        List<long> standIds = [.. pair.Select(a => a.StandId)];
+        List<HousingStand> stands = await _db.Set<HousingStand>().AsNoTracking().Where(s => standIds.Contains(s.Id)).ToListAsync(ct).ConfigureAwait(false);
+        if (stands.Any(s => s.Status != StandStatus.Allocated) || stands.Select(s => s.SchemeId).Distinct().Count() != 1)
+        {
+            return Error.Rule("Hse.SwapStands", "Only allocated, unsold stands in the same scheme can be swapped.");
+        }
+
+        return (pair[0], pair[1]);
+    }
 
     private async Task<Result<AllocationRunView>> ApproveCoreAsync(long companyId, string runNumber, long approverUserId, DateOnly date, int offerDays, CancellationToken ct,
         string? committeeResolution = null, DateOnly? meetingDate = null, string? members = null)

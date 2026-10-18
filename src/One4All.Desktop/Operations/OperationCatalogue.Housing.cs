@@ -163,8 +163,10 @@ public static partial class OperationCatalogue
             Module = module, Title = "Allocation run", ListTitle = "Allocation runs",
             Description = "Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify); the committee rejects a pairing with a reason or "
                 + "substitutes the next applicant stating why the skipped one was skipped; approve it (someone else; offers go out with a deadline; with a resolution the meeting's date and "
-                + "members are kept), cancel it, or verify a ballot's draw. Expired offers wait in a queue for an officer to lapse or extend them with a reason.",
-            Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands", "Expired offers", "Lapse offer", "Extend offer"]), Opt("Stands", "Only these stands (substitution run; ',')"),
+                + "members are kept; approving needs the allocation-approval permission), cancel it, or verify a ballot's draw. Expired offers wait in a queue for an officer to lapse or "
+                + "extend them with a reason. A swap of two allottees' stands is asked for as a document and approved or rejected by another officer before the stands change hands.",
+            Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands", "Approve swap", "Reject swap", "Expired offers", "Lapse offer",
+                "Extend offer"]), Opt("Stands", "Only these stands (substitution run; ',')"), OptNum("Swap", "Swap document id (approve / reject swap)"),
                 OptNum("Line", "Pairing sequence (reject / substitute)"), Opt("LineReason", "Reason (reject / substitute)"), Opt("Resolution", "Committee resolution (approve)"),
                 Opt("Meeting", "Meeting date yyyy-MM-dd (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap / lapse / extend)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
                 Opt("Reason", "Reason (swap / lapse / extend)"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
@@ -192,6 +194,13 @@ public static partial class OperationCatalogue
                     case "Substitute line":
                         return Show(Check(await allocation.SubstituteLineAsync(c.CompanyId, i.Text("Run"), (int)(i.OptionalNumber("Line") ?? 0), i.Optional("LineReason") ?? string.Empty).ConfigureAwait(true)));
                     case "Approve":
+                        // Approving a run is the allocation-approval right (brief §4.10.4, SOD-HSE-01), not the right to run allocations.
+                        if (!(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true))
+                                .Has("Housing.AllocationApprove", One4All.Core.Security.OperationFlags.Approve))
+                        {
+                            throw new OperationException("Approving an allocation run needs the allocation-approval permission.");
+                        }
+
                         return Show(Check(await (i.Optional("Resolution") is string resolution
                             ? allocation.ApproveByCommitteeAsync(c.CompanyId, i.Text("Run"), c.UserId, i.Date("Date"), i.Whole("OfferDays"), new CommitteeMeeting(resolution,
                                 i.Optional("Meeting") is string meeting ? DateOnly.ParseExact(meeting, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null, i.Optional("Members")))
@@ -207,8 +216,14 @@ public static partial class OperationCatalogue
                         return Check(await allocation.ExtendOfferAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Date("Date").AddDays(i.Whole("OfferDays")), i.Optional("Reason") ?? string.Empty)
                             .ConfigureAwait(true), $"Offer extended to {D(i.Date("Date").AddDays(i.Whole("OfferDays")))}.");
                     case "Swap stands":
-                        return Check(await allocation.SwapAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Optional("Other") ?? string.Empty, i.Date("Date"),
-                            i.Optional("Document") ?? string.Empty, i.Optional("Reason") ?? string.Empty, c.UserId).ConfigureAwait(true), "Stands swapped.");
+                        long swap = Check(await allocation.SwapAsync(c.CompanyId, i.Optional("Certificate") ?? string.Empty, i.Optional("Other") ?? string.Empty, i.Date("Date"),
+                            i.Optional("Document") ?? string.Empty, i.Optional("Reason") ?? string.Empty, c.UserId).ConfigureAwait(true));
+                        return $"Swap {swap} asked for; another officer approves it (Approve swap) before the stands change hands.";
+                    case "Approve swap":
+                    case "Reject swap":
+                        bool approveSwap = i.Text("Step") == "Approve swap";
+                        return Check(await allocation.DecideSwapAsync(c.CompanyId, (long)(i.OptionalNumber("Swap") ?? 0), approveSwap, c.UserId, i.Date("Date"), i.Optional("Reason")).ConfigureAwait(true),
+                            approveSwap ? "Swap approved; the stands have changed hands." : "Swap rejected.");
                     case "Cancel":
                         _ = Check(await allocation.CancelAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true), string.Empty);
                         return "Run cancelled.";

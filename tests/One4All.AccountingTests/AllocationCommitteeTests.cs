@@ -57,7 +57,15 @@ public sealed class AllocationCommitteeTests
         // A and B swap stands on a signed swap request.
         string a = approved.Lines[0].CertificateNumber!, b = approved.Lines[1].CertificateNumber!;
         (await allocations.SwapAsync(companyId, a, a, new DateOnly(2026, 3, 5), "SW-1", "Closer to work", 72)).Error.Code.Should().Be("Hse.SwapOffers");
-        (await allocations.SwapAsync(companyId, a, b, new DateOnly(2026, 3, 5), "SW-1", "Closer to work", 72)).IsSuccess.Should().BeTrue();
+        long swap = (await allocations.SwapAsync(companyId, a, b, new DateOnly(2026, 3, 5), "SW-1", "Closer to work", 72)).Value;
+        (await allocations.SwapAsync(companyId, b, a, new DateOnly(2026, 3, 5), "SW-2", "Again", 72)).Error.Code.Should().Be("Hse.SwapPending");
+        (await db.Set<StandAllocation>().AsNoTracking().SingleAsync(x => x.CompanyId == companyId && x.CertificateNumber == a)).StandId
+            .Should().Be(await db.HousingStands.AsNoTracking().Where(s => s.SchemeId == scheme.Id && s.StandNumber == "AC2-1").Select(s => s.Id).SingleAsync(), "nothing moves before approval");
+        (await allocations.DecideSwapAsync(companyId, swap, true, 72, new DateOnly(2026, 3, 5), null)).Error.Code.Should().Be("Hse.SwapSelfApproval");
+        (await allocations.DecideSwapAsync(companyId, swap, false, 73, new DateOnly(2026, 3, 5), " ")).Error.Code.Should().Be("Hse.SwapReason");
+        (await allocations.DecideSwapAsync(companyId, swap, true, 73, new DateOnly(2026, 3, 5), null)).IsSuccess.Should().BeTrue();
+        StandSwap approvedSwap = await db.Set<StandSwap>().AsNoTracking().SingleAsync(s => s.Id == swap);
+        (approvedSwap.Status, approvedSwap.RequestedByUserId, approvedSwap.ApprovedByUserId).Should().Be((StandSwapStatus.Approved, 72L, (long?)73));
         Dictionary<string, long> standOf = await db.Set<StandAllocation>().AsNoTracking().Where(x => x.CompanyId == companyId && (x.CertificateNumber == a || x.CertificateNumber == b))
             .ToDictionaryAsync(x => x.CertificateNumber!, x => x.StandId);
         Dictionary<string, long> stands = await db.HousingStands.AsNoTracking().Where(s => s.SchemeId == scheme.Id).ToDictionaryAsync(s => s.StandNumber, s => s.Id);

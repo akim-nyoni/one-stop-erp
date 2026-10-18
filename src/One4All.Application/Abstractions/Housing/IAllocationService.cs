@@ -147,8 +147,9 @@ public interface IAllocationService
     Task<Result<AllocationRunView>> SubstituteLineAsync(long companyId, string runNumber, int sequence, string skipReason, CancellationToken ct = default);
 
     /// <summary>
-    /// Swaps the stands of two allottees whose offers are live and whose stands are not yet sold, in the same scheme (brief §4.10.2): the
-    /// stands and their frozen prices change hands, recorded in a swap document.
+    /// Asks for a swap of the stands of two allottees whose offers are live and whose stands are not yet sold, in the same scheme (brief §4.10.2): a swap
+    /// document that waits for a different officer to approve it (<see cref="DecideSwapAsync"/>) before the stands and their frozen prices change hands
+    /// (brief §4.10.4: never an in-place edit).
     /// </summary>
     /// <param name="companyId">The council.</param>
     /// <param name="firstCertificate">One allottee's certificate.</param>
@@ -156,10 +157,21 @@ public interface IAllocationService
     /// <param name="date">When.</param>
     /// <param name="reference">The swap document.</param>
     /// <param name="reason">Why.</param>
-    /// <param name="userId">Who approved it.</param>
+    /// <param name="userId">Who asks for it.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Success, or why the two cannot swap.</returns>
-    Task<Result> SwapAsync(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long userId, CancellationToken ct = default);
+    /// <returns>The swap document's id, or why the two cannot swap.</returns>
+    Task<Result<long>> SwapAsync(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long userId, CancellationToken ct = default);
+
+    /// <summary>Approves a swap document (someone other than who asked; the stands change hands, checked again) or rejects it with the reason.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="swapId">The swap document.</param>
+    /// <param name="approve">True to approve, false to reject.</param>
+    /// <param name="userId">Who decides.</param>
+    /// <param name="date">When.</param>
+    /// <param name="reason">Why it is rejected (needed to reject).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> DecideSwapAsync(long companyId, long swapId, bool approve, long userId, DateOnly date, string? reason, CancellationToken ct = default);
 
     /// <summary>Cancels a proposed run, freeing its stands and applicants.</summary>
     /// <param name="companyId">The council.</param>

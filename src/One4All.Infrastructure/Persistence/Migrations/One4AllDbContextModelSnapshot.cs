@@ -11722,7 +11722,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("ApprovedByUserId")
+                    b.Property<long?>("ApprovedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("approved_by_user_id");
 
@@ -11768,6 +11768,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("reference");
 
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
@@ -11777,6 +11786,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(40)
                         .HasColumnType("character varying(40)")
                         .HasColumnName("second_certificate");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
 
                     b.HasKey("Id")
                         .HasName("pk_stand_swap");

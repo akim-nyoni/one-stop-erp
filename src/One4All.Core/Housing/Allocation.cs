@@ -383,7 +383,23 @@ public sealed class AllocationExclusion : Entity
     public ExclusionReason Reason { get; private set; }
 }
 
-/// <summary>A stand swap between two allottees (<c>hse.stand_swap</c>): the document behind the exchange.</summary>
+/// <summary>Where a stand swap stands.</summary>
+public enum StandSwapStatus
+{
+    /// <summary>Asked for; the stands have not moved.</summary>
+    Pending = 0,
+
+    /// <summary>Approved by someone other than who asked; the stands have changed hands.</summary>
+    Approved = 1,
+
+    /// <summary>Turned down, with the reason.</summary>
+    Rejected = 2,
+}
+
+/// <summary>
+/// A stand swap between two allottees (<c>hse.stand_swap</c>): the document behind the exchange (brief §4.10.4: a change to an existing allocation is a separate,
+/// approved document, never an in-place edit) - asked for by one officer, approved by another, and only then do the stands change hands.
+/// </summary>
 public sealed class StandSwap : AuditableEntity, ICompanyScoped
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>
@@ -402,8 +418,8 @@ public sealed class StandSwap : AuditableEntity, ICompanyScoped
     /// <param name="date">When.</param>
     /// <param name="reference">The swap document (the parties' signed request).</param>
     /// <param name="reason">Why.</param>
-    /// <param name="approvedByUserId">Who approved it.</param>
-    public StandSwap(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long approvedByUserId)
+    /// <param name="requestedByUserId">Who asked for it.</param>
+    public StandSwap(long companyId, string firstCertificate, string secondCertificate, DateOnly date, string reference, string reason, long requestedByUserId)
     {
         CompanyId = companyId;
         FirstCertificate = firstCertificate;
@@ -411,7 +427,37 @@ public sealed class StandSwap : AuditableEntity, ICompanyScoped
         Date = date;
         Reference = reference;
         Reason = reason;
-        ApprovedByUserId = approvedByUserId;
+        RequestedByUserId = requestedByUserId;
+        Status = StandSwapStatus.Pending;
+    }
+
+    /// <summary>Gets who asked for it.</summary>
+    public long RequestedByUserId { get; private set; }
+
+    /// <summary>Gets where it stands.</summary>
+    public StandSwapStatus Status { get; private set; }
+
+    /// <summary>Gets why it was turned down.</summary>
+    public string? RejectionReason { get; private set; }
+
+    /// <summary>Records the approval (the caller has moved the stands).</summary>
+    /// <param name="userId">Who approved it.</param>
+    /// <param name="on">When.</param>
+    public void Approve(long userId, DateOnly on)
+    {
+        Status = StandSwapStatus.Approved;
+        ApprovedByUserId = userId;
+        Date = on;
+    }
+
+    /// <summary>Turns it down.</summary>
+    /// <param name="userId">Who.</param>
+    /// <param name="reason">Why.</param>
+    public void Reject(long userId, string reason)
+    {
+        Status = StandSwapStatus.Rejected;
+        ApprovedByUserId = userId;
+        RejectionReason = reason;
     }
 
     /// <inheritdoc />
@@ -432,6 +478,6 @@ public sealed class StandSwap : AuditableEntity, ICompanyScoped
     /// <summary>Gets why.</summary>
     public string Reason { get; private set; }
 
-    /// <summary>Gets who approved it.</summary>
-    public long ApprovedByUserId { get; private set; }
+    /// <summary>Gets who approved or rejected it (null while it waits).</summary>
+    public long? ApprovedByUserId { get; private set; }
 }

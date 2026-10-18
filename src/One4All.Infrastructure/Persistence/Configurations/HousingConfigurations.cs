@@ -1453,6 +1453,8 @@ internal sealed class StandSwapConfiguration : IEntityTypeConfiguration<StandSwa
         b.Property(x => x.SecondCertificate).HasMaxLength(40);
         b.Property(x => x.Reference).HasMaxLength(80);
         b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.Property(x => x.RejectionReason).HasMaxLength(300);
     }
 }
 
