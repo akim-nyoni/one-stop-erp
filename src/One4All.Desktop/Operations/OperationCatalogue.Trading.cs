@@ -21,10 +21,12 @@ public static partial class OperationCatalogue
             Module = customers ? "Customers" : "Suppliers", Title = $"Allocate {trader.ToLowerInvariant()} items", ListTitle = $"Open {trader.ToLowerInvariant()} items",
             Description = customers
                 ? "Match a receipt or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, settle a customer "
-                    + "invoice against the same party's supplier invoice (contra), or write off a bad debt claiming back the VAT on it once it is overdue long enough."
+                    + "invoice against the same party's supplier invoice (contra), or ask to write off a bad debt (claiming back the VAT on it once it is overdue long enough) - "
+                    + "another user with the write-off right approves or rejects it by request id before anything is written off."
                 : "Match a payment or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, or write back "
                     + "an old creditor invoice that will never be paid (the liability released to income).",
-            Fields = [Pick("Step", "Step", customers ? ["Allocate", "Unallocate", "Contra", "Write off"] : ["Allocate", "Unallocate", "Write back"]), Req("Trader", $"{trader} code"),
+            Fields = [Pick("Step", "Step", customers ? ["Allocate", "Unallocate", "Contra", "Write off", "Approve write-off", "Reject write-off"] : ["Allocate", "Unallocate", "Write back"]),
+                Req("Trader", $"{trader} code"), .. (customers ? new[] { OptNum("Request", "Write-off request id (approve / reject)") } : []),
                 Opt("Debit", customers ? "Invoice number" : "Debit document (payment / debit note)"), Opt("Credit", customers ? "Receipt / credit note number" : "Invoice number"),
                 OptNum("Amount", "Amount (blank: as much as is open)"), Today(), OptNum("Allocation", "Allocation id (unallocate; blank: the latest on the document)"),
                 .. (customers ? new[] { Opt("Supplier", "Supplier code (contra)"), Opt("SupplierInvoice", "Supplier invoice number (contra)"), Opt("Clearing", "Contra clearing account") } : []),
@@ -88,10 +90,25 @@ public static partial class OperationCatalogue
                     case "Write off":
                     {
                         Core.Trading.OpenItem invoice = await ItemAsync(ledger, traderId, "Debit", LedgerSign.Debit).ConfigureAwait(true);
-                        VatReliefWriteOff off = Check(await c.Get<ISalesLedgerService>().WriteOffWithVatReliefAsync(c.CompanyId, invoice.Id, date,
+                        long request = Check(await c.Get<IWriteOffRequestService>().RequestAsync(c.CompanyId, invoice.Id,
                             i.Optional("Account") ?? throw new OperationException("Give the bad debt expense account."), i.Optional("Reason") ?? throw new OperationException("Give the reason."),
-                            (int)i.Number("Days")).ConfigureAwait(true));
-                        return $"{invoice.DocumentNumber} written off: {M(off.WrittenOffToBadDebt)} to bad debts, {M(off.VatRelief)} VAT relief claimed.";
+                            (int)i.Number("Days"), c.UserId).ConfigureAwait(true));
+                        return $"Write-off of {invoice.DocumentNumber} requested ({request}); another user with the write-off right approves it.";
+                    }
+
+                    case "Approve write-off":
+                    case "Reject write-off":
+                    {
+                        bool approveWriteOff = i.Text("Step") == "Approve write-off";
+                        if (approveWriteOff && !(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true))
+                                .Has("Sales.WriteOff", One4All.Core.Security.OperationFlags.Approve))
+                        {
+                            throw new OperationException("Approving a write-off needs the bad debt write-off approval right.");
+                        }
+
+                        VatReliefWriteOff? off = Check(await c.Get<IWriteOffRequestService>().DecideAsync(c.CompanyId, (long)(i.OptionalNumber("Request") ?? 0), approveWriteOff, c.UserId, date,
+                            i.Optional("Reason")).ConfigureAwait(true));
+                        return off is null ? "Write-off rejected." : $"Written off: {M(off.WrittenOffToBadDebt)} to bad debts, {M(off.VatRelief)} VAT relief claimed.";
                     }
 
                     default:

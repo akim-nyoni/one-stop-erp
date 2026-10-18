@@ -257,16 +257,31 @@ public sealed class DebtCollectionService : IDebtCollectionService
 internal sealed class WriteOffWorkflowHandler : Application.Abstractions.Workflow.IWorkflowDocumentHandler
 {
     private readonly DebtCollectionService _debts;
+    private readonly WriteOffRequestService _requests;
     private readonly One4All.Licensing.Core.IClock _clock;
 
-    public WriteOffWorkflowHandler(DebtCollectionService debts, One4All.Licensing.Core.IClock clock)
+    public WriteOffWorkflowHandler(DebtCollectionService debts, WriteOffRequestService requests, One4All.Licensing.Core.IClock clock)
     {
         _debts = debts;
+        _requests = requests;
         _clock = clock;
     }
 
     public string DocumentType => Application.Abstractions.Workflow.WorkflowDocumentTypes.WriteOff;
 
-    public Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
-        => _debts.ConcludeWriteOffAsync(companyId, documentReference, outcome == Core.Workflow.WorkflowStatus.Approved, decidedByUserId, DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime), ct);
+    // A direct write-off request (WO- and its id) or a debt-collection case (its case number).
+    public async Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+    {
+        DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+        if (documentReference.StartsWith("WO-", StringComparison.Ordinal)
+            && long.TryParse(documentReference.AsSpan(3), System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long requestId))
+        {
+            bool approved = outcome == Core.Workflow.WorkflowStatus.Approved;
+            Result<VatReliefWriteOff?> decided = await _requests.DecideCoreAsync(companyId, requestId, approved, decidedByUserId, today,
+                approved ? null : string.IsNullOrWhiteSpace(comment) ? $"Not approved in the workflow ({outcome})" : comment, ct).ConfigureAwait(false);
+            return decided.IsSuccess ? Result.Success() : Result.Failure(decided.Error);
+        }
+
+        return await _debts.ConcludeWriteOffAsync(companyId, documentReference, outcome == Core.Workflow.WorkflowStatus.Approved, decidedByUserId, today, ct).ConfigureAwait(false);
+    }
 }

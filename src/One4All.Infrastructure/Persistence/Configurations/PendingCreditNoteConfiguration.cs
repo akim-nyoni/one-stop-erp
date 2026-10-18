@@ -23,3 +23,19 @@ internal sealed class PendingCreditNoteConfiguration : IEntityTypeConfiguration<
         b.HasIndex(x => new { x.CompanyId, x.DocumentNumber });
     }
 }
+
+internal sealed class WriteOffRequestConfiguration : IEntityTypeConfiguration<WriteOffRequest>
+{
+    public void Configure(EntityTypeBuilder<WriteOffRequest> b)
+    {
+        b.ToTable("write_off_request", Schemas.AccountsReceivable);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.InvoiceNumber).HasMaxLength(40);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.BadDebtAccountCode).HasMaxLength(20);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.RejectionReason).HasMaxLength(300);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.OpenItemId }).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_write_off_request_one_pending_per_invoice");
+    }
+}
