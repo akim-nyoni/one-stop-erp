@@ -113,6 +113,17 @@ internal sealed class WorkflowInstanceApproverConfiguration : IEntityTypeConfigu
     }
 }
 
+internal sealed class WorkflowCommentConfiguration : IEntityTypeConfiguration<WorkflowComment>
+{
+    public void Configure(EntityTypeBuilder<WorkflowComment> b)
+    {
+        b.ToTable("comment", Schemas.Workflow);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Text).HasMaxLength(2000).IsRequired();
+        b.HasIndex(x => new { x.WorkflowInstanceId, x.PostedOnUtc });
+    }
+}
+
 internal sealed class ApprovalDelegationConfiguration : IEntityTypeConfiguration<ApprovalDelegation>
 {
     public void Configure(EntityTypeBuilder<ApprovalDelegation> b)

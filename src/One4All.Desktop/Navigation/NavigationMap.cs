@@ -355,7 +355,7 @@ public static class NavigationMap
             G("My work",
                 W("approvals", "My approvals", "Documents waiting for you to approve or reject.", MenuArea.Transactions),
                 W("notifications", "My notifications", "Messages and alerts for you.", MenuArea.Enquiries),
-                O("Approvals: Approve or reject several at once"), O("Approvals: Delegate my approvals")),
+                O("Approvals: Approve or reject several at once"), O("Approvals: Discuss a document"), O("Approvals: Delegate my approvals")),
             G("Approval rules",
                 O("Approvals: Set a stage's rules", "Approval stages and rules"), O("Approvals: Set a user's manager"), O("Approvals: Add an approver to a document"),
                 O("Approvals: Segregation-of-duties rules"), O("Approvals: Escalate overdue approvals"), O("Approvals: Request a master-data change"),

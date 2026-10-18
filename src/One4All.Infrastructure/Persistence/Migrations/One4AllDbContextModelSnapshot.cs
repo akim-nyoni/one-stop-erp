@@ -36203,6 +36203,48 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("approval", "wf");
                 });
 
+            modelBuilder.Entity("One4All.Core.Workflow.WorkflowComment", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset>("PostedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("posted_on_utc");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("text");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.Property<long>("WorkflowInstanceId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("workflow_instance_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_comment");
+
+                    b.HasIndex("WorkflowInstanceId", "PostedOnUtc")
+                        .HasDatabaseName("ix_comment_workflow_instance_id_posted_on_utc");
+
+                    b.ToTable("comment", "wf");
+                });
+
             modelBuilder.Entity("One4All.Core.Workflow.WorkflowDefinition", b =>
                 {
                     b.Property<long>("Id")

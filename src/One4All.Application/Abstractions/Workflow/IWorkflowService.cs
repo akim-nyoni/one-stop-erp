@@ -27,6 +27,14 @@ public sealed record PendingApproval(long InstanceId, string DocumentType, strin
 /// payment runs, budgets, master-data changes and more: start a workflow for a document, then route
 /// approvals through its stages with quorum and value-band rules.
 /// </summary>
+/// <summary>One entry of a document's approval thread: a remark, or a decision with its comment.</summary>
+/// <param name="AtUtc">When.</param>
+/// <param name="UserId">Who.</param>
+/// <param name="UserName">Their user name.</param>
+/// <param name="Kind">"Comment", or the decision (Approve, Reject, Return).</param>
+/// <param name="Text">What was written (null for a decision without a comment).</param>
+public sealed record WorkflowThreadEntry(DateTimeOffset AtUtc, long UserId, string UserName, string Kind, string? Text);
+
 /// <summary>One item of a bulk action.</summary>
 /// <param name="InstanceId">The workflow instance.</param>
 /// <param name="Succeeded">Whether the action was taken.</param>
@@ -106,6 +114,23 @@ public interface IWorkflowService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or why not.</returns>
     Task<Result> AddApproverAsync(long instanceId, long userId, long addedByUserId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Adds a remark to a document's approval thread without deciding it (brief §7): the requester, anyone who has acted on it, an approver added to it,
+    /// or anyone who may approve its current stage.
+    /// </summary>
+    /// <param name="instanceId">The workflow instance.</param>
+    /// <param name="userId">Who writes it.</param>
+    /// <param name="text">The remark (up to 2,000 characters).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> CommentAsync(long instanceId, long userId, string text, CancellationToken ct = default);
+
+    /// <summary>A document's approval thread: its remarks and every decision with its comment, in time order.</summary>
+    /// <param name="instanceId">The workflow instance.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The thread, or why not.</returns>
+    Task<Result<IReadOnlyList<WorkflowThreadEntry>>> ThreadAsync(long instanceId, CancellationToken ct = default);
 
     /// <summary>
     /// Escalates every in-progress instance that has waited at its stage longer than the stage allows: the stage's escalation user is

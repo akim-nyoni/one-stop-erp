@@ -281,3 +281,37 @@ public enum DynamicApprover
     RequesterManager = 1,
 }
 
+/// <summary>
+/// A remark on a document under approval (<c>wf.comment</c>, brief §7 "comment thread"): the requester and the approvers discuss it - a question,
+/// the answer, a supporting fact - without approving or rejecting; the thread reads with the decisions in time order.
+/// </summary>
+public sealed class WorkflowComment : Entity
+{
+    /// <summary>Parameterless constructor for ORM materialization.</summary>
+    private WorkflowComment() => Text = string.Empty;
+
+    /// <summary>Creates the remark.</summary>
+    /// <param name="instanceId">The workflow instance.</param>
+    /// <param name="userId">Who wrote it.</param>
+    /// <param name="text">What they wrote.</param>
+    /// <param name="postedOnUtc">When.</param>
+    public WorkflowComment(long instanceId, long userId, string text, DateTimeOffset postedOnUtc)
+    {
+        WorkflowInstanceId = instanceId;
+        UserId = userId;
+        Text = text;
+        PostedOnUtc = postedOnUtc;
+    }
+
+    /// <summary>Gets the workflow instance.</summary>
+    public long WorkflowInstanceId { get; private set; }
+
+    /// <summary>Gets who wrote it.</summary>
+    public long UserId { get; private set; }
+
+    /// <summary>Gets what they wrote.</summary>
+    public string Text { get; private set; }
+
+    /// <summary>Gets when.</summary>
+    public DateTimeOffset PostedOnUtc { get; private set; }
+}

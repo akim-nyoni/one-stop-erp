@@ -431,6 +431,60 @@ public sealed class WorkflowService : IWorkflowService
         return users;
     }
 
+    /// <inheritdoc />
+    public async Task<Result> CommentAsync(long instanceId, long userId, string text, CancellationToken ct = default)
+    {
+        string remark = (text ?? string.Empty).Trim();
+        if (remark.Length == 0 || remark.Length > 2000)
+        {
+            return Result.Failure(Error.Validation("Workflow.CommentText", "A comment needs some text, up to 2,000 characters."));
+        }
+
+        WorkflowInstance? instance = await _db.WorkflowInstances.Include(i => i.Approvals).FirstOrDefaultAsync(i => i.Id == instanceId, ct).ConfigureAwait(false);
+        if (instance is null)
+        {
+            return Result.Failure(Error.NotFound("Workflow.InstanceNotFound", $"Workflow instance {instanceId} not found."));
+        }
+
+        // Those taking part: the requester, anyone who has acted, an added approver, or anyone who may approve the current stage.
+        bool takesPart = instance.InitiatedByUserId == userId || instance.Approvals.Any(a => a.UserId == userId || a.OnBehalfOfUserId == userId)
+            || await _db.WorkflowInstanceApprovers.AnyAsync(a => a.WorkflowInstanceId == instanceId && a.UserId == userId, ct).ConfigureAwait(false);
+        if (!takesPart && instance.Status == WorkflowStatus.InProgress)
+        {
+            WorkflowDefinition? definition = await _db.WorkflowDefinitions.Include(d => d.Stages).FirstOrDefaultAsync(d => d.Id == instance.WorkflowDefinitionId, ct).ConfigureAwait(false);
+            WorkflowStage? stage = definition is null ? null
+                : Applicable(definition, instance.Value, Attributes(instance)).FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
+            takesPart = stage is not null && (await EligibilityAsync(instance, stage, userId, ct).ConfigureAwait(false)).Eligible;
+        }
+
+        if (!takesPart)
+        {
+            return Result.Failure(Error.Forbidden("Workflow.NotParticipant", $"User {userId} is not taking part in this approval."));
+        }
+
+        _db.WorkflowComments.Add(new WorkflowComment(instanceId, userId, remark, _clock.UtcNow));
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result<IReadOnlyList<WorkflowThreadEntry>>> ThreadAsync(long instanceId, CancellationToken ct = default)
+    {
+        WorkflowInstance? instance = await _db.WorkflowInstances.AsNoTracking().Include(i => i.Approvals).FirstOrDefaultAsync(i => i.Id == instanceId, ct).ConfigureAwait(false);
+        if (instance is null)
+        {
+            return Error.NotFound("Workflow.InstanceNotFound", $"Workflow instance {instanceId} not found.");
+        }
+
+        List<WorkflowComment> comments = await _db.WorkflowComments.AsNoTracking().Where(c => c.WorkflowInstanceId == instanceId).ToListAsync(ct).ConfigureAwait(false);
+        List<long> userIds = [.. comments.Select(c => c.UserId).Concat(instance.Approvals.Select(a => a.UserId)).Distinct()];
+        Dictionary<long, string> names = await _db.Users.AsNoTracking().Where(u => userIds.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Username, ct).ConfigureAwait(false);
+        string Name(long id) => names.GetValueOrDefault(id, $"user {id}");
+        return Result<IReadOnlyList<WorkflowThreadEntry>>.Success([.. comments.Select(c => new WorkflowThreadEntry(c.PostedOnUtc, c.UserId, Name(c.UserId), "Comment", c.Text))
+            .Concat(instance.Approvals.Select(a => new WorkflowThreadEntry(a.OccurredOnUtc, a.UserId, Name(a.UserId), a.Action.ToString(), a.Comment)))
+            .OrderBy(e => e.AtUtc)]);
+    }
+
     private async Task<(bool Eligible, long? OnBehalfOf)> EligibilityAsync(WorkflowInstance instance, WorkflowStage stage, long userId, CancellationToken ct)
     {
         List<long> extra = await _db.WorkflowInstanceApprovers.Where(a => a.WorkflowInstanceId == instance.Id && a.StageSequence == stage.Sequence).Select(a => a.UserId).ToListAsync(ct).ConfigureAwait(false);

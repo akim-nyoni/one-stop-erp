@@ -297,6 +297,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Approval delegations while approvers are away.</summary>
     public DbSet<Core.Workflow.ApprovalDelegation> ApprovalDelegations => Set<Core.Workflow.ApprovalDelegation>();
 
+    /// <summary>Remarks on documents under approval (the comment thread).</summary>
+    public DbSet<Core.Workflow.WorkflowComment> WorkflowComments => Set<Core.Workflow.WorkflowComment>();
+
     /// <summary>Budget enforcement rules for overruns at the spending gates.</summary>
     public DbSet<Core.Budgeting.BudgetEnforcementRule> BudgetEnforcementRules => Set<Core.Budgeting.BudgetEnforcementRule>();
 

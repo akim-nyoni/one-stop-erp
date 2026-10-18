@@ -3,6 +3,7 @@ Approvals	Add an approver to a document	False
 Approvals	Approve or reject several at once	False	
 Approvals	Define a workflow	False	
 Approvals	Delegate my approvals	False	
+Approvals	Discuss a document	False	
 Approvals	Email approval links	False	
 Approvals	Escalate overdue approvals	False	
 Approvals	Request a master-data change	False	

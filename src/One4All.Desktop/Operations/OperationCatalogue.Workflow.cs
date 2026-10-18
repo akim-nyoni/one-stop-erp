@@ -66,6 +66,27 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Discuss a document", ListTitle = "Waiting on me",
+            Description = "The comment thread of a document under approval: ask the requester a question, answer an approver, or add a fact, without approving or rejecting. "
+                + "The requester, anyone who has acted on it and anyone who may approve its current stage can write; leave the comment blank to read the thread.",
+            Fields = [Num("Instance", "Workflow instance id"), Opt("Comment", "Comment (blank: read the thread)")],
+            Run = async (c, i) =>
+            {
+                IWorkflowService workflow = c.Get<IWorkflowService>();
+                long instance = (long)i.Number("Instance");
+                if (i.Optional("Comment") is string remark)
+                {
+                    _ = Check(await workflow.CommentAsync(instance, c.UserId, remark).ConfigureAwait(true), string.Empty);
+                }
+
+                IReadOnlyList<WorkflowThreadEntry> thread = Check(await workflow.ThreadAsync(instance).ConfigureAwait(true));
+                return thread.Count == 0 ? "No comments or decisions yet."
+                    : string.Join(Environment.NewLine, thread.Select(e => $"{e.AtUtc.ToLocalTime():yyyy-MM-dd HH:mm} {e.UserName} - {e.Kind}{(e.Text is null ? string.Empty : ": " + e.Text)}"));
+            },
+            List = WaitingOnMeAsync,
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Escalate overdue approvals", ListTitle = "Waiting on me",
             Description = "Adds each overdue stage's escalation user to documents that have waited longer than the stage allows.",
             Fields = [],
