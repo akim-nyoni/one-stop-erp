@@ -156,6 +156,63 @@ public sealed class LeavePolicyService : ILeavePolicyService
         }, ct);
 
     /// <inheritdoc />
+    public Task<Result<IReadOnlyList<AttendancePayLine>>> ApplyAttendanceAsync(long companyId, string periodLabel, DateOnly fromDate, DateOnly toDate, string unpaidElementCode,
+        decimal workingDaysPerMonth, IReadOnlyCollection<string>? unpaidLeaveTypes = null, string overtimeElementCode = "OVERTIME", string doubleTimeElementCode = "OVERTIME2",
+        CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (workingDaysPerMonth <= 0m || toDate < fromDate || string.IsNullOrWhiteSpace(periodLabel) || string.IsNullOrWhiteSpace(unpaidElementCode))
+            {
+                return Error.Validation("Pay.AttendancePeriod", "Sending attendance to payroll needs a pay period and its dates, the unpaid-days element and working days a month.");
+            }
+
+            List<string> unpaidTypes = [.. (unpaidLeaveTypes is { Count: > 0 } ? unpaidLeaveTypes : ["UNPAID"]).Select(t => t.Trim().ToUpperInvariant())];
+            List<AttendanceRecord> days = await _db.AttendanceRecords.AsNoTracking().Where(a => a.CompanyId == companyId && a.Date >= fromDate && a.Date <= toDate)
+                .ToListAsync(ct).ConfigureAwait(false);
+            List<LeaveRecord> leave = await _db.LeaveRecords.AsNoTracking()
+                .Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && !l.IsCancelled && l.FromDate <= toDate && l.ToDate >= fromDate)
+                .ToListAsync(ct).ConfigureAwait(false);
+            List<long> ids = [.. days.Select(d => d.EmployeeId).Concat(leave.Where(l => unpaidTypes.Contains(l.LeaveType.ToUpperInvariant())).Select(l => l.EmployeeId)).Distinct().Order()];
+            Dictionary<long, decimal> basic = await _db.Employees.Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, e => e.BasicSalary, ct).ConfigureAwait(false);
+
+            List<AttendancePayLine> lines = [];
+            foreach (long id in ids)
+            {
+                List<AttendanceRecord> mine = [.. days.Where(d => d.EmployeeId == id)];
+                decimal overtime = mine.Where(d => d.OvertimeApprovedByUserId != null && d.OvertimeMultiplier < 2m).Sum(d => d.OvertimeHours);
+                decimal doubleTime = mine.Where(d => d.OvertimeApprovedByUserId != null && d.OvertimeMultiplier >= 2m).Sum(d => d.OvertimeHours);
+                decimal unapproved = mine.Where(d => d.OvertimeApprovedByUserId == null).Sum(d => d.OvertimeHours);
+
+                // An absence is unpaid unless leave covers the day; unpaid leave counts its days starting in the period (as sick pay does).
+                List<LeaveRecord> theirs = [.. leave.Where(l => l.EmployeeId == id)];
+                decimal unpaid = mine.Count(d => d.Status == AttendanceStatus.Absent && !theirs.Any(l => l.FromDate <= d.Date && l.ToDate >= d.Date))
+                    + theirs.Where(l => unpaidTypes.Contains(l.LeaveType.ToUpperInvariant()) && l.FromDate >= fromDate).Sum(l => l.Days);
+                decimal deduction = Math.Round(unpaid * basic.GetValueOrDefault(id) / workingDaysPerMonth, 2, MidpointRounding.AwayFromZero);
+                foreach ((string element, decimal? units, decimal? amount) in new (string, decimal?, decimal?)[]
+                    { (overtimeElementCode, overtime, null), (doubleTimeElementCode, doubleTime, null), (unpaidElementCode, null, deduction) })
+                {
+                    if ((units ?? amount ?? 0m) <= 0m)
+                    {
+                        continue;
+                    }
+
+                    Result<long> set = await _variables.SetAsync(companyId, id, element, periodLabel, units, amount, ct).ConfigureAwait(false);
+                    if (set.IsFailure)
+                    {
+                        return set.Error;
+                    }
+                }
+
+                if (overtime + doubleTime + unapproved + unpaid > 0m)
+                {
+                    lines.Add(new AttendancePayLine(id, overtime, doubleTime, unapproved, unpaid, deduction));
+                }
+            }
+
+            return Result<IReadOnlyList<AttendancePayLine>>.Success(lines);
+        }, ct);
+
+    /// <inheritdoc />
     public Task<Result<IReadOnlyList<SickPayLine>>> ApplySickPayAsync(long companyId, string leaveType, string periodLabel, DateOnly fromDate, DateOnly toDate, string deductionElementCode,
         decimal workingDaysPerMonth, CancellationToken ct = default)
         => _db.AtomicAsync(async () =>

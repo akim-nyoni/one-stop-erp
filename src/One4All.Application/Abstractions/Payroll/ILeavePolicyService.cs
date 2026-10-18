@@ -29,6 +29,15 @@ public sealed record LeavePolicyRequest(long CompanyId, string LeaveType, decima
 /// <param name="Deduction">The pay deduction (unpaid days × basic ÷ working days).</param>
 public sealed record SickPayLine(long EmployeeId, decimal SickDays, decimal UnpaidDays, decimal Deduction);
 
+/// <summary>One employee's attendance sent to a pay period.</summary>
+/// <param name="EmployeeId">The employee.</param>
+/// <param name="OvertimeHours">Approved overtime hours at time and a half (or any rate under double).</param>
+/// <param name="DoubleTimeHours">Approved overtime hours at double time or more.</param>
+/// <param name="UnapprovedHours">Overtime hours still waiting for approval (not paid).</param>
+/// <param name="UnpaidDays">Unpaid days: absences no leave covers, and unpaid leave.</param>
+/// <param name="Deduction">The pay deduction (unpaid days × basic ÷ working days).</param>
+public sealed record AttendancePayLine(long EmployeeId, decimal OvertimeHours, decimal DoubleTimeHours, decimal UnapprovedHours, decimal UnpaidDays, decimal Deduction);
+
 /// <summary>Leave pay paid ahead of an employee's leave, and its recovery.</summary>
 /// <param name="EmployeeId">The employee.</param>
 /// <param name="LeaveDays">The leave days starting in the window.</param>
@@ -55,6 +64,25 @@ public interface ILeavePolicyService
 
     /// <summary>Runs the policies for a month: carry-over caps first when a leave year starts, then that month's accrual or grant.</summary>
     Task<Result<LeaveAccrualRun>> RunMonthAsync(long companyId, DateOnly month, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends a period's attendance to payroll (brief §4.15): approved overtime as hours on the overtime elements (double time and above on its own element),
+    /// and unpaid days (an absence no leave covers, or a day of an unpaid leave type) as a deduction of basic ÷ working days a day. Overtime still waiting
+    /// for approval is reported, not paid. Sending again replaces the period's earlier figures.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="periodLabel">The pay period.</param>
+    /// <param name="fromDate">The period's first day.</param>
+    /// <param name="toDate">The period's last day.</param>
+    /// <param name="unpaidElementCode">The deduction element for unpaid days.</param>
+    /// <param name="workingDaysPerMonth">Working days a month (a day's pay is basic ÷ this).</param>
+    /// <param name="unpaidLeaveTypes">Leave types taken without pay (default UNPAID).</param>
+    /// <param name="overtimeElementCode">The overtime element (rate per hour).</param>
+    /// <param name="doubleTimeElementCode">The double-time overtime element (rate per hour).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Each employee with overtime or unpaid days in the period.</returns>
+    Task<Result<IReadOnlyList<AttendancePayLine>>> ApplyAttendanceAsync(long companyId, string periodLabel, DateOnly fromDate, DateOnly toDate, string unpaidElementCode, decimal workingDaysPerMonth,
+        IReadOnlyCollection<string>? unpaidLeaveTypes = null, string overtimeElementCode = "OVERTIME", string doubleTimeElementCode = "OVERTIME2", CancellationToken ct = default);
 
     /// <summary>
     /// Applies a leave type's sick pay tiers to a pay period: each sick day taken from the period's start to its end is placed in the leave year
