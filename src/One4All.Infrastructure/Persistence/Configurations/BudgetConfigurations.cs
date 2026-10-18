@@ -89,6 +89,7 @@ internal sealed class BudgetCommitmentConfiguration : IEntityTypeConfiguration<B
         b.HasKey(x => x.Id);
         b.Property(x => x.Type).HasConversion<int>();
         b.Property(x => x.Department).HasMaxLength(30);
+        b.Property(x => x.Fund).HasMaxLength(20);
         b.Property(x => x.AccountCode).HasMaxLength(8);
         b.Property(x => x.Amount).HasPrecision(19, 4);
         b.Property(x => x.Reference).HasMaxLength(60);

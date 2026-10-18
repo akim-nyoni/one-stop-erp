@@ -173,8 +173,13 @@ public sealed class BudgetControlService : IBudgetControlService
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<VoteBookRow>> VoteBookAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct = default)
+    public async Task<IReadOnlyList<VoteBookRow>> VoteBookAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct = default, bool byFund = false)
     {
+        if (byFund)
+        {
+            return await VoteBookByFundAsync(companyId, fiscalYearId, asAtPeriod, ct).ConfigureAwait(false);
+        }
+
         var lines = await _db.Budgets.AsNoTracking()
             .Where(b => b.CompanyId == companyId && b.FiscalYearId == fiscalYearId && b.IsActive
                         && (b.Type == BudgetType.OriginalApproved || b.Type == BudgetType.SupplementaryRevised))
@@ -209,6 +214,47 @@ public sealed class BudgetControlService : IBudgetControlService
             lines.Where(l => l.AccountCode == code && l.IsVirement).Sum(l => l.Amount),
             expenditure.GetValueOrDefault(code),
             commitments.GetValueOrDefault(code)))];
+    }
+
+    // The vote book kept by fund (brief §3.11): each vote is an account in a fund, so expenditure comes from the posted journal lines (period balances carry no fund).
+    // Spend or commitments in a fund the account has no appropriation in fall to the account's row with no fund.
+    private async Task<IReadOnlyList<VoteBookRow>> VoteBookByFundAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct)
+    {
+        var lines = await _db.Budgets.AsNoTracking()
+            .Where(b => b.CompanyId == companyId && b.FiscalYearId == fiscalYearId && b.IsActive
+                        && (b.Type == BudgetType.OriginalApproved || b.Type == BudgetType.SupplementaryRevised))
+            .SelectMany(b => b.Lines.Select(l => new { b.Type, l.AccountCode, l.Fund, l.Amount, IsVirement = l.VirementId != null }))
+            .ToListAsync(ct).ConfigureAwait(false);
+        var spent = await (
+            from l in _db.Set<JournalLine>()
+            join j in _db.Journals on l.JournalEntryId equals j.Id
+            join period in _db.Set<FiscalPeriod>() on j.FiscalPeriodId equals period.Id
+            where j.CompanyId == companyId && j.Status == JournalStatus.Posted && period.FiscalYearId == fiscalYearId && period.PeriodNumber <= asAtPeriod
+            group l by new { l.AccountCode, l.Fund } into g
+            select new { g.Key.AccountCode, g.Key.Fund, Movement = g.Sum(x => x.BaseDebit) - g.Sum(x => x.BaseCredit) })
+            .ToListAsync(ct).ConfigureAwait(false);
+        var committed = await _db.Set<BudgetCommitment>()
+            .Where(c => c.CompanyId == companyId && c.FiscalYearId == fiscalYearId && c.Status == CommitmentStatus.Open && c.Period <= asAtPeriod)
+            .GroupBy(c => new { c.AccountCode, c.Fund }).Select(g => new { g.Key.AccountCode, g.Key.Fund, Amount = g.Sum(c => c.Amount) })
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        List<(string Account, string? Fund)> votes = [.. lines.Select(l => (l.AccountCode, l.Fund)).Distinct()
+            .OrderBy(v => v.AccountCode, StringComparer.Ordinal).ThenBy(v => v.Fund ?? string.Empty, StringComparer.Ordinal)];
+        HashSet<(string, string?)> keyed = [.. votes];
+        bool Falls(string account, string? fund, string? rowFund) => fund == rowFund || (rowFund is null && !keyed.Contains((account, fund)));
+        List<string> codes = [.. votes.Select(v => v.Account).Distinct()];
+        Dictionary<string, string> names = await _db.Accounts.AsNoTracking()
+            .Where(a => a.CompanyId == companyId && codes.Contains(a.AccountCode))
+            .ToDictionaryAsync(a => a.AccountCode, a => a.Name, ct).ConfigureAwait(false);
+        return [.. votes.Select(v => new VoteBookRow(
+            v.Account,
+            names.GetValueOrDefault(v.Account, v.Account),
+            lines.Where(l => l.AccountCode == v.Account && l.Fund == v.Fund && !l.IsVirement && l.Type == BudgetType.OriginalApproved).Sum(l => l.Amount),
+            lines.Where(l => l.AccountCode == v.Account && l.Fund == v.Fund && !l.IsVirement && l.Type == BudgetType.SupplementaryRevised).Sum(l => l.Amount),
+            lines.Where(l => l.AccountCode == v.Account && l.Fund == v.Fund && l.IsVirement).Sum(l => l.Amount),
+            spent.Where(s => s.AccountCode == v.Account && Falls(v.Account, s.Fund, v.Fund)).Sum(s => s.Movement),
+            committed.Where(c => c.AccountCode == v.Account && Falls(v.Account, c.Fund, v.Fund)).Sum(c => c.Amount),
+            v.Fund))];
     }
 
     /// <inheritdoc />

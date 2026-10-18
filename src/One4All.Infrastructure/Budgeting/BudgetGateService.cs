@@ -52,13 +52,14 @@ public sealed class BudgetGateService : IBudgetGateService
         }
 
         List<BudgetEnforcementRule> rules = await _db.BudgetEnforcementRules.AsNoTracking().Where(r => r.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        string? defaultFund = await DefaultFundAsync(companyId, ct).ConfigureAwait(false);
         List<BudgetGateLine> lines = [];
-        foreach (var group in demands.Where(d => d.Amount > 0m).GroupBy(d => (Account: d.AccountCode.Trim().ToUpperInvariant(), Department: Clean(d.Department))))
+        foreach (var group in demands.Where(d => d.Amount > 0m).GroupBy(d => (Account: d.AccountCode.Trim().ToUpperInvariant(), Department: Clean(d.Department), Fund: Clean(d.Fund) ?? defaultFund)))
         {
             decimal amount = group.Sum(d => d.Amount);
-            decimal available = await AvailableAsync(companyId, year, group.Key.Account, group.Key.Department, ct).ConfigureAwait(false);
+            (decimal available, bool byFund) = await AvailableAsync(companyId, year, group.Key.Account, group.Key.Department, group.Key.Fund, ct).ConfigureAwait(false);
             lines.Add(new BudgetGateLine(group.Key.Account, group.Key.Department, amount, available, Math.Max(0m, amount - available),
-                BudgetGate.ActionFor(rules, group.Key.Department, group.Key.Account, amount)));
+                BudgetGate.ActionFor(rules, group.Key.Department, group.Key.Account, amount), byFund ? group.Key.Fund : null));
         }
 
         return new BudgetGateResult(BudgetGate.Overall(lines.Select(l => (l.Shortfall, l.Action))), lines);
@@ -75,9 +76,13 @@ public sealed class BudgetGateService : IBudgetGateService
 
         int period = year.Periods.FirstOrDefault(p => !p.IsAdjustment && p.StartDate <= date && p.EndDate >= date)?.PeriodNumber ?? 1;
         int raised = 0;
-        foreach (var group in demands.Where(d => d.Amount > 0m).GroupBy(d => (Account: d.AccountCode.Trim().ToUpperInvariant(), Department: Clean(d.Department))))
+        string? defaultFund = await DefaultFundAsync(companyId, ct).ConfigureAwait(false);
+        foreach (var group in demands.Where(d => d.Amount > 0m).GroupBy(d => (Account: d.AccountCode.Trim().ToUpperInvariant(), Department: Clean(d.Department), Fund: Clean(d.Fund) ?? defaultFund)))
         {
-            _db.Add(new BudgetCommitment(companyId, year.Id, BudgetType.OriginalApproved, group.Key.Department, group.Key.Account, period, group.Sum(d => d.Amount), reference.Trim()));
+            _db.Add(new BudgetCommitment(companyId, year.Id, BudgetType.OriginalApproved, group.Key.Department, group.Key.Account, period, group.Sum(d => d.Amount), reference.Trim())
+            {
+                Fund = group.Key.Fund,
+            });
             raised++;
         }
 
@@ -187,23 +192,31 @@ public sealed class BudgetGateService : IBudgetGateService
     private Task<FiscalYear?> YearAsync(long companyId, DateOnly date, CancellationToken ct)
         => _db.FiscalYears.AsNoTracking().Include(y => y.Periods).FirstOrDefaultAsync(y => y.CompanyId == companyId && y.StartDate <= date && y.EndDate >= date, ct);
 
-    // Full-year approved budget (the revised version when active, else the original) less the year's actuals and open commitments.
-    private async Task<decimal> AvailableAsync(long companyId, FiscalYear year, string account, string? department, CancellationToken ct)
+    // Under fund accounting, spend with no fund of its own is from the company's default fund (as the posting engine books it).
+    private Task<string?> DefaultFundAsync(long companyId, CancellationToken ct)
+        => _db.Companies.AsNoTracking().Where(c => c.Id == companyId && c.FundAccounting).Select(c => c.DefaultFund).FirstOrDefaultAsync(ct);
+
+    // Full-year approved budget (the revised version when active, else the original) less the year's actuals and open commitments. Where the budget
+    // appropriates the account by fund (brief §3.11 vote control), only that fund's appropriation, spend and commitments count - one fund's vote never
+    // pays for another's.
+    private async Task<(decimal Available, bool ByFund)> AvailableAsync(long companyId, FiscalYear year, string account, string? department, string? fund, CancellationToken ct)
     {
         List<Budget> active = await _db.Set<Budget>().AsNoTracking().Include(b => b.Lines)
             .Where(b => b.CompanyId == companyId && b.FiscalYearId == year.Id && b.IsActive && b.Department == department
                 && (b.Type == BudgetType.OriginalApproved || b.Type == BudgetType.SupplementaryRevised))
             .ToListAsync(ct).ConfigureAwait(false);
         Budget? approved = active.FirstOrDefault(b => b.Type == BudgetType.SupplementaryRevised) ?? active.FirstOrDefault();
-        decimal budget = approved?.Lines.Where(l => l.AccountCode == account).Sum(l => l.Amount) ?? 0m;
+        bool byFund = fund is not null && approved is not null && approved.Lines.Any(l => l.AccountCode == account && l.Fund is not null);
+        decimal budget = approved?.Lines.Where(l => l.AccountCode == account && (!byFund || l.Fund == fund)).Sum(l => l.Amount) ?? 0m;
         decimal actual = await _db.Journals.AsNoTracking()
             .Where(j => j.CompanyId == companyId && j.Status == JournalStatus.Posted && j.PostingDate >= year.StartDate && j.PostingDate <= year.EndDate)
             .SelectMany(j => j.Lines)
-            .Where(l => l.AccountCode == account && (department == null || l.Department == department))
+            .Where(l => l.AccountCode == account && (department == null || l.Department == department) && (!byFund || l.Fund == fund))
             .SumAsync(l => (decimal?)(l.BaseDebit - l.BaseCredit), ct).ConfigureAwait(false) ?? 0m;
         decimal committed = await _db.Set<BudgetCommitment>().AsNoTracking()
-            .Where(c => c.CompanyId == companyId && c.FiscalYearId == year.Id && c.AccountCode == account && c.Department == department && c.Status == CommitmentStatus.Open)
+            .Where(c => c.CompanyId == companyId && c.FiscalYearId == year.Id && c.AccountCode == account && c.Department == department && c.Status == CommitmentStatus.Open
+                && (!byFund || c.Fund == fund))
             .SumAsync(c => (decimal?)c.Amount, ct).ConfigureAwait(false) ?? 0m;
-        return budget - actual - committed;
+        return (budget - actual - committed, byFund);
     }
 }

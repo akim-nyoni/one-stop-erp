@@ -7,7 +7,8 @@ namespace One4All.Application.Abstractions.Budgeting;
 /// <param name="AccountCode">The expense account.</param>
 /// <param name="Department">The department, if analysed.</param>
 /// <param name="Amount">The amount.</param>
-public sealed record BudgetDemand(string AccountCode, string? Department, decimal Amount);
+/// <param name="Fund">The fund (vote) it is spent from; under fund accounting a demand with none is checked against the company's default fund.</param>
+public sealed record BudgetDemand(string AccountCode, string? Department, decimal Amount, string? Fund = null);
 
 /// <summary>One line's check.</summary>
 /// <param name="AccountCode">The account.</param>
@@ -16,7 +17,8 @@ public sealed record BudgetDemand(string AccountCode, string? Department, decima
 /// <param name="Available">What was available (approved budget − actuals − open commitments).</param>
 /// <param name="Shortfall">How far the spend overruns (0 when it fits).</param>
 /// <param name="Action">The rule's action should it overrun.</param>
-public sealed record BudgetGateLine(string AccountCode, string? Department, decimal Amount, decimal Available, decimal Shortfall, BudgetAction Action);
+/// <param name="Fund">The fund checked, when the budget appropriates the account by fund.</param>
+public sealed record BudgetGateLine(string AccountCode, string? Department, decimal Amount, decimal Available, decimal Shortfall, BudgetAction Action, string? Fund = null);
 
 /// <summary>A document's check.</summary>
 /// <param name="Outcome">The strictest action among overrunning lines (Allow when all fit).</param>

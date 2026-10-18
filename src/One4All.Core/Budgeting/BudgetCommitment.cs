@@ -86,6 +86,9 @@ public sealed class BudgetCommitment : AuditableEntity, ICompanyScoped
     /// <summary>The prior year's commitment this one was carried forward from, if any.</summary>
     public long? CarriedFromId { get; private set; }
 
+    /// <summary>The fund (vote) the commitment is against, under fund accounting; null when not analysed by fund.</summary>
+    public string? Fund { get; init; }
+
     /// <summary>Who approved the year-end decision (lapse or carry forward), once made.</summary>
     public long? YearEndApprovedByUserId { get; private set; }
 
@@ -140,7 +143,7 @@ public sealed class BudgetCommitment : AuditableEntity, ICompanyScoped
             return null;
         }
 
-        return new BudgetCommitment(CompanyId, nextFiscalYearId, Type, Department, AccountCode, 1, Amount, Reference) { CarriedFromId = Id };
+        return new BudgetCommitment(CompanyId, nextFiscalYearId, Type, Department, AccountCode, 1, Amount, Reference) { CarriedFromId = Id, Fund = Fund };
     }
 
     private bool CloseForYearEnd(CommitmentStatus status, long approvedByUserId)

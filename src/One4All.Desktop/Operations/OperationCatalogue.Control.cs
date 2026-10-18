@@ -181,8 +181,10 @@ public static partial class OperationCatalogue
                 long year = await YearAsync(c, i.Whole("Year")).ConfigureAwait(true);
                 if (i.Text("Step") == "Vote book")
                 {
-                    IReadOnlyList<VoteBookRow> book = await control.VoteBookAsync(c.CompanyId, year, i.Whole("Period")).ConfigureAwait(true);
-                    return book.Count == 0 ? "No votes." : string.Join(Environment.NewLine, book.Select(r => $"{r.AccountCode,-10} {r.Name,-24} appropriation {M(r.Appropriation),14}  spent {M(r.Expenditure),14}  "
+                    // Under fund accounting each vote is an account in a fund.
+                    bool byFund = await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.FundAccounting).FirstOrDefaultAsync().ConfigureAwait(true);
+                    IReadOnlyList<VoteBookRow> book = await control.VoteBookAsync(c.CompanyId, year, i.Whole("Period"), byFund: byFund).ConfigureAwait(true);
+                    return book.Count == 0 ? "No votes." : string.Join(Environment.NewLine, book.Select(r => $"{r.AccountCode + (r.Fund is null ? string.Empty : "/" + r.Fund),-16} {r.Name,-24} appropriation {M(r.Appropriation),14}  spent {M(r.Expenditure),14}  "
                         + $"committed {M(r.Commitments),12}  unexpended {M(r.Unexpended),14}"));
                 }
 

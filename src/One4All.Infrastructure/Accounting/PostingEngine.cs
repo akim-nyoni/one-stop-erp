@@ -739,17 +739,19 @@ public sealed class PostingEngine : IPostingEngine
         {
             string? costCentre = string.IsNullOrEmpty(line.CostCentre) ? null : line.CostCentre;
             string? department = string.IsNullOrEmpty(line.Department) ? null : line.Department;
+            string? fund = string.IsNullOrEmpty(line.Fund) ? null : line.Fund;
             decimal appropriated = await _db.Budgets
                 .Where(b => b.CompanyId == companyId && b.FiscalYearId == fiscalYearId && b.IsActive
                             && (b.Type == Core.Budgeting.BudgetType.OriginalApproved || b.Type == Core.Budgeting.BudgetType.SupplementaryRevised)
                             && (b.Department == null || b.Department == department))
                 .SelectMany(b => b.Lines)
-                .Where(l => l.AccountCode == line.AccountCode && (l.CostCentre == null || l.CostCentre == costCentre))
+                .Where(l => l.AccountCode == line.AccountCode && (l.CostCentre == null || l.CostCentre == costCentre) && (l.Fund == null || l.Fund == fund))
                 .SumAsync(l => (decimal?)l.Amount, ct).ConfigureAwait(false) ?? 0m;
             if (appropriated <= 0m)
             {
                 return (Error.Rule("Posting.NoAppropriation",
-                    $"Account '{line.AccountCode}' has no appropriation in this year's active budget; fund control does not allow expenditure against it."), line.AccountCode);
+                    $"Account '{line.AccountCode}'{(fund is null ? string.Empty : $" (fund {fund})")} has no appropriation in this year's active budget; fund control does not allow expenditure against it."),
+                    line.AccountCode);
             }
         }
 

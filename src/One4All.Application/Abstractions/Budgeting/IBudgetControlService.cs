@@ -55,7 +55,8 @@ public sealed record CommitmentYearEnd(IReadOnlyList<YearEndCommitment> Lapsed, 
 /// <param name="Virements">Net approved virements (in less out).</param>
 /// <param name="Expenditure">Expenditure posted.</param>
 /// <param name="Commitments">Open commitments (orders not yet invoiced).</param>
-public sealed record VoteBookRow(string AccountCode, string Name, decimal Original, decimal Supplementary, decimal Virements, decimal Expenditure, decimal Commitments)
+/// <param name="Fund">The fund (vote) the row is for, in a vote book kept by fund; null for the account across funds.</param>
+public sealed record VoteBookRow(string AccountCode, string Name, decimal Original, decimal Supplementary, decimal Virements, decimal Expenditure, decimal Commitments, string? Fund = null)
 {
     /// <summary>The current appropriation.</summary>
     public decimal Appropriation => Original + Supplementary + Virements;
@@ -119,8 +120,9 @@ public interface IBudgetControlService
     /// <param name="fiscalYearId">The fiscal year.</param>
     /// <param name="asAtPeriod">The last period included (1–12).</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>One row per vote, by account.</returns>
-    Task<IReadOnlyList<VoteBookRow>> VoteBookAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct = default);
+    /// <param name="byFund">One row per account and fund the budget appropriates (the account's unfunded lines and other spend in a row with no fund), instead of per account.</param>
+    /// <returns>One row per vote, by account (and fund).</returns>
+    Task<IReadOnlyList<VoteBookRow>> VoteBookAsync(long companyId, long fiscalYearId, int asAtPeriod, CancellationToken ct = default, bool byFund = false);
 
     /// <summary>
     /// Settles a year's open commitments at year end (brief §4.18.5): those chosen are carried forward into commitments
