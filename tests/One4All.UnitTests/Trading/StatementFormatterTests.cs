@@ -23,6 +23,24 @@ public sealed class StatementFormatterTests
         1070m);
 
     [Fact]
+    public void Documents_in_other_currencies_are_a_statement_of_their_own()
+    {
+        TraderStatement split = TraderStatement.Split("CUST1", "Acme Retail Ltd", "USD",
+        [
+            new StatementLineRow(new DateOnly(2026, 6, 1), OpenItemType.Invoice, "INV-1", new DateOnly(2026, 6, 30), 500m, 500m, "USD"),
+            new StatementLineRow(new DateOnly(2026, 6, 2), OpenItemType.Invoice, "INV-2", new DateOnly(2026, 7, 2), 9_000m, 9_000m, "ZWG"),
+            new StatementLineRow(new DateOnly(2026, 6, 3), OpenItemType.CreditNote, "CRN-1", new DateOnly(2026, 6, 3), -1_000m, -1_000m, "ZWG"),
+        ], AgeingBasis.DueDate);
+
+        split.Balance.Should().Be(500m, "the ZWG documents are not added to the USD balance");
+        split.OtherCurrencies.Should().ContainSingle().Which.Should().Match<TraderStatement>(s => s.Currency == "ZWG" && s.Balance == 8_000m && s.Lines.Count == 2);
+        split.ByCurrency.Select(s => s.Currency).Should().Equal("USD", "ZWG");
+        string text = StatementFormatter.ToPlainText(split, "Test Trading Co", AsAt);
+        text.Should().Contain("BALANCE DUE (USD)").And.Contain("BALANCE DUE (ZWG)").And.Contain("8,000.00").And.NotContain("8,500.00");
+        StatementAgeing.Of(split, AsAt).Total.Should().Be(500m);
+    }
+
+    [Fact]
     public void Ageing_buckets_by_days_past_due_and_nets_credits()
     {
         StatementAgeing ageing = StatementAgeing.Of(Sample(), AsAt);

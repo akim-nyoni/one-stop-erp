@@ -79,11 +79,12 @@ public sealed class TradingReports : ITradingReports
             .Select(i => new StatementLineRow(
                 i.DocumentDate, i.ItemType, i.DocumentNumber, i.DueDate,
                 i.Sign == LedgerSign.Debit ? i.OriginalTransaction : -i.OriginalTransaction,
-                i.Sign == LedgerSign.Debit ? i.OutstandingTransaction : -i.OutstandingTransaction))
+                i.Sign == LedgerSign.Debit ? i.OutstandingTransaction : -i.OutstandingTransaction,
+                i.Currency.Value))
             .ToList();
 
-        decimal balance = lines.Sum(l => l.Outstanding);
-        return new TraderStatement(customer.Code, customer.Name, customer.Currency.Value, lines, balance, customer.AgeingBasis);
+        // A document in another currency is on its own statement in that currency, never added to the trading-currency balance.
+        return TraderStatement.Split(customer.Code, customer.Name, customer.Currency.Value, lines, customer.AgeingBasis);
     }
 
     public async Task<TraderStatement?> SupplierStatementAsync(long companyId, long supplierId, CancellationToken ct = default)
@@ -104,11 +105,11 @@ public sealed class TradingReports : ITradingReports
             .Select(i => new StatementLineRow(
                 i.DocumentDate, i.ItemType, i.DocumentNumber, i.DueDate,
                 i.Sign == LedgerSign.Credit ? i.OriginalTransaction : -i.OriginalTransaction,
-                i.Sign == LedgerSign.Credit ? i.OutstandingTransaction : -i.OutstandingTransaction))
+                i.Sign == LedgerSign.Credit ? i.OutstandingTransaction : -i.OutstandingTransaction,
+                i.Currency.Value))
             .ToList();
 
-        decimal balance = lines.Sum(l => l.Outstanding);
-        return new TraderStatement(supplier.Code, supplier.Name, supplier.Currency.Value, lines, balance, supplier.AgeingBasis);
+        return TraderStatement.Split(supplier.Code, supplier.Name, supplier.Currency.Value, lines, supplier.AgeingBasis);
     }
 
     public async Task<RemittanceAdvice?> RemittanceAdviceAsync(long companyId, long paymentOpenItemId, CancellationToken ct = default)

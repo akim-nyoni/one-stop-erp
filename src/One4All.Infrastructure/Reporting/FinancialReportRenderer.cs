@@ -73,7 +73,7 @@ public sealed class FinancialReportRenderer : IFinancialReportRenderer
 
         string companyName = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? string.Empty;
 
-        List<IReadOnlyDictionary<string, object?>> rows = statement.Lines
+        List<IReadOnlyDictionary<string, object?>> rows = statement.ByCurrency.SelectMany(s => s.Lines)
             .Select(l => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
             {
                 ["Date"] = l.Date.ToDateTime(TimeOnly.MinValue),
@@ -83,6 +83,7 @@ public sealed class FinancialReportRenderer : IFinancialReportRenderer
                 ["Amount"] = l.Amount,
                 ["Outstanding"] = l.Outstanding,
                 ["TraderCode"] = statement.TraderCode,
+                ["Currency"] = l.Currency ?? statement.Currency,
             })
             .ToList();
 

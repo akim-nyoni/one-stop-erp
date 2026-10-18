@@ -65,7 +65,7 @@ public sealed class StatementService : IStatementService
         // Every document (invoice, credit note, receipt, journal) is an open item, so the brought-forward balance is the signed total of those
         // dated before the period, whatever has since been allocated.
         var items = await _db.OpenItems.AsNoTracking()
-            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId && i.DocumentDate <= to)
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId && i.DocumentDate <= to && i.Currency == customer.Currency)
             .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
             .Select(i => new { i.DocumentDate, i.ItemType, i.DocumentNumber, Amount = i.Sign == LedgerSign.Debit ? i.OriginalTransaction : -i.OriginalTransaction })
             .ToListAsync(ct).ConfigureAwait(false);

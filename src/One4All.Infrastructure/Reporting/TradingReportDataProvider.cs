@@ -94,7 +94,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             return [];
         }
 
-        return statement.Lines.Select(l => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        return statement.ByCurrency.SelectMany(s => s.Lines).Select(l => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
         {
             ["Date"] = l.Date.ToDateTime(TimeOnly.MinValue),
             ["Type"] = l.DocumentType.ToString(),
@@ -103,6 +103,7 @@ public sealed class TradingReportDataProvider : IReportDataProvider
             ["Amount"] = l.Amount,
             ["Outstanding"] = l.Outstanding,
             ["TraderCode"] = statement.TraderCode,
+            ["Currency"] = l.Currency ?? statement.Currency,
         }).ToList();
     }
 }

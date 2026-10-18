@@ -33,15 +33,45 @@ public sealed record AgeingReport(TradingLedger Ledger, DateOnly AsAtDate, IRead
 /// <param name="DueDate">The due date.</param>
 /// <param name="Amount">The signed transaction amount (debits positive, credits negative).</param>
 /// <param name="Outstanding">The outstanding transaction amount.</param>
-public sealed record StatementLineRow(DateOnly Date, OpenItemType DocumentType, string DocumentNumber, DateOnly DueDate, decimal Amount, decimal Outstanding);
+/// <param name="Currency">The document's currency (null: the statement's).</param>
+public sealed record StatementLineRow(DateOnly Date, OpenItemType DocumentType, string DocumentNumber, DateOnly DueDate, decimal Amount, decimal Outstanding, string? Currency = null);
 
 /// <summary>An open-item statement for one trader.</summary>
 /// <param name="TraderCode">The trader code.</param>
 /// <param name="TraderName">The trader name.</param>
 /// <param name="Currency">The trading currency.</param>
 /// <param name="Lines">The statement lines.</param>
-/// <param name="Balance">The outstanding balance in transaction currency.</param>
-public sealed record TraderStatement(string TraderCode, string TraderName, string Currency, IReadOnlyList<StatementLineRow> Lines, decimal Balance, AgeingBasis AgeingBasis = AgeingBasis.DueDate);
+/// <param name="Balance">The outstanding balance in the statement's currency.</param>
+/// <param name="AgeingBasis">What the lines age from.</param>
+/// <param name="OtherCurrencies">
+/// The trader's documents in other currencies, one statement per currency: amounts in different currencies are never added together (brief §4.5).
+/// Null or empty when every document is in the statement's currency.
+/// </param>
+public sealed record TraderStatement(string TraderCode, string TraderName, string Currency, IReadOnlyList<StatementLineRow> Lines, decimal Balance, AgeingBasis AgeingBasis = AgeingBasis.DueDate,
+    IReadOnlyList<TraderStatement>? OtherCurrencies = null)
+{
+    /// <summary>This statement followed by the ones in other currencies.</summary>
+    public IEnumerable<TraderStatement> ByCurrency => OtherCurrencies is null ? [this] : [this, .. OtherCurrencies];
+
+    /// <summary>
+    /// Builds a trader's statement from documents in any currencies: the trading currency's lines (always present, even when empty) and one statement for
+    /// each other currency the trader has documents in.
+    /// </summary>
+    /// <param name="traderCode">The trader code.</param>
+    /// <param name="traderName">The trader name.</param>
+    /// <param name="currency">The trader's trading currency.</param>
+    /// <param name="lines">Every line, each carrying its currency.</param>
+    /// <param name="basis">What the lines age from.</param>
+    /// <returns>The statement.</returns>
+    public static TraderStatement Split(string traderCode, string traderName, string currency, IReadOnlyList<StatementLineRow> lines, AgeingBasis basis)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        List<StatementLineRow> own = [.. lines.Where(l => l.Currency is null || l.Currency == currency)];
+        List<TraderStatement> others = [.. lines.Where(l => l.Currency is not null && l.Currency != currency).GroupBy(l => l.Currency!).OrderBy(g => g.Key, StringComparer.Ordinal)
+            .Select(g => new TraderStatement(traderCode, traderName, g.Key, [.. g], g.Sum(l => l.Outstanding), basis))];
+        return new TraderStatement(traderCode, traderName, currency, own, own.Sum(l => l.Outstanding), basis, others.Count == 0 ? null : others);
+    }
+}
 
 /// <summary>One customer's credit-control exposure (base currency).</summary>
 /// <param name="CustomerCode">The customer code.</param>

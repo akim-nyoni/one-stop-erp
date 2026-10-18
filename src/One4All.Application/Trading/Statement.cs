@@ -131,6 +131,14 @@ public static class StatementFormatter
         sb.AppendLine(TwoColumn($"BALANCE DUE ({statement.Currency})", Money(statement.Balance), width));
         sb.AppendLine(rule);
         AppendFooter(sb, statement.TraderCode, statement.TraderName, statement.Currency, statement.Balance, StatementAgeing.Of(statement, asAt), companyName, asAt, width, remittanceSlip);
+
+        // Documents in other currencies follow, each currency a statement of its own with its own balance and ageing.
+        foreach (TraderStatement other in statement.OtherCurrencies ?? [])
+        {
+            sb.AppendLine();
+            sb.Append(ToPlainText(other, companyName, asAt, width, address, remittanceSlip));
+        }
+
         return sb.ToString();
     }
 
