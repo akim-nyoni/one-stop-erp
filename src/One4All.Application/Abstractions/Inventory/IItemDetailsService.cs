@@ -32,4 +32,16 @@ public sealed record ItemDetails
 
     /// <summary>Weight of one unit in kilograms.</summary>
     public decimal? WeightKg { get; init; }
+
+    /// <summary>The customs tariff (HS) code: 4 to 12 digits, dots allowed (null: unchanged; blank: cleared).</summary>
+    public string? HsCode { get; init; }
+
+    /// <summary>The country of origin (null: unchanged; blank: cleared).</summary>
+    public string? CountryOfOrigin { get; init; }
+
+    /// <summary>The brand (null: unchanged; blank: cleared).</summary>
+    public string? Brand { get; init; }
+
+    /// <summary>The tax code its sales take, which must apply to the item's kind (null: unchanged; blank: cleared).</summary>
+    public string? TaxCode { get; init; }
 }

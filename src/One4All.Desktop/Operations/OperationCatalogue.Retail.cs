@@ -391,10 +391,12 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Item picture, description and dimensions", ListTitle = "Items",
-            Description = "An item's long description, its length, width and height in centimetres (the volume follows) and weight, and its picture (a JPEG, PNG, GIF or WebP "
-                + "file of at most 1 MB; Remove picture drops it).",
+            Description = "An item's long description, its length, width and height in centimetres (the volume follows) and weight, its customs (HS) code, country of origin, brand and "
+                + "the tax code its sales take (which must apply to goods or services as the item is), and its picture (a JPEG, PNG, GIF or WebP file of at most 1 MB; Remove picture "
+                + "drops it). A blank field leaves the value as it is.",
             Fields = [Pick("Step", "Step", ["Details", "Picture", "Remove picture"]), ItemPick("Item", "Product"), Opt("LongDescription", "Long description"), OptNum("Length", "Length (cm)"),
-                OptNum("Width", "Width (cm)"), OptNum("Height", "Height (cm)"), OptNum("Weight", "Weight (kg)"), Opt("File", "Picture file")],
+                OptNum("Width", "Width (cm)"), OptNum("Height", "Height (cm)"), OptNum("Weight", "Weight (kg)"), Opt("HsCode", "HS (customs) code"), Opt("Origin", "Country of origin"),
+                Opt("Brand", "Brand"), Opt("TaxCode", "Tax code"), Opt("File", "Picture file")],
             Run = async (c, i) =>
             {
                 IItemDetailsService details = c.Get<IItemDetailsService>();
@@ -410,13 +412,14 @@ public static partial class OperationCatalogue
                         return Check(await details.SetDetailsAsync(c.CompanyId, i.Text("Item"), new ItemDetails
                         {
                             LongDescription = i.Optional("LongDescription"), LengthCm = i.OptionalNumber("Length"), WidthCm = i.OptionalNumber("Width"), HeightCm = i.OptionalNumber("Height"),
-                            WeightKg = i.OptionalNumber("Weight"),
+                            WeightKg = i.OptionalNumber("Weight"), HsCode = i.Optional("HsCode"), CountryOfOrigin = i.Optional("Origin"), Brand = i.Optional("Brand"), TaxCode = i.Optional("TaxCode"),
                         }).ConfigureAwait(true), "Item details saved.");
                 }
             },
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Item", x => x.Code), ("Description", x => x.Description), ("L × W × H (cm)", x => x.LengthCm is null ? string.Empty : $"{x.LengthCm:0.#} × {x.WidthCm:0.#} × {x.HeightCm:0.#}"),
-                ("Weight (kg)", x => x.UnitWeightKg?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty)),
+                ("Weight (kg)", x => x.UnitWeightKg?.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty), ("HS code", x => x.HsCode),
+                ("Origin", x => x.CountryOfOrigin), ("Brand", x => x.Brand), ("Tax code", x => x.TaxCode)),
         };
         yield return new Operation
         {

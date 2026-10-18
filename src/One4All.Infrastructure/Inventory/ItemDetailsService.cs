@@ -37,6 +37,52 @@ public sealed class ItemDetailsService : IItemDetailsService
             item.LongDescription = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
         }
 
+        // Customs and trade details (brief §3.6): the HS code as digits (dots allowed), the country of origin and the brand.
+        if (details.HsCode is string hs)
+        {
+            string digits = hs.Trim().Replace(".", string.Empty, StringComparison.Ordinal);
+            if (digits.Length > 0 && (digits.Length is < 4 or > 12 || !digits.All(char.IsAsciiDigit)))
+            {
+                return Result.Failure(Error.Validation("Item.HsCode", $"\"{hs.Trim()}\" is not an HS code: 4 to 12 digits, dots allowed (e.g. 2523.29)."));
+            }
+
+            item.HsCode = digits.Length == 0 ? null : hs.Trim();
+        }
+
+        if (details.CountryOfOrigin is string country)
+        {
+            item.CountryOfOrigin = string.IsNullOrWhiteSpace(country) ? null : country.Trim();
+        }
+
+        if (details.Brand is string brand)
+        {
+            item.Brand = string.IsNullOrWhiteSpace(brand) ? null : brand.Trim();
+        }
+
+        if (details.TaxCode is string taxCode)
+        {
+            string code = taxCode.Trim().ToUpperInvariant();
+            if (code.Length == 0)
+            {
+                item.TaxCode = null;
+            }
+            else
+            {
+                Core.Accounting.TaxCode? tax = await _db.TaxCodes.AsNoTracking().FirstOrDefaultAsync(t => t.CompanyId == companyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
+                if (tax is null)
+                {
+                    return Result.Failure(Error.NotFound("Item.TaxCode", $"No active tax code {code}."));
+                }
+
+                if (!tax.Suits(item.ItemType))
+                {
+                    return Result.Failure(Error.Rule("Tax.WrongSupply", $"Tax code {code} applies to {tax.AppliesTo.ToString().ToLowerInvariant()} only; item {item.Code} is {(item.ItemType == ItemType.Service ? "a service" : "goods")}."));
+                }
+
+                item.TaxCode = code;
+            }
+        }
+
         item.LengthCm = details.LengthCm ?? item.LengthCm;
         item.WidthCm = details.WidthCm ?? item.WidthCm;
         item.HeightCm = details.HeightCm ?? item.HeightCm;

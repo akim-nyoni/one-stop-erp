@@ -1,0 +1,46 @@
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.Inventory;
+using One4All.Application.Abstractions.MasterData;
+using One4All.Core.Accounting;
+using One4All.Core.Inventory;
+using One4All.Infrastructure.Persistence;
+using Xunit;
+
+namespace One4All.AccountingTests;
+
+/// <summary>Thirteenth audit #23: an item's HS code, country of origin, brand and tax code are set from its details, the tax code checked against the item's kind.</summary>
+[Collection(AccountingCollection.Name)]
+public sealed class ItemTradeDetailsTests
+{
+    private readonly AccountingFixture _fixture;
+
+    public ItemTradeDetailsTests(AccountingFixture fixture) => _fixture = fixture;
+
+    [SkippableFact]
+    public async Task Hs_code_origin_brand_and_tax_code_are_set_and_checked()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        (await scope.ServiceProvider.GetRequiredService<IMasterDataService>().CreateTaxCodeAsync(new NewTaxCode(companyId, "SVC15", "Services 15%", TaxType.Standard, 15m,
+            new DateOnly(2026, 1, 1), "2300", "2300", TaxAppliesTo.Services))).IsSuccess.Should().BeTrue();
+        db.Items.Add(new Item(companyId, "ITD-CEM", "Cement 50kg"));
+        await db.SaveChangesAsync();
+        IItemDetailsService details = scope.ServiceProvider.GetRequiredService<IItemDetailsService>();
+
+        (await details.SetDetailsAsync(companyId, "ITD-CEM", new ItemDetails { HsCode = "25AB" })).Error.Code.Should().Be("Item.HsCode");
+        (await details.SetDetailsAsync(companyId, "ITD-CEM", new ItemDetails { TaxCode = "svc15" })).Error.Code.Should().Be("Tax.WrongSupply");
+        (await details.SetDetailsAsync(companyId, "ITD-CEM", new ItemDetails { TaxCode = "NONE" })).Error.Code.Should().Be("Item.TaxCode");
+        (await details.SetDetailsAsync(companyId, "ITD-CEM", new ItemDetails { HsCode = "2523.29", CountryOfOrigin = "Zimbabwe", Brand = "PPC" })).IsSuccess.Should().BeTrue();
+        Item saved = await db.Items.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.Code == "ITD-CEM");
+        (saved.HsCode, saved.CountryOfOrigin, saved.Brand, saved.TaxCode).Should().Be(("2523.29", "Zimbabwe", "PPC", (string?)null));
+
+        (await details.SetDetailsAsync(companyId, "ITD-CEM", new ItemDetails { HsCode = " ", Brand = string.Empty })).IsSuccess.Should().BeTrue();
+        saved = await db.Items.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.Code == "ITD-CEM");
+        (saved.HsCode, saved.CountryOfOrigin, saved.Brand).Should().Be(((string?)null, "Zimbabwe", (string?)null), "blank clears, null leaves as it is");
+    }
+}
