@@ -68,6 +68,7 @@ public sealed class PrepaidVendingTests
         VendResult first = sold.Value;
         first.Should().Match<VendResult>(r => r.ToArrears == 10m && r.ToUnits == 40m && r.Units == 160m && r.ArrearsAfter == 90m);
         first.Token.Should().MatchRegex(@"^\d{4}(-\d{4}){4}$");
+        first.TestToken.Should().BeTrue("no vendor generator is registered, so the token is a test one");
         VendResult second = (await prepaid.VendAsync(Vend(stand.Id, 500m, 25m, 2))).Value;
         second.Should().Match<VendResult>(r => r.ToArrears == 90m && r.ToUnits == 410m && r.Units == 1640m && r.ArrearsAfter == 0m);
         VendResult third = (await prepaid.VendAsync(Vend(stand.Id, 20m, 25m, 3))).Value;

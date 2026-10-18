@@ -23,6 +23,9 @@ namespace One4All.Infrastructure.Municipal;
 public sealed class PlaceholderPrepaidTokenGenerator : IPrepaidTokenGenerator
 {
     /// <inheritdoc />
+    public bool IsLive => false;
+
+    /// <inheritdoc />
     public string Generate(string meterSerial, decimal units, string saleNumber)
     {
         byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(string.Create(CultureInfo.InvariantCulture, $"{meterSerial}|{units:0.00}|{saleNumber}")));
@@ -158,7 +161,7 @@ public sealed class PrepaidVendingService : IPrepaidVendingService
         _db.Set<PrepaidSale>().Add(new PrepaidSale(request.CompanyId, number.Value, property.Id, request.ServiceType, meterSerial, request.Date,
             request.Amount, split.ToArrears, split.Units, token, string.IsNullOrWhiteSpace(request.Channel) ? "Counter" : request.Channel.Trim()));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new VendResult(number.Value, token, split.Units, split.ToArrears, split.ToUnits, Math.Max(0m, arrears - split.ToArrears));
+        return new VendResult(number.Value, token, split.Units, split.ToArrears, split.ToUnits, Math.Max(0m, arrears - split.ToArrears), !_tokens.IsLive);
     }
 
     /// <inheritdoc />

@@ -395,7 +395,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Prepaid vending", ListTitle = "Prepaid sales (this month)",
-            Description = "Sells prepaid units (water or electricity) to a stand: part of the payment can go to its arrears; the rest buys units and gives a token.",
+            Description = "Sells prepaid units (water or electricity) to a stand: part of the payment can go to its arrears; the rest buys units and gives a token. Until the prepaid "
+                + "vendor's token generator is registered, tokens come from a test generator and each sale says so.",
             Fields = [Req("Stand", "Stand number"), Pick("Service", "Service", [nameof(ServiceType.Water), nameof(ServiceType.Electricity)]), Num("Amount", "Amount paid"), Req("Bank", "Bank / cash account"),
                 Num("Arrears", "% to arrears", "0"), Pick("Channel", "Channel", ["Counter", "Agent", "Mobile"]), Today()],
             Run = async (c, i) =>
@@ -405,7 +406,11 @@ public static partial class OperationCatalogue
                     CompanyId = c.CompanyId, PropertyId = await PropertyAsync(c, i.Text("Stand")).ConfigureAwait(true), ServiceType = Enum.Parse<ServiceType>(i.Text("Service")), Amount = i.Number("Amount"),
                     Date = i.Date("Date"), BankAccountCode = i.Text("Bank"), ArrearsPercent = i.Number("Arrears"), Channel = i.Text("Channel"),
                 }).ConfigureAwait(true));
-                return $"Sale {vend.SaleNumber}: token {vend.Token} for {Q(vend.Units)} units ({M(vend.ToUnits)}); {M(vend.ToArrears)} to arrears, arrears now {M(vend.ArrearsAfter)}.";
+                string sold = $"Sale {vend.SaleNumber}: token {vend.Token} for {Q(vend.Units)} units ({M(vend.ToUnits)}); {M(vend.ToArrears)} to arrears, arrears now {M(vend.ArrearsAfter)}.";
+                return vend.TestToken
+                    ? "WARNING: TEST TOKEN - no meter will accept it. This installation has no prepaid vendor's token generator registered; do not hand this token to the customer."
+                        + Environment.NewLine + sold
+                    : sold;
             },
             List = async c => Table(await c.Get<IPrepaidVendingService>().SalesAsync(c.CompanyId, new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1), DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
                 ("Sale", x => x.SaleNumber), ("Stand", x => x.StandNumber), ("Date", x => x.SoldOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Amount", x => M(x.Amount)),

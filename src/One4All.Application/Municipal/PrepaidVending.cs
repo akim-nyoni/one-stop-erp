@@ -41,4 +41,7 @@ public interface IPrepaidTokenGenerator
     /// <param name="saleNumber">The sale number.</param>
     /// <returns>The token.</returns>
     string Generate(string meterSerial, decimal units, string saleNumber);
+
+    /// <summary>Whether the tokens are real ones a meter accepts (a vendor's STS generator); false for the built-in test generator.</summary>
+    bool IsLive => true;
 }

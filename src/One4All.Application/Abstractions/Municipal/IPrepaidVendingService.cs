@@ -38,7 +38,8 @@ public sealed class PrepaidVendRequest
 /// <param name="ToArrears">The part taken towards arrears.</param>
 /// <param name="ToUnits">The part that bought units.</param>
 /// <param name="ArrearsAfter">What the account still owes.</param>
-public sealed record VendResult(string SaleNumber, string Token, decimal Units, decimal ToArrears, decimal ToUnits, decimal ArrearsAfter);
+/// <param name="TestToken">True when the token came from the built-in test generator and no meter will accept it (no vendor generator is registered).</param>
+public sealed record VendResult(string SaleNumber, string Token, decimal Units, decimal ToArrears, decimal ToUnits, decimal ArrearsAfter, bool TestToken = false);
 
 /// <summary>A line of the prepaid sales report.</summary>
 /// <param name="SaleNumber">The sale number.</param>
