@@ -946,7 +946,7 @@ public static class SystemReports
             def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
         }
 
-        // Sales, purchasing, cash book and tax listings all take the common parameters (brief §9): a reporting currency and rate basis, a branch,
+        // Sales, purchasing, cash book, tax and the finance modules' listings all take the common parameters (brief §9): a reporting currency and rate basis, a branch,
         // cost centre and department to narrow to, and whether unposted journals count; the header then names the rate basis the runner used.
         bool common = CommonParameterModules.Contains(module, StringComparer.Ordinal);
         if (common)
@@ -1045,12 +1045,12 @@ public static class SystemReports
         definition.DataSources.FirstOrDefault()?.Command ?? definition.Code;
 
     /// <summary>The modules whose listings take the common parameters (mirrored by the application layer's ReportCommonParameters, which this project cannot reference).</summary>
-    public static readonly string[] CommonParameterModules = ["Sales", "Purchasing", "CashBook", "Tax"];
+    public static readonly string[] CommonParameterModules = ["Sales", "Purchasing", "CashBook", "Tax", "GeneralLedger", "Receivables", "SalesOrders", "FixedAssets", "Budget", "JobCosting"];
 
     /// <summary>The parameter the report runner adds to say which rate it translated amounts at; the listing header shows it.</summary>
     public const string RateBasisUsedParameter = "RateBasisUsed";
 
-    /// <summary>The common parameters of sales, purchasing, cash book and tax listings, in the order they are prompted.</summary>
+    /// <summary>The common parameters of the listings of <see cref="CommonParameterModules"/>, in the order they are prompted.</summary>
     public static readonly (string Name, ParameterType Type)[] CommonParameters =
     [
         ("ReportingCurrency", ParameterType.String), ("RateBasis", ParameterType.String), ("Rate", ParameterType.Decimal), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String),

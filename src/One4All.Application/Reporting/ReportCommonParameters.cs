@@ -3,7 +3,8 @@ using System.Globalization;
 namespace One4All.Application.Reporting;
 
 /// <summary>
-/// The parameters every sales, purchasing, cash book and tax listing takes besides its own (brief §9 "common parameters"): a reporting
+/// The parameters every sales, purchasing, cash book, tax, general ledger, receivables, sales order, fixed asset, budget and job costing listing takes
+/// besides its own (brief §9 "common parameters"): a reporting
 /// currency with the rate basis to translate at, and a branch, cost centre and department to narrow postings to, and whether unposted
 /// journals count. Listings declare them (see the reporting catalogue); the report runner translates amounts and names the rate basis
 /// used in the header, and the providers that read journal lines apply the dimension filters.
@@ -24,7 +25,7 @@ public sealed record ReportCommonParameters(string? ReportingCurrency, string? R
     public const string RateBasisUsed = "RateBasisUsed";
 
     /// <summary>The modules whose listings take the common parameters.</summary>
-    public static readonly string[] Modules = ["Sales", "Purchasing", "CashBook", "Tax"];
+    public static readonly string[] Modules = ["Sales", "Purchasing", "CashBook", "Tax", "GeneralLedger", "Receivables", "SalesOrders", "FixedAssets", "Budget", "JobCosting"];
 
     /// <summary>Nothing asked for: base currency, every dimension, posted journals only.</summary>
     public static ReportCommonParameters None { get; } = new(null, null, null, null, null, null, false);

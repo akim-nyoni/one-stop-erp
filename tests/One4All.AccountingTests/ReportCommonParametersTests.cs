@@ -25,16 +25,16 @@ public sealed class ReportCommonParametersTests
     public ReportCommonParametersTests(AccountingFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public void Listings_in_the_four_modules_declare_the_common_parameters()
+    public void Listings_in_the_finance_modules_declare_the_common_parameters()
     {
-        foreach (string code in new[] { "AR29", "AP64", "CB68", "TX216" })
+        foreach (string code in new[] { "AR29", "AP64", "CB68", "TX216", "GL22" })
         {
             ReportDefinition? definition = SystemReportCatalogue.All().FirstOrDefault(d => d.Code == code);
             definition.Should().NotBeNull(code);
             definition!.Parameters.Select(p => p.Name).Should().Contain(ReportCommonParameters.Names, code);
         }
 
-        SystemReportCatalogue.All().First(d => d.Code == "GL22").Parameters.Select(p => p.Name).Should().NotContain("RateBasis", "ledger listings keep their own parameter lists");
+        SystemReportCatalogue.All().First(d => d.Module == "Payroll").Parameters.Select(p => p.Name).Should().NotContain("RateBasis", "payroll listings keep their own parameter lists");
     }
 
     [SkippableFact]

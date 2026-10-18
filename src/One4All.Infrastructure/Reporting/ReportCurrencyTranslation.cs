@@ -76,7 +76,9 @@ internal static class ReportCurrencyTranslation
         return (translated, shown);
     }
 
-    private static readonly System.Text.RegularExpressions.Regex NotMoney = new("rate|percent|share|days|count|qty|quantity|items|documents|customers|suppliers|rank|number|weight|hours|units", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+    // Columns that are not base-currency money: rates, shares and counts, and amounts already in a currency of their own (transaction, foreign, reporting).
+    private static readonly System.Text.RegularExpressions.Regex NotMoney = new("rate|percent|share|days|count|qty|quantity|items|documents|customers|suppliers|rank|number|weight|hours|units"
+        + "|transaction|foreign|reporting|year|period|months|life|age|version|sequence|score|size|area", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private static readonly System.Text.RegularExpressions.Regex TwoDecimals = new(@"^-?[0-9][0-9,]*\.[0-9]{2}$", System.Text.RegularExpressions.RegexOptions.Compiled);
 

@@ -39,6 +39,7 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         DateOnly asAt = DateParameter(parameters, "AsAtDate") ?? today;
         DateOnly toDate = DateParameter(parameters, "ToDate") ?? today;
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
+        _common = Application.Reporting.ReportCommonParameters.From(parameters);
         return command.ToUpperInvariant() switch
         {
             "GLEDCLOSESTATUS" => await CloseStatusAsync(companyId, asAt, ct).ConfigureAwait(false),
@@ -68,11 +69,23 @@ public sealed class LedgerReportDataProvider : IReportDataProvider
         };
     }
 
+    // Posted lines in a date range, narrowed by the listing's common parameters (brief §9): a branch, cost centre or department, and unposted journals when asked.
     private IQueryable<JournalLine> PostedLines(long companyId, DateOnly fromDate, DateOnly toDate)
-        => from l in _db.Set<JournalLine>().AsNoTracking()
-           join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
-           where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate >= fromDate && j.PostingDate <= toDate
-           select l;
+    {
+        Application.Reporting.ReportCommonParameters common = _common;
+        IQueryable<JournalLine> lines = _db.Set<JournalLine>().AsNoTracking();
+        if (common.Branch is string branch) { lines = lines.Where(l => l.Branch == branch); }
+        if (common.CostCentre is string costCentre) { lines = lines.Where(l => l.CostCentre == costCentre); }
+        if (common.Department is string department) { lines = lines.Where(l => l.Department == department); }
+        bool unposted = common.IncludeUnposted;
+        return from l in lines
+               join j in _db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id
+               where j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred)))
+                   && j.PostingDate >= fromDate && j.PostingDate <= toDate
+               select l;
+    }
+
+    private Application.Reporting.ReportCommonParameters _common = Application.Reporting.ReportCommonParameters.None;
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> MultiCurrencyTbAsync(long companyId, DateOnly asAt, CancellationToken ct)
     {
