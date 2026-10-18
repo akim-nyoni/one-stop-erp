@@ -78,4 +78,38 @@ public sealed class SchoolOptionsProRataTests
         (await db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.DocumentNumber == "SOP-T1-SOP-003-CR").SelectMany(j => j.Lines)
             .Where(l => l.AccountCode == "2490").SumAsync(l => l.BaseDebit)).Should().Be(299.97m);
     }
+
+    [SkippableFact]
+    public async Task A_leaver_is_credited_the_unused_transport_and_boarding()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.Add(new LedgerAccount(companyId, "4220", "Transport Income", AccountType.Income));
+        db.Accounts.Add(new LedgerAccount(companyId, "4230", "Boarding Income", AccountType.Income));
+        Customer guardian = new(companyId, "SOX-G", "Guardian", Scenario.Usd);
+        db.Customers.Add(guardian);
+        FeeStructure g4 = new(companyId, "SOX-G4", "Grade 4 Term 1", "SOX4", "Term 1", "4200");
+        g4.AddItem("Tuition", 900m, true);
+        TransportRoute bus = new(companyId, "SOX-R1", "Northern route", 40, 180m, "4220");
+        Hostel house = new(companyId, "SOX-H1", "Boys' house", 60, 600m, "4230");
+        db.AddRange(g4, bus, house);
+        await db.SaveChangesAsync();
+        Student leaver = new(companyId, "SOX-001", "Bus and Board", "SOX4", guardian.Id) { TransportRouteId = bus.Id, IsBoarder = true, HostelId = house.Id };
+        db.Students.Add(leaver);
+        await db.SaveChangesAsync();
+
+        ISchoolBillingService billing = scope.ServiceProvider.GetRequiredService<ISchoolBillingService>();
+        (await billing.SetTermAsync(companyId, g4.Id, new DateOnly(2026, 1, 1), new DateOnly(2026, 3, 31), true)).IsSuccess.Should().BeTrue();
+        (await billing.BillTermAsync(companyId, g4.Id, "SOX-T1-", new DateOnly(2026, 1, 5))).IsSuccess.Should().BeTrue();
+
+        // Leaving on 1 March (60 of 90 days): a third of the tuition, the bus (59.99 of 180) and the boarding (199.98 of 600) come back.
+        WithdrawalResult left = (await billing.WithdrawAsync(companyId, leaver.Id, new DateOnly(2026, 3, 1), g4.Id, "SOX-T1-")).Value;
+        left.Should().Be(new WithdrawalResult("SOX-T1-SOX-001-CR", 299.97m, 259.97m));
+        (await db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.DocumentNumber == "SOX-T1-SOX-001-HS-CR").SelectMany(j => j.Lines)
+            .Where(l => l.AccountCode == "4230").SumAsync(l => l.BaseDebit)).Should().Be(199.98m);
+        (await db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.TraderId == guardian.Id).SumAsync(i => i.OutstandingBase)).Should().Be(1_680m - 299.97m - 259.97m);
+    }
 }

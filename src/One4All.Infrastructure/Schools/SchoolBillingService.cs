@@ -392,9 +392,76 @@ public sealed class SchoolBillingService : ISchoolBillingService
                 }
             }
 
+            // Transport and boarding were billed for the whole term on their own invoices: the unused part comes back on each, to its own revenue account.
+            decimal extrasCredited = 0m;
+            if (structure.ProRata && structure.TermStart is not null)
+            {
+                Result<decimal> extras = await CreditExtrasAsync(companyId, student, structure, invoiceNumber, leftOn, ct).ConfigureAwait(false);
+                if (extras.IsFailure)
+                {
+                    return extras.Error;
+                }
+
+                extrasCredited = extras.Value;
+            }
+
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return Result<WithdrawalResult>.Success(new WithdrawalResult(creditNumber, credit));
+            return Result<WithdrawalResult>.Success(new WithdrawalResult(creditNumber, credit, extrasCredited));
         }, ct);
+
+    // A leaver's transport (-TR) and boarding (-HS) invoices for the term credited for the days after leaving (-TR-CR, -HS-CR) and set against them.
+    private async Task<Result<decimal>> CreditExtrasAsync(long companyId, Student student, FeeStructure structure, string invoiceNumber, DateOnly leftOn, CancellationToken ct)
+    {
+        List<(string Suffix, string Tag, string Account)> extras = [];
+        if (student.TransportRouteId is long routeId && await _db.Set<TransportRoute>().AsNoTracking().FirstOrDefaultAsync(r => r.Id == routeId, ct).ConfigureAwait(false) is TransportRoute route)
+        {
+            extras.Add(("-TR", $"transport {route.Code}", route.RevenueAccountCode));
+        }
+
+        if (student.HostelId is long hostelId && await _db.Set<Hostel>().AsNoTracking().FirstOrDefaultAsync(h => h.Id == hostelId, ct).ConfigureAwait(false) is Hostel hostel)
+        {
+            extras.Add(("-HS", $"boarding {hostel.Code}", hostel.RevenueAccountCode));
+        }
+
+        decimal used = structure.ShareOfTerm(null, leftOn), total = 0m;
+        Company? company = null;
+        foreach ((string suffix, string tag, string account) in extras)
+        {
+            string number = invoiceNumber + suffix;
+            OpenItem? invoice = await _db.OpenItems.AsNoTracking().FirstOrDefaultAsync(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.DocumentNumber == number, ct)
+                .ConfigureAwait(false);
+            decimal credit = invoice is null ? 0m : invoice.OriginalTransaction - decimal.Round(invoice.OriginalTransaction * used, 2, MidpointRounding.AwayFromZero);
+            if (invoice is null || credit <= 0m)
+            {
+                continue;
+            }
+
+            company ??= await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+            Result<TradingPostingResult> posted = await _salesLedger.PostCreditNoteAsync(new SalesCreditNoteRequest
+            {
+                CompanyId = companyId, CustomerId = invoice.TraderId, DocumentNumber = number + "-CR", DocumentDate = leftOn, Currency = company.BaseCurrency, NetAmount = credit, SalesAccountCode = account,
+                Narrative = $"{structure.Term} fees - {student.FullName} ({student.AdmissionNumber}) [{tag}, left {leftOn:yyyy-MM-dd}]",
+            }, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+
+            if (_allocations is not null && invoice.OutstandingTransaction > 0m)
+            {
+                Result<AllocationResult> allocated = await _allocations.AllocateAsync(companyId, TradingLedger.AccountsReceivable, invoice.Id, posted.Value.OpenItemId,
+                    Math.Min(credit, invoice.OutstandingTransaction), leftOn, ct).ConfigureAwait(false);
+                if (allocated.IsFailure)
+                {
+                    return allocated.Error;
+                }
+            }
+
+            total += credit;
+        }
+
+        return total;
+    }
 
     // Transport and boarding are billed on their own invoices (-TR, -HS) to their own revenue accounts, without bursary discounts;
     // the narrative keeps the fee pattern so arrears and collections see them, tagged with the route or hostel.

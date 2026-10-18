@@ -24,7 +24,8 @@ public readonly record struct StudentBillResult(long StudentId, decimal GrossFee
 /// <summary>A withdrawal and its pro-rata credit.</summary>
 /// <param name="CreditNoteNumber">The credit note (null when nothing was credited).</param>
 /// <param name="Credited">The amount credited for the unused part of the term.</param>
-public readonly record struct WithdrawalResult(string? CreditNoteNumber, decimal Credited);
+/// <param name="ExtrasCredited">What was credited on the term's transport and boarding invoices for the unused part of the term.</param>
+public readonly record struct WithdrawalResult(string? CreditNoteNumber, decimal Credited, decimal ExtrasCredited = 0m);
 
 /// <summary>The result of a term billing run.</summary>
 /// <param name="Bills">The per-student results.</param>
