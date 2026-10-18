@@ -178,7 +178,8 @@ internal sealed class StandAllocationConfiguration : IEntityTypeConfiguration<St
 
         // Hard controls (brief §4.10.4): one live allocation per stand, one per beneficiary, certificates never reused.
         b.HasIndex(x => x.StandId).IsUnique().HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_one_live_per_stand");
-        b.HasIndex(x => x.ApplicantId).IsUnique().HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_one_live_per_applicant");
+        // Not unique: a household may hold more than one stand where the council or the scheme allows (the allocation run enforces the limit).
+        b.HasIndex(x => x.ApplicantId).HasFilter("status IN (0, 1, 2)").HasDatabaseName("ix_stand_allocation_live_per_applicant");
         b.HasIndex(x => new { x.CompanyId, x.CertificateNumber }).IsUnique().HasFilter("certificate_number IS NOT NULL");
     }
 }

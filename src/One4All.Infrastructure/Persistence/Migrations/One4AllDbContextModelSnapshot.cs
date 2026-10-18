@@ -11027,8 +11027,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_stand_allocation_allocation_run_id");
 
                     b.HasIndex("ApplicantId")
-                        .IsUnique()
-                        .HasDatabaseName("ix_stand_allocation_one_live_per_applicant")
+                        .HasDatabaseName("ix_stand_allocation_live_per_applicant")
                         .HasFilter("status IN (0, 1, 2)");
 
                     b.HasIndex("StandId")

@@ -64,8 +64,12 @@ public sealed class AllocationService : IAllocationService
                 .OrderBy(s => s.StandNumber).Select(s => new { s.Id, s.StandNumber }).ToListAsync(ct).ConfigureAwait(false))
             .Where(s => !unavailable.Contains(s.Id)).ToList();
 
+        // Where a household may hold more than one stand, an applicant already allocated one stays a candidate until the household reaches the limit.
+        int limit = Math.Max(1, await _db.HousingSchemes.AsNoTracking().Where(s => s.Id == proposal.SchemeId).Select(s => s.StandsPerBeneficiary).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+            ?? await _db.Companies.AsNoTracking().Where(c => c.Id == proposal.CompanyId).Select(c => c.StandsPerBeneficiary).FirstOrDefaultAsync(ct).ConfigureAwait(false));
         var listed = await _db.HousingApplicants.AsNoTracking()
-            .Where(a => a.CompanyId == proposal.CompanyId && a.Category == proposal.Category && a.WaitingListNumber != null && (a.Status == ApplicantStatus.Active || a.Status == ApplicantStatus.Suspended))
+            .Where(a => a.CompanyId == proposal.CompanyId && a.Category == proposal.Category && a.WaitingListNumber != null
+                && (a.Status == ApplicantStatus.Active || a.Status == ApplicantStatus.Suspended || (limit > 1 && a.Status == ApplicantStatus.Allocated)))
             .Select(a => new { a.Id, Number = a.WaitingListNumber!, a.Status, a.IdNumber, a.SpouseIdNumber }).ToListAsync(ct).ConfigureAwait(false);
 
         // A substitution run does not offer a stand again to whoever declined it or let its offer lapse.
@@ -76,8 +80,6 @@ public sealed class AllocationService : IAllocationService
 
         // One household, N stands (brief §4.10.4; N is 1 unless the council or the scheme says otherwise): a household's stands held plus its live allocations, counted on the
         // national IDs of applicant and spouse, keep it out once it reaches the limit.
-        int limit = Math.Max(1, await _db.HousingSchemes.AsNoTracking().Where(s => s.Id == proposal.SchemeId).Select(s => s.StandsPerBeneficiary).FirstOrDefaultAsync(ct).ConfigureAwait(false)
-            ?? await _db.Companies.AsNoTracking().Where(c => c.Id == proposal.CompanyId).Select(c => c.StandsPerBeneficiary).FirstOrDefaultAsync(ct).ConfigureAwait(false));
         HashSet<string> householdIds = [.. listed.SelectMany(a => new[] { a.IdNumber, a.SpouseIdNumber }).OfType<string>()];
         Dictionary<string, int> held = new(StringComparer.Ordinal);
         var holders = await _db.Customers.AsNoTracking()
@@ -89,18 +91,27 @@ public sealed class AllocationService : IAllocationService
             held[holder.Id] = held.GetValueOrDefault(holder.Id) + holder.Count;
         }
 
+        // Live allocations, once each: an accepted one stops counting here when its stand already has a holder (counted above); an applicant marked allocated with
+        // no allocation on record (taken on, or housed some other way) counts one.
         var allocated = await _db.HousingApplicants.AsNoTracking()
             .Where(a => a.CompanyId == proposal.CompanyId && householdIds.Contains(a.IdNumber))
-            .Select(a => new { a.IdNumber, Count = _db.Set<StandAllocation>().Count(x => x.ApplicantId == a.Id && Live.Contains(x.Status)) + (a.Status == ApplicantStatus.Allocated ? 1 : 0) })
+            .Select(a => new
+            {
+                a.IdNumber,
+                Live = _db.Set<StandAllocation>().Count(x => x.ApplicantId == a.Id && Live.Contains(x.Status)
+                    && (x.Status != AllocationStatus.Accepted || _db.HousingStands.Any(s => s.Id == x.StandId && s.CurrentHolderCustomerId == null))),
+                Allocated = a.Status == ApplicantStatus.Allocated,
+                AnyAllocation = _db.Set<StandAllocation>().Any(x => x.ApplicantId == a.Id && x.Status == AllocationStatus.Accepted),
+            })
             .ToListAsync(ct).ConfigureAwait(false);
         foreach (var holder in allocated)
         {
-            held[holder.IdNumber] = held.GetValueOrDefault(holder.IdNumber) + holder.Count;
+            held[holder.IdNumber] = held.GetValueOrDefault(holder.IdNumber) + holder.Live + (holder.Allocated && !holder.AnyAllocation ? 1 : 0);
         }
 
         int Household(string idNumber, string? spouse) => held.GetValueOrDefault(idNumber) + (spouse is null || spouse == idNumber ? 0 : held.GetValueOrDefault(spouse));
         HashSet<long> spouseHolds = [.. listed.Where(a => Household(a.IdNumber, a.SpouseIdNumber) >= limit && held.GetValueOrDefault(a.IdNumber) < limit).Select(a => a.Id)];
-        var applicants = listed.Where(a => a.Status == ApplicantStatus.Active && Household(a.IdNumber, a.SpouseIdNumber) < limit && !refused.Contains(a.Id)).ToList();
+        var applicants = listed.Where(a => a.Status is ApplicantStatus.Active or ApplicantStatus.Allocated && Household(a.IdNumber, a.SpouseIdNumber) < limit && !refused.Contains(a.Id)).ToList();
         Dictionary<string, long> applicantIds = applicants.ToDictionary(a => a.Number, a => a.Id, StringComparer.Ordinal);
 
         // The canonical candidate list: ranked for seniority and score, waiting-list-number order for a ballot.
