@@ -976,10 +976,20 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         }
 
         decimal rate = rateResult.Value;
-        decimal gross = request.NetAmount + request.TaxAmount;
+
+        // The tax code decides how the VAT posts (brief §3.5): a reverse-charge or deemed (import) code is self-assessed - the supplier is owed the net only, the
+        // tax is charged as output and claimed as input - and a code's recoverable percentage splits the input claim from the part that is a cost.
+        TaxCode? taxCode = request.TaxCode is string codeOnInvoice
+            ? await _db.TaxCodes.AsNoTracking().Include(t => t.Rates).FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == codeOnInvoice, ct).ConfigureAwait(false)
+            : null;
+        bool selfAssessed = taxCode is { Type: TaxType.ReverseCharge or TaxType.Deemed };
+        decimal taxAmount = selfAssessed && request.TaxAmount == 0m
+            ? decimal.Round(request.NetAmount * taxCode!.RateOn(request.DocumentDate) / 100m, 2, MidpointRounding.AwayFromZero)
+            : request.TaxAmount;
+        decimal gross = selfAssessed ? request.NetAmount : request.NetAmount + taxAmount;
         decimal baseNet = Round(request.NetAmount * rate);
-        decimal baseTax = Round(request.TaxAmount * rate);
-        decimal baseGross = baseNet + baseTax;
+        decimal baseTax = Round(taxAmount * rate);
+        decimal baseGross = selfAssessed ? baseNet : baseNet + baseTax;
 
         // An invoice with no order behind it never passed the gate at order raising, so it passes it here (brief §4.18.5): the spend against what is left of the vote.
         if (_budget is not null && request.NetAmount > 0m)
@@ -1019,9 +1029,15 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
                 lines.Insert(i, Analysed(Line(expense.AccountCode, JournalSide.Debit, expense.NetAmount, rate, baseShare), request, expense));
             }
         }
-        if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
+        if (taxAmount != 0m)
         {
-            lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax, request.TaxCode));
+            Result<List<JournalLineRequest>> taxLines = await PurchaseTaxLinesAsync(request, taxCode, selfAssessed, taxAmount, baseTax, rate, ct).ConfigureAwait(false);
+            if (taxLines.IsFailure)
+            {
+                return taxLines.Error;
+            }
+
+            lines.AddRange(taxLines.Value);
         }
 
         Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice,
@@ -1036,6 +1052,57 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         }
 
         return posted;
+    }
+
+    // A purchase invoice's tax: the recoverable share to the input account, the rest to the (first) expense account as cost, and for a self-assessed
+    // (reverse-charge or deemed) code the whole tax credited to the output account, so the supplier is never owed it.
+    private async Task<Result<List<JournalLineRequest>>> PurchaseTaxLinesAsync(PurchaseInvoiceRequest request, TaxCode? taxCode, bool selfAssessed, decimal taxAmount, decimal baseTax, decimal rate,
+        CancellationToken ct)
+    {
+        decimal recoverablePercent = taxCode is null ? 100m : Math.Clamp(taxCode.RecoverablePercent, 0m, 100m);
+        decimal recoverable = decimal.Round(taxAmount * recoverablePercent / 100m, 2, MidpointRounding.AwayFromZero);
+        decimal recoverableBase = recoverable == taxAmount ? baseTax : Round(recoverable * rate);
+        string? inputAccount = request.TaxAccountCode ?? taxCode?.InputAccountCode
+            ?? await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == request.CompanyId && a.ControlAccountType == ControlAccountType.VatInput).OrderBy(a => a.AccountCode)
+                .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        List<JournalLineRequest> lines = [];
+        if (recoverable != 0m)
+        {
+            if (inputAccount is null)
+            {
+                return Error.Validation("Tax.InputAccount", "The invoice carries tax but there is no input tax account to claim it on.");
+            }
+
+            lines.Add(Line(inputAccount, JournalSide.Debit, recoverable, rate, recoverableBase, request.TaxCode));
+        }
+
+        if (taxAmount - recoverable != 0m)
+        {
+            // The irrecoverable part is part of what the purchase cost.
+            string costAccount = request.ExpenseLines.Count == 0 ? request.ExpenseAccountCode : request.ExpenseLines[0].AccountCode;
+            JournalLineRequest cost = Analysed(Line(costAccount, JournalSide.Debit, taxAmount - recoverable, rate, baseTax - recoverableBase, request.TaxCode), request,
+                request.ExpenseLines.Count == 0 ? null : request.ExpenseLines[0]);
+            lines.Add(new JournalLineRequest
+            {
+                AccountCode = cost.AccountCode, Side = cost.Side, TransactionAmount = cost.TransactionAmount, ExchangeRate = cost.ExchangeRate, BaseAmount = cost.BaseAmount, TaxCode = cost.TaxCode,
+                CostCentre = cost.CostCentre, Department = cost.Department, Project = cost.Project, Narrative = $"Irrecoverable tax ({100m - recoverablePercent:0.##}%)",
+            });
+        }
+
+        if (selfAssessed)
+        {
+            string? outputAccount = taxCode!.OutputAccountCode
+                ?? await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == request.CompanyId && a.ControlAccountType == ControlAccountType.VatOutput).OrderBy(a => a.AccountCode)
+                    .Select(a => a.AccountCode).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (outputAccount is null)
+            {
+                return Error.Validation("Tax.OutputAccount", $"Tax code {taxCode.Code} is self-assessed but there is no output tax account to charge it to.");
+            }
+
+            lines.Add(Line(outputAccount, JournalSide.Credit, taxAmount, rate, baseTax, request.TaxCode));
+        }
+
+        return lines;
     }
 
     /// <inheritdoc />
