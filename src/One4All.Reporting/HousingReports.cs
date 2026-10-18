@@ -283,6 +283,10 @@ public static class HousingReports
 
         yield return Listing("H97", "Ward Housing Pack", "Housing", "One ward for its councillor: schemes, stands by status, allocations, beneficiaries, instalment arrears and the council-wide waiting list.",
             "HousingWardPack", [new Column("Section", "Section", 100), new Column("Item", "Item", 200), new Column("Value", "Value", 160)], [("Ward", ParameterType.String), ("AsAtDate", ParameterType.Date)]);
+        yield return Listing("H98", "Stand Holder vs Municipal Ratepayer", "Housing", "Stands whose holder on the housing register is not the ratepayer the municipal property is billed to, "
+            + "with any transfer application in progress - each to be put through a transfer with a rates clearance certificate so the bills go to the holder.",
+            "HousingRatepayerMismatch", [new Column("Stand", "Stand", 90), new Column("Holder", "Holder (housing)", 180), new Column("Ratepayer", "Ratepayer (municipal)", 180),
+             new Column("Transfer", "Transfer in progress", 110), new Column("Action", "Action", 220)], []);
 
         // Applicant verification, statements and scheme delivery.
         yield return Listing("H21", "Applicant Detail / Verification Sheet", "Housing", "One applicant: every captured detail, notices, date changes and the score derivation - printable for the applicant.",

@@ -72,10 +72,12 @@ public sealed class HousingMunicipalLinkService : IHousingMunicipalLinkService
         }
 
         HousingStand stand = await _db.HousingStands.AsNoTracking().FirstAsync(s => s.Id == standId && s.CompanyId == companyId, ct).ConfigureAwait(false);
-        long? existing = await _db.Properties.Where(p => p.CompanyId == companyId && p.StandNumber == stand.StandNumber).Select(p => (long?)p.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        var existing = await _db.Properties.Where(p => p.CompanyId == companyId && p.StandNumber == stand.StandNumber).Select(p => new { p.Id, p.RatepayerCustomerId })
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (existing is not null)
         {
-            return new MunicipalLinkResult(MunicipalLinkOutcome.AlreadyLinked, existing);
+            // Billed to someone else: the ratepayer moves only through a transfer with clearance, so the stand is reported (H98) rather than re-pointed here.
+            return new MunicipalLinkResult(existing.RatepayerCustomerId == holderCustomerId ? MunicipalLinkOutcome.AlreadyLinked : MunicipalLinkOutcome.RatepayerDiffers, existing.Id);
         }
 
         // The stand's own ward when it has one; the link's default ward otherwise (thirteenth audit #14).

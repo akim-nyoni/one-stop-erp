@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-630 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+631 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -301,6 +301,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. | AsAtDate (Date, optional) | Measure, Value | - | - |
 | H96 | Housing Delivery / Statutory Return | Stands delivered in the year by density, tenure and beneficiary category. | AsAtDate (Date, optional) | Density, Tenure, Category, Stands | - | - |
 | H97 | Ward Housing Pack | One ward for its councillor: schemes, stands by status, allocations, beneficiaries, instalment arrears and the council-wide waiting list. | Ward (String, optional), AsAtDate (Date, optional) | Section, Item, Value | - | - |
+| H98 | Stand Holder vs Municipal Ratepayer | Stands whose holder on the housing register is not the ratepayer the municipal property is billed to, with any transfer application in progress - each to be put through a transfer with a rates clearance certificate so the bills go to the holder. | - | Stand, Holder, Ratepayer, Transfer, Action | - | - |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. | - | StandNumber, Status, Holder, AllocatedCost, SellingPrice | - | Sum(SellingPrice) |
 
 ## HumanResources

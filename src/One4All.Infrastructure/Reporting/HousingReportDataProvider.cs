@@ -148,6 +148,7 @@ public sealed class HousingReportDataProvider : IReportDataProvider
             "HOUSINGCOLLECTIONS" => await CollectionsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGREVENUESUMMARY" => await RevenueSummaryAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGWARDPACK" => await WardPackAsync(companyId, parameters, asAt, ct).ConfigureAwait(false),
+            "HOUSINGRATEPAYERMISMATCH" => await RatepayerMismatchAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGREGISTRATIONFEES" => await RegistrationFeesAsync(companyId, ct).ConfigureAwait(false),
             "HOUSINGARRANGEMENTS" => await ArrangementsAsync(companyId, asAt, ct).ConfigureAwait(false),
             "HOUSINGTRANSFERDUTY" => await TransferDutyAsync(companyId, ct).ConfigureAwait(false),
@@ -1779,6 +1780,31 @@ public sealed class HousingReportDataProvider : IReportDataProvider
         ];
         return [.. streams.Select(x => Row(("Stream", x.Item1), ("PriorYear", Money(x.Item3)),
             ("Change", x.Item3 == 0m ? "-" : ((x.Item2 - x.Item3) * 100m / x.Item3).ToString("+0.0;-0.0;0.0", CultureInfo.InvariantCulture) + "%"), ("YearToDate", x.Item2)))];
+    }
+
+    // H98: a stand held on the housing register by one customer and billed on the municipal register to another (thirteenth audit #14).
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RatepayerMismatchAsync(long companyId, CancellationToken ct)
+    {
+        var pairs = await (from s in _db.HousingStands.AsNoTracking()
+                           join p in _db.Properties.AsNoTracking() on new { s.CompanyId, s.StandNumber } equals new { p.CompanyId, p.StandNumber }
+                           where s.CompanyId == companyId && s.CurrentHolderCustomerId != null && s.CurrentHolderCustomerId != p.RatepayerCustomerId
+                           orderby s.StandNumber
+                           select new { s.Id, s.StandNumber, Holder = s.CurrentHolderCustomerId!.Value, p.RatepayerCustomerId }).ToListAsync(ct).ConfigureAwait(false);
+        if (pairs.Count == 0)
+        {
+            return [];
+        }
+
+        List<long> customerIds = [.. pairs.SelectMany(x => new[] { x.Holder, x.RatepayerCustomerId }).Distinct()];
+        Dictionary<long, string> names = await _db.Customers.AsNoTracking().Where(c => customerIds.Contains(c.Id)).ToDictionaryAsync(c => c.Id, c => c.Code + " " + c.Name, ct).ConfigureAwait(false);
+        List<long> standIds = [.. pairs.Select(x => x.Id)];
+        Dictionary<long, string> open = (await _db.Set<TransferApplication>().AsNoTracking()
+                .Where(t => t.CompanyId == companyId && standIds.Contains(t.StandId) && (t.Status == TransferStatus.Lodged || t.Status == TransferStatus.Submitted || t.Status == TransferStatus.Approved))
+                .Select(t => new { t.StandId, t.ApplicationNumber }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(t => t.StandId).ToDictionary(g => g.Key, g => g.First().ApplicationNumber);
+        return [.. pairs.Select(x => (IReadOnlyDictionary<string, object?>)Row(("Stand", x.StandNumber), ("Holder", names.GetValueOrDefault(x.Holder, "?")), ("Ratepayer", names.GetValueOrDefault(x.RatepayerCustomerId, "?")),
+            ("Transfer", open.GetValueOrDefault(x.Id, "-")),
+            ("Action", open.ContainsKey(x.Id) ? "Complete the transfer (it moves the ratepayer)" : "Lodge a transfer with a rates clearance certificate")))];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> WardPackAsync(long companyId, IReadOnlyDictionary<string, object?> parameters, DateOnly asAt, CancellationToken ct)

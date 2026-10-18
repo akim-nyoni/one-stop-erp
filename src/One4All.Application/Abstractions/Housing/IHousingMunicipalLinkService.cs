@@ -14,6 +14,12 @@ public enum MunicipalLinkOutcome
 
     /// <summary>The stand was already a property; nothing changed (ownership moves by transfer).</summary>
     AlreadyLinked = 2,
+
+    /// <summary>
+    /// The stand was already a property billed to someone other than the new holder: nothing changed, since the ratepayer moves only by a transfer with a rates
+    /// clearance certificate; H98 lists the stand until it does.
+    /// </summary>
+    RatepayerDiffers = 3,
 }
 
 /// <summary>A link result.</summary>

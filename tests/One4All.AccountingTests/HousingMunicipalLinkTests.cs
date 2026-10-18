@@ -14,7 +14,7 @@ namespace One4All.AccountingTests;
 /// <summary>
 /// Covers housing → municipality: the council links stands on sale; selling a stand creates the billable property with the
 /// buyer as owner and ratepayer and the configured service starting on the sale date, so the first month's charge is
-/// pro-rata; a stand already rated is left alone; other events do nothing while the trigger is the sale.
+/// pro-rata; a stand already rated to someone else is left alone and reported as such (the ratepayer moves by transfer with clearance); other events do nothing while the trigger is the sale.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class HousingMunicipalLinkTests
@@ -70,6 +70,6 @@ public sealed class HousingMunicipalLinkTests
         (await housing.SellStandAsync(companyId, rated.Id, buyer.Id, buyer.Name, 8000m, sold, "4100", "1460", "5100", $"HM-INV2-{companyId}")).IsSuccess.Should().BeTrue();
         (await db.Properties.AsNoTracking().SingleAsync(p => p.CompanyId == companyId && p.StandNumber == rated.StandNumber)).RatepayerCustomerId.Should().Be(other.Id);
         (await link.OnEventAsync(companyId, stand.Id, buyer.Id, MunicipalLinkTrigger.TitleRegistered, sold, "T 1/2026")).Value.Outcome.Should().Be(MunicipalLinkOutcome.NotTriggered);
-        (await link.OnEventAsync(companyId, rated.Id, buyer.Id, MunicipalLinkTrigger.Sale, sold, null)).Value.Should().Be(new MunicipalLinkResult(MunicipalLinkOutcome.AlreadyLinked, (await db.Properties.AsNoTracking().SingleAsync(p => p.StandNumber == rated.StandNumber && p.CompanyId == companyId)).Id));
+        (await link.OnEventAsync(companyId, rated.Id, buyer.Id, MunicipalLinkTrigger.Sale, sold, null)).Value.Should().Be(new MunicipalLinkResult(MunicipalLinkOutcome.RatepayerDiffers, (await db.Properties.AsNoTracking().SingleAsync(p => p.StandNumber == rated.StandNumber && p.CompanyId == companyId)).Id));
     }
 }
