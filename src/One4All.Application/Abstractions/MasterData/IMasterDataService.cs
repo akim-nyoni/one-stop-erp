@@ -24,7 +24,11 @@ public sealed record NewAccount(long CompanyId, string Code, string Name, Accoun
 /// <param name="EffectiveFrom">When the rate starts.</param>
 /// <param name="OutputAccountCode">The output (or withholding payable) account.</param>
 /// <param name="InputAccountCode">The input account, if recoverable.</param>
-public sealed record NewTaxCode(long CompanyId, string Code, string Name, TaxType Type, decimal RatePercent, DateOnly EffectiveFrom, string? OutputAccountCode, string? InputAccountCode);
+/// <param name="AppliesTo">Goods, services or both: a code for one is refused on a line for the other.</param>
+/// <param name="Jurisdiction">The country or region the code belongs to (the VAT return groups by it).</param>
+/// <param name="ReturnBox">The tax return box the code reports in.</param>
+public sealed record NewTaxCode(long CompanyId, string Code, string Name, TaxType Type, decimal RatePercent, DateOnly EffectiveFrom, string? OutputAccountCode, string? InputAccountCode,
+    TaxAppliesTo AppliesTo = TaxAppliesTo.Both, string? Jurisdiction = null, string? ReturnBox = null);
 
 /// <summary>A new stock or service item.</summary>
 /// <param name="CompanyId">The company.</param>
@@ -77,16 +81,18 @@ public interface IMasterDataService
     /// <returns>The fiscal year id.</returns>
     Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, int months = 12, CancellationToken ct = default);
 
-    /// <summary>Creates a fiscal year on a calendar: monthly periods, or 4-4-5 weeks (52 weeks in 12 periods); optionally with an adjustment period.</summary>
+    /// <summary>Creates a fiscal year on a calendar: monthly periods, or a week calendar (4-4-5, 4-5-4, 5-4-4 or 13 x 4 weeks, 52 or 53 weeks); optionally with an adjustment period.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="code">The year code.</param>
     /// <param name="startDate">The first day.</param>
-    /// <param name="calendar">Monthly or 4-4-5.</param>
+    /// <param name="calendar">Monthly or a week calendar.</param>
     /// <param name="months">Monthly periods (monthly calendar only).</param>
     /// <param name="adjustmentPeriod">Whether to add the adjustment ("13th") period on the last day.</param>
+    /// <param name="week53">For a week calendar, a 53rd week added to the last period.</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The year id.</returns>
-    Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, Core.System.FiscalCalendar calendar, int months, bool adjustmentPeriod, CancellationToken ct = default);
+    Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, Core.System.FiscalCalendar calendar, int months, bool adjustmentPeriod, bool week53 = false,
+        CancellationToken ct = default);
 
     /// <summary>Adds a ledger account.</summary>
     /// <param name="account">The account.</param>

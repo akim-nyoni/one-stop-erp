@@ -74,6 +74,11 @@ public sealed class SalesOrderService : ISalesOrderService
             orderNumber = allocated.Value;
         }
 
+        if (await TaxSupplyCheck.CheckAsync(_db, request.CompanyId, request.Lines.Select(l => (l.ItemId, l.TaxCode)), ct).ConfigureAwait(false) is Error wrongSupply)
+        {
+            return wrongSupply;
+        }
+
         SalesOrder order = new(request.CompanyId, request.CustomerId, orderNumber, request.OrderDate, request.Currency) { RequestedDeliveryDate = request.RequestedDeliveryDate };
         decimal? limit = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.MaxSalesDiscountPercent).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         decimal deepest = 0m;

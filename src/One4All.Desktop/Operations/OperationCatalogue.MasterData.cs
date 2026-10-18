@@ -677,14 +677,24 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Create a fiscal year", ListTitle = "Fiscal years",
-            Description = "Monthly periods from the start date (any month - e.g. July to June), or a 4-4-5 week calendar; optionally an adjustment (13th) period on the last day for audit "
-                + "and year-end adjustments. Tick to open the periods for every ledger at once.",
-            Fields = [Req("Code", "Year code"), Today("Start", "First day"), Num("Months", "Periods (monthly)", "12"), Pick("Calendar", "Calendar", ["Monthly", "4-4-5 weeks"]),
+            Description = "Monthly periods from the start date (any month - e.g. July to June), or a week calendar: 4-4-5, 4-5-4 or 5-4-4 weeks a quarter, or 13 periods of 4 weeks, "
+                + "with a 53rd week in the last period when the year needs one (the year-end adds it on its own when the calendar would drift from its year-end date); optionally "
+                + "an adjustment period on the last day for audit and year-end adjustments. Tick to open the periods for every ledger at once.",
+            Fields = [Req("Code", "Year code"), Today("Start", "First day"), Num("Months", "Periods (monthly)", "12"),
+                Pick("Calendar", "Calendar", ["Monthly", "4-4-5 weeks", "4-5-4 weeks", "5-4-4 weeks", "13 x 4 weeks"]), Tick("Week53", "53 weeks (week calendars)"),
                 Tick("Adjust", "Add an adjustment period"), Tick("Open", "Open all periods now")],
             Run = async (c, i) =>
             {
-                long year = Check(await c.Get<IMasterDataService>().CreateFiscalYearAsync(c.CompanyId, i.Text("Code"), i.Date("Start"),
-                    i.Text("Calendar") == "Monthly" ? FiscalCalendar.Monthly : FiscalCalendar.FourFourFive, i.Whole("Months"), i.Flag("Adjust")).ConfigureAwait(true));
+                FiscalCalendar calendar = i.Text("Calendar") switch
+                {
+                    "4-4-5 weeks" => FiscalCalendar.FourFourFive,
+                    "4-5-4 weeks" => FiscalCalendar.FourFiveFour,
+                    "5-4-4 weeks" => FiscalCalendar.FiveFourFour,
+                    "13 x 4 weeks" => FiscalCalendar.ThirteenFourWeek,
+                    _ => FiscalCalendar.Monthly,
+                };
+                long year = Check(await c.Get<IMasterDataService>().CreateFiscalYearAsync(c.CompanyId, i.Text("Code"), i.Date("Start"), calendar, i.Whole("Months"), i.Flag("Adjust"),
+                    week53: i.Flag("Week53")).ConfigureAwait(true));
                 if (i.Flag("Open"))
                 {
                     _ = Check(await c.Get<IPeriodService>().OpenYearAsync(c.CompanyId, year, ["GL", "AR", "AP", "CB", "INV", "POP", "SOP", "POS", "VOU", "FA", "PAY", "JOB", "MUNI", "HSE", "SCH", "BUD"])
@@ -709,13 +719,18 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a tax code", ListTitle = "Tax codes", Description = "A tax code with its first rate and the accounts it posts to.",
+            Module = module, Title = "Add a tax code", ListTitle = "Tax codes",
+            Description = "A tax code with its first rate and the accounts it posts to; what it applies to (a goods-only code is refused on a service line and the other way round), "
+                + "its jurisdiction and the tax-return box it reports in (TX226 VAT return by box).",
             Fields = [Req("Code", "Code"), Req("Name", "Name"), Pick("Type", "Type", Enum.GetNames<TaxType>()), Num("Rate", "Rate %"), Today("From", "Rate from"),
-                Opt("Output", "Output / payable account"), Opt("Input", "Input account")],
+                Opt("Output", "Output / payable account"), Opt("Input", "Input account"), Pick("AppliesTo", "Applies to", Enum.GetNames<TaxAppliesTo>()), Opt("Jurisdiction", "Jurisdiction"),
+                Opt("ReturnBox", "Return box")],
             Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateTaxCodeAsync(new NewTaxCode(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<TaxType>(i.Text("Type")),
-                i.Number("Rate"), i.Date("From"), i.Optional("Output"), i.Optional("Input"))).ConfigureAwait(true), id => "Tax code added."),
+                i.Number("Rate"), i.Date("From"), i.Optional("Output"), i.Optional("Input"), Enum.Parse<TaxAppliesTo>(i.Text("AppliesTo")), i.Optional("Jurisdiction"), i.Optional("ReturnBox")))
+                .ConfigureAwait(true), id => "Tax code added."),
             List = async c => Table(await c.Db.TaxCodes.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Type", x => x.Type), ("Output", x => x.OutputAccountCode), ("Input", x => x.InputAccountCode), ("Active", x => x.IsActive)),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Type", x => x.Type), ("Output", x => x.OutputAccountCode), ("Input", x => x.InputAccountCode), ("Applies to", x => x.AppliesTo),
+                ("Jurisdiction", x => x.Jurisdiction), ("Return box", x => x.ReturnBox), ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {

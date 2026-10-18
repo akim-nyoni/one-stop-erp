@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-629 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+630 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -739,6 +739,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | TX223 | Tax Invoice / Fiscal Receipt Compliance Layout | A sale laid out as a tax invoice - supplier and tax number, document number and time, lines with tax, the tax summary by code, totals, the fiscal device status - followed by the compliance checks it passes or fails. | SaleNumber (String, optional), ReportingCurrency (String, optional), RateBasis (String, optional), Rate (Decimal, optional), Branch (String, optional), CostCentre (String, optional), Department (String, optional), IncludeUnposted (Boolean, optional) | Section, Item, Value, Check | - | Sum(Check) |
 | TX224 | Annual Financial Statements Pack | Statement of financial position and profit or loss by report category for the year to the date, with the prior year's comparatives and the note each line is disclosed in. | AsAtDate (Date, optional), ReportingCurrency (String, optional), RateBasis (String, optional), Rate (Decimal, optional), Branch (String, optional), CostCentre (String, optional), Department (String, optional), IncludeUnposted (Boolean, optional) | Statement, Line, Note, Prior, Current | - | Sum(Current) |
 | TX225 | Audit File Export (SAF-T style) | Every posted journal line in the period with its period, source, document, account, tax code, trading party, currency amounts and base debit / credit - the GL audit file. | FromDate (Date, optional), ToDate (Date, optional), ReportingCurrency (String, optional), RateBasis (String, optional), Rate (Decimal, optional), Branch (String, optional), CostCentre (String, optional), Department (String, optional), IncludeUnposted (Boolean, optional) | Journal, Date, Period, Source, Document, Account, TaxCode, Party, Currency, Transaction, Debit, Credit, Narrative | - | - |
+| TX226 | VAT Return by Box | The period's tax-coded postings by jurisdiction and return box: per tax code what it applies to, the net supplies (sales positive, purchases negative) and the tax (output positive, input negative), with a payable total per jurisdiction. | FromDate (Date, optional), ToDate (Date, optional), ReportingCurrency (String, optional), RateBasis (String, optional), Rate (Decimal, optional), Branch (String, optional), CostCentre (String, optional), Department (String, optional), IncludeUnposted (Boolean, optional) | Jurisdiction, Box, TaxCode, Name, AppliesTo, Net, Tax | - | Sum(Tax) |
 
 ## Weighbridge
 

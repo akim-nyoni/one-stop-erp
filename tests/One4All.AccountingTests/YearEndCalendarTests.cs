@@ -87,4 +87,29 @@ public sealed class YearEndCalendarTests
         locked.IsHardLocked.Should().BeTrue();
         locked.Periods.Should().OnlyContain(p => p.StatusFor("GL") == PeriodStatus.PermanentlyClosed);
     }
+
+    [SkippableFact]
+    public async Task A_week_calendar_rolls_forward_and_adds_a_53rd_week_when_it_drifts()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        IMasterDataService master = scope.ServiceProvider.GetRequiredService<IMasterDataService>();
+
+        // The first 13 x 4-week year ends on 2 January: that is the anchor the calendar keeps to.
+        long first = (await master.CreateFiscalYearAsync(companyId, "W27", new DateOnly(2027, 1, 4), FiscalCalendar.ThirteenFourWeek, 12, false)).Value;
+        FiscalYear anchor = await db.FiscalYears.AsNoTracking().Include(y => y.Periods).SingleAsync(y => y.Id == first);
+        (anchor.EndDate, anchor.Periods.Count, anchor.Periods.OrderBy(p => p.PeriodNumber).First().Name).Should().Be((new DateOnly(2028, 1, 2), 13, "P1 W27"));
+
+        // A later year that has drifted: 52 weeks from 24 December 2029 would end on 22 December, eleven days short, so the year-end adds the 53rd week.
+        long drifted = (await master.CreateFiscalYearAsync(companyId, "W29", new DateOnly(2028, 12, 25), FiscalCalendar.ThirteenFourWeek, 12, false)).Value;
+        (await scope.ServiceProvider.GetRequiredService<IPeriodService>().OpenYearAsync(companyId, drifted, ["GL"])).IsSuccess.Should().BeTrue();
+        YearEndResult closed = (await scope.ServiceProvider.GetRequiredService<IYearEndService>().RunAsync(companyId, drifted, "3200")).Value;
+        FiscalYear next = await db.FiscalYears.AsNoTracking().Include(y => y.Periods).SingleAsync(y => y.Id == closed.NextYearId);
+        (next.StartDate, next.EndDate, next.Periods.Count).Should().Be((new DateOnly(2029, 12, 24), new DateOnly(2030, 12, 29), 13));
+        FiscalPeriod last = next.Periods.Single(p => p.PeriodNumber == 13);
+        (last.EndDate.DayNumber - last.StartDate.DayNumber + 1).Should().Be(35);
+    }
 }

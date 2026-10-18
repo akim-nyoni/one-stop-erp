@@ -50,6 +50,11 @@ public sealed class QuotationService : IQuotationService
             return Error.NotFound("Sop.CustomerNotFound", $"Customer {customerId} not found.");
         }
 
+        if (await TaxSupplyCheck.CheckAsync(_db, companyId, lines.Select(l => (l.ItemId, l.TaxCode)), ct).ConfigureAwait(false) is Error wrongSupply)
+        {
+            return wrongSupply;
+        }
+
         Quotation quote = new(companyId, customerId, quoteNumber, quoteDate, validUntil, currency);
         foreach (QuotationLineRequest line in lines)
         {

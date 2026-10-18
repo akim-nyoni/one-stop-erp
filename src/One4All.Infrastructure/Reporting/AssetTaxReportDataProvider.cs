@@ -40,6 +40,7 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
             "FATXFULLYDEPRECIATED" => await FullyDepreciatedAsync(companyId, ct).ConfigureAwait(false),
             "FATXVATDETAIL" => await VatDetailAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXVATRECON" => await VatReconAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "FATXVATRETURNBOX" => await VatReturnByBoxAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXNONSTANDARD" => await NonStandardAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXREVERSECHARGE" => await ReverseChargeAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "FATXAFS" => await AfsAsync(companyId, DateParameter(parameters, "AsAtDate") ?? toDate, ct).ConfigureAwait(false),
@@ -249,6 +250,53 @@ public sealed class AssetTaxReportDataProvider : IReportDataProvider
     }
 
     // Output tax is credit-natural, input tax debit-natural; coded lines on those accounts should account for all of their movement.
+    // TX225: per tax code, the tax on its output or input account and the supplies it was charged on, credit positive: a line carrying the code on
+    // another account, and in a journal posted under the one code, its lines on ordinary (non-control, non-tax) accounts. Grouped by the code's
+    // jurisdiction and return box, with what is payable per jurisdiction.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VatReturnByBoxAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+    {
+        Dictionary<string, TaxCode> codes = await _db.TaxCodes.AsNoTracking().Where(t => t.CompanyId == companyId).ToDictionaryAsync(t => t.Code, ct).ConfigureAwait(false);
+        HashSet<string> taxAccounts = [.. codes.Values.SelectMany(c => new[] { c.OutputAccountCode, c.InputAccountCode }).Where(a => a != null).Select(a => a!)];
+        HashSet<string> controls = [.. await _db.Accounts.AsNoTracking().Where(a => a.CompanyId == companyId && a.ControlAccountType != ControlAccountType.None).Select(a => a.AccountCode)
+            .ToListAsync(ct).ConfigureAwait(false)];
+        List<string> journals = await Posted(companyId, fromDate, toDate).Where(l => l.TaxCode != null).Select(l => l.Journal).Distinct().ToListAsync(ct).ConfigureAwait(false);
+        var lines = await Posted(companyId, fromDate, toDate).Where(l => journals.Contains(l.Journal)).Select(l => new { l.Journal, l.TaxCode, l.AccountCode, Net = l.Credit - l.Debit })
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, (decimal Net, decimal Tax)> totals = [];
+        void Add(string code, decimal net, decimal tax) => totals[code] = totals.TryGetValue(code, out var t) ? (t.Net + net, t.Tax + tax) : (net, tax);
+        foreach (var journal in lines.GroupBy(l => l.Journal))
+        {
+            List<string> used = [.. journal.Where(l => l.TaxCode != null && codes.ContainsKey(l.TaxCode)).Select(l => l.TaxCode!).Distinct()];
+            foreach (var line in journal)
+            {
+                if (line.TaxCode is string own && codes.TryGetValue(own, out TaxCode? code))
+                {
+                    bool isTax = line.AccountCode == code.OutputAccountCode || line.AccountCode == code.InputAccountCode;
+                    Add(own, isTax ? 0m : line.Net, isTax ? line.Net : 0m);
+                }
+                else if (line.TaxCode is null && used.Count == 1 && !controls.Contains(line.AccountCode) && !taxAccounts.Contains(line.AccountCode))
+                {
+                    Add(used[0], line.Net, 0m);
+                }
+            }
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (var jurisdiction in totals.Select(t => (Code: codes[t.Key], t.Value.Net, t.Value.Tax)).GroupBy(c => c.Code.Jurisdiction ?? "-").OrderBy(g => g.Key, StringComparer.Ordinal))
+        {
+            foreach (var c in jurisdiction.OrderBy(c => c.Code.ReturnBox ?? "~", StringComparer.Ordinal).ThenBy(c => c.Code.Code, StringComparer.Ordinal))
+            {
+                rows.Add(Row(("Jurisdiction", jurisdiction.Key), ("Box", c.Code.ReturnBox ?? "(no box)"), ("TaxCode", c.Code.Code), ("Name", c.Code.Name), ("AppliesTo", c.Code.AppliesTo.ToString()),
+                    ("Net", c.Net), ("Tax", c.Tax)));
+            }
+
+            rows.Add(Row(("Jurisdiction", jurisdiction.Key), ("Box", "Total"), ("TaxCode", string.Empty), ("Name", "Payable (refundable when negative)"), ("AppliesTo", string.Empty),
+                ("Net", jurisdiction.Sum(c => c.Net)), ("Tax", jurisdiction.Sum(c => c.Tax))));
+        }
+
+        return rows;
+    }
+
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> VatReconAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         List<TaxCode> codes = await _db.TaxCodes.AsNoTracking().Where(t => t.CompanyId == companyId && (t.OutputAccountCode != null || t.InputAccountCode != null)).OrderBy(t => t.Code).ToListAsync(ct).ConfigureAwait(false);

@@ -99,6 +99,16 @@ public sealed class TaxCode : SoftDeletableEntity, ICompanyScoped
     /// <summary>The jurisdiction (country/region) the code belongs to.</summary>
     public string? Jurisdiction { get; set; }
 
+    /// <summary>Whether the code may be used on a line for an item of a kind: goods-only codes not on services, services-only codes only on services.</summary>
+    /// <param name="itemType">The item's kind.</param>
+    /// <returns>True when the code applies.</returns>
+    public bool Suits(Inventory.ItemType itemType) => AppliesTo switch
+    {
+        TaxAppliesTo.Goods => itemType != Inventory.ItemType.Service,
+        TaxAppliesTo.Services => itemType == Inventory.ItemType.Service,
+        _ => true,
+    };
+
     /// <summary>The box on the tax return this code maps to.</summary>
     public string? ReturnBox { get; set; }
 

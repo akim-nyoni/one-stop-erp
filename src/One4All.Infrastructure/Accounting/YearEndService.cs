@@ -152,6 +152,14 @@ public sealed class YearEndService : IYearEndService
         return new YearEndResult(closingJournalNumber, netProfit, nextYearId);
     }
 
+    // The year-end a week-based calendar keeps to: the month and day the company's first week-based year ended on.
+    private async Task<(int Month, int Day)?> AnchorAsync(long company, CancellationToken ct)
+    {
+        List<FiscalYear> years = await _db.FiscalYears.AsNoTracking().Include(y => y.Periods).Where(y => y.CompanyId == company).OrderBy(y => y.StartDate).ToListAsync(ct).ConfigureAwait(false);
+        FiscalYear? first = years.FirstOrDefault(y => FiscalCalendars.IsWeekly(FiscalCalendars.Detect([.. y.OrderedPeriods.Where(p => !p.IsAdjustment).Select(p => (p.StartDate, p.EndDate))])));
+        return first is null ? null : (first.EndDate.Month, first.EndDate.Day);
+    }
+
     // The next year starts the day after this one ends and follows the same calendar (monthly or 4-4-5, with or without an
     // adjustment period); an existing year starting that day is used as it is.
     private async Task<long> EnsureNextYearAsync(long company, FiscalYear year, CancellationToken ct)
@@ -165,7 +173,8 @@ public sealed class YearEndService : IYearEndService
 
         List<(DateOnly Start, DateOnly End)> ordinary = [.. year.OrderedPeriods.Where(p => !p.IsAdjustment).Select(p => (p.StartDate, p.EndDate))];
         FiscalCalendar calendar = FiscalCalendars.Detect(ordinary);
-        IReadOnlyList<(DateOnly Start, DateOnly End)> periods = FiscalCalendars.Periods(calendar, nextStart, Math.Max(ordinary.Count, 1));
+        bool week53 = FiscalCalendars.IsWeekly(calendar) && await AnchorAsync(company, ct).ConfigureAwait(false) is (int month, int day) && FiscalCalendars.NeedsWeek53(nextStart, month, day);
+        IReadOnlyList<(DateOnly Start, DateOnly End)> periods = FiscalCalendars.Periods(calendar, nextStart, Math.Max(ordinary.Count, 1), week53);
         string code = FiscalCalendars.NextCode(year.Code, nextStart);
         if (await _db.FiscalYears.AnyAsync(y => y.CompanyId == company && y.Code == code, ct).ConfigureAwait(false))
         {
@@ -175,7 +184,7 @@ public sealed class YearEndService : IYearEndService
         FiscalYear next = new(company, code, nextStart, periods[^1].End);
         for (int n = 0; n < periods.Count; n++)
         {
-            next.AddPeriod(n + 1, calendar == FiscalCalendar.FourFourFive ? $"P{n + 1} {code}" : periods[n].Start.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
+            next.AddPeriod(n + 1, FiscalCalendars.IsWeekly(calendar) ? $"P{n + 1} {code}" : periods[n].Start.ToString("MMMM yyyy", System.Globalization.CultureInfo.InvariantCulture),
                 periods[n].Start, periods[n].End);
         }
 

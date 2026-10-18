@@ -83,10 +83,11 @@ public sealed class MasterDataService : IMasterDataService
 
     /// <inheritdoc />
     public Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, int months = 12, CancellationToken ct = default)
-        => CreateFiscalYearAsync(companyId, code, startDate, FiscalCalendar.Monthly, months, false, ct);
+        => CreateFiscalYearAsync(companyId, code, startDate, FiscalCalendar.Monthly, months, false, ct: ct);
 
     /// <inheritdoc />
-    public async Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, FiscalCalendar calendar, int months, bool adjustmentPeriod, CancellationToken ct = default)
+    public async Task<Result<long>> CreateFiscalYearAsync(long companyId, string code, DateOnly startDate, FiscalCalendar calendar, int months, bool adjustmentPeriod, bool week53 = false,
+        CancellationToken ct = default)
     {
         if (Key(code, 20) is not string key || months is < 1 or > 24)
         {
@@ -98,7 +99,7 @@ public sealed class MasterDataService : IMasterDataService
             return missing;
         }
 
-        IReadOnlyList<(DateOnly Start, DateOnly End)> periods = FiscalCalendars.Periods(calendar, startDate, months);
+        IReadOnlyList<(DateOnly Start, DateOnly End)> periods = FiscalCalendars.Periods(calendar, startDate, months, week53);
         DateOnly endDate = periods[^1].End;
         List<FiscalYear> years = await _db.FiscalYears.Where(y => y.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
         if (years.Any(y => y.Code == key))
@@ -114,7 +115,7 @@ public sealed class MasterDataService : IMasterDataService
         FiscalYear year = new(companyId, key, startDate, endDate);
         for (int n = 0; n < periods.Count; n++)
         {
-            year.AddPeriod(n + 1, calendar == FiscalCalendar.FourFourFive ? $"P{n + 1} {key}" : periods[n].Start.ToString("MMMM yyyy", CultureInfo.InvariantCulture), periods[n].Start, periods[n].End);
+            year.AddPeriod(n + 1, FiscalCalendars.IsWeekly(calendar) ? $"P{n + 1} {key}" : periods[n].Start.ToString("MMMM yyyy", CultureInfo.InvariantCulture), periods[n].Start, periods[n].End);
         }
 
         if (adjustmentPeriod)
@@ -185,7 +186,9 @@ public sealed class MasterDataService : IMasterDataService
 
         TaxCode created = new(taxCode.CompanyId, key, taxCode.Name.Trim(), taxCode.Type)
         {
-            OutputAccountCode = Code(taxCode.OutputAccountCode), InputAccountCode = Code(taxCode.InputAccountCode), IsActive = true,
+            OutputAccountCode = Code(taxCode.OutputAccountCode), InputAccountCode = Code(taxCode.InputAccountCode), IsActive = true, AppliesTo = taxCode.AppliesTo,
+            Jurisdiction = string.IsNullOrWhiteSpace(taxCode.Jurisdiction) ? null : taxCode.Jurisdiction.Trim().ToUpperInvariant(),
+            ReturnBox = string.IsNullOrWhiteSpace(taxCode.ReturnBox) ? null : taxCode.ReturnBox.Trim(),
         };
         created.AddRate(taxCode.EffectiveFrom, taxCode.RatePercent);
         _db.TaxCodes.Add(created);

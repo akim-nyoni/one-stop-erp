@@ -55,6 +55,10 @@ public static class AssetTaxReports
         yield return Listing("TX220", "Withholding Tax Return", "Tax", "Withholding certificates by month and tax code: count, gross paid, tax withheld and how much has been remitted.",
             "FatxWhtReturn", [new Column("Month", "Month", 70), new Column("TaxCode", "Tax code", 70), new Column("Certificates", "Certificates", 75), new Column("Gross", "Gross", 100), new Column("Remitted", "Remitted", 100),
              new Column("Withheld", "Withheld", 100, true)], Period);
+        yield return Listing("TX226", "VAT Return by Box", "Tax", "The period's tax-coded postings by jurisdiction and return box: per tax code what it applies to, the net supplies (sales positive, "
+            + "purchases negative) and the tax (output positive, input negative), with a payable total per jurisdiction.",
+            "FatxVatReturnBox", [new Column("Jurisdiction", "Jurisdiction", 80), new Column("Box", "Return box", 70), new Column("TaxCode", "Tax code", 70), new Column("Name", "Name", 140),
+             new Column("AppliesTo", "Applies to", 70), new Column("Net", "Net", 100), new Column("Tax", "Tax", 100, true)], Period);
         yield return Listing("TX224", "Annual Financial Statements Pack", "Tax", "Statement of financial position and profit or loss by report category for the year to the date, with the prior year's comparatives and the note each line is disclosed in.",
             "FatxAfs", [new Column("Statement", "Statement", 150), new Column("Line", "Line", 200), new Column("Note", "Note", 50), new Column("Prior", "Prior year", 110), new Column("Current", "Current year", 110, true)],
             [("AsAtDate", ParameterType.Date)]);
