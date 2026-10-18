@@ -4,8 +4,9 @@ using One4All.Desktop.ViewModels;
 namespace One4All.Desktop;
 
 /// <summary>
-/// The account enquiry: nominal activity with running balance and journal drill-down. All behaviour lives
-/// in <see cref="AccountEnquiryViewModel"/>; this code-behind only constructs it and loads the accounts.
+/// The account enquiry: nominal activity with running balance and journal drill-down, on to a journal line's account (double-click) and the
+/// source document as it prints. The behaviour lives in <see cref="AccountEnquiryViewModel"/>; this code-behind constructs it, wires the
+/// drill-through and passes on the double-click.
 /// </summary>
 public partial class AccountEnquiryWindow : Window
 {
@@ -17,6 +18,7 @@ public partial class AccountEnquiryWindow : Window
     public AccountEnquiryWindow(IServiceProvider services, string? accountCode = null)
     {
         _viewModel = new AccountEnquiryViewModel(services);
+        _viewModel.OpenDrill = (target, key) => Reporting.DrillThroughOpener.OpenAsync(services, this, _viewModel.CompanyId, target, key);
         DataContext = _viewModel;
         InitializeComponent();
 
@@ -29,5 +31,13 @@ public partial class AccountEnquiryWindow : Window
                 await _viewModel.LoadAsync().ConfigureAwait(true);
             }
         };
+    }
+
+    private async void JournalLine_DoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is System.Windows.Controls.ListView { SelectedItem: JournalLineRowVm { AccountCode: string account } })
+        {
+            await _viewModel.ShowAccountAsync(account).ConfigureAwait(true);
+        }
     }
 }

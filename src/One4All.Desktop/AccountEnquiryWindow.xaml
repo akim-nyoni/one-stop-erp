@@ -82,7 +82,11 @@
         <Border DockPanel.Dock="Bottom" Style="{StaticResource Tile}" MaxHeight="160">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel>
-                    <TextBlock Text="Source document" FontWeight="SemiBold" Foreground="#1E3A2E" />
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Open document" Command="{Binding OpenSourceDocumentCommand}" Padding="10,2" Margin="8,0,0,0"
+                                ToolTip="Open the source document as it prints (an invoice, credit note, receipt...)" />
+                        <TextBlock Text="Source document" FontWeight="SemiBold" Foreground="#1E3A2E" VerticalAlignment="Center" />
+                    </DockPanel>
                     <TextBlock Text="{Binding SourceDocument}" FontFamily="Consolas" FontSize="12" Foreground="#334" TextWrapping="Wrap" />
                 </StackPanel>
             </ScrollViewer>
@@ -93,7 +97,8 @@
                     <TextBlock Text="{Binding JournalHeading}" FontSize="14" FontWeight="SemiBold" Foreground="#1E3A2E" TextWrapping="Wrap" />
                     <TextBlock Text="{Binding JournalNarrative}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                 </StackPanel>
-                <ListView ItemsSource="{Binding JournalLines}" BorderThickness="0">
+                <ListView ItemsSource="{Binding JournalLines}" BorderThickness="0" MouseDoubleClick="JournalLine_DoubleClick"
+                          ToolTip="Double-click a line to see its account">
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="Account" Width="300" DisplayMemberBinding="{Binding Account}" />

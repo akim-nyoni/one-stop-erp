@@ -29,7 +29,8 @@ public sealed record ActivityRowVm(string Date, string JournalNumber, string Nar
 /// <param name="Debit">Debit, or blank.</param>
 /// <param name="Credit">Credit, or blank.</param>
 /// <param name="Narrative">The line narrative.</param>
-public sealed record JournalLineRowVm(string Account, string Analysis, string Debit, string Credit, string Narrative);
+/// <param name="AccountCode">The line's account, which a double-click opens (null on the total line).</param>
+public sealed record JournalLineRowVm(string Account, string Analysis, string Debit, string Credit, string Narrative, string? AccountCode = null);
 
 /// <summary>
 /// Backs the account enquiry: pick a nominal account and a date range, see the opening balance, every
@@ -187,11 +188,43 @@ public sealed partial class AccountEnquiryViewModel : ObservableObject
         }
     }
 
+    /// <summary>Gets or sets what opens a drill-through target (the window wires it to the report drill-through, so the document opens as it prints).</summary>
+    public Func<string, string, Task>? OpenDrill { get; set; }
+
+    /// <summary>Gets the company the enquiry reads.</summary>
+    public long CompanyId => _companyId;
+
+    /// <summary>Gets the selected journal's source document number, when it has one.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(OpenSourceDocumentCommand))]
+    private string? _sourceDocumentNumber;
+
+    /// <summary>Opens the selected journal's source document - the invoice, credit note or receipt as printed, or what the drill-through finds for it.</summary>
+    /// <returns>A task.</returns>
+    [RelayCommand(CanExecute = nameof(CanOpenSourceDocument))]
+    private Task OpenSourceDocumentAsync()
+        => OpenDrill is not null && SourceDocumentNumber is string number ? OpenDrill("Document", number) : Task.CompletedTask;
+
+    private bool CanOpenSourceDocument() => SourceDocumentNumber is not null;
+
+    /// <summary>Moves the enquiry to another account (a journal line double-clicked), keeping the period.</summary>
+    /// <param name="accountCode">The account.</param>
+    /// <returns>A task.</returns>
+    public async Task ShowAccountAsync(string accountCode)
+    {
+        if (Accounts.FirstOrDefault(a => a.Code == accountCode) is AccountChoiceVm account && !Equals(account, SelectedAccount))
+        {
+            SelectedAccount = account;
+            await LoadAsync().ConfigureAwait(true);
+        }
+    }
+
     private async Task ShowJournalAsync(ActivityRowVm? row)
     {
         JournalLines.Clear();
         JournalNarrative = string.Empty;
         SourceDocument = string.Empty;
+        SourceDocumentNumber = null;
         if (row is null)
         {
             JournalHeading = "Select a posting to see its journal.";
@@ -214,11 +247,12 @@ public sealed partial class AccountEnquiryViewModel : ObservableObject
             JournalHeading = $"{journal.JournalNumber} · {journal.PostingDate:yyyy-MM-dd} · {journal.SourceModule} · {journal.Status}"
                 + (document.Length > 0 ? $" · {document}" : string.Empty) + links;
             JournalNarrative = journal.Narrative ?? string.Empty;
+            SourceDocumentNumber = string.IsNullOrWhiteSpace(journal.DocumentNumber) ? null : journal.DocumentNumber;
 
             foreach (JournalDetailLine line in journal.Lines)
             {
                 string analysis = string.Join(" / ", new[] { line.CostCentre, line.Department }.Where(s => !string.IsNullOrWhiteSpace(s)));
-                JournalLines.Add(new JournalLineRowVm($"{line.AccountCode} {line.AccountName}", analysis, Blank(line.Debit), Blank(line.Credit), line.Narrative ?? string.Empty));
+                JournalLines.Add(new JournalLineRowVm($"{line.AccountCode} {line.AccountName}", analysis, Blank(line.Debit), Blank(line.Credit), line.Narrative ?? string.Empty, line.AccountCode));
             }
 
             JournalLines.Add(new JournalLineRowVm("Total", string.Empty, Money(journal.TotalDebit), Money(journal.TotalCredit), string.Empty));
