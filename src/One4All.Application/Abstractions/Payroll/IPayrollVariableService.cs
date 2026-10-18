@@ -22,8 +22,9 @@ public sealed record VariableImportPreview(IReadOnlyList<VariableImportLine> Lin
 
 /// <summary>
 /// Variable input for a pay period (brief §4.15.6): overtime, absences and once-off earnings or deductions, keyed one at a time or
-/// imported from a CSV template ("employee number, element code, units, amount") with a preview-and-error step first. The run uses
-/// the period's variables; an import replaces the period's earlier import.
+/// imported from a file with a preview-and-error step first - the CSV template ("employee number, element code, units, amount"), the same with
+/// named columns in any order, or a sheet with a row per employee and a column per pay element (see <see cref="Payroll.PayrollVariableCsv"/>).
+/// The run uses the period's variables; an import replaces the period's earlier import.
 /// </summary>
 public interface IPayrollVariableService
 {

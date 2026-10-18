@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Payroll;
+using One4All.Application.Payroll;
 using One4All.Core.Common;
 using One4All.Core.Payroll;
 using One4All.Infrastructure.Persistence;
@@ -53,38 +54,22 @@ public sealed partial class PayrollService : IPayrollVariableService
             .GroupBy(e => e.EmployeeNumber, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         List<VariableImportLine> lines = [];
         HashSet<(string, string)> seen = [];
-        string[] rows = (csv ?? string.Empty).Split('\n');
-        int firstData = Array.FindIndex(rows, r => r.Trim().Length > 0);
-        for (int n = 0; n < rows.Length; n++)
+
+        // The template, named columns in any order, or a sheet with a column per element (Application.Payroll.PayrollVariableCsv).
+        IReadOnlyList<ParsedVariable> parsed = PayrollVariableCsv.Parse(csv ?? string.Empty, code => ElementByCode(elements, code) is not null,
+            code => ElementByCode(elements, code)?.Basis == CalculationBasis.RatePerUnit, employees.ContainsKey);
+        foreach (ParsedVariable read in parsed)
         {
-            string row = rows[n].Trim();
-            if (row.Length == 0)
-            {
-                continue;
-            }
-
-            string[] cells = [.. row.Split([',', ';', '\t']).Select(c => c.Trim().Trim('"'))];
-            string number = cells.ElementAtOrDefault(0) ?? string.Empty;
-            string code = cells.ElementAtOrDefault(1) ?? string.Empty;
-            bool unitsOk = TryNumber(cells.ElementAtOrDefault(2), out decimal? units);
-            bool amountOk = TryNumber(cells.ElementAtOrDefault(3), out decimal? amount);
-
-            // A first line that is not data is the template's header.
-            if (n == firstData && (!unitsOk || !amountOk || (units is null && amount is null)) && !employees.ContainsKey(number))
-            {
-                continue;
-            }
-
-            employees.TryGetValue(number, out Employee? employee);
-            string? error = !unitsOk || !amountOk ? "Units and amount must be numbers."
-                : employee is null ? $"No employee '{number}'."
-                : await CheckVariableAsync(companyId, employee, ElementByCode(elements, code), code, period, units, amount, ct).ConfigureAwait(false);
-            if (error is null && !seen.Add((number.ToUpperInvariant(), code.ToUpperInvariant())))
+            employees.TryGetValue(read.EmployeeNumber, out Employee? employee);
+            string? error = read.Error
+                ?? (employee is null ? $"No employee '{read.EmployeeNumber}'."
+                : await CheckVariableAsync(companyId, employee, ElementByCode(elements, read.ElementCode), read.ElementCode, period, read.Units, read.Amount, ct).ConfigureAwait(false));
+            if (error is null && !seen.Add((read.EmployeeNumber.ToUpperInvariant(), read.ElementCode)))
             {
                 error = "Duplicate line for this employee and element.";
             }
 
-            lines.Add(new VariableImportLine(n + 1, number, employee?.FullName, code.ToUpperInvariant(), units, amount, error));
+            lines.Add(new VariableImportLine(read.Line, read.EmployeeNumber, employee?.FullName, read.ElementCode, read.Units, read.Amount, error));
         }
 
         return new VariableImportPreview(lines);
@@ -161,23 +146,6 @@ public sealed partial class PayrollService : IPayrollVariableService
         }
 
         return await RegularRunIsLiveAsync(companyId, period, PayGroupKey(employee.PayGroup), ct).ConfigureAwait(false) ? $"Period {period} has already been paid for {employee.EmployeeNumber}." : null;
-    }
-
-    private static bool TryNumber(string? text, out decimal? value)
-    {
-        value = null;
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            return true;
-        }
-
-        if (decimal.TryParse(text, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed))
-        {
-            value = parsed;
-            return true;
-        }
-
-        return false;
     }
 
     // Each employee's variables for the period, by element code.
