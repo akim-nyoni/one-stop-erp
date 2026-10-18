@@ -14,8 +14,8 @@ using Xunit;
 namespace One4All.AccountingTests;
 
 /// <summary>
-/// The common parameters on sales, purchasing, cash book and tax listings (brief §9): a reporting currency translated at a named rate
-/// basis shown in the header, and a branch, cost centre or department narrowing the postings read.
+/// The common parameters (brief §9): a reporting currency translated at a named rate basis shown in the header on the finance modules' listings, and a
+/// branch, cost centre or department narrowing the postings read where the listing applies them - and a plain note where it does not.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class ReportCommonParametersTests
@@ -27,11 +27,18 @@ public sealed class ReportCommonParametersTests
     [Fact]
     public void Listings_in_the_finance_modules_declare_the_common_parameters()
     {
-        foreach (string code in new[] { "AR29", "AP64", "CB68", "TX216", "GL22" })
+        foreach (string code in new[] { "CB68", "TX216", "GL22" })
         {
             ReportDefinition? definition = SystemReportCatalogue.All().FirstOrDefault(d => d.Code == code);
             definition.Should().NotBeNull(code);
             definition!.Parameters.Select(p => p.Name).Should().Contain(ReportCommonParameters.Names, code);
+        }
+
+        // Listings whose providers do not narrow by dimension take the reporting currency only, so they never appear filtered when they are not.
+        foreach (string code in new[] { "AR29", "AP64" })
+        {
+            IEnumerable<string> names = SystemReportCatalogue.All().First(d => d.Code == code).Parameters.Select(p => p.Name);
+            names.Should().Contain(["ReportingCurrency", "RateBasis", "Rate"], code).And.NotContain(["Branch", "CostCentre", "Department", "IncludeUnposted"], code);
         }
 
         SystemReportCatalogue.All().First(d => d.Module == "Payroll").Parameters.Select(p => p.Name).Should().NotContain("RateBasis", "payroll listings keep their own parameter lists");
@@ -102,6 +109,11 @@ public sealed class ReportCommonParametersTests
             keyed.Should().Contain("CP-W").And.Contain("100.00").And.NotContain("CP-E");
 
             basisLine.Should().Contain("closing rate at 2026-08-31");
+
+            // A listing that does not narrow by dimension says so, rather than claiming a filter its rows did not get.
+            var unfiltered = await runner.RenderAsync(companyId, "AR29", new Dictionary<string, object?> { ["CostCentre"] = "HQ" }, ReportFormat.Html);
+            unfiltered.IsSuccess.Should().BeTrue(unfiltered.IsFailure ? unfiltered.Error.Message : null);
+            Encoding.UTF8.GetString(unfiltered.Value.Content).Should().Contain("filters do not apply to this listing").And.NotContain("cost centre HQ");
         }
     }
 }

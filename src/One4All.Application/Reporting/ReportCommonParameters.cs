@@ -27,6 +27,18 @@ public sealed record ReportCommonParameters(string? ReportingCurrency, string? R
     /// <summary>The modules whose listings take the common parameters.</summary>
     public static readonly string[] Modules = ["Sales", "Purchasing", "CashBook", "Tax", "GeneralLedger", "Receivables", "SalesOrders", "FixedAssets", "Budget", "JobCosting"];
 
+    /// <summary>
+    /// The data commands whose providers narrow their postings by branch, cost centre and department and can count unposted journals (cash book, tax, ledger);
+    /// other listings take the reporting currency only, so a header never claims a filter the rows did not get.
+    /// </summary>
+    public static readonly string[] DimensionCommandPrefixes = ["Cash", "Fatx", "Gled"];
+
+    /// <summary>Whether a listing's data command applies the dimension filters.</summary>
+    /// <param name="command">The data command.</param>
+    /// <returns>True when its provider narrows by branch, cost centre and department.</returns>
+    public static bool AppliesDimensions(string? command)
+        => command is not null && DimensionCommandPrefixes.Any(p => command.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Nothing asked for: base currency, every dimension, posted journals only.</summary>
     public static ReportCommonParameters None { get; } = new(null, null, null, null, null, null, false);
 

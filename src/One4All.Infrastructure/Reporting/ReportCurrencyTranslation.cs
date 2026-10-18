@@ -33,10 +33,11 @@ internal static class ReportCurrencyTranslation
         }
 
         Dictionary<string, object?> shown = new(parameters, StringComparer.OrdinalIgnoreCase);
+        bool dimensions = ReportCommonParameters.AppliesDimensions(definition.DataSources.FirstOrDefault()?.Command ?? definition.Code);
         CurrencyCode baseCurrency = await db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
         if (!common.WantsCurrency || !CurrencyCode.TryParse(common.ReportingCurrency, out CurrencyCode reporting) || reporting == baseCurrency)
         {
-            shown[ReportCommonParameters.RateBasisUsed] = $"Amounts in {baseCurrency.Value} (base currency)" + Narrowed(common);
+            shown[ReportCommonParameters.RateBasisUsed] = $"Amounts in {baseCurrency.Value} (base currency)" + Narrowed(common, dimensions);
             return (rows, shown);
         }
 
@@ -51,7 +52,7 @@ internal static class ReportCurrencyTranslation
         };
         if (rate is not decimal factor || factor <= 0m)
         {
-            shown[ReportCommonParameters.RateBasisUsed] = $"No {reporting.Value} rate on file for {date:yyyy-MM-dd}: amounts in {baseCurrency.Value} (base currency)" + Narrowed(common);
+            shown[ReportCommonParameters.RateBasisUsed] = $"No {reporting.Value} rate on file for {date:yyyy-MM-dd}: amounts in {baseCurrency.Value} (base currency)" + Narrowed(common, dimensions);
             return (rows, shown);
         }
 
@@ -72,7 +73,7 @@ internal static class ReportCurrencyTranslation
             translated.Add(copy);
         }
 
-        shown[ReportCommonParameters.RateBasisUsed] = $"Amounts in {reporting.Value} at {factor.ToString("0.####", CultureInfo.InvariantCulture)} {reporting.Value}/{baseCurrency.Value} ({basis})" + Narrowed(common);
+        shown[ReportCommonParameters.RateBasisUsed] = $"Amounts in {reporting.Value} at {factor.ToString("0.####", CultureInfo.InvariantCulture)} {reporting.Value}/{baseCurrency.Value} ({basis})" + Narrowed(common, dimensions);
         return (translated, shown);
     }
 
@@ -84,8 +85,14 @@ internal static class ReportCurrencyTranslation
 
     private static bool LooksLikeMoney(object? value) => value is decimal || (value is string s && TwoDecimals.IsMatch(s));
 
-    private static string Narrowed(ReportCommonParameters common)
+    // The filters the rows were narrowed by - said only where the listing applies them, and plainly when it does not.
+    private static string Narrowed(ReportCommonParameters common, bool applied)
     {
+        if (!applied)
+        {
+            return common.HasDimensionFilter || common.IncludeUnposted ? "; branch, cost centre, department and unposted filters do not apply to this listing" : string.Empty;
+        }
+
         List<string> parts = [];
         if (common.Branch is not null) { parts.Add($"branch {common.Branch}"); }
         if (common.CostCentre is not null) { parts.Add($"cost centre {common.CostCentre}"); }

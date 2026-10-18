@@ -951,7 +951,10 @@ public static class SystemReports
         bool common = CommonParameterModules.Contains(module, StringComparer.Ordinal);
         if (common)
         {
-            foreach ((string paramName, ParameterType type) in CommonParameters.Where(c => def.Parameters.All(p => !string.Equals(p.Name, c.Name, StringComparison.OrdinalIgnoreCase))))
+            // The reporting currency on every one; the dimension filters only where the listing's provider applies them.
+            bool dimensions = DimensionCommandPrefixes.Any(p => command.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+            foreach ((string paramName, ParameterType type) in CommonParameters.Where(c => (dimensions || CurrencyParameters.Contains(c.Name, StringComparer.Ordinal))
+                && def.Parameters.All(p => !string.Equals(p.Name, c.Name, StringComparison.OrdinalIgnoreCase))))
             {
                 def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
             }
@@ -1046,6 +1049,12 @@ public static class SystemReports
 
     /// <summary>The modules whose listings take the common parameters (mirrored by the application layer's ReportCommonParameters, which this project cannot reference).</summary>
     public static readonly string[] CommonParameterModules = ["Sales", "Purchasing", "CashBook", "Tax", "GeneralLedger", "Receivables", "SalesOrders", "FixedAssets", "Budget", "JobCosting"];
+
+    /// <summary>The data commands whose providers apply the branch, cost centre, department and unposted filters (mirrored by ReportCommonParameters).</summary>
+    public static readonly string[] DimensionCommandPrefixes = ["Cash", "Fatx", "Gled"];
+
+    /// <summary>The common parameters every listing of the modules takes; the rest are the dimension filters.</summary>
+    public static readonly string[] CurrencyParameters = ["ReportingCurrency", "RateBasis", "Rate"];
 
     /// <summary>The parameter the report runner adds to say which rate it translated amounts at; the listing header shows it.</summary>
     public const string RateBasisUsedParameter = "RateBasisUsed";
