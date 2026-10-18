@@ -74,4 +74,7 @@ public static class WorkflowDocumentTypes
 
     /// <summary>A prepared accounting voucher (reference: the voucher number); approval posts it.</summary>
     public const string AccountingVoucher = "AccountingVoucher";
+
+    /// <summary>A requested change of a supplier's bank details (reference: <c>SBC-</c> and the change id); approval applies it to the supplier.</summary>
+    public const string SupplierBankChange = "SupplierBankChange";
 }

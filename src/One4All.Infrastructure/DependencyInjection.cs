@@ -199,7 +199,9 @@ public static class DependencyInjection
         services.AddScoped<Trading.DebtCollectionService>();
         services.AddScoped<Application.Abstractions.Trading.IDebtCollectionService>(sp => sp.GetRequiredService<Trading.DebtCollectionService>());
         services.AddScoped<Application.Abstractions.Budgeting.IVarianceCommentaryService, Budgeting.VarianceCommentaryService>();
-        services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService, Trading.SupplierBankDetailsService>();
+        services.AddScoped<Trading.SupplierBankDetailsService>();
+        services.AddScoped<Application.Abstractions.Trading.ISupplierBankDetailsService>(sp => sp.GetRequiredService<Trading.SupplierBankDetailsService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Trading.SupplierBankChangeWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Trading.ISupplierAdvanceService, Trading.SupplierAdvanceService>();
         services.AddScoped<IRecurringJournalService, Accounting.RecurringJournalService>();
         services.AddScoped<IDeferredIncomeService, Accounting.DeferredIncomeService>();
