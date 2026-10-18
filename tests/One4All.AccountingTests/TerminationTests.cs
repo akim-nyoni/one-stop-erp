@@ -49,7 +49,9 @@ public sealed class TerminationTests
         EmployeeLeaveBalance leave = new(companyId, retrenched, "Annual");
         leave.Accrue(10m);
         leave.Take(2m);
-        db.AddRange(leave, new EmployeeLoan(companyId, retrenched, "LN-1", 200m, 50m, new DateOnly(2025, 1, 1), "1350"), new EmployeeLoan(companyId, resigning, "LN-2", 900m, 100m, new DateOnly(2025, 6, 1), "1350"));
+        EmployeeLeaveBalance sick = new(companyId, retrenched, "Sick");
+        sick.Accrue(30m);
+        db.AddRange(leave, sick, new EmployeeLoan(companyId, retrenched, "LN-1", 200m, 50m, new DateOnly(2025, 1, 1), "1350"), new EmployeeLoan(companyId, resigning, "LN-2", 900m, 100m, new DateOnly(2025, 6, 1), "1350"));
         await db.SaveChangesAsync();
 
         ITerminationService terminations = scope.ServiceProvider.GetRequiredService<ITerminationService>();
@@ -88,6 +90,16 @@ public sealed class TerminationTests
         Employee gone = await db.Employees.AsNoTracking().SingleAsync(e => e.Id == retrenched);
         (gone.Status, gone.TerminationDate).Should().Be((EmployeeStatus.Terminated, new DateOnly(2026, 4, 15)));
         (await terminations.TerminateAsync(Request("TM-001", TerminationType.Retrenchment))).Error.Code.Should().Be("Payroll.AlreadyTerminated");
+
+        // The final pay is on the PAYE return for April and on the leaver's tax certificate: 509.09 PAYE and 830.77 terminal tax.
+        await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();
+        One4All.Application.Abstractions.Reporting.IReportRunner runner = scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Reporting.IReportRunner>();
+        async Task<string> Csv(string code) => System.Text.Encoding.UTF8.GetString((await runner.RenderAsync(companyId, code, new Dictionary<string, object?>
+        {
+            ["FromDate"] = new DateOnly(2026, 4, 1), ["ToDate"] = new DateOnly(2026, 4, 30),
+        }, One4All.Application.Abstractions.Reporting.ReportFormat.Csv)).Value.Content);
+        (await Csv("PR27")).Should().Contain("2026-04,").And.Contain(",1339.86");
+        (await Csv("PR28")).Should().Contain("TM-001 Tafadzwa Ncube").And.Contain(",1339.86");
 
         // Clearance and certificate.
         done.Clearance.Should().Contain(i => i.Description.StartsWith("Final pay calculated", StringComparison.Ordinal) && i.IsCleared);

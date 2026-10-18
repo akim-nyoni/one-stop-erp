@@ -14,6 +14,9 @@ namespace One4All.Infrastructure.Payroll;
 /// <summary>Termination and final pay: worked out, posted in one journal, the employee terminated, a clearance checklist and a certificate of service.</summary>
 public sealed class TerminationService : ITerminationService
 {
+    /// <summary>The leave type paid out on termination (balances keep their type in upper case).</summary>
+    private const string AnnualLeave = "ANNUAL";
+
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _engine;
 
@@ -213,7 +216,9 @@ public sealed class TerminationService : ITerminationService
 
         string period = request.LastDay.ToString("yyyy-MM", CultureInfo.InvariantCulture);
         bool lastMonthPaid = await _db.Payslips.AnyAsync(p => p.CompanyId == request.CompanyId && p.EmployeeId == employee.Id && p.PeriodLabel == period, ct).ConfigureAwait(false);
-        decimal leaveDays = await _db.EmployeeLeaveBalances.Where(b => b.CompanyId == request.CompanyId && b.EmployeeId == employee.Id).SumAsync(b => b.AccruedDays - b.TakenDays, ct).ConfigureAwait(false);
+        // Leave encashment (brief §4.15.8) pays out annual leave owed - not sick, study or other leave, which lapses when employment ends.
+        decimal leaveDays = await _db.EmployeeLeaveBalances.Where(b => b.CompanyId == request.CompanyId && b.EmployeeId == employee.Id && b.LeaveType == AnnualLeave)
+            .SumAsync(b => b.AccruedDays - b.TakenDays, ct).ConfigureAwait(false);
         List<EmployeeLoan> loans = await _db.EmployeeLoans.Where(l => l.CompanyId == request.CompanyId && l.EmployeeId == employee.Id && l.Outstanding > 0m).ToListAsync(ct).ConfigureAwait(false);
         string tableCode = request.TaxTableCode.Trim().ToUpperInvariant();
         DateOnly payDate = request.PayDate ?? request.LastDay;

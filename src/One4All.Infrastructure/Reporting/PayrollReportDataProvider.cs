@@ -438,7 +438,8 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> YtdAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
-        return [.. (await PayslipsAsync(companyId, new DateOnly(toDate.Year, 1, 1), toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal)
+        return [.. (await PayslipsAsync(companyId, await TaxYearStartAsync(companyId, toDate, ct).ConfigureAwait(false), toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId)
+            .OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal)
             .Select(g => Row(("Employee", Name(employees, g.Key)), ("Department", employees.GetValueOrDefault(g.Key)?.Department ?? "-"), ("Gross", Money(g.Sum(p => p.GrossEarnings))),
                 ("Taxable", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount))), ("Deductions", Money(g.Sum(p => p.TotalDeductions))),
                 ("Employer", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.EmployerContribution).Sum(l => l.Amount))), ("Net", g.Sum(p => p.NetPay))))];
@@ -1246,19 +1247,39 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
     private static TaxTable? InForce(List<TaxTable> tables, DateOnly date) => tables.LastOrDefault(t => t.Currency == null && t.EffectiveFrom <= date);
 
+    // A leaver's final pay is taxed outside the run (brief §4.15.8): its taxable pay and the PAYE and terminal tax taken belong on the return and the certificate too.
+    private Task<List<Termination>> FinalPaysAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
+        => _db.Set<Termination>().AsNoTracking().Where(t => t.CompanyId == companyId && t.LastDay >= fromDate && t.LastDay <= toDate && t.JournalNumber != null).ToListAsync(ct);
+
+    // Year-to-date figures run from the start of the company's tax year (brief §4.15.3), which need not be January.
+    private async Task<DateOnly> TaxYearStartAsync(long companyId, DateOnly asAt, CancellationToken ct)
+    {
+        int startMonth = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.TaxYearStartMonth).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return PayPeriods.TaxYearStart(asAt, startMonth is >= 1 and <= 12 ? startMonth : 1);
+    }
+
+    private static decimal FinalPayTaxable(Termination t) => t.ProRataSalary + t.Notice + t.Leave + t.Gratuity + t.Severance;
+
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayeReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         List<TaxTable> tables = await TaxTablesAsync(companyId, ct).ConfigureAwait(false);
-        return [.. (await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).GroupBy(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)).OrderBy(g => g.Key, StringComparer.Ordinal)
-            .Select(g =>
+        List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
+        ILookup<string, Termination> finals = (await FinalPaysAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).ToLookup(t => t.LastDay.ToString("yyyy-MM", CultureInfo.InvariantCulture));
+        return [.. slips.Select(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)).Concat(finals.Select(f => f.Key)).Distinct().Order(StringComparer.Ordinal)
+            .Select(month =>
             {
-                decimal taxable = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount);
-                decimal deducted = g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount);
+                List<Payslip> g = [.. slips.Where(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture) == month)];
+                List<Termination> leavers = [.. finals[month]];
+                decimal finalTax = leavers.Sum(x => x.OrdinaryTax + x.TerminalTax);
+                decimal taxable = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount) + leavers.Sum(FinalPayTaxable);
+                decimal deducted = g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount) + finalTax;
+                // Final pay was taxed on its own rules (ordinary pay on the table, benefits on the terminal rate or table), so it counts as taxed as due.
                 decimal? byTable = g.All(p => InForce(tables, p.PayDate) is not null)
                     ? g.Sum(p => PayeTable.Tax(InForce(tables, p.PayDate)!.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), p.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount)))
+                        + finalTax
                     : null;
-                return Row(("Month", g.Key), ("Employees", g.Select(p => p.EmployeeId).Distinct().Count()), ("Taxable", Money(taxable)), ("ByTable", byTable is decimal t ? Money(t) : "no table"),
-                    ("Difference", byTable is decimal d ? Money(deducted - d) : "-"), ("Deducted", deducted));
+                return (IReadOnlyDictionary<string, object?>)Row(("Month", month), ("Employees", g.Select(p => p.EmployeeId).Concat(leavers.Select(x => x.EmployeeId)).Distinct().Count()),
+                    ("Taxable", Money(taxable)), ("ByTable", byTable is decimal t ? Money(t) : "no table"), ("Difference", byTable is decimal d ? Money(deducted - d) : "-"), ("Deducted", deducted));
             })];
     }
 
@@ -1267,10 +1288,20 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         HashSet<string> pension = [.. await _db.Set<StatutoryScheme>().AsNoTracking().Where(s => s.CompanyId == companyId && s.Kind == SchemeKind.Pension && s.EmployeeElementCode != null)
             .Select(s => s.EmployeeElementCode!).ToListAsync(ct).ConfigureAwait(false)];
-        return [.. (await PayslipsAsync(companyId, new DateOnly(toDate.Year, 1, 1), toDate, ct).ConfigureAwait(false)).GroupBy(p => p.EmployeeId).OrderBy(g => Name(employees, g.Key), StringComparer.Ordinal)
-            .Select(g => Row(("Employee", Name(employees, g.Key)), ("NationalId", employees.GetValueOrDefault(g.Key)?.NationalIdNumber ?? "MISSING"), ("TaxNumber", employees.GetValueOrDefault(g.Key)?.TaxNumber ?? "MISSING"),
-                ("Gross", Money(g.Sum(p => p.GrossEarnings))), ("Taxable", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount))),
-                ("Pension", Money(g.SelectMany(p => p.Lines).Where(l => pension.Contains(l.ElementCode)).Sum(l => l.Amount))), ("Paye", g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount))))];
+        // The tax year the company keeps (brief §4.15.3), which need not be the calendar year; a leaver's final pay is on their certificate.
+        DateOnly yearStart = await TaxYearStartAsync(companyId, toDate, ct).ConfigureAwait(false);
+        ILookup<long, Payslip> slips = (await PayslipsAsync(companyId, yearStart, toDate, ct).ConfigureAwait(false)).ToLookup(p => p.EmployeeId);
+        ILookup<long, Termination> finals = (await FinalPaysAsync(companyId, yearStart, toDate, ct).ConfigureAwait(false)).ToLookup(t => t.EmployeeId);
+        return [.. slips.Select(g => g.Key).Concat(finals.Select(f => f.Key)).Distinct().OrderBy(id => Name(employees, id), StringComparer.Ordinal).Select(id =>
+        {
+            List<Payslip> g = [.. slips[id]];
+            List<Termination> leaver = [.. finals[id]];
+            return (IReadOnlyDictionary<string, object?>)Row(("Employee", Name(employees, id)), ("NationalId", employees.GetValueOrDefault(id)?.NationalIdNumber ?? "MISSING"),
+                ("TaxNumber", employees.GetValueOrDefault(id)?.TaxNumber ?? "MISSING"), ("Gross", Money(g.Sum(p => p.GrossEarnings) + leaver.Sum(FinalPayTaxable))),
+                ("Taxable", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount) + leaver.Sum(FinalPayTaxable))),
+                ("Pension", Money(g.SelectMany(p => p.Lines).Where(l => pension.Contains(l.ElementCode)).Sum(l => l.Amount))),
+                ("Paye", g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount) + leaver.Sum(x => x.OrdinaryTax + x.TerminalTax)));
+        })];
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TaxTableAsync(long companyId, DateOnly asAt, CancellationToken ct)
