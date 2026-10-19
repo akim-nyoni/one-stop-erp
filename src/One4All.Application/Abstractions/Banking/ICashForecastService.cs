@@ -18,6 +18,20 @@ public interface ICashForecastService
     /// <returns>The forecast.</returns>
     Task<CashForecast> ForecastAsync(long companyId, DateOnly from, int weeks, decimal minimumBalance, CancellationToken ct = default);
 
+    /// <summary>
+    /// Forecasts the cash held in one currency, in that currency (brief §4.4 multi-currency treasury): the bank accounts kept in it, and the receivables,
+    /// payables, payment runs, sales and purchase orders and standing orders in it, at their own amounts. Payroll and flows keyed by hand are in base
+    /// and stay in the base forecast; the base currency gives the full forecast.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="currency">The currency.</param>
+    /// <param name="from">The first day.</param>
+    /// <param name="weeks">How many weeks (1 to 52).</param>
+    /// <param name="minimumBalance">The minimum to hold in the currency.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The forecast in the currency.</returns>
+    Task<CashForecast> ForecastInCurrencyAsync(long companyId, string currency, DateOnly from, int weeks, decimal minimumBalance, CancellationToken ct = default);
+
     /// <summary>Keys a flow into the forecast by hand: once, or monthly until a date (positive in, negative out).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="date">The (first) date.</param>

@@ -1113,8 +1113,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Cash-flow forecast", ListTitle = "Bank accounts",
             Description = "Week by week from the bank balances: receivables and payables by due date, saved payment runs on their dates, open sales and purchase orders on "
                 + "delivery plus terms, standing orders, payroll (repeating the last regular run) and flows keyed in by hand (once or monthly). Weeks where cash would fall "
-                + "below the minimum are marked.",
-            Fields = [Pick("Step", "Step", ["Forecast", "Add a flow", "Remove a flow"]), Today("From", "From"), Num("Weeks", "Weeks", "13"), Num("Minimum", "Minimum cash to hold", "0"),
+                + "below the minimum are marked. With a currency, the forecast is of the cash held in that currency, in it (its bank accounts, documents, orders and runs).",
+            Fields = [Pick("Step", "Step", ["Forecast", "Add a flow", "Remove a flow"]), Opt("Currency", "Currency (blank: everything in base)"), Today("From", "From"), Num("Weeks", "Weeks", "13"), Num("Minimum", "Minimum cash to hold", "0"),
                 Tick("Detail", "Show every flow"), Num("Amount", "Flow amount (+ in, − out)", "0"), Opt("What", "Flow description"), Opt("Until", "Repeat monthly until (yyyy-mm-dd)"),
                 OptNum("Entry", "Flow id (remove)")],
             Run = async (c, i) =>
@@ -1129,8 +1129,10 @@ public static partial class OperationCatalogue
                         return Check(await forecast.RemoveEntryAsync(c.CompanyId, (long)(i.OptionalNumber("Entry") ?? 0m)).ConfigureAwait(true), "Flow removed.");
                 }
 
-                Application.Banking.CashForecast f = await c.Get<Application.Abstractions.Banking.ICashForecastService>().ForecastAsync(c.CompanyId, i.Date("From"), i.Whole("Weeks"), i.Number("Minimum"))
-                    .ConfigureAwait(true);
+                // One currency's cash in that currency, or everything in base.
+                Application.Banking.CashForecast f = i.Optional("Currency") is string currency
+                    ? await forecast.ForecastInCurrencyAsync(c.CompanyId, currency, i.Date("From"), i.Whole("Weeks"), i.Number("Minimum")).ConfigureAwait(true)
+                    : await forecast.ForecastAsync(c.CompanyId, i.Date("From"), i.Whole("Weeks"), i.Number("Minimum")).ConfigureAwait(true);
                 List<string> text =
                 [
                     $"Opening {M(f.OpeningBalance)}; lowest {M(f.LowestClosing)}" + (f.FirstShortfall is DateOnly shortfall ? $"; below {M(f.Minimum)} from the week of {D(shortfall)}." : "."),

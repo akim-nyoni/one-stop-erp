@@ -21,6 +21,87 @@ public sealed class CashForecastService : ICashForecastService
     public CashForecastService(One4AllDbContext db) => _db = db;
 
     /// <inheritdoc />
+    public async Task<CashForecast> ForecastInCurrencyAsync(long companyId, string currency, DateOnly from, int weeks, decimal minimumBalance, CancellationToken ct = default)
+    {
+        string code = (currency ?? string.Empty).Trim().ToUpperInvariant();
+        CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        if (code.Length == 0 || code == baseCurrency.Value)
+        {
+            return await ForecastAsync(companyId, from, weeks, minimumBalance, ct).ConfigureAwait(false);
+        }
+
+        weeks = Math.Clamp(weeks, 1, 52);
+        DateOnly end = from.AddDays(weeks * 7);
+        CurrencyCode cur = CurrencyCode.Parse(code);
+        List<CashFlowLine> lines = [];
+
+        // Opening: the bank accounts kept in the currency, at their balances in it.
+        List<string> bankAccounts = await _db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == companyId && b.Currency == cur).Select(b => b.GlAccountCode).Distinct().ToListAsync(ct)
+            .ConfigureAwait(false);
+        decimal opening = await _db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.PostingDate < from && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed))
+            .SelectMany(j => j.Lines).Where(l => bankAccounts.Contains(l.AccountCode) && l.TransactionCurrency == cur)
+            .SumAsync(l => (decimal?)(l.TransactionDebit - l.TransactionCredit), ct).ConfigureAwait(false) ?? 0m;
+
+        var runs = await _db.Set<PaymentRunBatch>().AsNoTracking().Include(r => r.Lines).Where(r => r.CompanyId == companyId && r.Status == PaymentRunStatus.Proposed).ToListAsync(ct)
+            .ConfigureAwait(false);
+        HashSet<(long Supplier, DateOnly DueBy)> inRuns = [];
+        foreach (PaymentRunBatch run in runs)
+        {
+            foreach (PaymentRunBatchLine line in run.Lines.Where(l => l.Included && l.Amount > 0m && l.Currency == code))
+            {
+                lines.Add(new CashFlowLine(run.PaymentDate, CashFlowSource.PaymentRuns, $"{run.Number} {line.SupplierCode}", -line.Amount));
+                inRuns.Add((line.SupplierId, run.DueOnOrBefore));
+            }
+        }
+
+        var open = await _db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.Currency == cur && i.OutstandingTransaction != 0m && i.DueDate < end
+                && (i.Ledger == TradingLedger.AccountsReceivable || i.Ledger == TradingLedger.AccountsPayable))
+            .Select(i => new { i.Ledger, i.TraderId, i.DocumentNumber, i.DueDate, i.Sign, i.OutstandingTransaction }).ToListAsync(ct).ConfigureAwait(false);
+        foreach (var item in open)
+        {
+            decimal signed = item.Sign == LedgerSign.Debit ? item.OutstandingTransaction : -item.OutstandingTransaction;
+            if (item.Ledger == TradingLedger.AccountsReceivable)
+            {
+                lines.Add(new CashFlowLine(item.DueDate, CashFlowSource.Receivables, item.DocumentNumber, signed));
+            }
+            else if (!inRuns.Any(r => r.Supplier == item.TraderId && item.DueDate <= r.DueBy))
+            {
+                lines.Add(new CashFlowLine(item.DueDate, CashFlowSource.Payables, item.DocumentNumber, signed));
+            }
+        }
+
+        Dictionary<long, int> customerTerms = await _db.Customers.AsNoTracking().Where(c => c.CompanyId == companyId).ToDictionaryAsync(c => c.Id, c => c.PaymentTermsDays, ct).ConfigureAwait(false);
+        foreach (SalesOrder order in await _db.SalesOrders.AsNoTracking().Include(o => o.Lines)
+            .Where(o => o.CompanyId == companyId && o.Currency == cur && o.Status != SalesOrderStatus.Invoiced && o.Status != SalesOrderStatus.Cancelled).ToListAsync(ct).ConfigureAwait(false))
+        {
+            decimal value = order.Lines.Sum(l => Math.Max(0m, l.OrderedQuantity - l.InvoicedQuantity) * l.UnitPrice);
+            lines.Add(new CashFlowLine((order.RequestedDeliveryDate ?? order.OrderDate).AddDays(customerTerms.GetValueOrDefault(order.CustomerId)), CashFlowSource.SalesOrders, order.OrderNumber,
+                decimal.Round(value, 2, MidpointRounding.AwayFromZero)));
+        }
+
+        Dictionary<long, int> supplierTerms = await _db.Suppliers.AsNoTracking().Where(s => s.CompanyId == companyId).ToDictionaryAsync(s => s.Id, s => s.PaymentTermsDays, ct).ConfigureAwait(false);
+        foreach (PurchaseOrder order in await _db.PurchaseOrders.AsNoTracking().Include(o => o.Lines)
+            .Where(o => o.CompanyId == companyId && o.Currency == cur && o.Status != PurchaseOrderStatus.Cancelled && o.Status != PurchaseOrderStatus.Closed).ToListAsync(ct).ConfigureAwait(false))
+        {
+            decimal value = order.Lines.Sum(l => Math.Max(0m, l.OrderedQuantity - l.InvoicedQuantity) * l.UnitPrice);
+            lines.Add(new CashFlowLine((order.RequiredBy ?? order.OrderDate).AddDays(supplierTerms.GetValueOrDefault(order.SupplierId)), CashFlowSource.PurchaseOrders, order.OrderNumber,
+                -decimal.Round(value, 2, MidpointRounding.AwayFromZero)));
+        }
+
+        // Standing orders paid from a bank account kept in the currency.
+        foreach (StandingOrder order in await _db.Set<StandingOrder>().AsNoTracking().Where(s => s.CompanyId == companyId && s.IsActive && bankAccounts.Contains(s.BankAccountCode))
+            .ToListAsync(ct).ConfigureAwait(false))
+        {
+            foreach (DateOnly date in Recurrence.Due(order.StartDate, order.EndDate, order.Frequency, order.LastRunOn ?? from.AddDays(-1), end.AddDays(-1)))
+            {
+                lines.Add(new CashFlowLine(date, CashFlowSource.StandingOrders, order.Reference, -order.Amount));
+            }
+        }
+
+        return CashForecastBuilder.Build(from, weeks, opening, minimumBalance, lines);
+    }
+
+    /// <inheritdoc />
     public async Task<CashForecast> ForecastAsync(long companyId, DateOnly from, int weeks, decimal minimumBalance, CancellationToken ct = default)
     {
         weeks = Math.Clamp(weeks, 1, 52);
