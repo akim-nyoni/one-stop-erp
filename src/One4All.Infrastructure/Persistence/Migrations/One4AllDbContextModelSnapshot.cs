@@ -8962,6 +8962,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("agreed_price");
 
+                    b.Property<int>("Approval")
+                        .HasColumnType("integer")
+                        .HasColumnName("approval");
+
                     b.Property<decimal>("AreaSquareMetres")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")

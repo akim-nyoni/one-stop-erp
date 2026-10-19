@@ -140,6 +140,18 @@ public interface ILandAcquisitionService
     /// <returns>Success or why not.</returns>
     Task<Result> BreakOffAsync(long companyId, string acquisitionNumber, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Submits the acquisition to the land acquisition workflow at its value (the agreed price, else the cost built up so far), so the value bands choose
+    /// who approves; while a workflow is defined an acquisition completes only once approved. Refused when no such workflow is defined or it is already
+    /// waiting or approved.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="acquisitionNumber">The acquisition.</param>
+    /// <param name="userId">Who submits it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The value submitted, or why not.</returns>
+    Task<Result<decimal>> SubmitForApprovalAsync(long companyId, string acquisitionNumber, long userId, CancellationToken ct = default);
+
     /// <summary>Completes the acquisition: the parcel enters the land bank at its total cost.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="acquisitionNumber">The acquisition.</param>

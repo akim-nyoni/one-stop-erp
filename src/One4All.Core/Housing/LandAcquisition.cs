@@ -159,6 +159,22 @@ public enum AcquisitionCostComponent
     CapitalisedInterest = 7,
 }
 
+/// <summary>Where an acquisition's approval stands, when the council puts acquisitions through an approval workflow.</summary>
+public enum AcquisitionApproval
+{
+    /// <summary>Not submitted (or no approval workflow is defined).</summary>
+    NotRequired = 0,
+
+    /// <summary>Submitted and waiting for the workflow.</summary>
+    Pending = 1,
+
+    /// <summary>Approved: the acquisition may complete.</summary>
+    Approved = 2,
+
+    /// <summary>Rejected: it may be renegotiated and submitted again, or abandoned.</summary>
+    Rejected = 3,
+}
+
 /// <summary>Where an acquisition stands.</summary>
 public enum AcquisitionStatus
 {
@@ -286,6 +302,9 @@ public sealed class LandAcquisition : AuditableEntity, ICompanyScoped
 
     /// <summary>Gets why the negotiation was broken off, if it was.</summary>
     public string? BreakOffReason { get; private set; }
+
+    /// <summary>Gets or sets where the acquisition's approval stands (brief §4.10.1: acquisitions approved within the council's bands before they complete).</summary>
+    public AcquisitionApproval Approval { get; set; }
 
     /// <summary>Records an offer or counter-offer; the negotiation is open from the first offer.</summary>
     /// <param name="party">Who offers.</param>

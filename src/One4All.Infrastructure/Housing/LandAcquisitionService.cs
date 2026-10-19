@@ -3,6 +3,7 @@ using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Numbering;
 using One4All.Application.Abstractions.Security;
+using One4All.Application.Abstractions.Workflow;
 using One4All.Application.Housing;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -22,14 +23,17 @@ public sealed class LandAcquisitionService : ILandAcquisitionService
     private readonly INumberSequenceService _numbers;
     private readonly IPostingEngine _posting;
     private readonly IPermissionService _permissions;
+    private readonly Lazy<IWorkflowService>? _workflow;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
     /// <param name="posting">The posting engine.</param>
     /// <param name="permissions">The permission resolver.</param>
-    public LandAcquisitionService(One4AllDbContext db, INumberSequenceService numbers, IPostingEngine posting, IPermissionService permissions)
+    /// <param name="workflow">The approval workflow acquisitions go through when the council defines one.</param>
+    public LandAcquisitionService(One4AllDbContext db, INumberSequenceService numbers, IPostingEngine posting, IPermissionService permissions, Lazy<IWorkflowService>? workflow = null)
     {
+        _workflow = workflow;
         _db = db;
         _numbers = numbers;
         _posting = posting;
@@ -219,6 +223,57 @@ public sealed class LandAcquisitionService : ILandAcquisitionService
         return Result.Success();
     }
 
+    private Task<bool> GovernedAsync(long companyId, CancellationToken ct)
+        => _db.WorkflowDefinitions.AnyAsync(d => d.CompanyId == companyId && d.DocumentType == WorkflowDocumentTypes.LandAcquisition && d.IsActive, ct);
+
+    /// <inheritdoc />
+    public Task<Result<decimal>> SubmitForApprovalAsync(long companyId, string acquisitionNumber, long userId, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Result<LandAcquisition> found = await OpenCaseAsync(companyId, acquisitionNumber, ct).ConfigureAwait(false);
+            if (found.IsFailure)
+            {
+                return found.Error;
+            }
+
+            LandAcquisition acquisition = found.Value;
+            if (_workflow is null || !await GovernedAsync(companyId, ct).ConfigureAwait(false))
+            {
+                return Error.Rule("Hse.NoAcquisitionWorkflow", "No land acquisition workflow is defined: acquisitions complete without one.");
+            }
+
+            if (acquisition.Approval is AcquisitionApproval.Pending or AcquisitionApproval.Approved)
+            {
+                return Error.Rule("Hse.AcquisitionSubmitted", $"{acquisition.AcquisitionNumber} is already {acquisition.Approval.ToString().ToLowerInvariant()}.");
+            }
+
+            decimal value = acquisition.AgreedPrice ?? acquisition.TotalCost;
+            Result<bool> started = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, companyId, WorkflowDocumentTypes.LandAcquisition, acquisition.AcquisitionNumber, value, userId,
+                [("Method", acquisition.Method.ToString()), ("Parcel", acquisition.ParcelNumber)], ct).ConfigureAwait(false);
+            if (started.IsFailure)
+            {
+                return started.Error;
+            }
+
+            acquisition.Approval = AcquisitionApproval.Pending;
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<decimal>.Success(value);
+        }, ct);
+
+    /// <summary>Applies the end of an acquisition's workflow: approved lets it complete; rejected sends it back.</summary>
+    internal async Task<Result> ConcludeAsync(long companyId, string reference, bool approved, CancellationToken ct)
+    {
+        LandAcquisition? acquisition = await _db.Set<LandAcquisition>().FirstOrDefaultAsync(a => a.CompanyId == companyId && a.AcquisitionNumber == reference, ct).ConfigureAwait(false);
+        if (acquisition is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.AcquisitionNotFound", $"No acquisition {reference}."));
+        }
+
+        acquisition.Approval = approved ? AcquisitionApproval.Approved : AcquisitionApproval.Rejected;
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     /// <inheritdoc />
     public Task<Result<long>> CompleteAsync(long companyId, string acquisitionNumber, DateOnly date, CancellationToken ct = default)
         => _db.AtomicAsync(() => CompleteCoreAsync(companyId, acquisitionNumber, date, ct), ct);
@@ -236,6 +291,17 @@ public sealed class LandAcquisitionService : ILandAcquisitionService
         if (problems.Count > 0)
         {
             return Error.Rule("Hse.DueDiligenceIncomplete", string.Join(" ", problems));
+        }
+
+        // Under an acquisition workflow the council's bands must have approved it first.
+        if (acquisition.Approval != AcquisitionApproval.Approved && await GovernedAsync(companyId, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Hse.AcquisitionApproval", acquisition.Approval switch
+            {
+                AcquisitionApproval.Pending => $"{acquisition.AcquisitionNumber} is waiting for approval.",
+                AcquisitionApproval.Rejected => $"{acquisition.AcquisitionNumber} was rejected: renegotiate and submit it again, or abandon it.",
+                _ => $"{acquisition.AcquisitionNumber} needs approval: submit it for approval first.",
+            });
         }
 
         // The costs are already in land WIP; the parcel simply carries their total.
@@ -334,4 +400,17 @@ public sealed class LandAcquisitionService : ILandAcquisitionService
 
         return acquisition;
     }
+}
+
+/// <summary>Applies the end of a land acquisition's workflow.</summary>
+internal sealed class LandAcquisitionWorkflowHandler : IWorkflowDocumentHandler
+{
+    private readonly LandAcquisitionService _acquisitions;
+
+    public LandAcquisitionWorkflowHandler(LandAcquisitionService acquisitions) => _acquisitions = acquisitions;
+
+    public string DocumentType => WorkflowDocumentTypes.LandAcquisition;
+
+    public Task<Result> ConcludeAsync(long companyId, string documentReference, Core.Workflow.WorkflowStatus outcome, long decidedByUserId, string? comment, CancellationToken ct = default)
+        => _acquisitions.ConcludeAsync(companyId, documentReference, outcome == Core.Workflow.WorkflowStatus.Approved, ct);
 }

@@ -169,7 +169,9 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Housing.ISchemeBudgetService, Housing.SchemeBudgetService>();
         services.AddScoped<Application.Abstractions.Housing.ITitleDeedService, Housing.TitleDeedService>();
         services.AddScoped<Application.Abstractions.Housing.ITransferApplicationService, Housing.TransferApplicationService>();
-        services.AddScoped<Application.Abstractions.Housing.ILandAcquisitionService, Housing.LandAcquisitionService>();
+        services.AddScoped<Housing.LandAcquisitionService>();
+        services.AddScoped<Application.Abstractions.Housing.ILandAcquisitionService>(sp => sp.GetRequiredService<Housing.LandAcquisitionService>());
+        services.AddScoped<Application.Abstractions.Workflow.IWorkflowDocumentHandler, Housing.LandAcquisitionWorkflowHandler>();
         services.AddScoped<Application.Abstractions.Housing.ILayoutPlanService, Housing.LayoutPlanService>();
         services.AddScoped<Application.Abstractions.Housing.IStandPricingService, Housing.StandPricingService>();
         services.AddScoped<Application.Abstractions.Housing.IDevelopmentLevyService, Housing.DevelopmentLevyService>();

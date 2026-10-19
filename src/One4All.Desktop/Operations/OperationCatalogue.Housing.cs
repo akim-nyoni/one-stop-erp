@@ -569,8 +569,9 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Land acquisition", ListTitle = "Acquisitions",
             Description = "Open an acquisition (method, counterparty, authorising resolution), record its valuation, sign off each due-diligence item, capitalise costs into land WIP, "
-                + "see its position (cost build-up and what still blocks it), complete it into the land bank, or abandon it (costs written off).",
-            Fields = [Pick("Step", "Step", ["Open", "Valuation", "Council offer", "Counterparty offer", "Agree price", "Break off talks", "Sign off", "Add cost", "Position", "Complete", "Abandon"]),
+                + "see its position (cost build-up and what still blocks it), complete it into the land bank, or abandon it (costs written off). Under a land acquisition workflow, "
+                + "submit it for approval at its value first; it completes once approved.",
+            Fields = [Pick("Step", "Step", ["Open", "Valuation", "Council offer", "Counterparty offer", "Agree price", "Break off talks", "Sign off", "Add cost", "Position", "Submit for approval", "Complete", "Abandon"]),
                 Opt("Acquisition", "Acquisition number"),
                 Opt("Parcel", "Parcel number (open)"), Opt("Description", "Description / finding / reference"), Num("Area", "Area m² (open)", "0"), Pick("Method", "Method (open)", Enum.GetNames<AcquisitionMethod>()),
                 Opt("Party", "Counterparty / valuer"), Opt("Resolution", "Resolution (open) / reason (abandon)"), Num("Amount", "Value / cost", "0"),
@@ -615,6 +616,8 @@ public static partial class OperationCatalogue
                         AcquisitionPosition position = Check(await land.PositionAsync(c.CompanyId, acquisition).ConfigureAwait(true));
                         return $"{position.AcquisitionNumber} {position.Status}: total {M(position.TotalCost)}." + Environment.NewLine
                             + (position.Outstanding.Count == 0 ? "Nothing outstanding." : "Outstanding: " + string.Join("; ", position.Outstanding));
+                    case "Submit for approval":
+                        return Check(await land.SubmitForApprovalAsync(c.CompanyId, acquisition, c.UserId).ConfigureAwait(true), value => $"Submitted for approval at {M(value)}.");
                     case "Complete":
                         return Check(await land.CompleteAsync(c.CompanyId, acquisition, date).ConfigureAwait(true), parcel => $"Completed into the land bank (parcel {parcel}).");
                     default:
@@ -626,7 +629,7 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Set<LandAcquisition>().AsNoTracking().Include(a => a.Costs).Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 300).ToListAsync()
                     .ConfigureAwait(true),
                 ("Acquisition", a => a.AcquisitionNumber), ("Parcel", a => a.ParcelNumber), ("Method", a => a.Method), ("Counterparty", a => a.Counterparty), ("Valued", a => a.ValuedAt is decimal v ? M(v) : "-"),
-                ("Cost", a => M(a.TotalCost)), ("Status", a => a.Status)),
+                ("Cost", a => M(a.TotalCost)), ("Status", a => a.Status), ("Approval", a => a.Approval)),
         };
         yield return new Operation
         {

@@ -80,4 +80,7 @@ public static class WorkflowDocumentTypes
 
     /// <summary>A new municipal tariff version (reference: <c>TV-</c> and the version id); approval puts it in force.</summary>
     public const string TariffVersion = "TariffVersion";
+
+    /// <summary>A land acquisition at its value (reference: the acquisition number); approval lets it complete, the value bands choosing who approves.</summary>
+    public const string LandAcquisition = "LandAcquisition";
 }
