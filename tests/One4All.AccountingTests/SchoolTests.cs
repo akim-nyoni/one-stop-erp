@@ -79,6 +79,12 @@ public sealed class SchoolTests
             IGeneralLedgerReports gl = scope.ServiceProvider.GetRequiredService<IGeneralLedgerReports>();
             TrialBalanceReport tb = await gl.TrialBalanceAsync(companyId, new DateOnly(2026, 1, 31));
             tb.IsBalanced.Should().BeTrue();
+
+            // Each student's own account out of the guardian's: Student Two's 750 after the bursary, charged to Guardian B.
+            Application.Abstractions.Schools.StudentAccount account = (await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Schools.IStudentAccountService>()
+                .AccountAsync(companyId, "adm-002")).Value;
+            (account.Billed, account.Balance, account.Lines.Single().Payer).Should().Be((750m, 750m, "GUAR-B"));
+            (await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Schools.IStudentAccountService>().AccountAsync(companyId, "NOBODY")).IsFailure.Should().BeTrue();
         }
     }
 }

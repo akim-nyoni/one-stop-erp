@@ -427,6 +427,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Schools.ISchoolSetupService, Schools.SchoolSetupService>();
         services.AddScoped<Application.Abstractions.Schools.IAcademicStructureService, Schools.AcademicStructureService>();
         services.AddScoped<Application.Abstractions.Schools.IStudentWalletService, Schools.StudentWalletService>();
+        services.AddScoped<Application.Abstractions.Schools.IStudentAccountService, Schools.StudentAccountService>();
 
         // Construction / Job Costing.
         services.AddScoped<Application.Abstractions.JobCosting.IJobCostingService, JobCosting.JobCostingService>();

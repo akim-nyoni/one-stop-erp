@@ -1928,6 +1928,21 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Sales & Schools", Title = "Student account",
+            Description = "One student's fees out of the family's account: every fee invoice, credit and debit note raised for the student (to the guardian or the sponsor), what has been "
+                + "paid on each and what is still owed.",
+            Fields = [Req("Student", "Admission number")],
+            Run = async (c, i) =>
+            {
+                StudentAccount account = Check(await c.Get<IStudentAccountService>().AccountAsync(c.CompanyId, i.Text("Student")).ConfigureAwait(true));
+                return account.Lines.Count == 0 ? $"{account.AdmissionNumber} {account.StudentName}: no fees billed."
+                    : string.Join(Environment.NewLine, [$"{account.AdmissionNumber} {account.StudentName}",
+                        .. account.Lines.Select(l => $"{D(l.Date)} {l.DocumentNumber,-16} {l.Type,-10} {l.Payer,-10} {M(l.Amount),12} paid {M(l.Paid),12} owed {M(l.Outstanding),12}  {l.Description}"),
+                        $"Billed {M(account.Billed)}, paid {M(account.Paid)}, owed {M(account.Balance)}."]);
+            },
+        };
+        yield return new Operation
+        {
             Module = "Sales & Schools", Title = "Top up / spend a student wallet", ListTitle = "Wallet balances",
             Description = "A top-up is paid into the bank; a spend (tuck shop) is limited to the balance and the student's daily limit.",
             Fields = [Req("Student", "Admission number"), Pick("Action", "Action", "Top up", "Spend"), Today(), Num("Amount", "Amount"), Req("Wallet", "Wallet liability account"),

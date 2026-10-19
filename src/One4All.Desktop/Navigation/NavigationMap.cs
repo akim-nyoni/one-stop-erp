@@ -338,7 +338,8 @@ public static class NavigationMap
         new("Schools", "\U0001F393", "#7B1FA2", "Students, classes, fees, bursaries and wallets.", ["Sales & Schools"],
         [
             G("Students",
-                O("Sales & Schools: Students, hostels and routes"), O("Sales & Schools: Staff children and restricted students"), O("Sales & Schools: Top up / spend a student wallet")),
+                O("Sales & Schools: Students, hostels and routes"), O("Sales & Schools: Staff children and restricted students"), O("Sales & Schools: Student account", "A student's fees and balance"),
+                O("Sales & Schools: Top up / spend a student wallet")),
             G("Fees",
                 O("Sales & Schools: Fee structures and term billing"), O("Sales & Schools: Bursaries"), O("Sales & Schools: Set a sibling discount", "Sibling discount"),
                 O("Sales & Schools: Send fee reminders"), O("Documents: Fee invoice", "Print a fee invoice")),

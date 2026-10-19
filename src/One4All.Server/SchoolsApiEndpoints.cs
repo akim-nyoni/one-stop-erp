@@ -52,6 +52,10 @@ internal static class SchoolsApiEndpoints
         })
         .WithName("GetStudent");
 
+        api.MapGet("/api/schools/students/{admissionNumber}/account", async (string admissionNumber, long companyId, IStudentAccountService accounts, CancellationToken ct) =>
+            Value(await accounts.AccountAsync(companyId, admissionNumber, ct).ConfigureAwait(false)))
+        .WithName("StudentAccount");
+
         api.MapPost("/api/schools/students", async (AdmitStudentApiRequest request, ISchoolSetupService setup, CancellationToken ct) =>
             Value(await setup.AdmitStudentAsync(request.CompanyId, request.AdmissionNumber, request.FullName, request.Grade, request.GuardianCustomerCode, request.AdmittedOn, ct)
                 .ConfigureAwait(false)))
