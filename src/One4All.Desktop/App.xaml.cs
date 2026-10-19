@@ -116,6 +116,7 @@ public partial class App : System.Windows.Application
         await sp.GetRequiredService<One4AllDbContext>().Database.MigrateAsync().ConfigureAwait(false);
         await sp.GetRequiredService<PermissionSeeder>().SeedAsync().ConfigureAwait(false);
         await sp.GetRequiredService<AdministratorSeeder>().SeedAsync().ConfigureAwait(false);
+        await sp.GetRequiredService<CurrencySeeder>().SeedAsync().ConfigureAwait(false);
         await sp.GetRequiredService<MessageTemplateSeeder>().SeedAsync().ConfigureAwait(false);
 
         ILicenceService licence = Services.GetRequiredService<ILicenceService>();

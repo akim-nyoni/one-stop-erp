@@ -527,6 +527,7 @@ public static class DependencyInjection
         services.AddSingleton<ISqlScriptRunner>(_ => new SqlScriptRunner(connectionString));
         services.AddScoped<PermissionSeeder>();
         services.AddScoped<AdministratorSeeder>();
+        services.AddScoped<CurrencySeeder>();
         services.AddScoped<MessageTemplateSeeder>();
 
         return services;
