@@ -29,6 +29,8 @@ public sealed class PosService : IPosService
     private readonly IFiscalDeviceProvider? _fiscal;
     private readonly Application.Abstractions.Trading.IAllocationService? _allocations;
 
+    private readonly Application.Abstractions.Pos.ILoyaltyService? _loyalty;
+
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The posting engine.</param>
@@ -41,8 +43,9 @@ public sealed class PosService : IPosService
     public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
         Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null,
         Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? caller = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Pos.ILoyaltyService? loyalty = null)
     {
+        _loyalty = loyalty;
         _permissions = permissions;
         _audit = audit;
         _caller = caller;
@@ -328,11 +331,26 @@ public sealed class PosService : IPosService
                 }
             }
 
+            // Loyalty points: redeemed from the member's balance, the value paid out of the scheme's points liability.
+            string? pointsLiability = null;
+            if (tender.TenderType == TenderType.Loyalty)
+            {
+                Result<string> redeemed = await RedeemPointsAsync(request, tender, baseCurrency, ct).ConfigureAwait(false);
+                if (redeemed.IsFailure)
+                {
+                    return redeemed.Error;
+                }
+
+                pointsLiability = redeemed.Value;
+            }
+
             decimal rate = rateResult.Value;
             decimal baseAmount = decimal.Round(tender.Amount * rate, 4, MidpointRounding.ToEven);
-            string tenderAccount = tender.TenderType == TenderType.Credit && tender.StaffEmployeeId is null && receivablesControl is not null ? receivablesControl : tender.AccountCode;
+            string tenderAccount = pointsLiability
+                ?? (tender.TenderType == TenderType.Credit && tender.StaffEmployeeId is null && receivablesControl is not null ? receivablesControl : tender.AccountCode);
             sale.AddTender(new SaleTender(tender.TenderType, tender.Currency, tender.Amount, rate, baseAmount, tenderAccount, tender.IsChange, tender.StaffEmployeeId,
-                tender.TenderType == TenderType.Voucher ? tender.VoucherNumber!.Trim().ToUpperInvariant() : null));
+                tender.TenderType is TenderType.Voucher or TenderType.Loyalty or TenderType.Cheque && !string.IsNullOrWhiteSpace(tender.VoucherNumber)
+                    ? tender.VoucherNumber.Trim().ToUpperInvariant() : null));
 
             // A foreign-currency tender goes to its account in that currency (so the drawer's dollars are revalued as dollars), at the till's rate.
             journalLines.Add(tender.Currency == baseCurrency
@@ -1130,6 +1148,30 @@ public sealed class PosService : IPosService
         }
 
         return new CashPosition(lines, expectedBase, accounts);
+    }
+
+    // A points tender: the member's points worth the amount are redeemed; the scheme's points liability is the account it is paid from.
+    private async Task<Result<string>> RedeemPointsAsync(CompleteSaleRequest request, PosTenderRequest tender, CurrencyCode baseCurrency, CancellationToken ct)
+    {
+        if (tender.IsChange || string.IsNullOrWhiteSpace(tender.VoucherNumber) || tender.Amount <= 0m)
+        {
+            return Error.Validation("Pos.LoyaltyTender", "A points tender needs the member number and a positive amount, and gives no change.");
+        }
+
+        if (tender.Currency != baseCurrency)
+        {
+            return Error.Rule("Pos.LoyaltyCurrency", $"Points are redeemed in {baseCurrency.Value}.");
+        }
+
+        Core.Pos.LoyaltyScheme? scheme = await _db.Set<Core.Pos.LoyaltyScheme>().AsNoTracking().FirstOrDefaultAsync(s => s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (_loyalty is null || scheme is null || scheme.ValuePerPoint <= 0m)
+        {
+            return Error.Rule("Loyalty.NoScheme", "No loyalty scheme is set up to redeem points against.");
+        }
+
+        decimal points = decimal.Round(tender.Amount / scheme.ValuePerPoint, 4, MidpointRounding.ToEven);
+        Result<decimal> value = await _loyalty.RedeemAsync(request.CompanyId, tender.VoucherNumber, points, request.SaleDate, $"POS sale {request.SaleNumber}", ct).ConfigureAwait(false);
+        return value.IsFailure ? value.Error : Result<string>.Success(scheme.LiabilityAccountCode);
     }
 
     private async Task<Result<decimal>> ResolveRateAsync(CurrencyCode baseCurrency, CurrencyCode tenderCurrency, decimal? explicitRate, DateOnly date, CancellationToken ct)

@@ -310,6 +310,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _mobileMoneyAccountCode = string.Empty;
 
+    /// <summary>The GL account cheques taken at the till post to (cheques awaiting banking).</summary>
+    [ObservableProperty]
+    private string _chequeAccountCode = string.Empty;
+
+    /// <summary>The GL account bank transfers to the till post to.</summary>
+    [ObservableProperty]
+    private string _bankTransferAccountCode = string.Empty;
+
     /// <summary>The gift card liability account a voucher tender posts to.</summary>
     [ObservableProperty]
     private string _giftCardAccountCode = string.Empty;
@@ -554,6 +562,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         OverShortAccountCode = Account("OverShort", OverShortAccountCode);
         DiscountAccountCode = Account("Discount", DiscountAccountCode);
         MobileMoneyAccountCode = Account("MobileMoney", MobileMoneyAccountCode);
+        ChequeAccountCode = Account("Cheque", ChequeAccountCode);
+        BankTransferAccountCode = Account("BankTransfer", BankTransferAccountCode);
         GiftCardAccountCode = Account("GiftCard", GiftCardAccountCode);
         TipsAccountCode = Account("Tips", TipsAccountCode);
         TenderCurrencies.Clear();
@@ -737,7 +747,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             Accounts = new Dictionary<string, string>
             {
                 ["Cash"] = CashAccountCode, ["Card"] = CardAccountCode, ["Tax"] = TaxAccountCode, ["OverShort"] = OverShortAccountCode, ["Discount"] = DiscountAccountCode,
-                ["MobileMoney"] = MobileMoneyAccountCode, ["GiftCard"] = GiftCardAccountCode, ["Tips"] = TipsAccountCode,
+                ["MobileMoney"] = MobileMoneyAccountCode, ["GiftCard"] = GiftCardAccountCode, ["Tips"] = TipsAccountCode, ["Cheque"] = ChequeAccountCode,
+                ["BankTransfer"] = BankTransferAccountCode,
             },
             TenderCurrencies = [.. TenderCurrencies.Select(t => new OfflineTenderCurrency(t.Code.Value, t.Rate))],
             Customers = _customers.Count > 0 ? _customers : _snapshot?.Customers ?? [],
@@ -1091,6 +1102,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         OverShortAccountCode = FindByName(accounts, "over", "short", "variance") ?? OverShortAccountCode;
         DiscountAccountCode = FindByName(accounts, "discount allowed", "discounts allowed", "sales discount") ?? DiscountAccountCode;
         MobileMoneyAccountCode = FindByName(accounts, "mobile money", "ecocash", "wallet") ?? MobileMoneyAccountCode;
+        ChequeAccountCode = FindByName(accounts, "cheques", "cheque") ?? CashAccountCode;
+        BankTransferAccountCode = FindByName(accounts, "bank") ?? CashAccountCode;
         GiftCardAccountCode = FindByName(accounts, "gift card", "voucher") ?? GiftCardAccountCode;
     }
 
@@ -1751,6 +1764,59 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [RelayCommand]
     private void TenderMobileMoney() => AddTender(TenderType.MobileMoney, allowOverTender: false);
 
+    /// <summary>Takes a cheque for the entered amount (or the exact balance when blank); no change is given on a cheque.</summary>
+    [RelayCommand]
+    private void TenderCheque() => AddTender(TenderType.Cheque, allowOverTender: false);
+
+    /// <summary>Takes a bank transfer for the entered amount (or the exact balance when blank).</summary>
+    [RelayCommand]
+    private void TenderBankTransfer() => AddTender(TenderType.BankTransfer, allowOverTender: false);
+
+    /// <summary>Pays with the loyalty member's points: the entered amount (or as much of the balance as the points cover).</summary>
+    [RelayCommand]
+    private async Task TenderPointsAsync()
+    {
+        if (!IsSessionOpen || _ticket.Lines.Count == 0)
+        {
+            return;
+        }
+
+        if (NullIfBlank(LoyaltyMember) is not string member)
+        {
+            StatusMessage = "Type the loyalty member number under More functions first.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        Result<LoyaltyStatement> statement = await scope.ServiceProvider.GetRequiredService<ILoyaltyService>()
+            .StatementAsync(_companyId, member, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true);
+        if (statement.IsFailure)
+        {
+            StatusMessage = statement.Error.Message;
+            return;
+        }
+
+        decimal available = statement.Value.BalanceValue - _ticket.Tenders.Where(t => t.Type == TenderType.Loyalty).Sum(t => t.Amount);
+        decimal wanted = string.IsNullOrWhiteSpace(TenderEntry) ? _ticket.BalanceDue : TryEntry(out decimal typed) ? typed : 0m;
+        decimal amount = Math.Min(Math.Min(wanted, _ticket.BalanceDue), available);
+        if (amount <= 0m)
+        {
+            StatusMessage = available <= 0m ? $"{member} has no points to spend." : "Enter a valid amount.";
+            return;
+        }
+
+        Result added = _ticket.AddTender(TenderType.Loyalty, amount, member);
+        if (added.IsFailure)
+        {
+            StatusMessage = added.Error.Message;
+            return;
+        }
+
+        TenderEntry = string.Empty;
+        RefreshTotals();
+        StatusMessage = (_ticket.IsFullyTendered ? "Paid. Press Pay to complete." : $"Balance {BalanceText} due.") + $" {member}: {available - amount:N2} in points left after this sale.";
+    }
+
     /// <summary>Charges the balance to the customer's account (checked against their credit limit when the sale posts).</summary>
     [RelayCommand]
     private async Task TenderAccountAsync()
@@ -2323,6 +2389,16 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(GiftCardAccountCode))
         {
             tenderAccounts[TenderType.Voucher] = GiftCardAccountCode.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(ChequeAccountCode))
+        {
+            tenderAccounts[TenderType.Cheque] = ChequeAccountCode.Trim();
+        }
+
+        if (!string.IsNullOrWhiteSpace(BankTransferAccountCode))
+        {
+            tenderAccounts[TenderType.BankTransfer] = BankTransferAccountCode.Trim();
         }
 
         return new(

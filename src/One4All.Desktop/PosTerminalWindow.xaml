@@ -388,6 +388,8 @@
                                             <StackPanel Margin="2"><TextBlock Text="Card a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding CardAccountCode}" /></StackPanel>
                                             <StackPanel Margin="2"><TextBlock Text="Tax a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding TaxAccountCode}" /></StackPanel>
                                             <StackPanel Margin="2"><TextBlock Text="Mobile money a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding MobileMoneyAccountCode}" /></StackPanel>
+                                            <StackPanel Margin="2"><TextBlock Text="Cheques a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding ChequeAccountCode}" /></StackPanel>
+                                            <StackPanel Margin="2"><TextBlock Text="Bank transfer a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding BankTransferAccountCode}" /></StackPanel>
                                             <StackPanel Margin="2"><TextBlock Text="Gift card a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding GiftCardAccountCode}" /></StackPanel>
                                             <StackPanel Margin="2"><TextBlock Text="Tips a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding TipsAccountCode}" /></StackPanel>
                                             <StackPanel Margin="2"><TextBlock Text="Discount a/c" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding DiscountAccountCode}" /></StackPanel>
@@ -464,6 +466,11 @@
                                 <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" FontSize="20" Background="#2980B9" Command="{Binding TenderCashCommand}" ToolTip="Type the cash handed over, then press CASH" />
                                 <Button Content="CARD" Style="{StaticResource PadButton}" Height="48" FontSize="16" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
                                 <Button Content="MOBILE MONEY" Style="{StaticResource PadButton}" Height="48" FontSize="15" Background="#117A65" Command="{Binding TenderMobileMoneyCommand}" />
+                                <UniformGrid Columns="3">
+                                    <Button Content="CHEQUE" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#5D6D7E" Command="{Binding TenderChequeCommand}" ToolTip="A cheque for the amount on the pad (blank: the balance); no change is given" />
+                                    <Button Content="TRANSFER" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#1F618D" Command="{Binding TenderBankTransferCommand}" ToolTip="A bank transfer for the amount on the pad (blank: the balance)" />
+                                    <Button Content="POINTS" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#A04000" Command="{Binding TenderPointsCommand}" ToolTip="Pay with the loyalty member's points (member number under More functions)" />
+                                </UniformGrid>
                                 <Button Content="SELL GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#7D6608" Command="{Binding SellGiftCardCommand}" ToolTip="Card number in the gift card box, value on the number pad: printed stock activates, an active card tops up, when the sale posts" />
                                 <Button Content="VOUCHER / GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#B9770E" Command="{Binding TenderVoucherCommand}" ToolTip="Type the gift card number under More functions first" />
                                 <ItemsControl ItemsSource="{Binding CurrencyButtons}" Margin="3,2,3,0" ToolTip="{Binding PayingInText}">

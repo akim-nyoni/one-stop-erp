@@ -544,7 +544,7 @@ public sealed class PosTicket
     /// <param name="type">The tender type.</param>
     /// <param name="amount">The amount (must be positive).</param>
     /// <returns>Success, or a validation error.</returns>
-    /// <param name="voucherNumber">For a voucher tender, the gift card it is paid from.</param>
+    /// <param name="voucherNumber">The tender's reference: the gift card (voucher), the member (loyalty points) or the cheque number.</param>
     public Result AddTender(TenderType type, decimal amount, string? voucherNumber = null)
     {
         if (amount <= 0m)
@@ -557,7 +557,13 @@ public sealed class PosTicket
             return Result.Failure(Error.Validation("Pos.VoucherTender", "A voucher tender needs the gift card number."));
         }
 
-        _tenders.Add(new PosTicketTender(type, PosMoney.Round(amount), type == TenderType.Voucher ? voucherNumber!.Trim().ToUpperInvariant() : null));
+        if (type == TenderType.Loyalty && string.IsNullOrWhiteSpace(voucherNumber))
+        {
+            return Result.Failure(Error.Validation("Pos.LoyaltyTender", "A points tender needs the member number."));
+        }
+
+        _tenders.Add(new PosTicketTender(type, PosMoney.Round(amount),
+            type is TenderType.Voucher or TenderType.Loyalty or TenderType.Cheque && !string.IsNullOrWhiteSpace(voucherNumber) ? voucherNumber.Trim().ToUpperInvariant() : null));
         return Result.Success();
     }
 
@@ -609,6 +615,10 @@ public sealed class PosTicket
                 }
 
                 account ??= string.Empty; // the server posts it to the receivables control account
+            }
+            else if (tender.Type == TenderType.Loyalty)
+            {
+                account ??= string.Empty; // the server posts it to the loyalty scheme's points liability
             }
             else if (string.IsNullOrWhiteSpace(account))
             {

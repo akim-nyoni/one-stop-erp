@@ -25,6 +25,8 @@ public readonly record struct PosSaleLineRequest(long ItemId, string Description
 /// <param name="AccountCode">The GL account for the tender.</param>
 /// <param name="IsChange">True when this is change given.</param>
 /// <param name="ExchangeRate">Optional explicit rate (else the daily rate / 1 for base).</param>
+/// <param name="StaffEmployeeId">For a staff purchase, the employee charged.</param>
+/// <param name="VoucherNumber">The tender's reference: the gift card (voucher), the member number (loyalty points) or the cheque number.</param>
 public readonly record struct PosTenderRequest(TenderType TenderType, CurrencyCode Currency, decimal Amount, string AccountCode, bool IsChange, decimal? ExchangeRate = null, long? StaffEmployeeId = null,
     string? VoucherNumber = null);
 

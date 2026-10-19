@@ -26,6 +26,9 @@ public enum TenderType
 
     /// <summary>On account (credit - posts to AR).</summary>
     Credit = 7,
+
+    /// <summary>Loyalty points redeemed (the member number is the tender's reference; it posts to the scheme's points liability).</summary>
+    Loyalty = 8,
 }
 
 /// <summary>The status of a till session.</summary>
