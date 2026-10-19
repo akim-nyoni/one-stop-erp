@@ -12,13 +12,82 @@
             </StackPanel>
         </DockPanel>
 
-        <Border DockPanel.Dock="Right" Width="260" Margin="8,0,0,0" Background="#26313A" CornerRadius="6" Padding="12">
-            <StackPanel>
-                <TextBlock Text="Table" Foreground="#9AA7B0" FontSize="12" />
-                <TextBlock Text="{Binding Selected.Detail, FallbackValue='Tap a table'}" Foreground="White" FontSize="15" TextWrapping="Wrap" Margin="0,6,0,14" />
-                <TextBlock Foreground="#9AA7B0" FontSize="11" TextWrapping="Wrap"
-                           Text="Green: free. Amber: occupied. Red: past the tab warning (time open or total). Place tables and set the warnings under Restaurant operations; the screen refreshes every 30 seconds." />
-            </StackPanel>
+        <Border DockPanel.Dock="Right" Width="380" Margin="8,0,0,0" Background="#26313A" CornerRadius="6" Padding="12">
+            <Border.Resources>
+                <BooleanToVisibilityConverter x:Key="Visible" />
+                <Style x:Key="Action" TargetType="Button">
+                    <Setter Property="Height" Value="40" />
+                    <Setter Property="Margin" Value="2" />
+                    <Setter Property="FontWeight" Value="SemiBold" />
+                    <Setter Property="Foreground" Value="White" />
+                    <Setter Property="BorderThickness" Value="0" />
+                    <Setter Property="Cursor" Value="Hand" />
+                </Style>
+                <Style x:Key="Field" TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="#9AA7B0" />
+                    <Setter Property="FontSize" Value="11" />
+                </Style>
+            </Border.Resources>
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top">
+                    <TextBlock Text="Table" Foreground="#9AA7B0" FontSize="12" />
+                    <TextBlock Text="{Binding Selected.Detail, FallbackValue='Tap a table'}" Foreground="White" FontSize="15" TextWrapping="Wrap" Margin="0,6,0,8" />
+                    <StackPanel Orientation="Horizontal" Visibility="{Binding CanSeat, Converter={StaticResource Visible}}" Margin="0,0,0,8">
+                        <TextBlock Text="Party" Foreground="#9AA7B0" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <TextBox Text="{Binding PartySize}" Width="48" VerticalContentAlignment="Center" />
+                        <Button Content="Seat the table" Style="{StaticResource Action}" Background="#239B56" Padding="16,0" Command="{Binding SeatCommand}" />
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Bottom">
+                    <TextBlock Text="{Binding Message}" Foreground="#F7DC6F" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,6" />
+                    <UniformGrid Columns="3" Margin="0,0,0,6" Visibility="{Binding HasOrder, Converter={StaticResource Visible}}">
+                        <StackPanel Margin="2"><TextBlock Text="Pay into a/c" Style="{StaticResource Field}" /><TextBox Text="{Binding PayAccount}" /></StackPanel>
+                        <StackPanel Margin="2"><TextBlock Text="Tax a/c" Style="{StaticResource Field}" /><TextBox Text="{Binding TaxAccount}" /></StackPanel>
+                        <StackPanel Margin="2"><TextBlock Text="Warehouse" Style="{StaticResource Field}" /><TextBox Text="{Binding Warehouse}" /></StackPanel>
+                    </UniformGrid>
+                    <UniformGrid Columns="2" Visibility="{Binding HasOrder, Converter={StaticResource Visible}}">
+                        <Button Content="Send to kitchen" Style="{StaticResource Action}" Background="#B9770E" Command="{Binding FireCommand}" />
+                        <Button Content="{Binding OrderTotal}" ContentStringFormat="Bill {0}" Style="{StaticResource Action}" Background="#2980B9" Command="{Binding BillCommand}" />
+                    </UniformGrid>
+                    <TextBlock Foreground="#9AA7B0" FontSize="11" TextWrapping="Wrap" Margin="0,8,0,0"
+                               Text="Green: free. Amber: occupied. Red: past the tab warning (time open or total). Place tables and set the warnings under Restaurant operations; the screen refreshes every 30 seconds." />
+                </StackPanel>
+                <Grid Visibility="{Binding HasOrder, Converter={StaticResource Visible}}">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <ListView Grid.Row="0" ItemsSource="{Binding OrderLines}" Background="#1F2A33" Foreground="White" BorderThickness="0">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <DockPanel Width="320">
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding Amount}" Margin="8,0,0,0" />
+                                    <TextBlock DockPanel.Dock="Right" Text="{Binding State}" Foreground="#9AA7B0" Margin="8,0,0,0" />
+                                    <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,6,0,0">
+                        <ItemsControl ItemsSource="{Binding Menu}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="112" Height="56" Margin="2" Background="#34495E" Foreground="White" BorderThickness="0" Cursor="Hand"
+                                            Command="{Binding DataContext.AddItemCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding}">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Name}" TextWrapping="Wrap" TextAlignment="Center" FontSize="12" MaxHeight="32" />
+                                            <TextBlock Text="{Binding PriceText}" HorizontalAlignment="Center" FontSize="11" Foreground="#AED6F1" />
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </DockPanel>
         </Border>
 
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" Background="#1F2A33">
