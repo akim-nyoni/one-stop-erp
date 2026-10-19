@@ -230,6 +230,12 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LeaveProvisionTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.MonthlyDepreciationTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.WaitingListRenewalsTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.ArrangementReviewTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.InstalmentDefaultsTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.CovenantBreachesTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.IndigentReviewsTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.LicenceRenewalsTask>();
+        services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Scheduling.BursaryExpiryTask>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Backup.BackupTask>();
         services.AddScoped<Application.Abstractions.Reporting.IReportingSnapshotService, Reporting.ReportingSnapshotService>();
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Reporting.RefreshSnapshotsTask>();
