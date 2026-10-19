@@ -136,6 +136,12 @@ public sealed class ServiceTicket : AuditableEntity, ICompanyScoped
     /// <summary>The public reference.</summary>
     public string Reference { get; private set; }
 
+    /// <summary>Gets or sets the council rental unit the fault is in (a housing fault).</summary>
+    public long? RentalUnitId { get; set; }
+
+    /// <summary>Gets or sets the repair raised on the rental unit for the fault.</summary>
+    public string? RepairNumber { get; set; }
+
     /// <summary>The category.</summary>
     public long CategoryId { get; private set; }
 

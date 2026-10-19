@@ -51,6 +51,8 @@
                     <ComboBox ItemsSource="{Binding Priorities}" SelectedItem="{Binding Priority}" Margin="0,2,0,6" />
                     <TextBlock Text="Stand / erf (optional)" FontSize="11" Foreground="#667" />
                     <TextBox Text="{Binding StandNumber, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,6" />
+                    <TextBlock Text="Council rental unit (optional: raises a repair)" FontSize="11" Foreground="#667" />
+                    <TextBox Text="{Binding RentalUnit, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,6" />
                     <TextBlock Text="Reported by" FontSize="11" Foreground="#667" />
                     <TextBox Text="{Binding ReporterName, UpdateSourceTrigger=PropertyChanged}" Margin="0,2,0,6" />
                     <TextBlock Text="Contact" FontSize="11" Foreground="#667" />

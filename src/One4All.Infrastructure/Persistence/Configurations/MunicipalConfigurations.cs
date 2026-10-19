@@ -463,6 +463,8 @@ internal sealed class ServiceTicketConfiguration : IEntityTypeConfiguration<Serv
         b.Property(x => x.ReporterContact).HasMaxLength(100);
         b.Property(x => x.Description).HasMaxLength(2000);
         b.Property(x => x.Resolution).HasMaxLength(2000);
+        b.Property(x => x.RepairNumber).HasMaxLength(40);
+        b.HasIndex(x => x.RentalUnitId);
         b.HasOne<TicketCategory>().WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<Property>().WithMany().HasForeignKey(x => x.PropertyId).OnDelete(DeleteBehavior.Restrict);
         b.HasMany(x => x.Events).WithOne().HasForeignKey(x => x.ServiceTicketId).OnDelete(DeleteBehavior.Restrict);

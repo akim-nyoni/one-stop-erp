@@ -16,6 +16,12 @@ public sealed class FaultReport
     /// <summary>The property, when known (by stand number).</summary>
     public string? StandNumber { get; init; }
 
+    /// <summary>
+    /// The council rental unit the fault is in (housing faults, brief §4.10): the ticket follows the unit, and a repair is raised on the unit so its
+    /// maintenance history and costs carry the job.
+    /// </summary>
+    public string? RentalUnitCode { get; init; }
+
     /// <summary>The priority.</summary>
     public TicketPriority Priority { get; init; } = TicketPriority.Normal;
 

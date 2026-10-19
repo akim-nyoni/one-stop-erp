@@ -18666,6 +18666,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("reference");
 
+                    b.Property<long?>("RentalUnitId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rental_unit_id");
+
+                    b.Property<string>("RepairNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("repair_number");
+
                     b.Property<DateTimeOffset>("ReportedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("reported_at");
@@ -18719,6 +18728,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("PropertyId")
                         .HasDatabaseName("ix_service_ticket_property_id");
+
+                    b.HasIndex("RentalUnitId")
+                        .HasDatabaseName("ix_service_ticket_rental_unit_id");
 
                     b.HasIndex("CompanyId", "Reference")
                         .IsUnique()

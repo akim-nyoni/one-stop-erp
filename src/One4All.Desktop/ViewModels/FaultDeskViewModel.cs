@@ -54,6 +54,10 @@ public sealed partial class FaultDeskViewModel : ObservableObject
     [ObservableProperty]
     private string? _category;
 
+    /// <summary>The council rental unit the fault is in (optional): a housing fault raises a repair on it.</summary>
+    [ObservableProperty]
+    private string? _rentalUnit;
+
     /// <summary>The new fault's stand number (optional).</summary>
     [ObservableProperty]
     private string _standNumber = string.Empty;
@@ -128,6 +132,7 @@ public sealed partial class FaultDeskViewModel : ObservableObject
         Result<string> logged = await scope.ServiceProvider.GetRequiredService<IServiceDeskService>().LogAsync(new FaultReport
         {
             CompanyId = _companyId, CategoryCode = Category ?? string.Empty, StandNumber = string.IsNullOrWhiteSpace(StandNumber) ? null : StandNumber, Priority = Priority,
+            RentalUnitCode = string.IsNullOrWhiteSpace(RentalUnit) ? null : RentalUnit,
             ReporterName = ReporterName, ReporterContact = ReporterContact, Description = Description, ReportedAt = DateTimeOffset.UtcNow,
         }, ct).ConfigureAwait(true);
         if (logged.IsFailure)
@@ -137,7 +142,7 @@ public sealed partial class FaultDeskViewModel : ObservableObject
         }
 
         StatusMessage = $"Logged {logged.Value} - give the reporter this reference.";
-        (StandNumber, ReporterName, ReporterContact, Description) = (string.Empty, string.Empty, string.Empty, string.Empty);
+        (StandNumber, RentalUnit, ReporterName, ReporterContact, Description) = (string.Empty, string.Empty, string.Empty, string.Empty, string.Empty);
         await RefreshAsync(ct).ConfigureAwait(true);
     }
 

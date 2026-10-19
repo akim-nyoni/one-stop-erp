@@ -16,12 +16,17 @@ public sealed class ServiceDeskService : IServiceDeskService
     private readonly INumberSequenceService _numbers;
     private readonly INotificationService _notifications;
 
+    private readonly Application.Abstractions.Housing.IRentalMaintenanceService? _maintenance;
+
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
     /// <param name="notifications">The notification centre.</param>
-    public ServiceDeskService(One4AllDbContext db, INumberSequenceService numbers, INotificationService notifications)
+    /// <param name="maintenance">Raises the repair for a fault in a council rental unit.</param>
+    public ServiceDeskService(One4AllDbContext db, INumberSequenceService numbers, INotificationService notifications,
+        Application.Abstractions.Housing.IRentalMaintenanceService? maintenance = null)
     {
+        _maintenance = maintenance;
         _db = db;
         _numbers = numbers;
         _notifications = notifications;
@@ -74,14 +79,45 @@ public sealed class ServiceDeskService : IServiceDeskService
             }
         }
 
+        // A fault in a council rental unit: the ticket follows the unit, and the unit's repair carries the job.
+        long? unitId = null;
+        string? unitCode = null;
+        if (!string.IsNullOrWhiteSpace(report.RentalUnitCode))
+        {
+            unitCode = report.RentalUnitCode.Trim().ToUpperInvariant();
+            string code = unitCode;
+            unitId = await _db.Set<Core.Housing.RentalUnit>().Where(u => u.CompanyId == report.CompanyId && u.Code.ToUpper() == code).Select(u => (long?)u.Id).FirstOrDefaultAsync(ct)
+                .ConfigureAwait(false);
+            if (unitId is null)
+            {
+                return Error.NotFound("Svc.RentalUnitNotFound", $"No rental unit {unitCode}.");
+            }
+        }
+
         Result<string> reference = await _numbers.AllocateAsync(report.CompanyId, "FLT", DateOnly.FromDateTime(report.ReportedAt.UtcDateTime), ct: ct).ConfigureAwait(false);
         if (reference.IsFailure)
         {
             return reference.Error;
         }
 
-        _db.Set<ServiceTicket>().Add(new ServiceTicket(report.CompanyId, reference.Value, category.Id, propertyId, report.Priority, report.ReporterName.Trim(), report.ReporterContact.Trim(),
-            report.Description.Trim(), report.ReportedAt, SlaClock.Due(report.ReportedAt, category.ResponseHours, report.Priority), SlaClock.Due(report.ReportedAt, category.ResolutionHours, report.Priority)));
+        ServiceTicket ticket = new(report.CompanyId, reference.Value, category.Id, propertyId, report.Priority, report.ReporterName.Trim(), report.ReporterContact.Trim(),
+            report.Description.Trim(), report.ReportedAt, SlaClock.Due(report.ReportedAt, category.ResponseHours, report.Priority), SlaClock.Due(report.ReportedAt, category.ResolutionHours, report.Priority))
+        {
+            RentalUnitId = unitId,
+        };
+        if (unitCode is not null && _maintenance is not null)
+        {
+            Result<string> repair = await _maintenance.ReportRepairAsync(report.CompanyId, unitCode, DateOnly.FromDateTime(report.ReportedAt.UtcDateTime),
+                $"{reference.Value}: {report.Description.Trim()}", ct).ConfigureAwait(false);
+            if (repair.IsFailure)
+            {
+                return repair.Error;
+            }
+
+            ticket.RepairNumber = repair.Value;
+        }
+
+        _db.Set<ServiceTicket>().Add(ticket);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return reference.Value;
     }
