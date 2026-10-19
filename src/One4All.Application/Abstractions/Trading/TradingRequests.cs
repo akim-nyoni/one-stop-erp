@@ -83,7 +83,13 @@ public sealed record SalesInvoiceRequest : ITradingAnalysis
 /// <summary>One revenue account's share of a sales invoice's net amount.</summary>
 /// <param name="AccountCode">The revenue account (credited).</param>
 /// <param name="NetAmount">Its net amount.</param>
-public readonly record struct RevenueLine(string AccountCode, decimal NetAmount, string? CostCentre = null, string? Department = null);
+/// <param name="CostCentre">The cost centre.</param>
+/// <param name="Department">The department.</param>
+/// <param name="TaxCode">
+/// The line's own tax code (brief §3.5 mixed-rate invoices): when lines carry codes, every line needs one, each code's tax is worked out on its lines and
+/// posted to its own accounts, and the invoice's tax is their total.
+/// </param>
+public readonly record struct RevenueLine(string AccountCode, decimal NetAmount, string? CostCentre = null, string? Department = null, string? TaxCode = null);
 
 /// <summary>A request to post a receipt against a customer (AR).</summary>
 public sealed class ReceiptRequest
