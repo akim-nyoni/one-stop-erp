@@ -1723,8 +1723,12 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         IReceiptPrinter? printer = scope.ServiceProvider.GetRequiredService<IDeviceProvider>().Printer;
-        return printer is null ? "No receipt printer." : await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, openDrawer: false)).ConfigureAwait(true);
+        return printer is null ? "No receipt printer." : await printer.PrintAsync(await ReceiptBytesAsync(scope.ServiceProvider, LastReceiptText, openDrawer: false).ConfigureAwait(true)).ConfigureAwait(true);
     }
+
+    // A receipt as the printer takes it: the till's logo above the text.
+    private async Task<byte[]> ReceiptBytesAsync(IServiceProvider services, string receipt, bool openDrawer)
+        => await services.GetRequiredService<IReceiptPrintService>().ReceiptBytesAsync(_companyId, _terminalId, receipt, openDrawer).ConfigureAwait(true);
 
     // The receipt printers set up for this workstation (Printers per workstation, Receipts), if any: null when none is set up (the till's own device prints),
     // an empty string when every printer printed, else what failed.
@@ -2276,7 +2280,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
                 }
                 else if (devices.Printer is IReceiptPrinter printer)
                 {
-                    printed ??= await printer.PrintAsync(EscPosBuilder.Receipt(slip, false)).ConfigureAwait(true);
+                    printed ??= await printer.PrintAsync(await ReceiptBytesAsync(scope.ServiceProvider, slip, false).ConfigureAwait(true)).ConfigureAwait(true);
                 }
             }
 
@@ -2379,7 +2383,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             string? setUp = LastReceiptText.Length > 0 ? await PrintOnSetUpPrintersAsync(scope.ServiceProvider, LastReceiptText, cashTaken).ConfigureAwait(true) : null;
             string? printed = setUp is not null ? (setUp.Length == 0 ? null : setUp)
                 : devices.Printer is IReceiptPrinter printer && LastReceiptText.Length > 0
-                    ? await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, cashTaken && devices.Drawer is not null)).ConfigureAwait(true)
+                    ? await printer.PrintAsync(await ReceiptBytesAsync(scope.ServiceProvider, LastReceiptText, cashTaken && devices.Drawer is not null).ConfigureAwait(true)).ConfigureAwait(true)
                     : null;
             await ShowOnDisplayAsync(devices, "Thank you - change", change).ConfigureAwait(true);
 

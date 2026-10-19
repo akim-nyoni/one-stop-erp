@@ -39,10 +39,11 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Point of Sale", Title = "Receipt layout", ListTitle = "Receipt layouts",
-            Description = "How receipts print: 80mm (48 characters) or 58mm (32) paper, the title, header and footer lines (separate lines with |), what is shown and how many "
-                + "copies. Blank till: the company's layout; a till code gives that till its own. Preview shows the receipt as it prints, inside the paper's edges, "
+            Description = "How receipts print: 80mm (48 characters) or 58mm (32) paper, a logo picture printed at the top, the title, header and footer lines (separate lines with |), "
+                + "what is shown and how many copies. Blank till: the company's layout; a till code gives that till its own. Preview shows the receipt as it prints, inside the paper's edges, "
                 + "without saving; Save keeps it; Remove takes a till's own layout away.",
-            Fields = [Pick("Step", "Step", ["Preview", "Save", "Show saved", "Remove till layout"]), Opt("Terminal", "Till code (blank: every till)"), Pick("Paper", "Paper", ["80mm", "58mm"]),
+            Fields = [Pick("Step", "Step", ["Preview", "Save", "Show saved", "Set logo", "Remove logo", "Remove till layout"]), Opt("Terminal", "Till code (blank: every till)"), Pick("Paper", "Paper", ["80mm", "58mm"]),
+                Opt("Logo", "Logo picture file (PNG, JPG, BMP; set logo)"),
                 Opt("Title", "Title", "SALES RECEIPT"), Opt("Header", "Header lines (address | phone | message)"), Opt("Footer", "Footer lines (blank: Thank you!)"),
                 Tick("Cashier", "Show the cashier", true), Tick("Till", "Show the till", true), Tick("UnitPrice", "Show quantity x unit price"), Tick("TaxSummary", "Show subtotal and tax", true),
                 Tick("TaxNumber", "Show the company's tax number"), Tick("Fiscal", "Show the fiscal code", true), Num("Copies", "Copies", "1")],
@@ -58,6 +59,12 @@ public static partial class OperationCatalogue
                         return "Receipt layout saved." + Environment.NewLine + Check(await layouts.PreviewAsync(c.CompanyId, null, i.Optional("Terminal")).ConfigureAwait(true));
                     case "Show saved":
                         return Check(await layouts.PreviewAsync(c.CompanyId, null, i.Optional("Terminal")).ConfigureAwait(true));
+                    case "Set logo":
+                        One4All.Application.Pos.ReceiptLogo logo = Desktop.Pos.ReceiptLogoImage.Load(i.Optional("Logo") ?? throw new OperationException("Give the logo picture's file."), layout.PaperWidthMm);
+                        _ = Check(await layouts.SetLogoAsync(c.CompanyId, i.Optional("Terminal"), logo).ConfigureAwait(true), string.Empty);
+                        return $"Logo set ({logo.WidthBytes * 8} x {logo.Height} dots)." + Environment.NewLine + Check(await layouts.PreviewAsync(c.CompanyId, null, i.Optional("Terminal")).ConfigureAwait(true));
+                    case "Remove logo":
+                        return Check(await layouts.SetLogoAsync(c.CompanyId, i.Optional("Terminal"), null).ConfigureAwait(true), "Logo removed.");
                     case "Remove till layout":
                         return Check(await layouts.RemoveAsync(c.CompanyId, i.Optional("Terminal") ?? string.Empty).ConfigureAwait(true), "The till prints the company's layout again.");
                     default:

@@ -23859,6 +23859,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("header_text");
 
+                    b.Property<int>("LogoHeight")
+                        .HasColumnType("integer")
+                        .HasColumnName("logo_height");
+
+                    b.Property<byte[]>("LogoRaster")
+                        .HasColumnType("bytea")
+                        .HasColumnName("logo_raster");
+
+                    b.Property<int>("LogoWidthBytes")
+                        .HasColumnType("integer")
+                        .HasColumnName("logo_width_bytes");
+
                     b.Property<int>("PaperWidthMm")
                         .HasColumnType("integer")
                         .HasColumnName("paper_width_mm");

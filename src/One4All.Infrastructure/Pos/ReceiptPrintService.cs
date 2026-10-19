@@ -30,6 +30,7 @@ public sealed class ReceiptPrintService : IReceiptPrintService
         }
 
         int copies = (await _layouts.OptionsAsync(companyId, terminalId, ct).ConfigureAwait(false)).Copies;
+        ReceiptLogo? logo = await _layouts.LogoAsync(companyId, terminalId, ct).ConfigureAwait(false);
         int printed = 0;
         List<string> failures = [];
         for (int index = 0; index < printers.Count; index++)
@@ -38,7 +39,7 @@ public sealed class ReceiptPrintService : IReceiptPrintService
             string? failed = null;
             for (int copy = 0; copy < Math.Max(1, copies) * Math.Max(1, printer.Copies) && failed is null; copy++)
             {
-                failed = await Raw(printer).PrintAsync(EscPosBuilder.Receipt(receiptText, openDrawer && index == 0 && copy == 0), ct).ConfigureAwait(false);
+                failed = await Raw(printer).PrintAsync(EscPosBuilder.Receipt(receiptText, openDrawer && index == 0 && copy == 0, logo), ct).ConfigureAwait(false);
             }
 
             if (failed is null)
@@ -53,6 +54,10 @@ public sealed class ReceiptPrintService : IReceiptPrintService
 
         return new ReceiptPrintOutcome(printed, failures);
     }
+
+    /// <inheritdoc />
+    public async Task<byte[]> ReceiptBytesAsync(long companyId, long? terminalId, string receiptText, bool openDrawer, CancellationToken ct = default)
+        => EscPosBuilder.Receipt(receiptText, openDrawer, await _layouts.LogoAsync(companyId, terminalId, ct).ConfigureAwait(false));
 
     /// <inheritdoc />
     public Task<string?> TestAsync(PrinterSetting setting, CancellationToken ct = default)

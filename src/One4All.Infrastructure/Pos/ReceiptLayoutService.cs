@@ -105,8 +105,50 @@ public sealed class ReceiptLayoutService : IReceiptLayoutService
             TotalNet = 7.48m, TotalTax = 1.02m, TotalGross = 8.50m, Tenders = [new PosReceiptTender("Cash", 10.00m)], Change = 1.50m, FiscalCode = "SAMPLE-FISCAL-0001",
         };
         string text = PosReceiptFormatter.ToPlainText(sample, options);
+        Result<long?> previewTill = await TerminalAsync(companyId, terminalCode, ct).ConfigureAwait(false);
+        if (await LogoAsync(companyId, previewTill.IsSuccess ? previewTill.Value : null, ct).ConfigureAwait(false) is ReceiptLogo logo)
+        {
+            // The logo prints as an image above the text; the preview marks its place and size.
+            string mark = $"[ LOGO {logo.WidthBytes * 8}x{logo.Height} dots ]";
+            text = mark.PadLeft((options.Width + mark.Length) / 2) + Environment.NewLine + text;
+        }
+
         return $"{(options.Width >= 48 ? "80mm" : "58mm")} paper, {options.Width} characters, {options.Copies} cop{(options.Copies == 1 ? "y" : "ies")}" + Environment.NewLine
             + PosReceiptFormatter.Framed(text, options.Width);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetLogoAsync(long companyId, string? terminalCode, ReceiptLogo? logo, CancellationToken ct = default)
+    {
+        Result<long?> terminal = await TerminalAsync(companyId, terminalCode, ct).ConfigureAwait(false);
+        if (terminal.IsFailure)
+        {
+            return Result.Failure(terminal.Error);
+        }
+
+        ReceiptLayout? saved = await _db.ReceiptLayouts.FirstOrDefaultAsync(l => l.CompanyId == companyId && l.TerminalId == terminal.Value, ct).ConfigureAwait(false);
+        if (saved is null)
+        {
+            return Result.Failure(Error.Rule("Pos.ReceiptLayoutMissing", "Save the receipt layout first, then give it a logo."));
+        }
+
+        if (logo is not null && (logo.WidthBytes * 8 > ReceiptLogo.MaxDots(saved.PaperWidthMm) || logo.Height is < 1 or > 400 || logo.Raster.Length != logo.WidthBytes * logo.Height))
+        {
+            return Result.Failure(Error.Validation("Pos.ReceiptLogo", $"A logo is at most {ReceiptLogo.MaxDots(saved.PaperWidthMm)} dots wide on {saved.PaperWidthMm}mm paper and 400 dots high."));
+        }
+
+        (saved.LogoRaster, saved.LogoWidthBytes, saved.LogoHeight) = logo is null ? (null, 0, 0) : (logo.Raster, logo.WidthBytes, logo.Height);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<ReceiptLogo?> LogoAsync(long companyId, long? terminalId, CancellationToken ct = default)
+    {
+        var logos = await _db.ReceiptLayouts.AsNoTracking().Where(l => l.CompanyId == companyId && (l.TerminalId == null || l.TerminalId == terminalId) && l.LogoRaster != null)
+            .Select(l => new { l.TerminalId, l.LogoRaster, l.LogoWidthBytes, l.LogoHeight }).ToListAsync(ct).ConfigureAwait(false);
+        var chosen = logos.FirstOrDefault(l => l.TerminalId is not null && l.TerminalId == terminalId) ?? logos.FirstOrDefault(l => l.TerminalId is null);
+        return chosen is null ? null : new ReceiptLogo(chosen.LogoRaster!, chosen.LogoWidthBytes, chosen.LogoHeight);
     }
 
     internal static ReceiptOptions Options(ReceiptLayout l)

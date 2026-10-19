@@ -59,4 +59,13 @@ public sealed class ReceiptLayout : Entity, ICompanyScoped
 
     /// <summary>Gets or sets how many copies print.</summary>
     public int Copies { get; set; } = 1;
+
+    /// <summary>Gets or sets the logo printed at the top, as packed monochrome printer rows (null: none).</summary>
+    public byte[]? LogoRaster { get; set; }
+
+    /// <summary>Gets or sets the logo's row width in bytes (8 dots each).</summary>
+    public int LogoWidthBytes { get; set; }
+
+    /// <summary>Gets or sets the logo's height in dots.</summary>
+    public int LogoHeight { get; set; }
 }

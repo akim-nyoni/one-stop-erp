@@ -88,6 +88,40 @@ public static class Barcodes
     }
 }
 
+/// <summary>A receipt logo ready for a thermal printer: packed monochrome rows (most significant bit leftmost, a set bit black).</summary>
+/// <param name="Raster">The rows, <paramref name="WidthBytes"/> bytes each.</param>
+/// <param name="WidthBytes">Bytes a row (8 dots each).</param>
+/// <param name="Height">Rows (dots high).</param>
+public sealed record ReceiptLogo(byte[] Raster, int WidthBytes, int Height)
+{
+    /// <summary>The widest a logo may be in dots: 576 on 80mm paper, 384 on 58mm.</summary>
+    /// <param name="paperMm">The paper width in millimetres.</param>
+    /// <returns>The dots.</returns>
+    public static int MaxDots(int paperMm) => paperMm <= 58 ? 384 : 576;
+
+    /// <summary>Packs a grid of dark and light dots into printer rows.</summary>
+    /// <param name="dark">Whether each dot is dark, [row, column].</param>
+    /// <returns>The logo.</returns>
+    public static ReceiptLogo FromDots(bool[,] dark)
+    {
+        ArgumentNullException.ThrowIfNull(dark);
+        int height = dark.GetLength(0), width = dark.GetLength(1), widthBytes = (width + 7) / 8;
+        byte[] raster = new byte[widthBytes * height];
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                if (dark[y, x])
+                {
+                    raster[(y * widthBytes) + (x / 8)] |= (byte)(0x80 >> (x % 8));
+                }
+            }
+        }
+
+        return new ReceiptLogo(raster, widthBytes, height);
+    }
+}
+
 /// <summary>
 /// Builds ESC/POS byte streams for receipt printers and the cash drawer wired to them: initialise, text in the printer's code page,
 /// bold, alignment, double size, feed, cut, and the drawer-kick pulse.
@@ -154,13 +188,37 @@ public sealed class EscPosBuilder
     /// <returns>The builder.</returns>
     public EscPosBuilder KickDrawer() => Add(Esc, (byte)'p', 0, 25, 250);
 
+    /// <summary>Prints a monochrome image (GS v 0): rows of packed pixels, the most significant bit leftmost, a set bit black.</summary>
+    /// <param name="logo">The image.</param>
+    /// <returns>The builder.</returns>
+    public EscPosBuilder Raster(ReceiptLogo logo)
+    {
+        ArgumentNullException.ThrowIfNull(logo);
+        Add(Gs, (byte)'v', (byte)'0', 0, (byte)(logo.WidthBytes & 0xFF), (byte)(logo.WidthBytes >> 8), (byte)(logo.Height & 0xFF), (byte)(logo.Height >> 8));
+        _bytes.AddRange(logo.Raster);
+        return this;
+    }
+
     /// <summary>A complete receipt: the text, fed and cut, the drawer opened when asked.</summary>
     /// <param name="receiptText">The receipt as text.</param>
     /// <param name="openDrawer">Whether to open the drawer (cash taken).</param>
     /// <returns>The bytes.</returns>
-    public static byte[] Receipt(string receiptText, bool openDrawer)
+    public static byte[] Receipt(string receiptText, bool openDrawer) => Receipt(receiptText, openDrawer, null);
+
+    /// <summary>A complete receipt with the company's logo centred at the top, the text, fed and cut, the drawer opened when asked.</summary>
+    /// <param name="receiptText">The receipt as text.</param>
+    /// <param name="openDrawer">Whether to open the drawer (cash taken).</param>
+    /// <param name="logo">The logo, or null for none.</param>
+    /// <returns>The bytes.</returns>
+    public static byte[] Receipt(string receiptText, bool openDrawer, ReceiptLogo? logo)
     {
-        EscPosBuilder builder = new EscPosBuilder().Text(receiptText).Feed(3).Cut();
+        EscPosBuilder builder = new();
+        if (logo is not null)
+        {
+            builder.Align(1).Raster(logo).Align(0);
+        }
+
+        builder.Text(receiptText).Feed(3).Cut();
         return (openDrawer ? builder.KickDrawer() : builder).ToArray();
     }
 

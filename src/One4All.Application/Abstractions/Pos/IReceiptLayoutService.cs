@@ -50,4 +50,19 @@ public interface IReceiptLayoutService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The preview.</returns>
     Task<Result<string>> PreviewAsync(long companyId, ReceiptLayoutInput? layout, string? terminalCode = null, CancellationToken ct = default);
+
+    /// <summary>Sets the logo printed at the top of the company's receipts, or a till's (null removes it); the layout must be saved first.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalCode">The till (blank: the company's layout).</param>
+    /// <param name="logo">The logo, or null to remove it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetLogoAsync(long companyId, string? terminalCode, ReceiptLogo? logo, CancellationToken ct = default);
+
+    /// <summary>The logo a till's receipts print with: its own layout's, else the company's, else none.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalId">The till.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The logo, or null.</returns>
+    Task<ReceiptLogo?> LogoAsync(long companyId, long? terminalId, CancellationToken ct = default);
 }

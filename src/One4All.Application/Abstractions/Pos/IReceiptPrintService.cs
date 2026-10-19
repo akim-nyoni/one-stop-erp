@@ -23,6 +23,15 @@ public interface IReceiptPrintService
     /// <returns>What happened, or null when no receipt printer is set up for the workstation (the till then uses its own device).</returns>
     Task<ReceiptPrintOutcome?> PrintAsync(long companyId, string workstation, long? terminalId, string receiptText, bool openDrawer, CancellationToken ct = default);
 
+    /// <summary>The bytes a receipt prints as on a thermal printer: the till's logo (if any) above the text, fed and cut, the drawer opened when asked.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="terminalId">The till.</param>
+    /// <param name="receiptText">The receipt.</param>
+    /// <param name="openDrawer">Whether to kick the cash drawer.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The bytes.</returns>
+    Task<byte[]> ReceiptBytesAsync(long companyId, long? terminalId, string receiptText, bool openDrawer, CancellationToken ct = default);
+
     /// <summary>Prints a test receipt on one printer.</summary>
     /// <param name="setting">The printer.</param>
     /// <param name="ct">Cancellation token.</param>

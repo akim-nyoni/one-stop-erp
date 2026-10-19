@@ -41,7 +41,13 @@ public sealed class ReceiptLayoutTests
         (await layouts.SaveAsync(companyId, new ReceiptLayoutInput("rl-58", 58, Footer: "Thanks"))).IsSuccess.Should().BeTrue();
         (await layouts.SaveAsync(companyId, new ReceiptLayoutInput(null, 72))).Error.Code.Should().Be("Pos.ReceiptLayout");
         (await layouts.SaveAsync(companyId, new ReceiptLayoutInput("NOPE"))).Error.Code.Should().Be("Pos.TerminalNotFound");
+        (await layouts.SetLogoAsync(companyId, "RL-80", new One4All.Application.Pos.ReceiptLogo(new byte[2], 1, 2))).Error.Code.Should().Be("Pos.ReceiptLayoutMissing", "RL-80 has no layout of its own");
+        (await layouts.SetLogoAsync(companyId, null, new One4All.Application.Pos.ReceiptLogo(new byte[100 * 2], 100, 2))).Error.Code.Should().Be("Pos.ReceiptLogo", "800 dots is wider than 80mm paper");
+        (await layouts.SetLogoAsync(companyId, null, new One4All.Application.Pos.ReceiptLogo(new byte[4 * 3], 4, 3))).IsSuccess.Should().BeTrue();
         string preview = (await layouts.PreviewAsync(companyId, null)).Value;
+        preview.Should().Contain("[ LOGO 32x3 dots ]");
+        byte[] printed = await scope.ServiceProvider.GetRequiredService<IReceiptPrintService>().ReceiptBytesAsync(companyId, null, "Text", openDrawer: false);
+        printed.Should().ContainInOrder([(byte)0x1D, (byte)'v', (byte)'0']);
         preview.Should().StartWith("80mm paper, 48 characters").And.Contain("12 Main Street").And.Contain("TAX INVOICE").And.Contain("Come again");
 
         IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
