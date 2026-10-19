@@ -9,9 +9,9 @@ namespace One4All.Infrastructure.Housing;
 /// <summary>The stand status state machine, consolidation and re-subdivision (brief §4.10.2).</summary>
 public sealed class StandLifecycleService : IStandLifecycleService
 {
-    // These moves belong to their own documents (allocation run / offer, sale, cession, repossession, consolidation, re-subdivision).
+    // These moves belong to their own documents (allocation run / offer, sale, cession, surrender, repossession, consolidation, re-subdivision).
     private static readonly HashSet<StandStatus> DocumentOnly =
-        [StandStatus.Allocated, StandStatus.Sold, StandStatus.Transferred, StandStatus.ConsolidatedAway, StandStatus.ReSubdivided, StandStatus.Repossessed];
+        [StandStatus.Allocated, StandStatus.Sold, StandStatus.Transferred, StandStatus.Surrendered, StandStatus.ConsolidatedAway, StandStatus.ReSubdivided, StandStatus.Repossessed];
 
     private readonly One4AllDbContext _db;
 
@@ -32,7 +32,7 @@ public sealed class StandLifecycleService : IStandLifecycleService
         bool release = stand.Status == StandStatus.Withheld && to == stand.StatusBeforeHold;
         if (!release && (DocumentOnly.Contains(to) || (to == StandStatus.Available && stand.Status is StandStatus.Allocated or StandStatus.Sold or StandStatus.Transferred)))
         {
-            return Error.Rule("Hse.StandMoveByDocument", $"Stand {stand.StandNumber} goes to {to} through its own process (allocation, sale, cession, repossession, consolidation or re-subdivision).");
+            return Error.Rule("Hse.StandMoveByDocument", $"Stand {stand.StandNumber} goes to {to} through its own process (allocation, sale, cession, surrender, repossession, consolidation or re-subdivision).");
         }
 
         Result moved = stand.MoveTo(to, date, userId, authority, reason);

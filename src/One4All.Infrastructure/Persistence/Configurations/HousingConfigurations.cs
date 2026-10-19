@@ -363,6 +363,29 @@ internal sealed class RepossessionConfiguration : IEntityTypeConfiguration<Repos
     }
 }
 
+internal sealed class StandSurrenderConfiguration : IEntityTypeConfiguration<StandSurrender>
+{
+    public void Configure(EntityTypeBuilder<StandSurrender> b)
+    {
+        b.ToTable("stand_surrender", Schemas.Housing, t =>
+        {
+            t.HasCheckConstraint("ck_stand_surrender_approver", "approved_by_user_id <> requested_by_user_id");
+            t.HasCheckConstraint("ck_stand_surrender_refund", "refund >= 0");
+        });
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(30);
+        b.Property(x => x.ReceivableDerecognised).HasPrecision(19, 4);
+        b.Property(x => x.InventoryRecognised).HasPrecision(19, 4);
+        b.Property(x => x.Refund).HasPrecision(19, 4);
+        b.Property(x => x.Reason).HasMaxLength(500);
+        b.Property(x => x.Holder).HasMaxLength(200);
+        b.HasOne<HousingStand>().WithMany().HasForeignKey(x => x.StandId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<InstalmentAgreement>().WithMany().HasForeignKey(x => x.AgreementId).OnDelete(DeleteBehavior.Restrict);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+        b.HasIndex(x => x.StandId);
+    }
+}
+
 internal sealed class UnitRepairConfiguration : IEntityTypeConfiguration<UnitRepair>
 {
     public void Configure(EntityTypeBuilder<UnitRepair> b)

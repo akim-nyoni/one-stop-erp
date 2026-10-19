@@ -443,6 +443,27 @@ public sealed class HousingStand : SoftDeletableEntity, ICompanyScoped
         AppendOwnership(OwnershipChangeType.Repossession, null, "Council (repossessed)", date, 0m);
     }
 
+    /// <summary>
+    /// Takes the stand back from a holder who surrenders it (an approved surrender document): the holder is cleared, the surrender joins the ownership
+    /// chain, and a stand that had been sold comes back into inventory at its new carrying amount.
+    /// </summary>
+    /// <param name="date">The surrender date.</param>
+    /// <param name="carryingAmount">The amount it is re-recognised at (a sold stand), or null to keep its cost (an allocated stand still in inventory).</param>
+    /// <param name="userId">Who approved it.</param>
+    /// <param name="reference">The surrender reference.</param>
+    /// <param name="reason">Why.</param>
+    /// <returns>Success, or why the stand cannot be surrendered.</returns>
+    public Result Surrender(DateOnly date, decimal? carryingAmount, long userId, string reference, string reason)
+    {
+        Result moved = MoveTo(StandStatus.Surrendered, date, userId, reference, reason);
+        if (moved.IsSuccess && carryingAmount is decimal amount)
+        {
+            AllocatedCost = amount;
+        }
+
+        return moved;
+    }
+
     /// <summary>Returns an allocated stand to the available pool (the offer was declined or lapsed).</summary>
     public void ReleaseAllocation()
     {

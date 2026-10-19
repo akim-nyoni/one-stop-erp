@@ -301,7 +301,7 @@ public static class NavigationMap
                 O("Housing: Allocation appeals")),
             G("Sales and instalments",
                 O("Housing: Sale, lease and rental agreements", "Agreements"), O("Housing: Instalment sales of stands"), O("Housing: Stand deposits and cancellations"),
-                O("Housing: Instalment arrears and default notices"), O("Housing: Repossess a stand"), O("Housing: Stand leases"), O("Housing: Housing grants"),
+                O("Housing: Instalment arrears and default notices"), O("Housing: Repossess a stand"), O("Housing: Surrender a stand"), O("Housing: Stand leases"), O("Housing: Housing grants"),
                 O("Housing: Link stands to municipal accounts")),
             G("Ownership and title",
                 O("Housing: Transfer of ownership"), O("Housing: Joint ownership"), O("Housing: Title deeds"),

@@ -42,6 +42,9 @@ public enum InstalmentAgreementStatus
 
     /// <summary>The stand was repossessed for default.</summary>
     Repossessed = 3,
+
+    /// <summary>Closed because the buyer surrendered the stand to council.</summary>
+    Surrendered = 4,
 }
 
 /// <summary>
@@ -179,6 +182,14 @@ public sealed class InstalmentAgreement : AuditableEntity, ICompanyScoped
         {
             line.Rebate();
         }
+    }
+
+    /// <summary>Closes it when the buyer surrenders the stand: instalments not yet raised are never charged.</summary>
+    /// <param name="date">When.</param>
+    public void Surrender(DateOnly date)
+    {
+        Repossess(date);
+        Status = InstalmentAgreementStatus.Surrendered;
     }
 
     /// <summary>Settles it early, rebating the interest of instalments not yet raised.</summary>

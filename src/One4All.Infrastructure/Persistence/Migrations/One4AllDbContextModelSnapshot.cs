@@ -11862,6 +11862,121 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stand_status_change", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.StandSurrender", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AgreementId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("agreement_id");
+
+                    b.Property<long?>("AllocationId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("allocation_id");
+
+                    b.Property<long>("ApprovedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("approved_by_user_id");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<string>("Holder")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("holder");
+
+                    b.Property<long?>("HolderCustomerId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("holder_customer_id");
+
+                    b.Property<decimal>("InventoryRecognised")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("inventory_recognised");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("ReceivableDerecognised")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("receivable_derecognised");
+
+                    b.Property<string>("Reference")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("reference");
+
+                    b.Property<decimal>("Refund")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("refund");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<long>("StandId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("stand_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_surrender");
+
+                    b.HasIndex("AgreementId")
+                        .HasDatabaseName("ix_stand_surrender_agreement_id");
+
+                    b.HasIndex("StandId")
+                        .HasDatabaseName("ix_stand_surrender_stand_id");
+
+                    b.HasIndex("CompanyId", "Reference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_surrender_company_id_reference");
+
+                    b.ToTable("stand_surrender", "hse", t =>
+                        {
+                            t.HasCheckConstraint("ck_stand_surrender_approver", "approved_by_user_id <> requested_by_user_id");
+
+                            t.HasCheckConstraint("ck_stand_surrender_refund", "refund >= 0");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.StandSurveyStep", b =>
                 {
                     b.Property<long>("Id")
@@ -37943,6 +38058,22 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_stand_status_change_housing_stands_housing_stand_id");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.StandSurrender", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.InstalmentAgreement", null)
+                        .WithMany()
+                        .HasForeignKey("AgreementId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stand_surrender_instalment_agreement_agreement_id");
+
+                    b.HasOne("One4All.Core.Housing.HousingStand", null)
+                        .WithMany()
+                        .HasForeignKey("StandId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_surrender_stand_stand_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.StandSurveyStep", b =>

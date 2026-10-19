@@ -48,6 +48,9 @@ public enum AllocationStatus
 
     /// <summary>Cancelled with its run before approval.</summary>
     Cancelled = 5,
+
+    /// <summary>Ended after acceptance: the stand was surrendered or repossessed, so it no longer holds the stand.</summary>
+    Ended = 6,
 }
 
 /// <summary>

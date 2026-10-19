@@ -709,6 +709,31 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Surrender a stand", ListTitle = "Surrenders this year",
+            Description = "A holder gives a stand back to council (requested by you, approved by another user): an instalment agreement closes and what is owed is written off, "
+                + "a sold stand comes back into inventory at the lower of cost and net realisable value, and any refund is credited to the holder's account.",
+            Fields = [Req("Stand", "Stand number"), Req("Reason", "Reason"), Req("Approver", "Approving user name"), Req("GainLoss", "Surrender gain / loss account"),
+                Opt("Available", "Stands available (inventory) account (a sold stand)"), OptNum("Nrv", "Net realisable value (a sold stand)"), OptNum("Refund", "Refund to the holder"),
+                Opt("RefundAccount", "Refund charged to account"), Today()],
+            Run = async (c, i) =>
+            {
+                StandSurrenderEntry done = Check(await c.Get<IRepossessionService>().SurrenderAsync(new StandSurrenderRequest
+                {
+                    CompanyId = c.CompanyId, StandNumber = i.Text("Stand"), Date = i.Date("Date"), Reason = i.Text("Reason"), RequestedByUserId = c.UserId,
+                    ApprovedByUserId = await UserAsync(c, i.Text("Approver")).ConfigureAwait(true), GainLossAccountCode = i.Text("GainLoss"),
+                    StandsAvailableAccountCode = i.Optional("Available") ?? string.Empty, NetRealisableValue = i.OptionalNumber("Nrv") ?? 0m, Refund = i.OptionalNumber("Refund") ?? 0m,
+                    RefundAccountCode = i.Optional("RefundAccount"),
+                }).ConfigureAwait(true));
+                return $"{done.Reference}: stand {done.StandNumber} surrendered by {done.Holder}; receivable {M(done.ReceivableDerecognised)} written off, "
+                    + $"back in inventory at {M(done.InventoryRecognised)}, refund {M(done.Refund)} credited.";
+            },
+            List = async c => Table(await c.Get<IRepossessionService>().SurrenderRegisterAsync(c.CompanyId, new DateOnly(DateTime.Today.Year, 1, 1), DateOnly.FromDateTime(DateTime.Today))
+                    .ConfigureAwait(true),
+                ("Reference", r => r.Reference), ("Stand", r => r.StandNumber), ("Holder", r => r.Holder), ("Date", r => D(r.Date)), ("Receivable", r => M(r.ReceivableDerecognised)),
+                ("Inventory", r => M(r.InventoryRecognised)), ("Refund", r => M(r.Refund))),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Receivables control per tenure type", ListTitle = "Tenure control accounts",
             Description = "Instalment debtors post to a dedicated receivables control account per tenure type (instalment sale, rent-to-buy, lease with option): a buyer goes "
                 + "onto it when their agreement is signed. Customer control sets one customer's control directly (only before they have items). The control reconciliation "
