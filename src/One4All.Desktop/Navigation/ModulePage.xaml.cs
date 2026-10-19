@@ -4,8 +4,8 @@ using System.Windows.Controls;
 namespace One4All.Desktop.Navigation;
 
 /// <summary>
-/// A module's page in the Explorer: "Related Tasks" (its everyday screens) on the left, and its kinds of work side by side on the right -
-/// Maintenance, Transactions, Enquiries, Utilities - each listing its screens as tiles.
+/// A module's page in the Explorer: what the module is for, then its kinds of work side by side - Maintenance, Transactions, Enquiries,
+/// Utilities - each listing its screens as tiles.
 /// </summary>
 public partial class ModulePage : UserControl
 {
@@ -14,21 +14,12 @@ public partial class ModulePage : UserControl
     public ModulePage(NavModule module)
     {
         Module = module;
-        RelatedTasks = [.. module.Categories.Where(c => c.Area == Application.Navigation.MenuArea.Transactions).SelectMany(c => c.Entries).Take(4)];
-        if (RelatedTasks.Count == 0)
-        {
-            RelatedTasks = [.. module.Entries.Take(4)];
-        }
-
         DataContext = this;
         InitializeComponent();
     }
 
     /// <summary>Gets the module.</summary>
     public NavModule Module { get; }
-
-    /// <summary>Gets the everyday screens shown first.</summary>
-    public IReadOnlyList<NavEntry> RelatedTasks { get; }
 
     /// <summary>Raised when a screen tile is clicked.</summary>
     public event Action<NavEntry>? EntryOpened;

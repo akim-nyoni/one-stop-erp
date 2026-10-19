@@ -12,35 +12,14 @@
         </ResourceDictionary>
     </UserControl.Resources>
     <Grid Margin="16">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="330" />
-            <ColumnDefinition Width="*" />
-        </Grid.ColumnDefinitions>
-
-        <!-- Related tasks: the everyday screens of this module -->
-        <Border Grid.Column="0" BorderBrush="{StaticResource PageBorder}" BorderThickness="1" Margin="0,0,16,0">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <StackPanel>
-                    <TextBlock Text="Related Tasks" Style="{StaticResource SectionHeading}" Foreground="{StaticResource PageMuted}" HorizontalAlignment="Center" />
-                    <ItemsControl ItemsSource="{Binding RelatedTasks}" HorizontalAlignment="Center">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate><WrapPanel Width="316" /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate DataType="{x:Type nav:NavEntry}">
-                                <Button Style="{StaticResource Tile}" Content="{Binding}" ContentTemplate="{StaticResource EntryTile}" Click="Entry_Click" ToolTip="{Binding Purpose}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <Separator Margin="16,10" />
-                    <TextBlock Text="About this module" Style="{StaticResource SectionHeading}" Foreground="{StaticResource PageMuted}" HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding Module.Purpose}" Foreground="{StaticResource PageInk}" FontSize="13" TextWrapping="Wrap" Margin="16,0,16,12" TextAlignment="Center" />
-                </StackPanel>
-            </ScrollViewer>
-        </Border>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="{Binding Module.Purpose}" Foreground="{StaticResource PageMuted}" FontSize="13" TextWrapping="Wrap" Margin="2,0,0,10" />
 
         <!-- The kinds of work side by side, each with its screens as tiles -->
-        <Border Grid.Column="1" BorderBrush="{StaticResource PageBorder}" BorderThickness="1">
+        <Border Grid.Row="1" BorderBrush="{StaticResource PageBorder}" BorderThickness="1">
             <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                 <StackPanel Orientation="Horizontal" Margin="8">
                 <ItemsControl ItemsSource="{Binding Module.Categories}">

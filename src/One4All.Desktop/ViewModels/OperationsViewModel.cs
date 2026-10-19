@@ -207,7 +207,7 @@ public sealed partial class OperationsViewModel : ObservableObject
     }
 
     /// <summary>Gets the list toolbar's Add… button text: the screen's own name.</summary>
-    public string AddText => (SingleTitle ?? Selected?.Title ?? "Add") + "…";
+    public string AddText => SingleTitle ?? Selected?.Title ?? "Add";
 
     /// <summary>Gets the OK button's text: OK for a form, Run for a document or an enquiry that shows output.</summary>
     public string OkText => Selected?.IsDocument == true || Selected?.HasList == false ? "▶  Run" : "✔  OK";
