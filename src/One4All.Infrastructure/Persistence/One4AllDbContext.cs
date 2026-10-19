@@ -210,6 +210,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Recurring-journal templates.</summary>
     public DbSet<RecurringJournal> RecurringJournals => Set<RecurringJournal>();
 
+    /// <summary>Gets the prepayments released to expense month by month.</summary>
+    public DbSet<PrepaymentSchedule> PrepaymentSchedules => Set<PrepaymentSchedule>();
+
     /// <summary>Tax codes.</summary>
     public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
 

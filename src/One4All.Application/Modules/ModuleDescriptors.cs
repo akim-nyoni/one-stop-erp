@@ -61,7 +61,7 @@ public static class BuiltInModules
         new ModuleDescriptor("System", "System Manager", LicenceModules.Core, "⚙", "#455A64", ["system", "offline"], ["system.backup", "messages.despatch", "security.reencrypt-fields", "system.idempotency-purge", "workflow.escalate", "system.partitions"],
             ["System Manager", "Approvals", "Documents"]),
         new ModuleDescriptor("Security", "Users & Security", LicenceModules.Core, "\U0001F510", "#546E7A", ["audit"], [], []),
-        new ModuleDescriptor("GeneralLedger", "General Ledger", LicenceModules.GeneralLedger, "\U0001F4D8", "#1565C0", ["gl", "accounting", "interco", "consolidation"], ["tax.certificate-expiry", "gl.recurring-journals"], ["General Ledger"]),
+        new ModuleDescriptor("GeneralLedger", "General Ledger", LicenceModules.GeneralLedger, "\U0001F4D8", "#1565C0", ["gl", "accounting", "interco", "consolidation"], ["tax.certificate-expiry", "gl.recurring-journals", "gl.prepayment-release"], ["General Ledger"]),
         new ModuleDescriptor("Sales", "Accounts Receivable", LicenceModules.AccountsReceivable, "\U0001F9FE", "#2E7D32", ["ar", "credit", "trading", "receipting", "pricing", "messages"],
             ["statements.email", "trading.recurring-invoices", "ar.finance-charges", "ar.arrangements"], ["Sales & Schools", "Customers"]),
         new ModuleDescriptor("Purchasing", "Accounts Payable", LicenceModules.AccountsPayable, "\U0001F4B8", "#C62828", ["ap", "trading"], [], ["Suppliers"]),

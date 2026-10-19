@@ -336,12 +336,27 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Accruals and prepayments",
-            Description = "An accrual (an expense incurred, not yet invoiced) or a prepayment (paid ahead), posted on the date and reversed automatically on the reversal date.",
-            Fields = [Pick("Kind", "Kind", ["Accrual", "Prepayment"]), Today("Date", "Date"), Today("Reversal", "Reverses on"), Req("Expense", "Expense account"), Req("Balance", "Accrual / prepayment account"),
-                Num("Amount", "Amount"), Req("Document", "Document number"), Req("Narrative", "Narrative")],
+            Description = "An accrual (an expense incurred, not yet invoiced) or a prepayment (paid ahead), posted on the date and reversed automatically on the reversal date. "
+                + "A prepayment schedule releases a prepayment to expense over the months it covers (from the month of the date, the document number as its reference); "
+                + "Release prepayments charges every month ended by the date (the scheduled task gl.prepayment-release does it daily).",
+            Fields = [Pick("Kind", "Kind", ["Accrual", "Prepayment", "Prepayment schedule", "Release prepayments"]), Today("Date", "Date"), Today("Reversal", "Reverses on"), Req("Expense", "Expense account"),
+                Req("Balance", "Accrual / prepayment account"), Num("Amount", "Amount"), Req("Document", "Document number"), Req("Narrative", "Narrative"), Num("Months", "Months covered (schedule)", "12")],
             Run = async (c, i) =>
             {
                 IAccrualService accruals = c.Get<IAccrualService>();
+                if (i.Text("Kind") == "Prepayment schedule")
+                {
+                    long schedule = Check(await accruals.CreatePrepaymentScheduleAsync(new NewPrepaymentSchedule(c.CompanyId, i.Text("Document"), i.Text("Narrative"), i.Text("Balance"), i.Text("Expense"),
+                        i.Number("Amount"), i.Date("Date"), i.Whole("Months"))).ConfigureAwait(true));
+                    return $"Prepayment schedule {i.Text("Document").ToUpperInvariant()} set up ({schedule}): {M(i.Number("Amount"))} over {i.Whole("Months")} month(s).";
+                }
+
+                if (i.Text("Kind") == "Release prepayments")
+                {
+                    PrepaymentRelease release = Check(await accruals.ReleasePrepaymentsAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true));
+                    return $"{release.Months} month(s) released from {release.Schedules} schedule(s): {M(release.Amount)} charged to expense.";
+                }
+
                 ReversingJournalResult posted = i.Text("Kind") == "Accrual"
                     ? Check(await accruals.PostAccrualAsync(c.CompanyId, i.Date("Date"), i.Date("Reversal"), i.Text("Expense"), i.Text("Balance"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true))
                     : Check(await accruals.PostPrepaymentAsync(c.CompanyId, i.Date("Date"), i.Date("Reversal"), i.Text("Balance"), i.Text("Expense"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true));

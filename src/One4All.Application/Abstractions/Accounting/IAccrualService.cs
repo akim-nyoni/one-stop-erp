@@ -7,6 +7,27 @@ namespace One4All.Application.Abstractions.Accounting;
 /// <param name="ReversalJournalNumber">The auto-reversal journal posted in the following period.</param>
 public readonly record struct ReversingJournalResult(string PostingJournalNumber, string ReversalJournalNumber);
 
+/// <summary>A prepayment to release to expense month by month.</summary>
+/// <param name="CompanyId">The company.</param>
+/// <param name="Reference">The reference (unique).</param>
+/// <param name="Description">What was prepaid.</param>
+/// <param name="PrepaymentAccountCode">The prepayment (asset) account it sits in.</param>
+/// <param name="ExpenseAccountCode">The expense account charged each month.</param>
+/// <param name="Total">The amount to release.</param>
+/// <param name="FirstMonth">The first month covered (any day in it).</param>
+/// <param name="Months">How many months it covers (1 to 120).</param>
+/// <param name="CostCentre">The cost centre charged.</param>
+/// <param name="Department">The department charged.</param>
+public sealed record NewPrepaymentSchedule(long CompanyId, string Reference, string Description, string PrepaymentAccountCode, string ExpenseAccountCode, decimal Total, DateOnly FirstMonth,
+    int Months, string? CostCentre = null, string? Department = null);
+
+/// <summary>A release run's outcome.</summary>
+/// <param name="Schedules">Schedules that released something.</param>
+/// <param name="Months">Months released.</param>
+/// <param name="Amount">The amount charged to expense.</param>
+/// <param name="Journals">The journals posted.</param>
+public sealed record PrepaymentRelease(int Schedules, int Months, decimal Amount, IReadOnlyList<string> Journals);
+
 /// <summary>
 /// Posts auto-reversing period-end journals - accruals and prepayments - through the central posting engine.
 /// Each call posts the period-end entry and immediately posts its exact inverse dated in the next period (via
@@ -15,6 +36,22 @@ public readonly record struct ReversingJournalResult(string PostingJournalNumber
 /// </summary>
 public interface IAccrualService
 {
+    /// <summary>Sets up a prepayment to be released to expense over the months it covers (equal monthly amounts, the last month taking the rounding).</summary>
+    /// <param name="schedule">The schedule.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The schedule's id, or why not.</returns>
+    Task<Result<long>> CreatePrepaymentScheduleAsync(NewPrepaymentSchedule schedule, CancellationToken ct = default);
+
+    /// <summary>
+    /// Releases every month of every prepayment schedule that has ended on or before the date and is not yet released: Dr the expense, Cr the
+    /// prepayment, one journal a month dated its last day. Run again it releases nothing twice.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asAt">Release the months ending on or before this date.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was released.</returns>
+    Task<Result<PrepaymentRelease>> ReleasePrepaymentsAsync(long companyId, DateOnly asAt, CancellationToken ct = default);
+
     /// <summary>
     /// Posts an accrual for an expense incurred but not yet invoiced: Dr the expense account / Cr the accrual
     /// (liability) account on <paramref name="date"/>, auto-reversed on <paramref name="reversalDate"/>.

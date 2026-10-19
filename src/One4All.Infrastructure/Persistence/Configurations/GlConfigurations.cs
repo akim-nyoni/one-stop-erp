@@ -275,6 +275,23 @@ internal sealed class RecurringJournalConfiguration : IEntityTypeConfiguration<R
     }
 }
 
+internal sealed class PrepaymentScheduleConfiguration : IEntityTypeConfiguration<PrepaymentSchedule>
+{
+    public void Configure(EntityTypeBuilder<PrepaymentSchedule> b)
+    {
+        b.ToTable("prepayment_schedule", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Reference).HasMaxLength(40);
+        b.Property(x => x.Description).HasMaxLength(200);
+        b.Property(x => x.PrepaymentAccountCode).HasMaxLength(20);
+        b.Property(x => x.ExpenseAccountCode).HasMaxLength(20);
+        b.Property(x => x.CostCentre).HasMaxLength(20);
+        b.Property(x => x.Department).HasMaxLength(30);
+        b.Ignore(x => x.IsFinished);
+        b.HasIndex(x => new { x.CompanyId, x.Reference }).IsUnique();
+    }
+}
+
 internal sealed class RecurringJournalLineConfiguration : IEntityTypeConfiguration<RecurringJournalLine>
 {
     public void Configure(EntityTypeBuilder<RecurringJournalLine> b)

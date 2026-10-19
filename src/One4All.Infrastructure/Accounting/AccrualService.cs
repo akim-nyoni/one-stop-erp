@@ -27,6 +27,83 @@ public sealed class AccrualService : IAccrualService
     }
 
     /// <inheritdoc />
+    public async Task<Result<long>> CreatePrepaymentScheduleAsync(NewPrepaymentSchedule schedule, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(schedule);
+        if (string.IsNullOrWhiteSpace(schedule.Reference) || string.IsNullOrWhiteSpace(schedule.PrepaymentAccountCode) || string.IsNullOrWhiteSpace(schedule.ExpenseAccountCode))
+        {
+            return Error.Validation("GL.PrepaymentSchedule", "A prepayment schedule needs a reference, the prepayment account and the expense account.");
+        }
+
+        if (schedule.Total <= 0m || schedule.Months is < 1 or > 120)
+        {
+            return Error.Validation("GL.PrepaymentTerms", "A prepayment schedule releases a positive amount over 1 to 120 months.");
+        }
+
+        string reference = schedule.Reference.Trim().ToUpperInvariant();
+        if (await _db.PrepaymentSchedules.AnyAsync(s => s.CompanyId == schedule.CompanyId && s.Reference == reference, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("GL.PrepaymentExists", $"Prepayment schedule {reference} already exists.");
+        }
+
+        PrepaymentSchedule created = new(schedule.CompanyId, reference, schedule.Description ?? string.Empty, schedule.PrepaymentAccountCode, schedule.ExpenseAccountCode, schedule.Total,
+            schedule.FirstMonth, schedule.Months)
+        {
+            CostCentre = string.IsNullOrWhiteSpace(schedule.CostCentre) ? null : schedule.CostCentre.Trim().ToUpperInvariant(),
+            Department = string.IsNullOrWhiteSpace(schedule.Department) ? null : schedule.Department.Trim().ToUpperInvariant(),
+        };
+        _db.PrepaymentSchedules.Add(created);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return created.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<PrepaymentRelease>> ReleasePrepaymentsAsync(long companyId, DateOnly asAt, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            Company company = await _db.Set<Company>().FirstAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+            List<PrepaymentSchedule> schedules = await _db.PrepaymentSchedules.Where(s => s.CompanyId == companyId && s.ReleasedMonths < s.Months && s.FirstMonth <= asAt)
+                .OrderBy(s => s.Reference).ToListAsync(ct).ConfigureAwait(false);
+            List<string> journals = [];
+            int released = 0, touched = 0;
+            decimal amount = 0m;
+            foreach (PrepaymentSchedule schedule in schedules)
+            {
+                bool any = false;
+                while (!schedule.IsFinished && schedule.MonthEnd(schedule.ReleasedMonths) <= asAt)
+                {
+                    int index = schedule.ReleasedMonths;
+                    decimal month = schedule.AmountFor(index);
+                    Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
+                    {
+                        CompanyId = companyId, SourceModule = "GL", PostingDate = schedule.MonthEnd(index), TransactionCurrency = company.BaseCurrency, DocumentType = "GL-PREPREL",
+                        DocumentNumber = $"{schedule.Reference}-{index + 1:00}", Narrative = $"{schedule.Description} - month {index + 1} of {schedule.Months}",
+                        Lines =
+                        [
+                            new JournalLineRequest { AccountCode = schedule.ExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = month, CostCentre = schedule.CostCentre, Department = schedule.Department },
+                            new JournalLineRequest { AccountCode = schedule.PrepaymentAccountCode, Side = JournalSide.Credit, TransactionAmount = month },
+                        ],
+                    }, ct).ConfigureAwait(false);
+                    if (posted.IsFailure)
+                    {
+                        return posted.Error;
+                    }
+
+                    schedule.MarkReleased(month);
+                    journals.Add(posted.Value.JournalNumber);
+                    released++;
+                    amount += month;
+                    any = true;
+                }
+
+                touched += any ? 1 : 0;
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<PrepaymentRelease>.Success(new PrepaymentRelease(touched, released, amount, journals));
+        }, ct);
+
+    /// <inheritdoc />
     public Task<Result<ReversingJournalResult>> PostAccrualAsync(long companyId, DateOnly date, DateOnly reversalDate, string expenseAccountCode, string accrualAccountCode, decimal amount, string documentNumber, string narrative, CancellationToken ct = default)
         => _db.AtomicAsync(() => PostReversingAsync(companyId, date, reversalDate, expenseAccountCode, accrualAccountCode, amount, "GL-ACCR", documentNumber, narrative, ct), ct);
 
@@ -74,5 +151,25 @@ public sealed class AccrualService : IAccrualService
         return reversal.IsFailure
             ? reversal.Error
             : new ReversingJournalResult(posted.Value.JournalNumber, reversal.Value.JournalNumber);
+    }
+}
+
+/// <summary>Scheduled task: releases the prepayment months that have ended (key <c>gl.prepayment-release</c>); a month already released is skipped.</summary>
+public sealed class PrepaymentReleaseTask : Application.Abstractions.Scheduling.IScheduledTask
+{
+    private readonly IAccrualService _accruals;
+
+    /// <summary>Creates the task.</summary>
+    /// <param name="accruals">The accrual service.</param>
+    public PrepaymentReleaseTask(IAccrualService accruals) => _accruals = accruals;
+
+    /// <inheritdoc />
+    public string Key => "gl.prepayment-release";
+
+    /// <inheritdoc />
+    public async Task<Result<string>> RunAsync(long companyId, DateTimeOffset runAt, CancellationToken ct = default)
+    {
+        Result<PrepaymentRelease> run = await _accruals.ReleasePrepaymentsAsync(companyId, DateOnly.FromDateTime(runAt.UtcDateTime), ct).ConfigureAwait(false);
+        return run.IsFailure ? run.Error : $"{run.Value.Months} prepayment month(s) released from {run.Value.Schedules} schedule(s), {run.Value.Amount:N2} charged to expense.";
     }
 }
