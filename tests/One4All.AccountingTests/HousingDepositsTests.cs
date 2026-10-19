@@ -1,5 +1,6 @@
 using System.Text;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Housing;
@@ -78,9 +79,11 @@ public sealed class HousingDepositsTests
         {
             CompanyId = companyId, CertificateNumber = certificate, CustomerId = payer.Id, Amount = amount, Date = date, ReceiptReference = receipt, BankAccountCode = "1100", LiabilityAccountCode = "2482",
         };
-        (await deposits.TakeDepositAsync(Deposit("DP-1", 500m, new DateOnly(2026, 3, 3)))).Error.Code.Should().Be("Hse.OfferNotAccepted");
-        (await allocations.AcceptAsync(companyId, certificate, new DateOnly(2026, 3, 10))).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IHousingRegisterDetailsService>().SetSchemeDetailsAsync(companyId, scheme.Code, new SchemeDetails(null, null, null, 500m)))
+            .IsSuccess.Should().BeTrue();
+        (await allocations.AcceptAsync(companyId, certificate, new DateOnly(2026, 3, 10))).Error.Code.Should().Be("Hse.DepositRequired");
         (await deposits.TakeDepositAsync(Deposit("DP-1", 500m, new DateOnly(2026, 3, 15)))).IsSuccess.Should().BeTrue();
+        (await allocations.AcceptAsync(companyId, certificate, new DateOnly(2026, 3, 16))).IsSuccess.Should().BeTrue();
         (await deposits.TakeDepositAsync(Deposit("DP-X", 100m, new DateOnly(2026, 3, 16)))).Error.Code.Should().Be("Hse.DepositHeld");
         (await deposits.RefundDepositAsync(companyId, certificate, new DateOnly(2026, 4, 1), "1100")).IsSuccess.Should().BeTrue();
         (await deposits.TakeDepositAsync(Deposit("DP-2", 600m, new DateOnly(2026, 4, 5)))).IsSuccess.Should().BeTrue();
@@ -102,6 +105,15 @@ public sealed class HousingDepositsTests
         (await deposits.CancelAgreementAsync(Cancel(71))).Error.Code.Should().Be("Hse.SelfApproval");
         AgreementCancellationResult cancelled = (await deposits.CancelAgreementAsync(Cancel(72))).Value;
         cancelled.Should().BeEquivalentTo(new { Paid = 3132.38m, MonthsOccupied = 4, OccupationRental = 200m, AdminCharge = 130m, Arrears = 0m, Refund = 2802.38m });
+
+        // The allocatee gives the allocated stand back: the accepted allocation ends, so the stand no longer counts as promised.
+        StandSurrenderEntry surrendered = (await scope.ServiceProvider.GetRequiredService<IRepossessionService>().SurrenderAsync(new StandSurrenderRequest
+        {
+            CompanyId = companyId, StandNumber = "HDP-1", Date = new DateOnly(2026, 4, 20), Reason = "Emigrating", RequestedByUserId = 71, ApprovedByUserId = 72, GainLossAccountCode = "4986",
+        })).Value;
+        (surrendered.Holder, surrendered.InventoryRecognised).Should().Be(("Deposit Applicant", 0m));
+        (await db.Set<StandAllocation>().AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.CertificateNumber == certificate)).Status.Should().Be(AllocationStatus.Ended);
+        (await db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == stands[0])).Status.Should().Be(StandStatus.Surrendered);
 
         ConsolidatedTrialBalance tb = (await scope.ServiceProvider.GetRequiredService<IConsolidationService>().ConsolidatedTrialBalanceAsync([companyId], new DateOnly(2026, 12, 31))).Value;
         tb.IsBalanced.Should().BeTrue();

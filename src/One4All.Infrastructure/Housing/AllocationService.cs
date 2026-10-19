@@ -528,6 +528,20 @@ public sealed class AllocationService : IAllocationService
             return Result.Failure(Error.Rule("Hse.OfferExpired", $"The offer under {certificateNumber} expired on {allocation.OfferExpires:yyyy-MM-dd}."));
         }
 
+        // A scheme that sells its stands may require the purchase deposit to be held before an offer is accepted.
+        decimal required = await (from s in _db.HousingStands.AsNoTracking()
+                                  join h in _db.HousingSchemes.AsNoTracking() on s.SchemeId equals h.Id
+                                  where s.Id == allocation.StandId
+                                  select h.AcceptanceDeposit).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? 0m;
+        if (required > 0m)
+        {
+            decimal held = await _db.Set<StandDeposit>().Where(d => d.AllocationId == allocation.Id && d.ClearedOn == null).SumAsync(d => d.Amount, ct).ConfigureAwait(false);
+            if (held < required)
+            {
+                return Result.Failure(Error.Rule("Hse.DepositRequired", $"The offer under {certificateNumber} needs a deposit of {required:N2} held before it is accepted ({held:N2} held)."));
+            }
+        }
+
         HousingApplicant applicant = await _db.HousingApplicants.FirstAsync(a => a.Id == allocation.ApplicantId, ct).ConfigureAwait(false);
         allocation.Accept(date);
         applicant.SetStatus(ApplicantStatus.Allocated);

@@ -98,6 +98,11 @@ public sealed class HousingRegisterDetailsService : IHousingRegisterDetailsServi
             return Result.Failure(Error.Validation("Hse.SchemeDates", "A scheme cannot be completed before it starts."));
         }
 
+        if (details.AcceptanceDeposit < 0m)
+        {
+            return Result.Failure(Error.Validation("Hse.SchemeDeposit", "The acceptance deposit is zero or more."));
+        }
+
         string key = (schemeCode ?? string.Empty).Trim().ToUpperInvariant();
         HousingScheme? scheme = await _db.Set<HousingScheme>().FirstOrDefaultAsync(s => s.CompanyId == companyId && s.Code == key, ct).ConfigureAwait(false);
         if (scheme is null)
@@ -108,6 +113,7 @@ public sealed class HousingRegisterDetailsService : IHousingRegisterDetailsServi
         scheme.FundingSource = details.FundingSource;
         scheme.StartDate = details.StartDate;
         scheme.CompletionDate = details.CompletionDate;
+        scheme.AcceptanceDeposit = details.AcceptanceDeposit is > 0m ? details.AcceptanceDeposit : null;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

@@ -8476,6 +8476,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal?>("AcceptanceDeposit")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("acceptance_deposit");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(30)

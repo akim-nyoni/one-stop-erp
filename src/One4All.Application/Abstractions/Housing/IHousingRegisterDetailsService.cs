@@ -10,8 +10,8 @@ public sealed record StandDetails(string? StreetAddress, string? Ward, string? S
 /// <summary>A parcel's register details.</summary>
 public sealed record ParcelDetails(string? Locality, string? Ward, string? LandUse, ParcelTenure? Tenure, string? Improvements, ParcelOccupation? Occupation);
 
-/// <summary>A scheme's funding and dates.</summary>
-public sealed record SchemeDetails(SchemeFunding? FundingSource, DateOnly? StartDate, DateOnly? CompletionDate);
+/// <summary>A scheme's funding, dates and the deposit an offer must be secured with before acceptance (none when null or zero).</summary>
+public sealed record SchemeDetails(SchemeFunding? FundingSource, DateOnly? StartDate, DateOnly? CompletionDate, decimal? AcceptanceDeposit = null);
 
 /// <summary>
 /// The register details the brief asks the stand, parcel and scheme records to carry (§4.10.1–4.10.2): a stand's address, ward / suburb / zone, intended use,

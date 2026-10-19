@@ -915,12 +915,13 @@ public static partial class OperationCatalogue
             Module = module, Title = "Stand, parcel and scheme details", ListTitle = "Stand register",
             Description = "Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and the services available (water, sewer, road, electricity, storm water). "
                 + "Remark: adds a dated line to the stand's remarks history; Remarks lists it. Parcel: locality, ward, land use, tenure, improvements and occupation. "
-                + "Scheme: funding source and start / completion dates.",
+                + "Scheme: funding source, start / completion dates and the deposit an offer must be secured with before it is accepted.",
             Fields = [Pick("Step", "Step", ["Stand", "Remark", "Remarks", "Parcel", "Scheme"]), Opt("Code", "Stand / parcel / scheme number"), Opt("Address", "Street address"),
                 Opt("Ward", "Ward"), Opt("Suburb", "Suburb / locality"), Opt("Zone", "Zone"), Opt("Use", "Intended use / land use"), Opt("Zoning", "Zoning"), Opt("Phase", "Servicing phase"),
                 Tick("Water", "Water"), Tick("Sewer", "Sewer"), Tick("Road", "Road"), Tick("Power", "Electricity"), Tick("Storm", "Storm water"), Opt("Remark", "Remark / improvements"),
                 Pick("Tenure", "Parcel tenure", ["", .. Enum.GetNames<ParcelTenure>()]), Pick("Occupation", "Parcel occupation", ["", .. Enum.GetNames<ParcelOccupation>()]),
-                Pick("Funding", "Scheme funding", ["", .. Enum.GetNames<SchemeFunding>()]), Opt("Start", "Scheme start (yyyy-MM-dd)"), Opt("End", "Scheme completion (yyyy-MM-dd)")],
+                Pick("Funding", "Scheme funding", ["", .. Enum.GetNames<SchemeFunding>()]), Opt("Start", "Scheme start (yyyy-MM-dd)"), Opt("End", "Scheme completion (yyyy-MM-dd)"),
+                OptNum("Deposit", "Scheme deposit before acceptance")],
             Run = async (c, i) =>
             {
                 IHousingRegisterDetailsService details = c.Get<IHousingRegisterDetailsService>();
@@ -941,7 +942,7 @@ public static partial class OperationCatalogue
                         return Check(await details.SetParcelDetailsAsync(c.CompanyId, code, new ParcelDetails(i.Optional("Suburb"), i.Optional("Ward"), i.Optional("Use"),
                             Choice<ParcelTenure>(i.Text("Tenure")), i.Optional("Remark"), Choice<ParcelOccupation>(i.Text("Occupation")))).ConfigureAwait(true), "Parcel details saved.");
                     default:
-                        return Check(await details.SetSchemeDetailsAsync(c.CompanyId, code, new SchemeDetails(Choice<SchemeFunding>(i.Text("Funding")), Date(i.Optional("Start")), Date(i.Optional("End"))))
+                        return Check(await details.SetSchemeDetailsAsync(c.CompanyId, code, new SchemeDetails(Choice<SchemeFunding>(i.Text("Funding")), Date(i.Optional("Start")), Date(i.Optional("End")), i.OptionalNumber("Deposit")))
                             .ConfigureAwait(true), "Scheme details saved.");
                 }
             },

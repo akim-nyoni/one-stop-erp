@@ -37,6 +37,7 @@ internal sealed class HousingSchemeConfiguration : IEntityTypeConfiguration<Hous
     public void Configure(EntityTypeBuilder<HousingScheme> b)
     {
         b.ToTable("scheme", Schemas.Housing);
+        b.Property(x => x.AcceptanceDeposit).HasPrecision(19, 4);
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).HasMaxLength(30);
         b.Property(x => x.Name).HasMaxLength(120);

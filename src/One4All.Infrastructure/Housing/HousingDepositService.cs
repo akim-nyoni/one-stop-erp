@@ -50,9 +50,9 @@ public sealed class HousingDepositService : IHousingDepositService
             return Error.NotFound("Hse.CertificateNotFound", $"Allocation certificate {receipt.CertificateNumber} not found.");
         }
 
-        if (allocation.Status != AllocationStatus.Accepted)
+        if (allocation.Status is not (AllocationStatus.Offered or AllocationStatus.Accepted))
         {
-            return Error.Rule("Hse.OfferNotAccepted", $"The offer under {receipt.CertificateNumber} is {allocation.Status}; a deposit secures an accepted offer.");
+            return Error.Rule("Hse.OfferNotAccepted", $"The offer under {receipt.CertificateNumber} is {allocation.Status}; a deposit secures an open or accepted offer.");
         }
 
         if (!await _db.Customers.AnyAsync(c => c.Id == receipt.CustomerId && c.CompanyId == receipt.CompanyId, ct).ConfigureAwait(false))

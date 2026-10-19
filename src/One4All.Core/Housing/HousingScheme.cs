@@ -76,6 +76,9 @@ public sealed class HousingScheme : SoftDeletableEntity, ICompanyScoped
 
     /// <summary>When it is to be (or was) completed.</summary>
     public DateOnly? CompletionDate { get; set; }
+
+    /// <summary>The purchase deposit an offer of one of its stands must be secured with before it can be accepted (none when null or zero).</summary>
+    public decimal? AcceptanceDeposit { get; set; }
 }
 
 /// <summary>
