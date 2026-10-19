@@ -78,9 +78,11 @@
                         <ComboBox ItemsSource="{Binding Accounts}" SelectedItem="{Binding NewAccount}" DisplayMemberPath="Label" IsTextSearchEnabled="True" />
                         <TextBlock Text="Narrative (optional)" Style="{StaticResource Label}" />
                         <TextBox Text="{Binding NewNarrative, UpdateSourceTrigger=PropertyChanged}" Padding="4,2" />
+                        <TextBlock Text="Tax code (optional, splits out the VAT)" Style="{StaticResource Label}" />
+                        <TextBox Text="{Binding NewTaxCode, UpdateSourceTrigger=PropertyChanged}" Width="110" HorizontalAlignment="Left" Padding="4,2" />
                         <TextBlock Text="Priority (lower first)" Style="{StaticResource Label}" />
                         <TextBox Text="{Binding NewPriority, UpdateSourceTrigger=PropertyChanged}" Width="80" HorizontalAlignment="Left" Padding="4,2" />
-                        <Button Content="Add rule" Padding="14,6" Margin="0,12,0,0" HorizontalAlignment="Left" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding AddCommand}" />
+                        <Button Content="Add" Padding="14,6" Margin="0,12,0,0" HorizontalAlignment="Left" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding AddCommand}" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>

@@ -70,6 +70,26 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
                 AccountingVoucherType.Journal => (Math.Max(line.Amount, 0m), Math.Max(-line.Amount, 0m)),
                 _ => (line.Amount, 0m),
             };
+            if (cashVoucher && !string.IsNullOrWhiteSpace(line.TaxCode))
+            {
+                // A VAT-inclusive amount: the net to the account and the VAT to the code's input (payment) or output (receipt) account, both tagged.
+                bool purchase = request.Type != AccountingVoucherType.Receipt;
+                Result<Accounting.GrossTaxSplit> split = await Accounting.GrossTaxSplit.SplitAsync(_db, companyId, line.TaxCode, line.Amount, request.Date, purchase, ct).ConfigureAwait(false);
+                if (split.IsFailure)
+                {
+                    return split.Error;
+                }
+
+                voucher.AddLine(line.AccountCode.Trim(), purchase ? split.Value.Net : 0m, purchase ? 0m : split.Value.Net, line.Narrative, Dimension(line.CostCentre), Dimension(line.Department),
+                    Dimension(line.Project), split.Value.Code);
+                if (split.Value.Tax != 0m)
+                {
+                    voucher.AddLine(split.Value.TaxAccountCode, purchase ? split.Value.Tax : 0m, purchase ? 0m : split.Value.Tax, $"VAT ({split.Value.Code})", taxCode: split.Value.Code);
+                }
+
+                continue;
+            }
+
             voucher.AddLine(line.AccountCode.Trim(), debit, credit, line.Narrative, Dimension(line.CostCentre), Dimension(line.Department), Dimension(line.Project));
         }
 
@@ -145,7 +165,7 @@ public sealed class AccountingVoucherService : IAccountingVoucherService
         List<JournalLineRequest> lines = [.. voucher.Lines.Select(l => new JournalLineRequest
         {
             AccountCode = l.AccountCode, Side = l.Debit > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = l.Debit > 0m ? l.Debit : l.Credit, Narrative = l.Narrative,
-            CostCentre = l.CostCentre, Department = l.Department, Project = l.Project,
+            CostCentre = l.CostCentre, Department = l.Department, Project = l.Project, TaxCode = l.TaxCode,
         })];
         decimal total = voucher.Lines.Sum(l => l.Debit + l.Credit);
         if (voucher.Type is AccountingVoucherType.Payment or AccountingVoucherType.PettyCash)

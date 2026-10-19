@@ -2485,6 +2485,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
 
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("tax_code");
+
                     b.HasKey("Id")
                         .HasName("pk_bank_rule");
 
@@ -36054,6 +36059,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long>("RowVersion")
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("tax_code");
 
                     b.HasKey("Id")
                         .HasName("pk_accounting_voucher_line");

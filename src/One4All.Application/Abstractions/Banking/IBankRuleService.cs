@@ -30,6 +30,9 @@ public sealed record CreateBankRuleRequest
     /// <summary>The account to post to.</summary>
     public string AccountCode { get; init; } = string.Empty;
 
+    /// <summary>The tax code when the amounts include VAT, or null.</summary>
+    public string? TaxCode { get; init; }
+
     /// <summary>The posting narrative, or null for the bank's description.</summary>
     public string? Narrative { get; init; }
 

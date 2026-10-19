@@ -644,6 +644,18 @@ public sealed class PostingEngine : IPostingEngine
                 _ => MidpointRounding.ToEven,
             }), StringComparer.Ordinal);
 
+    private async Task<bool> IsTaxCodeAccountAsync(long companyId, string? taxCode, string accountCode, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(taxCode))
+        {
+            return false;
+        }
+
+        string code = taxCode.Trim().ToUpperInvariant();
+        return await _db.TaxCodes.AsNoTracking().AnyAsync(t => t.CompanyId == companyId && t.Code == code && (t.InputAccountCode == accountCode || t.OutputAccountCode == accountCode), ct)
+            .ConfigureAwait(false);
+    }
+
     private async Task<Result<JournalLine>> BuildLineAsync(JournalRequest request, JournalLineRequest lineRequest, CurrencyCode baseCurrency, string? defaultFund, CancellationToken ct)
     {
         AccountKey key = lineRequest.ToKey();
@@ -659,13 +671,16 @@ public sealed class PostingEngine : IPostingEngine
             return Error.Rule("Posting.AccountInactive", $"Account '{key.AccountCode}' is not active.");
         }
 
-        if (request.EnforceManualJournalRules && account.IsControlAccount)
+        // A tax line split out of a cash voucher posts to its tax code's own VAT account, which is a control account.
+        bool taxLine = request.EnforceManualJournalRules && (account.IsControlAccount || !account.AllowManualJournal)
+            && await IsTaxCodeAccountAsync(request.CompanyId, lineRequest.TaxCode, key.AccountCode, ct).ConfigureAwait(false);
+        if (request.EnforceManualJournalRules && account.IsControlAccount && !taxLine)
         {
             return Error.Rule("Posting.ControlAccountManualJournal",
                 $"Account '{key.AccountCode}' is a control account and cannot be posted by manual journal.");
         }
 
-        if (request.EnforceManualJournalRules && !account.AllowManualJournal)
+        if (request.EnforceManualJournalRules && !account.AllowManualJournal && !taxLine)
         {
             return Error.Rule("Posting.ManualJournalNotAllowed",
                 $"Account '{key.AccountCode}' does not allow manual journals; it is posted by the system only.");

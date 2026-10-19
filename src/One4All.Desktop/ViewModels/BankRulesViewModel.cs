@@ -91,6 +91,10 @@ public sealed partial class BankRulesViewModel : ObservableObject
     [ObservableProperty]
     private string _newNarrative = string.Empty;
 
+    /// <summary>New rule: tax code (blank posts the amount gross; otherwise the VAT is split onto the code's account).</summary>
+    [ObservableProperty]
+    private string _newTaxCode = string.Empty;
+
     /// <summary>New rule: priority.</summary>
     [ObservableProperty]
     private int _newPriority = 100;
@@ -185,6 +189,7 @@ public sealed partial class BankRulesViewModel : ObservableObject
                 MaxAmount = max,
                 AccountCode = NewAccount?.Key ?? string.Empty,
                 Narrative = NewNarrative,
+                TaxCode = string.IsNullOrWhiteSpace(NewTaxCode) ? null : NewTaxCode.Trim(),
                 Priority = NewPriority,
             }).ConfigureAwait(true);
 
@@ -194,7 +199,7 @@ public sealed partial class BankRulesViewModel : ObservableObject
                 return;
             }
 
-            NewName = NewPhrase = NewMin = NewMax = NewNarrative = string.Empty;
+            NewName = NewPhrase = NewMin = NewMax = NewNarrative = NewTaxCode = string.Empty;
             StatusMessage = "Rule added.";
         }
         catch (Exception ex)

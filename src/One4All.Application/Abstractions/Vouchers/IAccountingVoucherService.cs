@@ -10,7 +10,9 @@ namespace One4All.Application.Abstractions.Vouchers;
 /// <param name="CostCentre">The cost centre the line posts to.</param>
 /// <param name="Department">The department the line posts to.</param>
 /// <param name="Project">The project the line posts to.</param>
-public sealed record VoucherLineRequest(string AccountCode, decimal Amount, string? Narrative = null, string? CostCentre = null, string? Department = null, string? Project = null);
+/// <param name="TaxCode">On a payment, receipt or petty cash voucher, the tax code when the amount includes VAT: the net posts to the account, the VAT to the code's account.</param>
+public sealed record VoucherLineRequest(string AccountCode, decimal Amount, string? Narrative = null, string? CostCentre = null, string? Department = null, string? Project = null,
+    string? TaxCode = null);
 
 /// <summary>A voucher to prepare.</summary>
 /// <param name="Type">The kind.</param>

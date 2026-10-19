@@ -69,6 +69,7 @@ public sealed class BankRuleService : IBankRuleService
             MaxAmount = request.MaxAmount,
             Narrative = string.IsNullOrWhiteSpace(request.Narrative) ? null : request.Narrative.Trim(),
             Priority = request.Priority,
+            TaxCode = string.IsNullOrWhiteSpace(request.TaxCode) ? null : request.TaxCode.Trim().ToUpperInvariant(),
         };
         _db.Set<BankRule>().Add(rule);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -127,7 +128,7 @@ public sealed class BankRuleService : IBankRuleService
             }
 
             BankRule rule = byId[match.Id];
-            Result<StatementLinePosting> result = await _posting.PostToAccountAsync(companyId, bankAccountId, line.Id, rule.AccountCode, rule.Narrative, ct).ConfigureAwait(false);
+            Result<StatementLinePosting> result = await _posting.PostToAccountAsync(companyId, bankAccountId, line.Id, rule.AccountCode, rule.Narrative, ct, rule.TaxCode).ConfigureAwait(false);
             if (result.IsFailure)
             {
                 failures.Add($"{line.Description} ({line.Amount:0.00}) - rule '{rule.Name}': {result.Error.Message}");

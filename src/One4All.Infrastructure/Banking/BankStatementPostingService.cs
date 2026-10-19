@@ -80,7 +80,8 @@ public sealed class BankStatementPostingService : IBankStatementPostingService
         }, ct);
 
     /// <inheritdoc />
-    public Task<Result<StatementLinePosting>> PostToAccountAsync(long companyId, long bankAccountId, long statementLineId, string accountCode, string? narrative = null, CancellationToken ct = default) =>
+    public Task<Result<StatementLinePosting>> PostToAccountAsync(long companyId, long bankAccountId, long statementLineId, string accountCode, string? narrative = null, CancellationToken ct = default,
+        string? taxCode = null) =>
         PostAndMatchAsync(companyId, bankAccountId, statementLineId, mustBePositive: null, async (bank, line) =>
         {
             if (string.IsNullOrWhiteSpace(accountCode))
@@ -102,6 +103,30 @@ public sealed class BankStatementPostingService : IBankStatementPostingService
 
             decimal amount = Math.Abs(line.Amount);
             bool moneyIn = line.Amount > 0m;
+            List<JournalLineRequest> lines =
+            [
+                new JournalLineRequest { AccountCode = bank.GlAccountCode, Side = moneyIn ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = amount },
+            ];
+            if (!string.IsNullOrWhiteSpace(taxCode))
+            {
+                // VAT inside the amount: the net to the account, the VAT to the code's input (money out) or output (money in) account, both tagged for the return.
+                Result<Accounting.GrossTaxSplit> split = await Accounting.GrossTaxSplit.SplitAsync(_db, companyId, taxCode, amount, line.StatementDate, purchase: !moneyIn, ct).ConfigureAwait(false);
+                if (split.IsFailure)
+                {
+                    return split.Error;
+                }
+
+                lines.Add(new JournalLineRequest { AccountCode = contra, Side = moneyIn ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = split.Value.Net, TaxCode = split.Value.Code });
+                if (split.Value.Tax != 0m)
+                {
+                    lines.Add(new JournalLineRequest { AccountCode = split.Value.TaxAccountCode, Side = moneyIn ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = split.Value.Tax, TaxCode = split.Value.Code });
+                }
+            }
+            else
+            {
+                lines.Add(new JournalLineRequest { AccountCode = contra, Side = moneyIn ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = amount });
+            }
+
             Result<PostingReceipt> posted = await _posting.PostAsync(new JournalRequest
             {
                 CompanyId = companyId,
@@ -113,11 +138,7 @@ public sealed class BankStatementPostingService : IBankStatementPostingService
                 DocumentNumber = Number(null, line),
                 Reference = line.Reference,
                 Narrative = string.IsNullOrWhiteSpace(narrative) ? line.Description : narrative.Trim(),
-                Lines =
-                [
-                    new JournalLineRequest { AccountCode = bank.GlAccountCode, Side = moneyIn ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = amount },
-                    new JournalLineRequest { AccountCode = contra, Side = moneyIn ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = amount },
-                ],
+                Lines = lines,
             }, ct).ConfigureAwait(false);
             if (posted.IsFailure)
             {

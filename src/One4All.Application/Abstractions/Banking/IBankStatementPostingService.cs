@@ -51,6 +51,8 @@ public interface IBankStatementPostingService
     /// <param name="accountCode">The contra account (e.g. bank charges expense).</param>
     /// <param name="narrative">An optional narrative (defaults to the bank's description).</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="taxCode">The tax code when the amount includes VAT (bank charges, utilities): the net posts to the account, the VAT to the code's input (money out) or output (money in) account.</param>
     /// <returns>The posting.</returns>
-    Task<Result<StatementLinePosting>> PostToAccountAsync(long companyId, long bankAccountId, long statementLineId, string accountCode, string? narrative = null, CancellationToken ct = default);
+    Task<Result<StatementLinePosting>> PostToAccountAsync(long companyId, long bankAccountId, long statementLineId, string accountCode, string? narrative = null, CancellationToken ct = default,
+        string? taxCode = null);
 }

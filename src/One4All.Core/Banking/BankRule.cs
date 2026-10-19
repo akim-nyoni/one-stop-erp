@@ -72,6 +72,9 @@ public sealed class BankRule : AuditableEntity, ICompanyScoped
     /// <summary>The account posted to.</summary>
     public string AccountCode { get; private set; }
 
+    /// <summary>Gets or sets the tax code when the money the rule posts includes VAT (its net to the account, the VAT to the code's account).</summary>
+    public string? TaxCode { get; set; }
+
     /// <summary>The narrative used on the posting, or null to keep the bank's description.</summary>
     public string? Narrative { get; set; }
 
