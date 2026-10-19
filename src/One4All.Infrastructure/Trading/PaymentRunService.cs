@@ -90,6 +90,8 @@ public sealed class PaymentRunService : IPaymentRunService
 
         (List<OpenItem> dueInvoices, List<OpenItem> credits, Dictionary<long, Supplier> suppliers) = await SelectAsync(request, ct).ConfigureAwait(false);
         HashSet<long> bankChanging = await BankChangingAsync(request.CompanyId, ct).ConfigureAwait(false);
+        string? discountAccount = await _db.Companies.AsNoTracking().Where(c => c.Id == request.CompanyId).Select(c => c.SettlementDiscountReceivedAccountCode).FirstOrDefaultAsync(ct)
+            .ConfigureAwait(false);
 
         // A mobile-money run pays wallets: every supplier it would pay needs one.
         if (request.Method == Core.Trading.PaymentRunMethod.MobileMoney
@@ -159,13 +161,49 @@ public sealed class PaymentRunService : IPaymentRunService
                 }
             }
 
+            // Settlement discount on each untouched invoice paid within the supplier's discount days: a credit note to the discount-received account,
+            // set against the invoice, so only the rest is paid.
+            decimal discountTaken = 0m;
+            if (discountAccount is not null && supplier.SettlementDiscountPercent > 0m && supplier.SettlementDiscountDays > 0)
+            {
+                foreach (OpenItem invoice in invoices.Where(i => i.ItemType == OpenItemType.Invoice && i.OutstandingTransaction == i.OriginalTransaction
+                    && i.DocumentDate.AddDays(supplier.SettlementDiscountDays) >= request.PaymentDate))
+                {
+                    decimal discount = decimal.Round(invoice.OutstandingTransaction * supplier.SettlementDiscountPercent / 100m, 2, MidpointRounding.AwayFromZero);
+                    if (discount <= 0m)
+                    {
+                        continue;
+                    }
+
+                    Result<TradingPostingResult> note = await _purchaseLedger.PostCreditNoteAsync(new PurchaseCreditNoteRequest
+                    {
+                        CompanyId = request.CompanyId, SupplierId = supplier.Id, DocumentNumber = $"SD-{invoice.DocumentNumber}", DocumentDate = request.PaymentDate, Currency = currency,
+                        NetAmount = discount, ExpenseAccountCode = discountAccount, Narrative = $"Settlement discount {supplier.SettlementDiscountPercent:0.##}% on {invoice.DocumentNumber}",
+                    }, ct).ConfigureAwait(false);
+                    if (note.IsFailure)
+                    {
+                        return note.Error;
+                    }
+
+                    Result<AllocationResult> set = await _allocationService.AllocateAsync(request.CompanyId, TradingLedger.AccountsPayable, note.Value.OpenItemId, invoice.Id, discount,
+                        request.PaymentDate, ct).ConfigureAwait(false);
+                    if (set.IsFailure)
+                    {
+                        return set.Error;
+                    }
+
+                    discountTaken += discount;
+                    touched.Add(invoice.Id);
+                }
+            }
+
             decimal toPay = Math.Min(invoices.Sum(i => i.OutstandingTransaction), cap ?? decimal.MaxValue);
             if (toPay <= 0m)
             {
                 // Settled entirely by credits: nothing to pay.
-                if (creditsApplied > 0m)
+                if (creditsApplied > 0m || discountTaken > 0m)
                 {
-                    lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, 0m, string.Empty, touched.Count, creditsApplied));
+                    lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, 0m, string.Empty, touched.Count, creditsApplied, 0m, discountTaken));
                 }
 
                 continue;
@@ -215,7 +253,7 @@ public sealed class PaymentRunService : IPaymentRunService
 
             totalBase += payment.Value.BaseAmount;
             decimal withheld = payment.Value.WithheldBase == 0m ? 0m : await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false);
-            lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied, withheld));
+            lines.Add(new PaymentRunLine(supplier.Id, supplier.Code, supplier.Name, currency.Value, toPay, paymentNumber, touched.Count, creditsApplied, withheld, discountTaken));
         }
 
         List<string> chequeNumbers = [];
@@ -483,6 +521,26 @@ public sealed class PaymentRunService : IPaymentRunService
                         i.Sign == LedgerSign.Credit && i.OutstandingTransaction > 0m && i.DueDate <= request.DueOnOrBefore)
             .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
             .ToListAsync(ct).ConfigureAwait(false);
+
+        // Taking settlement discounts: an unpaid invoice still within its supplier's discount days is paid now, before it is due, less the discount.
+        if (await _db.Companies.AnyAsync(c => c.Id == request.CompanyId && c.SettlementDiscountReceivedAccountCode != null, ct).ConfigureAwait(false))
+        {
+            var discounting = await _db.Suppliers.AsNoTracking().Where(s => s.CompanyId == request.CompanyId && s.SettlementDiscountPercent > 0m && s.SettlementDiscountDays > 0)
+                .Select(s => new { s.Id, s.SettlementDiscountDays }).ToListAsync(ct).ConfigureAwait(false);
+            List<long> ids = [.. discounting.Select(s => s.Id)];
+            HashSet<long> already = [.. dueInvoices.Select(i => i.Id)];
+            foreach (OpenItem early in await _db.OpenItems.Where(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsPayable && i.Sign == LedgerSign.Credit
+                    && i.ItemType == OpenItemType.Invoice && i.OutstandingTransaction == i.OriginalTransaction && i.OutstandingTransaction > 0m && ids.Contains(i.TraderId))
+                .ToListAsync(ct).ConfigureAwait(false))
+            {
+                if (!already.Contains(early.Id) && early.DocumentDate.AddDays(discounting.First(s => s.Id == early.TraderId).SettlementDiscountDays) >= request.PaymentDate)
+                {
+                    dueInvoices.Add(early);
+                }
+            }
+
+            dueInvoices = [.. dueInvoices.OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)];
+        }
 
         if (request.SupplierIds.Count > 0)
         {

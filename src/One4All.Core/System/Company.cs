@@ -159,6 +159,12 @@ public sealed class Company : SoftDeletableEntity
     /// <summary>Whether supplier payment runs must be saved, reviewed and approved by a second person before they pay (brief §4.6).</summary>
     public bool PaymentRunApprovalRequired { get; set; }
 
+    /// <summary>
+    /// Gets or sets the income account settlement discounts taken from suppliers are credited to; while it is set, payment runs pay invoices still
+    /// within a supplier's discount days (even before they are due) less the discount.
+    /// </summary>
+    public string? SettlementDiscountReceivedAccountCode { get; set; }
+
     /// <summary>How far (percent of the ordered quantity) a goods receipt may go over a purchase order line without a supervisor (brief §4.3).</summary>
     public decimal OverReceiptTolerancePercent { get; set; }
 

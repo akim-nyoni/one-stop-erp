@@ -32217,6 +32217,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("SettlementDiscountReceivedAccountCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("settlement_discount_received_account_code");
+
                     b.Property<decimal>("StaffChildDiscountPercent")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -35084,6 +35089,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<int>("SettlementDiscountDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("settlement_discount_days");
+
+                    b.Property<decimal>("SettlementDiscountPercent")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("settlement_discount_percent");
 
                     b.Property<DateOnly?>("TaxClearanceExpiry")
                         .HasColumnType("date")

@@ -53,6 +53,12 @@ public sealed class Supplier : SoftDeletableEntity, ICompanyScoped
     /// <summary>Payment terms in days.</summary>
     public int PaymentTermsDays { get; set; } = 30;
 
+    /// <summary>Gets or sets the settlement (early-payment) discount the supplier allows, as a percentage of the invoice.</summary>
+    public decimal SettlementDiscountPercent { get; set; }
+
+    /// <summary>Gets or sets the days from the invoice date within which the settlement discount may be taken.</summary>
+    public int SettlementDiscountDays { get; set; }
+
     /// <summary>How ageing is measured.</summary>
     public AgeingBasis AgeingBasis { get; set; }
 

@@ -439,7 +439,7 @@ public static partial class OperationCatalogue
             Description = "Saves a proposed payment run for review: everyone due (held suppliers left out with the reason); lines can be left out or part-paid (oldest invoices "
                 + "first); someone other than the proposer approves it, which pays exactly what it holds. Require approval stops direct payment runs for the company. With funds "
                 + "available (and a currency), the proposal pays suppliers by payment priority (1 first) until the funds run out. Mobile money writes a payout file to each wallet.",
-            Fields = [Pick("Step", "Step", ["Save proposal", "Set line", "Approve", "Cancel", "Show", "Require approval", "Allow direct runs"]), Opt("Run", "Run number"),
+            Fields = [Pick("Step", "Step", ["Save proposal", "Set line", "Approve", "Cancel", "Show", "Require approval", "Allow direct runs", "Settlement discount account"]), Opt("Run", "Run number"),
                 Today("Date", "Payment date"), Today("Due", "Pay invoices due on or before"), Req("Bank", "Bank account", "1100"), Opt("Currency", "Currency (blank: all)"),
                 Opt("Wht", "Withholding tax code"), Opt("Layout", "Bank file layout"), Pick("Method", "Pay by", Enum.GetNames<PaymentRunMethod>()), Opt("Cheque", "First cheque number (cheques)"),
                 Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true), OptNum("Amount", "Amount (blank: all due)"), OptNum("Funds", "Funds available (save proposal)"),
@@ -453,6 +453,11 @@ public static partial class OperationCatalogue
                 string run = i.Optional("Run") ?? string.Empty;
                 switch (i.Text("Step"))
                 {
+                    case "Settlement discount account":
+                        // Blank stops taking discounts; an account starts it (suppliers' discount terms are kept on the supplier).
+                        (await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true)).SettlementDiscountReceivedAccountCode = i.Optional("Supplier");
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return i.Optional("Supplier") is string discountAccount ? $"Payment runs take suppliers' settlement discounts, credited to {discountAccount}." : "Payment runs no longer take settlement discounts.";
                     case "Require approval":
                     case "Allow direct runs":
                         bool required = i.Text("Step") == "Require approval";
@@ -481,7 +486,8 @@ public static partial class OperationCatalogue
                                 + (advices.Failed.Count > 0 ? $"; not sent: {string.Join("; ", advices.Failed)}" : string.Empty) + ".";
                         }
 
-                        return $"Run {run} approved: {paid.Lines.Count(l => l.PaymentNumber.Length > 0)} payment(s), {M(paid.Total)} base."
+                        return $"Run {run} approved: {paid.Lines.Count(l => l.PaymentNumber.Length > 0)} payment(s), {M(paid.Total)} base"
+                            + (paid.Lines.Sum(l => l.DiscountTaken) is decimal taken and > 0m ? $", {M(taken)} settlement discount taken." : ".")
                             + (paid.ChequeNumbers is { Count: > 0 } cheques ? $" Cheques {cheques[0]} to {cheques[^1]} written; print them from Banking." : string.Empty) + remitted;
                     case "Cancel":
                         return Check(await runs.CancelAsync(c.CompanyId, run).ConfigureAwait(true), $"Run {run} cancelled.");

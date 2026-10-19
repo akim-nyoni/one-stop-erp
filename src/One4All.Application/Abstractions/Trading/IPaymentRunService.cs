@@ -55,7 +55,9 @@ public sealed class PaymentRunRequest
 /// <param name="InvoicesPaid">How many invoices were settled/part-paid.</param>
 /// <param name="CreditsApplied">Unused credit notes / payments on account set against the invoices before paying.</param>
 /// <param name="Withheld">Withholding tax deducted from the payment (payment currency); the bank pays <c>Amount − Withheld</c>.</param>
-public readonly record struct PaymentRunLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, decimal Amount, string PaymentNumber, int InvoicesPaid, decimal CreditsApplied = 0m, decimal Withheld = 0m)
+/// <param name="DiscountTaken">Settlement discount taken (payment currency): invoices paid within the supplier's discount days, less the discount.</param>
+public readonly record struct PaymentRunLine(long SupplierId, string SupplierCode, string SupplierName, string Currency, decimal Amount, string PaymentNumber, int InvoicesPaid, decimal CreditsApplied = 0m, decimal Withheld = 0m,
+    decimal DiscountTaken = 0m)
 {
     /// <summary>What the bank actually pays.</summary>
     public decimal NetPaid => Amount - Withheld;

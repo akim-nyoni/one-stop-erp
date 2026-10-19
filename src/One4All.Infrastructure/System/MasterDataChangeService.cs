@@ -22,7 +22,7 @@ public sealed class MasterDataChangeService : IMasterDataChangeService
     {
         [MasterDataTarget.Tariff] = ["FixedCharge", "PerUnitRate", "RatePerValuationCents", "RatePerSquareMetre", "MinimumCharge", "IsActive"],
         [MasterDataTarget.Customer] = ["Name", "PaymentTermsDays", "SettlementDiscountPercent", "SettlementDiscountDays", "OnHold", "InterestExempt", "TaxRegistration", "Email", "IsActive"],
-        [MasterDataTarget.Supplier] = ["Name", "PaymentTermsDays", "OnHold", "TaxRegistration", "TaxClearanceExpiry", "IsActive"],
+        [MasterDataTarget.Supplier] = ["Name", "PaymentTermsDays", "SettlementDiscountPercent", "SettlementDiscountDays", "OnHold", "TaxRegistration", "TaxClearanceExpiry", "IsActive"],
         [MasterDataTarget.Item] = ["Description", "TaxCode", "StandardCost", "CostOfSalesAccountCode", "RevenueAccountCode", "IsActive"],
     };
 
