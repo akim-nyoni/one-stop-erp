@@ -20,13 +20,16 @@ public static partial class OperationCatalogue
         {
             Module = customers ? "Customers" : "Suppliers", Title = $"Allocate {trader.ToLowerInvariant()} items", ListTitle = $"Open {trader.ToLowerInvariant()} items",
             Description = customers
-                ? "Match a receipt or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, settle a customer "
+                ? "Auto-allocate matches an account's receipts and credits to its invoices (exact amounts first, then oldest first; everyone: the whole ledger). "
+                    + "Or match a receipt or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, settle a customer "
                     + "invoice against the same party's supplier invoice (contra), or ask to write off a bad debt (claiming back the VAT on it once it is overdue long enough) - "
                     + "another user with the write-off right approves or rejects it by request id before anything is written off."
-                : "Match a payment or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, or write back "
+                : "Auto-allocate matches an account's payments and credits to its invoices (exact amounts first, then oldest first; everyone: the whole ledger). "
+                    + "Or match a payment or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, or write back "
                     + "an old creditor invoice that will never be paid (the liability released to income).",
-            Fields = [Pick("Step", "Step", customers ? ["Allocate", "Unallocate", "Contra", "Write off", "Approve write-off", "Reject write-off"] : ["Allocate", "Unallocate", "Write back"]),
-                Req("Trader", $"{trader} code"), .. (customers ? new[] { OptNum("Request", "Write-off request id (approve / reject)") } : []),
+            Fields = [Pick("Step", "Step", customers ? ["Allocate", "Auto-allocate", "Auto-allocate everyone", "Unallocate", "Contra", "Write off", "Approve write-off", "Reject write-off"]
+                    : ["Allocate", "Auto-allocate", "Auto-allocate everyone", "Unallocate", "Write back"]),
+                Opt("Trader", $"{trader} code (blank only for auto-allocate everyone)"), .. (customers ? new[] { OptNum("Request", "Write-off request id (approve / reject)") } : []),
                 Opt("Debit", customers ? "Invoice number" : "Debit document (payment / debit note)"), Opt("Credit", customers ? "Receipt / credit note number" : "Invoice number"),
                 OptNum("Amount", "Amount (blank: as much as is open)"), Today(), OptNum("Allocation", "Allocation id (unallocate; blank: the latest on the document)"),
                 .. (customers ? new[] { Opt("Supplier", "Supplier code (contra)"), Opt("SupplierInvoice", "Supplier invoice number (contra)"), Opt("Clearing", "Contra clearing account") } : []),
@@ -34,7 +37,21 @@ public static partial class OperationCatalogue
                 .. (customers ? new[] { Num("Days", "Overdue at least (days) for VAT relief", "180") } : []), Opt("Document", "Document number (contra)")],
             Run = async (c, i) =>
             {
+                // Matching in bulk: exact amounts first, then the oldest items first, per currency - for one account or the whole ledger.
+                if (i.Text("Step") == "Auto-allocate everyone")
+                {
+                    AutoAllocationResult all = await c.Get<IAutoAllocationService>().AllocateLedgerAsync(c.CompanyId, ledger, i.Date("Date")).ConfigureAwait(true);
+                    return $"{all.TradersProcessed} account(s): {all.Allocations} allocation(s) ({all.ExactMatches} exact), {M(all.AmountAllocated)} matched."
+                        + (all.Failures.Count == 0 ? string.Empty : Environment.NewLine + "Not matched: " + string.Join("; ", all.Failures));
+                }
+
                 long traderId = customers ? await CustomerAsync(c, i.Text("Trader")).ConfigureAwait(true) : await SupplierAsync(c, i.Text("Trader")).ConfigureAwait(true);
+                if (i.Text("Step") == "Auto-allocate")
+                {
+                    AutoAllocationResult one = Check(await c.Get<IAutoAllocationService>().AllocateTraderAsync(c.CompanyId, ledger, traderId, i.Date("Date")).ConfigureAwait(true));
+                    return $"{one.Allocations} allocation(s) ({one.ExactMatches} exact), {M(one.AmountAllocated)} matched."
+                        + (one.Failures.Count == 0 ? string.Empty : Environment.NewLine + "Not matched: " + string.Join("; ", one.Failures));
+                }
                 async Task<Core.Trading.OpenItem> ItemAsync(TradingLedger inLedger, long ofTrader, string field, LedgerSign? sign = null)
                 {
                     string number = (i.Optional(field) ?? throw new OperationException($"Give the {field.ToLowerInvariant()} document.")).Trim();
