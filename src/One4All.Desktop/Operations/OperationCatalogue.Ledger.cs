@@ -308,13 +308,16 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Settle VAT for a period",
-            Description = "Clears the period's output and input VAT accounts into the VAT payable (or refundable) account and shows output, input and the net.",
-            Fields = [Today("From", "From"), Today("To", "To"), Req("Payable", "VAT payable account"), Req("Document", "Document number")],
+            Description = "Clears the period's output and input VAT accounts into the VAT payable (or refundable) account and shows output, input and the net. On cash "
+                + "accounting or the tax point, VAT the ledger holds that is not yet due goes to the not-yet-due account (and comes back out when it falls due). The period "
+                + "is then filed: it cannot be settled again and no VAT posts on its days.",
+            Fields = [Today("From", "From"), Today("To", "To"), Req("Payable", "VAT payable account"), Req("Document", "Document number"), Opt("NotYetDue", "VAT not yet due account (cash / tax point)")],
             Run = async (c, i) =>
             {
                 VatSettlementResult vat = Check(await c.Get<IVatReturnService>().SettleAsync(new SettleVatRequest
                 {
                     CompanyId = c.CompanyId, FromDate = i.Date("From"), ToDate = i.Date("To"), VatPayableAccountCode = i.Text("Payable"), DocumentNumber = i.Text("Document"),
+                    VatNotYetDueAccountCode = i.Optional("NotYetDue"), FiledByUserId = c.UserId,
                 }).ConfigureAwait(true));
                 return $"Output {M(vat.OutputTax)} − input {M(vat.InputTax)} = {(vat.NetPayable >= 0m ? "payable" : "refundable")} {M(Math.Abs(vat.NetPayable))}{(vat.JournalNumber is null ? string.Empty : $" ({vat.JournalNumber})")}.";
             },

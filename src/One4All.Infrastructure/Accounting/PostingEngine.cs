@@ -251,6 +251,18 @@ public sealed class PostingEngine : IPostingEngine
             }
         }
 
+        // A filed VAT period is closed to VAT: nothing more may post to the VAT accounts on its days (brief §3.5) - correct it in an open period.
+        if (request.DocumentType != "VatReturn"
+            && await _db.VatReturnFilings.AnyAsync(f => f.CompanyId == request.CompanyId && f.FromDate <= request.PostingDate && f.ToDate >= request.PostingDate, ct).ConfigureAwait(false))
+        {
+            List<string> postedTo = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
+            if (await _db.Accounts.AnyAsync(a => a.CompanyId == request.CompanyId && postedTo.Contains(a.AccountCode)
+                    && (a.ControlAccountType == ControlAccountType.VatOutput || a.ControlAccountType == ControlAccountType.VatInput), ct).ConfigureAwait(false))
+            {
+                return Error.Rule("Tax.PeriodFiled", $"The VAT return covering {request.PostingDate:yyyy-MM-dd} has been filed; post the VAT in an open period.");
+            }
+        }
+
         // Rule 1: Dr = Cr in base currency.
         if (Math.Abs(totalBaseDebit - totalBaseCredit) > BalanceTolerance)
         {

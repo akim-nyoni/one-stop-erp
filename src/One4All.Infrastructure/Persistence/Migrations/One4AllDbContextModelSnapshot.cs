@@ -1921,6 +1921,76 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("tax_rate", "sys");
                 });
 
+            modelBuilder.Entity("One4All.Core.Accounting.VatReturnFiling", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<int>("Basis")
+                        .HasColumnType("integer")
+                        .HasColumnName("basis");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<decimal>("Deferred")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("deferred");
+
+                    b.Property<string>("DocumentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("document_number");
+
+                    b.Property<long?>("FiledByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("filed_by_user_id");
+
+                    b.Property<DateOnly>("FromDate")
+                        .HasColumnType("date")
+                        .HasColumnName("from_date");
+
+                    b.Property<decimal>("InputTax")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("input_tax");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<decimal>("OutputTax")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("output_tax");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("ToDate")
+                        .HasColumnType("date")
+                        .HasColumnName("to_date");
+
+                    b.HasKey("Id")
+                        .HasName("pk_vat_return");
+
+                    b.HasIndex("CompanyId", "FromDate", "ToDate")
+                        .HasDatabaseName("ix_vat_return_company_id_from_date_to_date");
+
+                    b.ToTable("vat_return", "gl");
+                });
+
             modelBuilder.Entity("One4All.Core.Audit.AuditArchive", b =>
                 {
                     b.Property<long>("Id")

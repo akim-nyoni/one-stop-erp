@@ -90,7 +90,7 @@ public sealed class VatReturnSettlementTests
             tb.Rows.Should().NotContain(r => r.AccountCode == "2210" && r.Debit > 0m);
         }
 
-        // Re-running the settled period nets to zero - nothing to post.
+        // The settled period is filed: settling it again is refused.
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IVatReturnService vat = scope.ServiceProvider.GetRequiredService<IVatReturnService>();
@@ -99,8 +99,7 @@ public sealed class VatReturnSettlementTests
                 CompanyId = companyId, FromDate = new DateOnly(2026, 3, 1), ToDate = new DateOnly(2026, 3, 31),
                 VatPayableAccountCode = "2250", DocumentNumber = "VAT-2026-Q1-B",
             });
-            again.Value.JournalNumber.Should().BeNull();
-            again.Value.NetPayable.Should().Be(0m);
+            again.Error.Code.Should().Be("Vat.PeriodFiled");
         }
     }
 }

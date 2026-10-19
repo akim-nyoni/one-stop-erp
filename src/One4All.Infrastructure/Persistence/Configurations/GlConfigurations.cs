@@ -275,6 +275,20 @@ internal sealed class RecurringJournalConfiguration : IEntityTypeConfiguration<R
     }
 }
 
+internal sealed class VatReturnFilingConfiguration : IEntityTypeConfiguration<VatReturnFiling>
+{
+    public void Configure(EntityTypeBuilder<VatReturnFiling> b)
+    {
+        b.ToTable("vat_return", Schemas.GeneralLedger);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Basis).HasConversion<int>();
+        b.Property(x => x.DocumentNumber).HasMaxLength(40);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Ignore(x => x.NetPayable);
+        b.HasIndex(x => new { x.CompanyId, x.FromDate, x.ToDate });
+    }
+}
+
 internal sealed class PrepaymentScheduleConfiguration : IEntityTypeConfiguration<PrepaymentSchedule>
 {
     public void Configure(EntityTypeBuilder<PrepaymentSchedule> b)

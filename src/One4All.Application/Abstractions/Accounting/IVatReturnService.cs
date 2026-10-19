@@ -19,6 +19,15 @@ public sealed class SettleVatRequest
 
     /// <summary>The settlement document number.</summary>
     public string DocumentNumber { get; init; } = string.Empty;
+
+    /// <summary>
+    /// The account VAT not yet due is held in (cash accounting or the tax point): the ledger's VAT that the company's basis does not put in this period
+    /// is moved there, and VAT that becomes due out of it, so the payable is the return's figure.
+    /// </summary>
+    public string? VatNotYetDueAccountCode { get; init; }
+
+    /// <summary>Who files the return.</summary>
+    public long? FiledByUserId { get; init; }
 }
 
 /// <summary>The result of settling a VAT return.</summary>
@@ -26,7 +35,7 @@ public sealed class SettleVatRequest
 /// <param name="InputTax">Input tax for the period (cleared from the VAT-input control accounts).</param>
 /// <param name="NetPayable">Output − input: positive is payable to the authority, negative is refundable.</param>
 /// <param name="JournalNumber">The settlement journal number, or null when there was nothing to settle.</param>
-public readonly record struct VatSettlementResult(decimal OutputTax, decimal InputTax, decimal NetPayable, string? JournalNumber);
+public readonly record struct VatSettlementResult(decimal OutputTax, decimal InputTax, decimal NetPayable, string? JournalNumber, decimal Deferred = 0m);
 
 /// <summary>
 /// Settles a VAT return for a period (brief §3.6): clears the accumulated balances on the VAT-output and

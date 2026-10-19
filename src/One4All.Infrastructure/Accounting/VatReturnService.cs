@@ -21,11 +21,15 @@ public sealed class VatReturnService : IVatReturnService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The central posting engine.</param>
-    public VatReturnService(One4AllDbContext db, IPostingEngine postingEngine)
+    /// <param name="tax">Works out the return on the company's basis (cash accounting or the tax point).</param>
+    public VatReturnService(One4AllDbContext db, IPostingEngine postingEngine, ITaxComplianceService? tax = null)
     {
         _db = db;
         _postingEngine = postingEngine;
+        _tax = tax;
     }
+
+    private readonly ITaxComplianceService? _tax;
 
     /// <inheritdoc />
     public async Task<Result<VatSettlementResult>> SettleAsync(SettleVatRequest request, CancellationToken ct = default)
@@ -36,6 +40,12 @@ public sealed class VatReturnService : IVatReturnService
         }
 
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
+
+        // A period is filed once: a second settlement over any of its days is refused.
+        if (await _db.VatReturnFilings.AnyAsync(f => f.CompanyId == request.CompanyId && f.FromDate <= request.ToDate && f.ToDate >= request.FromDate, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Vat.PeriodFiled", $"A VAT return already covers part of {request.FromDate:yyyy-MM-dd} to {request.ToDate:yyyy-MM-dd}.");
+        }
 
         List<LedgerAccount> vatAccounts = await _db.Accounts
             .Where(a => a.CompanyId == request.CompanyId
@@ -74,8 +84,32 @@ public sealed class VatReturnService : IVatReturnService
             }
         }
 
+        // On cash accounting or the tax point the return is not the ledger's movement: the difference is VAT not yet due (held back, or released from earlier).
+        decimal deferred = 0m;
+        if (company.TaxPointBasis != TaxPointBasis.InvoiceDate && _tax is not null)
+        {
+            BasisVatReturn basis = await _tax.VatReturnAsync(request.CompanyId, request.FromDate, request.ToDate, company.TaxPointBasis, ct).ConfigureAwait(false);
+            deferred = (outputTax - basis.OutputTax) - (inputTax - basis.InputTax);
+            (outputTax, inputTax) = (basis.OutputTax, basis.InputTax);
+            if (deferred != 0m)
+            {
+                if (string.IsNullOrWhiteSpace(request.VatNotYetDueAccountCode))
+                {
+                    return Error.Validation("Vat.NotYetDueAccount", $"On {company.TaxPointBasis} accounting {Math.Abs(deferred):N2} of VAT is not due in this period: give the VAT-not-yet-due account.");
+                }
+
+                lines.Add(new JournalLineRequest
+                {
+                    AccountCode = request.VatNotYetDueAccountCode.Trim(), Side = deferred > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(deferred),
+                    Narrative = deferred > 0m ? "VAT not yet due, held back" : "VAT now due, released",
+                });
+            }
+        }
+
         if (lines.Count == 0)
         {
+            _db.VatReturnFilings.Add(new VatReturnFiling(request.CompanyId, request.FromDate, request.ToDate, company.TaxPointBasis, request.DocumentNumber) { FiledByUserId = request.FiledByUserId });
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return new VatSettlementResult(0m, 0m, 0m, null); // nothing to settle
         }
 
@@ -109,7 +143,12 @@ public sealed class VatReturnService : IVatReturnService
             return posting.Error;
         }
 
-        return new VatSettlementResult(outputTax, inputTax, outputTax - inputTax, posting.Value.JournalNumber);
+        _db.VatReturnFilings.Add(new VatReturnFiling(request.CompanyId, request.FromDate, request.ToDate, company.TaxPointBasis, request.DocumentNumber)
+        {
+            OutputTax = outputTax, InputTax = inputTax, Deferred = deferred, JournalNumber = posting.Value.JournalNumber, FiledByUserId = request.FiledByUserId,
+        });
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new VatSettlementResult(outputTax, inputTax, outputTax - inputTax, posting.Value.JournalNumber, deferred);
     }
 
     private async Task<Dictionary<string, (decimal debit, decimal credit)>> MovementByAccountAsync(long companyId, DateOnly from, DateOnly to, CancellationToken ct)
