@@ -104,6 +104,23 @@ public sealed class JournalLine : Entity
     /// <param name="taxCode">The tax code, or null.</param>
     public void SetTaxCode(string? taxCode) => TaxCode = taxCode;
 
+    /// <summary>
+    /// Takes up a journal's rounding difference in base currency on this line (a converted line, so the difference stays within the conversion):
+    /// a positive difference (debits over credits) lowers a debit or raises a credit, a negative one the reverse.
+    /// </summary>
+    /// <param name="difference">Base debits less base credits for the whole journal.</param>
+    public void AbsorbRounding(decimal difference)
+    {
+        if (BaseDebit != 0m)
+        {
+            BaseDebit -= difference;
+        }
+        else
+        {
+            BaseCredit += difference;
+        }
+    }
+
     /// <summary>Gets the project the line belongs to (analysis: not part of the balance key).</summary>
     public string? Project { get; private set; }
 

@@ -7,7 +7,7 @@ Everything below is what the previous session needed to know to be productive; n
 ## The standing instruction
 
 Develop the system against `docs/BRIEF.md` non-stop, one increment at a time, working through the ranked gap list in the memory file
-`one4all-progress-and-layout.md` (section "THIRTEENTH AUDIT"). Per increment:
+`one4all-progress-and-layout.md` (section "FOURTEENTH AUDIT", then its "later" list). Per increment:
 
 1. Build Debug and Release and run every test suite with the verify script (see below).
 2. Add a row to `docs/PROGRESS.md` (`python -I tools/dev/progress_row.py <rowfile>`: line 1 of the row file is the prefix of the row it goes after, line 2 is the new row).
@@ -74,7 +74,9 @@ comments, docs, commit messages): use a plain hyphen. a search for U+2014 across
 
 ## State at handover
 
-The twelfth list is complete. The thirteenth audit (three Explore agents, 2026-10-17) is ranked in the memory file under "THIRTEENTH AUDIT":
-#1 to #13 and #15 to #17 are done, #14 partly (offer exceptions queue and stand ward; re-pointing an existing property's ratepayer and more than
-one stand per beneficiary are still open). Continue with #18 (the missing and thin section-14 reports) and down the list. The last rows of
-`docs/PROGRESS.md` say exactly what each increment did.
+Updated 2026-10-19. The twelfth and thirteenth lists are complete. The fourteenth audit (three Explore agents, 2026-10-18) is ranked in the memory
+file under "FOURTEENTH AUDIT"; all twenty items are done (the last, #20, guards the housing ownership chain in the database). Continue with its
+"later" list: currency rounding on postings is in progress (the posting engine now keeps amounts to each currency's decimals), then prepayment
+release schedules, cash forecast by currency, the allocation grid, hierarchy-driven financial statements, supplier settlement discount, POS
+commission, leave coverage, the student sub-ledger, housing faults on the service desk, the schools API, safe/treasury, offline restaurant tabs
+and field-based documents. After that, run a fifteenth audit. The last rows of `docs/PROGRESS.md` say exactly what each increment did.

@@ -195,6 +195,7 @@ public sealed class PostingEngine : IPostingEngine
         Dictionary<string, (decimal debit, decimal credit)> perCurrency = new(StringComparer.Ordinal);
         decimal totalBaseDebit = 0m;
         decimal totalBaseCredit = 0m;
+        List<JournalLine> converted = [];
 
         foreach (JournalLineRequest lineRequest in request.Lines)
         {
@@ -206,6 +207,10 @@ public sealed class PostingEngine : IPostingEngine
 
             JournalLine line = lineResult.Value;
             journal.AddLine(line);
+            if (lineRequest.BaseAmount is null && line.TransactionCurrency != baseCurrency)
+            {
+                converted.Add(line);
+            }
 
             totalBaseDebit += line.BaseDebit;
             totalBaseCredit += line.BaseCredit;
@@ -213,6 +218,18 @@ public sealed class PostingEngine : IPostingEngine
             string cur = line.TransactionCurrency.Value;
             (decimal debit, decimal credit) running = perCurrency.GetValueOrDefault(cur);
             perCurrency[cur] = (running.debit + line.TransactionDebit, running.credit + line.TransactionCredit);
+        }
+
+        // Converted amounts are rounded to the base currency's decimals line by line, so a balanced foreign-currency journal can be out by a few minor
+        // units in base: that rounding is taken up on the largest converted line (never more than half a unit a converted line).
+        decimal roundingGap = totalBaseDebit - totalBaseCredit;
+        int basePlaces = (await CurrencyRulesAsync(ct).ConfigureAwait(false)).TryGetValue(baseCurrency.Value, out (int Places, MidpointRounding Mode) baseRounding)
+            ? baseRounding.Places : Money.StorageScale;
+        if (roundingGap != 0m && converted.Count > 0 && Math.Abs(roundingGap) <= converted.Count / (decimal)Math.Pow(10, basePlaces))
+        {
+            converted.OrderByDescending(l => l.BaseDebit + l.BaseCredit).First().AbsorbRounding(roundingGap);
+            totalBaseDebit = journal.Lines.Sum(l => l.BaseDebit);
+            totalBaseCredit = journal.Lines.Sum(l => l.BaseCredit);
         }
 
         // Fund accounting: every line names a fund, and each fund balances on its own.
@@ -602,6 +619,19 @@ public sealed class PostingEngine : IPostingEngine
         return account;
     }
 
+    private Dictionary<string, (int Places, MidpointRounding Mode)>? _currencyRules;
+
+    // Each defined currency's decimal places and rounding rule (loaded once per unit of work); a currency not defined keeps the storage scale.
+    private async Task<IReadOnlyDictionary<string, (int Places, MidpointRounding Mode)>> CurrencyRulesAsync(CancellationToken ct)
+        => _currencyRules ??= (await _db.Currencies.AsNoTracking().Select(c => new { c.Code, c.DecimalPlaces, c.RoundingMode }).ToListAsync(ct).ConfigureAwait(false))
+            .ToDictionary(c => c.Code.Value, c => (Math.Clamp(c.DecimalPlaces, 0, Money.StorageScale), c.RoundingMode switch
+            {
+                RoundingMode.HalfAwayFromZero => MidpointRounding.AwayFromZero,
+                RoundingMode.Up => MidpointRounding.ToPositiveInfinity,
+                RoundingMode.Down => MidpointRounding.ToZero,
+                _ => MidpointRounding.ToEven,
+            }), StringComparer.Ordinal);
+
     private async Task<Result<JournalLine>> BuildLineAsync(JournalRequest request, JournalLineRequest lineRequest, CurrencyCode baseCurrency, string? defaultFund, CancellationToken ct)
     {
         AccountKey key = lineRequest.ToKey();
@@ -662,7 +692,21 @@ public sealed class PostingEngine : IPostingEngine
             rate = rateResult.Value;
         }
 
-        decimal baseAmount = lineRequest.BaseAmount ?? decimal.Round(lineRequest.TransactionAmount * rate, Money.StorageScale, MidpointRounding.ToEven);
+        // Amounts keep to their currency's minor units (brief §3.3 currency rounding): a hand-keyed amount with more decimals than its currency has is
+        // refused (the modules' own postings carry unit costs and shares at the storage scale), and a converted base amount is rounded to the base
+        // currency's decimals by its rounding rule.
+        IReadOnlyDictionary<string, (int Places, MidpointRounding Mode)> rules = await CurrencyRulesAsync(ct).ConfigureAwait(false);
+        if (request.EnforceManualJournalRules && rules.TryGetValue(lineCurrency.Value, out (int Places, MidpointRounding Mode) own)
+            && decimal.Round(lineRequest.TransactionAmount, own.Places) != lineRequest.TransactionAmount)
+        {
+            return Error.Validation("Posting.CurrencyPrecision",
+                $"{lineRequest.TransactionAmount} {lineCurrency.Value} on '{lineRequest.AccountCode}' has more decimals than {lineCurrency.Value} allows ({own.Places}).");
+        }
+
+        (int Places, MidpointRounding Mode) baseRule = rules.TryGetValue(baseCurrency.Value, out (int Places, MidpointRounding Mode) found) ? found : (Money.StorageScale, MidpointRounding.ToEven);
+        decimal baseAmount = lineRequest.BaseAmount ?? (lineCurrency == baseCurrency
+            ? decimal.Round(lineRequest.TransactionAmount, Money.StorageScale, MidpointRounding.ToEven)
+            : decimal.Round(lineRequest.TransactionAmount * rate, baseRule.Places, baseRule.Mode));
 
         JournalLine line = lineRequest.Side == JournalSide.Debit
             ? JournalLine.Debit(key, lineCurrency, lineRequest.TransactionAmount, rate, baseAmount, lineRequest.Narrative)
