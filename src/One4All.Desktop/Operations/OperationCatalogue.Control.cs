@@ -5,6 +5,7 @@ using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Expenses;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Offline;
+using One4All.Application.Abstractions.Pos;
 using One4All.Application.Abstractions.Security;
 using One4All.Application.Housing;
 using One4All.Application.Budgeting;
@@ -350,23 +351,36 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "System Manager", Title = "Printers per workstation", ListTitle = "Printers",
-            Description = "The printer, tray and copies a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips). Workstation * is the "
-                + "default for every computer without its own; this computer's name is filled in. The report viewer's print dialog opens on the chosen printer.",
-            Fields = [Pick("Step", "Step", ["Set", "Remove"]), Req("Workstation", "Workstation (computer name, or *)", Environment.MachineName),
-                Pick("Purpose", "Purpose", Enum.GetNames<Core.System.PrintPurpose>()),
-                new OperationField("Printer", "Printer", FieldKind.Choice, Required: false, Choices: [], ChoicesFrom: _ => Task.FromResult(Reporting.PrintPreferences.InstalledPrinters())),
-                Opt("Tray", "Tray (Auto, Manual, Cassette, Tractor)"), Num("Copies", "Copies", "1")],
+            Description = "The printers a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips): a Windows printer (USB or shared) "
+                + "or a network receipt printer by its IP address and port (usually 9100). Set makes it the purpose's only printer; Add another prints to it as well (a "
+                + "customer and a shop copy, a second counter); Remove one takes a printer away by name; Test prints a test slip. Workstation * is the default for "
+                + "every computer without its own; this computer's name is filled in. Tills print receipts on their workstation's receipt printers (copies from the "
+                + "receipt layout); the report viewer's print dialog opens on the chosen printer.",
+            Fields = [Pick("Step", "Step", ["Set", "Add another", "Remove one", "Remove all", "Test"]), Req("Workstation", "Workstation (computer name, or *)", Environment.MachineName),
+                Pick("Purpose", "Purpose", Enum.GetNames<Core.System.PrintPurpose>()), Pick("Connection", "Connection", ["Windows printer", "Network (IP address)"]),
+                new OperationField("Printer", "Printer (Windows name, or a name for a network printer)", FieldKind.Choice, Required: false, Choices: [],
+                    ChoicesFrom: _ => Task.FromResult(Reporting.PrintPreferences.InstalledPrinters())),
+                Opt("Host", "Network printer IP address"), Num("Port", "Network printer port", "9100"), Opt("Tray", "Tray (Auto, Manual, Cassette, Tractor)"), Num("Copies", "Copies", "1")],
             Run = async (c, i) =>
             {
                 Application.Abstractions.System.IWorkstationPrinterService printers = c.Get<Application.Abstractions.System.IWorkstationPrinterService>();
                 Core.System.PrintPurpose purpose = Enum.Parse<Core.System.PrintPurpose>(i.Text("Purpose"));
-                return i.Text("Step") == "Set"
-                    ? Check(await printers.SetAsync(c.CompanyId, new Application.Abstractions.System.PrinterSetting(i.Text("Workstation"), purpose, i.Optional("Printer") ?? string.Empty,
-                        i.Optional("Tray"), i.Whole("Copies"))).ConfigureAwait(true), "Printer set.")
-                    : Check(await printers.RemoveAsync(c.CompanyId, i.Text("Workstation"), purpose).ConfigureAwait(true), "Printer removed; the default applies.");
+                bool network = i.Text("Connection").StartsWith("Network", StringComparison.Ordinal);
+                string name = i.Optional("Printer") ?? (network ? i.Optional("Host") ?? string.Empty : string.Empty);
+                Application.Abstractions.System.PrinterSetting setting = new(i.Text("Workstation"), purpose, name, i.Optional("Tray"), i.Whole("Copies"),
+                    network ? Core.System.PrinterConnection.Network : Core.System.PrinterConnection.Windows, i.Optional("Host"), i.Whole("Port"));
+                return i.Text("Step") switch
+                {
+                    "Set" => Check(await printers.SetAsync(c.CompanyId, setting).ConfigureAwait(true), $"{name} is the {purpose} printer."),
+                    "Add another" => Check(await printers.AddAsync(c.CompanyId, setting).ConfigureAwait(true), $"{name} added: {purpose} now print there as well."),
+                    "Remove one" => Check(await printers.RemovePrinterAsync(c.CompanyId, i.Text("Workstation"), purpose, name).ConfigureAwait(true), $"{name} removed."),
+                    "Test" => await c.Get<IReceiptPrintService>().TestAsync(setting).ConfigureAwait(true) is string failed ? $"Test not printed: {failed}" : $"Test slip sent to {name}.",
+                    _ => Check(await printers.RemoveAsync(c.CompanyId, i.Text("Workstation"), purpose).ConfigureAwait(true), "Printers removed; the default applies."),
+                };
             },
             List = async c => Table(await c.Get<Application.Abstractions.System.IWorkstationPrinterService>().ListAsync(c.CompanyId).ConfigureAwait(true),
-                ("Workstation", p => p.Workstation), ("Purpose", p => p.Purpose), ("Printer", p => p.PrinterName), ("Tray", p => p.Tray ?? "default"), ("Copies", p => p.Copies)),
+                ("Workstation", p => p.Workstation), ("Purpose", p => p.Purpose), ("Printer", p => p.PrinterName),
+                ("Connection", p => p.Connection == Core.System.PrinterConnection.Network ? $"Network {p.Host}:{p.Port}" : "Windows"), ("Tray", p => p.Tray ?? "default"), ("Copies", p => p.Copies)),
         };
         yield return new Operation
         {

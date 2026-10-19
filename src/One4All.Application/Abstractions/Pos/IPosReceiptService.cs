@@ -12,5 +12,5 @@ public interface IPosReceiptService
     /// <param name="width">The receipt character width.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The receipt text, or NotFound when the sale does not exist.</returns>
-    Task<Result<string>> RenderReceiptTextAsync(long companyId, long saleId, int width = PosReceiptFormatter.DefaultWidth, CancellationToken ct = default);
+    Task<Result<string>> RenderReceiptTextAsync(long companyId, long saleId, int? width = null, CancellationToken ct = default);
 }

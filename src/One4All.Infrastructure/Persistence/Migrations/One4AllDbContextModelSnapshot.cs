@@ -23832,6 +23832,92 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("promotion_item", "pos");
                 });
 
+            modelBuilder.Entity("One4All.Core.Pos.ReceiptLayout", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<int>("Copies")
+                        .HasColumnType("integer")
+                        .HasColumnName("copies");
+
+                    b.Property<string>("FooterText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("footer_text");
+
+                    b.Property<string>("HeaderText")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("header_text");
+
+                    b.Property<int>("PaperWidthMm")
+                        .HasColumnType("integer")
+                        .HasColumnName("paper_width_mm");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<bool>("ShowCashier")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_cashier");
+
+                    b.Property<bool>("ShowFiscal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_fiscal");
+
+                    b.Property<bool>("ShowTaxNumber")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_tax_number");
+
+                    b.Property<bool>("ShowTaxSummary")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_tax_summary");
+
+                    b.Property<bool>("ShowTerminal")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_terminal");
+
+                    b.Property<bool>("ShowUnitPrice")
+                        .HasColumnType("boolean")
+                        .HasColumnName("show_unit_price");
+
+                    b.Property<long?>("TerminalId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("terminal_id");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasColumnName("title");
+
+                    b.HasKey("Id")
+                        .HasName("pk_receipt_layout");
+
+                    b.HasIndex("CompanyId", "TerminalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_receipt_layout_company_id_terminal_id");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("CompanyId", "TerminalId"), false);
+
+                    b.ToTable("receipt_layout", "pos", t =>
+                        {
+                            t.HasCheckConstraint("ck_receipt_layout_copies", "copies BETWEEN 1 AND 5");
+                        });
+                });
+
             modelBuilder.Entity("One4All.Core.Pos.Sale", b =>
                 {
                     b.Property<long>("Id")
@@ -33164,9 +33250,22 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<int>("Connection")
+                        .HasColumnType("integer")
+                        .HasColumnName("connection");
+
                     b.Property<int>("Copies")
                         .HasColumnType("integer")
                         .HasColumnName("copies");
+
+                    b.Property<string>("Host")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("host");
+
+                    b.Property<int>("Port")
+                        .HasColumnType("integer")
+                        .HasColumnName("port");
 
                     b.Property<string>("PrinterName")
                         .IsRequired()
@@ -33196,9 +33295,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasKey("Id")
                         .HasName("pk_workstation_printer");
 
-                    b.HasIndex("CompanyId", "Workstation", "Purpose")
+                    b.HasIndex("CompanyId", "Workstation", "Purpose", "PrinterName")
                         .IsUnique()
-                        .HasDatabaseName("ix_workstation_printer_company_id_workstation_purpose");
+                        .HasDatabaseName("ix_workstation_printer_company_id_workstation_purpose_printer_");
 
                     b.ToTable("workstation_printer", "sys", t =>
                         {

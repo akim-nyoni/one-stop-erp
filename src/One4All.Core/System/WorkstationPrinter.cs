@@ -24,6 +24,16 @@ public enum PrintPurpose
     Payslips = 6,
 }
 
+/// <summary>How a printer is reached.</summary>
+public enum PrinterConnection
+{
+    /// <summary>A printer installed in Windows (USB, shared or driver-based), by its Windows name.</summary>
+    Windows = 0,
+
+    /// <summary>A network receipt or label printer taking raw ESC/POS on a TCP port (usually 9100).</summary>
+    Network = 1,
+}
+
 /// <summary>
 /// The printer a workstation uses for a purpose (<c>sys.workstation_printer</c>, brief §4.1 "printers per workstation"): its name as the
 /// workstation knows it, the tray and the number of copies. Workstation "*" is the default for every workstation without its own.
@@ -70,4 +80,13 @@ public sealed class WorkstationPrinter : Entity, ICompanyScoped
 
     /// <summary>The number of copies.</summary>
     public int Copies { get; set; } = 1;
+
+    /// <summary>Gets or sets how the printer is reached.</summary>
+    public PrinterConnection Connection { get; set; }
+
+    /// <summary>Gets or sets the network printer's address (IP or host name).</summary>
+    public string? Host { get; set; }
+
+    /// <summary>Gets or sets the network printer's TCP port.</summary>
+    public int Port { get; set; } = 9100;
 }

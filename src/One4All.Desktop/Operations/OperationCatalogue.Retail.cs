@@ -38,6 +38,39 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = "Point of Sale", Title = "Receipt layout", ListTitle = "Receipt layouts",
+            Description = "How receipts print: 80mm (48 characters) or 58mm (32) paper, the title, header and footer lines (separate lines with |), what is shown and how many "
+                + "copies. Blank till: the company's layout; a till code gives that till its own. Preview shows the receipt as it prints, inside the paper's edges, "
+                + "without saving; Save keeps it; Remove takes a till's own layout away.",
+            Fields = [Pick("Step", "Step", ["Preview", "Save", "Show saved", "Remove till layout"]), Opt("Terminal", "Till code (blank: every till)"), Pick("Paper", "Paper", ["80mm", "58mm"]),
+                Opt("Title", "Title", "SALES RECEIPT"), Opt("Header", "Header lines (address | phone | message)"), Opt("Footer", "Footer lines (blank: Thank you!)"),
+                Tick("Cashier", "Show the cashier", true), Tick("Till", "Show the till", true), Tick("UnitPrice", "Show quantity x unit price"), Tick("TaxSummary", "Show subtotal and tax", true),
+                Tick("TaxNumber", "Show the company's tax number"), Tick("Fiscal", "Show the fiscal code", true), Num("Copies", "Copies", "1")],
+            Run = async (c, i) =>
+            {
+                IReceiptLayoutService layouts = c.Get<IReceiptLayoutService>();
+                ReceiptLayoutInput layout = new(i.Optional("Terminal"), i.Text("Paper") == "58mm" ? 58 : 80, i.Optional("Title") ?? string.Empty, i.Optional("Header"), i.Optional("Footer"),
+                    i.Flag("Cashier"), i.Flag("Till"), i.Flag("UnitPrice"), i.Flag("TaxSummary"), i.Flag("TaxNumber"), i.Flag("Fiscal"), i.Whole("Copies"));
+                switch (i.Text("Step"))
+                {
+                    case "Save":
+                        _ = Check(await layouts.SaveAsync(c.CompanyId, layout).ConfigureAwait(true), string.Empty);
+                        return "Receipt layout saved." + Environment.NewLine + Check(await layouts.PreviewAsync(c.CompanyId, null, i.Optional("Terminal")).ConfigureAwait(true));
+                    case "Show saved":
+                        return Check(await layouts.PreviewAsync(c.CompanyId, null, i.Optional("Terminal")).ConfigureAwait(true));
+                    case "Remove till layout":
+                        return Check(await layouts.RemoveAsync(c.CompanyId, i.Optional("Terminal") ?? string.Empty).ConfigureAwait(true), "The till prints the company's layout again.");
+                    default:
+                        return Check(await layouts.PreviewAsync(c.CompanyId, layout, i.Optional("Terminal")).ConfigureAwait(true));
+                }
+            },
+            List = async c => Table(await c.Db.ReceiptLayouts.AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderBy(l => l.TerminalId).ToListAsync().ConfigureAwait(true),
+                ("Till", l => l.TerminalId is long t ? c.Db.Set<PosTerminal>().Where(x => x.Id == t).Select(x => x.Code).FirstOrDefault() ?? t.ToString(System.Globalization.CultureInfo.InvariantCulture) : "(company)"),
+                ("Paper", l => $"{l.PaperWidthMm}mm"), ("Title", l => l.Title), ("Header", l => (l.HeaderText ?? string.Empty).Replace('\n', '|')), ("Footer", l => (l.FooterText ?? string.Empty).Replace('\n', '|')),
+                ("Copies", l => l.Copies)),
+        };
+        yield return new Operation
+        {
             Module = "Point of Sale", Title = "Activate a gift card", ListTitle = "Gift card stock", Description = "Loads a card of printed stock with its value when sold (Dr cash, Cr gift card liability).",
             Fields = [Req("Card", "Card number"), Num("Value", "Value"), Today(), Opt("Expiry", "Expires (yyyy-MM-dd, optional)"), Req("Cash", "Cash account", "1000"), Req("Liability", "Gift card liability account")],
             Run = async (c, i) =>

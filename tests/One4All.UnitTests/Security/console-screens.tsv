@@ -278,6 +278,7 @@ Point of Sale	Gift cards: balance, top up, block, replace, breakage	False
 Point of Sale	Loyalty: enrol, earn, redeem, statement	False	
 Point of Sale	Price a basket with promotions	False	
 Point of Sale	Promotional codes	False	
+Point of Sale	Receipt layout	False	
 Point of Sale	Record a till event	False	
 Point of Sale	Refund sale lines	False	
 Point of Sale	Refund window	False	

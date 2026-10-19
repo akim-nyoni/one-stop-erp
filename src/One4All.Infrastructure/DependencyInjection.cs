@@ -406,6 +406,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Abstractions.Scheduling.IScheduledTask, Payroll.LeaveAccrualTask>();
         services.AddScoped<Application.Abstractions.Pos.IPosEventService, Pos.PosEventService>();
         services.AddScoped<Application.Abstractions.Pos.IPosReceiptService, Pos.PosReceiptService>();
+        services.AddScoped<Application.Abstractions.Pos.IReceiptLayoutService, Pos.ReceiptLayoutService>();
+        services.AddScoped<Application.Abstractions.Pos.IReceiptPrintService, Pos.ReceiptPrintService>();
         services.AddScoped<Application.Abstractions.Vouchers.IVoucherService, Vouchers.VoucherService>();
         services.AddScoped<Application.Abstractions.SalesOrders.ISalesOrderService, SalesOrders.SalesOrderService>();
         services.AddScoped<Application.Abstractions.SalesOrders.IDeliveryPlanningService, SalesOrders.DeliveryPlanningService>();

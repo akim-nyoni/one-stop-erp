@@ -92,6 +92,35 @@ public partial class PosTerminalWindow : Window
         }
     }
 
+    // The last receipt as it prints, inside the paper's edges, with a button to print it again.
+    private async void PreviewReceipt_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_viewModel.LastReceiptText))
+        {
+            MessageBox.Show(this, "No receipt yet - complete a sale first.", "Receipt", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        int width = _viewModel.LastReceiptText.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n').Max(l => l.Length);
+        System.Windows.Controls.TextBox paper = new()
+        {
+            Text = One4All.Application.Pos.PosReceiptFormatter.Framed(_viewModel.LastReceiptText, width), IsReadOnly = true, FontFamily = new System.Windows.Media.FontFamily("Consolas"), FontSize = 13,
+            BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.White, VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+        };
+        System.Windows.Controls.Button print = new() { Content = "Print again", Height = 40, Margin = new Thickness(0, 8, 0, 0), FontSize = 14 };
+        System.Windows.Controls.DockPanel panel = new() { Margin = new Thickness(12) };
+        System.Windows.Controls.DockPanel.SetDock(print, System.Windows.Controls.Dock.Bottom);
+        panel.Children.Add(print);
+        panel.Children.Add(paper);
+        Window preview = new()
+        {
+            Title = "Receipt preview", Owner = this, Content = panel, SizeToContent = SizeToContent.Width, Height = 720, MinWidth = 360, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        print.Click += (_, _) => PrintReceipt_Click(sender, e);
+        await Dispatcher.InvokeAsync(() => preview.ShowDialog());
+    }
+
     private async void PrintReceipt_Click(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrEmpty(_viewModel.LastReceiptText))

@@ -33,6 +33,19 @@ internal sealed class TillSessionConfiguration : IEntityTypeConfiguration<TillSe
     }
 }
 
+internal sealed class ReceiptLayoutConfiguration : IEntityTypeConfiguration<ReceiptLayout>
+{
+    public void Configure(EntityTypeBuilder<ReceiptLayout> b)
+    {
+        b.ToTable("receipt_layout", Schemas.PointOfSale, t => t.HasCheckConstraint("ck_receipt_layout_copies", "copies BETWEEN 1 AND 5"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Title).HasMaxLength(60);
+        b.Property(x => x.HeaderText).HasMaxLength(1000);
+        b.Property(x => x.FooterText).HasMaxLength(1000);
+        b.HasIndex(x => new { x.CompanyId, x.TerminalId }).IsUnique().AreNullsDistinct(false);
+    }
+}
+
 internal sealed class SaleConfiguration : IEntityTypeConfiguration<Sale>
 {
     public void Configure(EntityTypeBuilder<Sale> b)

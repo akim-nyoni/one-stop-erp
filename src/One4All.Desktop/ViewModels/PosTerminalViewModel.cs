@@ -1717,8 +1717,22 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     public async Task<string?> PrintLastReceiptAsync()
     {
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        if (await PrintOnSetUpPrintersAsync(scope.ServiceProvider, LastReceiptText, openDrawer: false).ConfigureAwait(true) is string outcome)
+        {
+            return outcome.Length == 0 ? null : outcome;
+        }
+
         IReceiptPrinter? printer = scope.ServiceProvider.GetRequiredService<IDeviceProvider>().Printer;
         return printer is null ? "No receipt printer." : await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, openDrawer: false)).ConfigureAwait(true);
+    }
+
+    // The receipt printers set up for this workstation (Printers per workstation, Receipts), if any: null when none is set up (the till's own device prints),
+    // an empty string when every printer printed, else what failed.
+    private async Task<string?> PrintOnSetUpPrintersAsync(IServiceProvider services, string receipt, bool openDrawer)
+    {
+        ReceiptPrintOutcome? outcome = await services.GetRequiredService<IReceiptPrintService>().PrintAsync(_companyId, Environment.MachineName, _terminalId, receipt, openDrawer)
+            .ConfigureAwait(true);
+        return outcome is null ? null : outcome.Failures.Count == 0 ? string.Empty : string.Join("; ", outcome.Failures);
     }
 
     private static async Task ShowOnDisplayAsync(IDeviceProvider devices, string label, decimal amount)
@@ -2253,9 +2267,14 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             LastReceiptText = string.Join(Environment.NewLine + new string('-', 40) + Environment.NewLine, slips);
             IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
             string? printed = null;
-            if (devices.Printer is IReceiptPrinter printer)
+            foreach (string slip in slips)
             {
-                foreach (string slip in slips)
+                string? setUp = await PrintOnSetUpPrintersAsync(scope.ServiceProvider, slip, openDrawer: false).ConfigureAwait(true);
+                if (setUp is not null)
+                {
+                    printed ??= setUp.Length == 0 ? null : setUp;
+                }
+                else if (devices.Printer is IReceiptPrinter printer)
                 {
                     printed ??= await printer.PrintAsync(EscPosBuilder.Receipt(slip, false)).ConfigureAwait(true);
                 }
@@ -2356,9 +2375,12 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             LastReceiptText = receipt.IsSuccess ? receipt.Value : string.Empty;
             IDeviceProvider devices = scope.ServiceProvider.GetRequiredService<IDeviceProvider>();
             bool cashTaken = request.Tenders.Any(t => t.TenderType == TenderType.Cash);
-            string? printed = devices.Printer is IReceiptPrinter printer && LastReceiptText.Length > 0
-                ? await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, cashTaken && devices.Drawer is not null)).ConfigureAwait(true)
-                : null;
+            // The workstation's set-up receipt printers when there are any (one or several, in the layout's copies), else the till's own printer.
+            string? setUp = LastReceiptText.Length > 0 ? await PrintOnSetUpPrintersAsync(scope.ServiceProvider, LastReceiptText, cashTaken).ConfigureAwait(true) : null;
+            string? printed = setUp is not null ? (setUp.Length == 0 ? null : setUp)
+                : devices.Printer is IReceiptPrinter printer && LastReceiptText.Length > 0
+                    ? await printer.PrintAsync(EscPosBuilder.Receipt(LastReceiptText, cashTaken && devices.Drawer is not null)).ConfigureAwait(true)
+                    : null;
             await ShowOnDisplayAsync(devices, "Thank you - change", change).ConfigureAwait(true);
 
             _ticket.Clear();

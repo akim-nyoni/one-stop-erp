@@ -213,6 +213,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets the prepayments released to expense month by month.</summary>
     public DbSet<PrepaymentSchedule> PrepaymentSchedules => Set<PrepaymentSchedule>();
 
+    /// <summary>Gets the receipt layouts (the company's and any till's own).</summary>
+    public DbSet<Core.Pos.ReceiptLayout> ReceiptLayouts => Set<Core.Pos.ReceiptLayout>();
+
     /// <summary>Tax codes.</summary>
     public DbSet<TaxCode> TaxCodes => Set<TaxCode>();
 

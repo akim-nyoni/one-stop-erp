@@ -149,7 +149,8 @@ public static class NavigationMap
                 O("Point of Sale: Create gift card stock"), O("Point of Sale: Activate a gift card"), O("Point of Sale: Gift cards: balance, top up, block, replace, breakage", "Gift card balance and changes")),
             G("Till setup",
                 O("Point of Sale: Till favourites", "Till favourite buttons"), O("Point of Sale: Category under a category", "Till product categories"),
-                O("Point of Sale: Change currency and cash rounding"), O("System Manager: Cashier card and fingerprint", "Cashier cards and fingerprints")),
+                O("Point of Sale: Change currency and cash rounding"), O("Point of Sale: Receipt layout", "Receipt layout and preview"),
+                O("System Manager: Printers per workstation", "Receipt and till printers"), O("System Manager: Cashier card and fingerprint", "Cashier cards and fingerprints")),
         ]),
         new("Restaurant", "\U0001F37D", "#EF6C00", "Tables, orders, the kitchen, bills, reservations and tips.", ["Restaurant"],
         [

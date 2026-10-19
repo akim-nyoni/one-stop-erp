@@ -130,18 +130,17 @@
 
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="520" />
+                <ColumnDefinition Width="500" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="400" />
             </Grid.ColumnDefinitions>
 
-            <!-- LEFT: the ticket - lines, PLU box, keypad with tenders, totals, PAY -->
+            <!-- LEFT: the ticket - lines and the PLU box -->
             <Border Grid.Column="0" Background="{DynamicResource Panel}" CornerRadius="10" Padding="10" Margin="0,0,8,0">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
@@ -257,98 +256,6 @@
                         </DockPanel>
                     </Border>
 
-                    <!-- Keypad + tenders -->
-                    <Grid Grid.Row="3" Margin="0,8,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="200" />
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0">
-                            <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="3">
-                                <DockPanel>
-                                    <TextBlock Text="Amount" Foreground="{DynamicResource Muted}" FontSize="12" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding TenderEntry}" Foreground="{DynamicResource Ink}" FontSize="22" FontWeight="SemiBold" TextAlignment="Right" MinHeight="28" />
-                                </DockPanel>
-                            </Border>
-                            <UniformGrid Columns="4">
-                                <Button Content="7" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="7" />
-                                <Button Content="8" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="8" />
-                                <Button Content="9" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="9" />
-                                <Button Content="⌫" Style="{StaticResource KeyButton}" FontSize="18" Command="{Binding ClearEntryCommand}" ToolTip="Clear the amount" />
-                                <Button Content="4" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="4" />
-                                <Button Content="5" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="5" />
-                                <Button Content="6" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="6" />
-                                <Button Content="Hold" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ParkCommand}" ToolTip="Park this sale to serve someone else; Recall brings it back" />
-                                <Button Content="1" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="1" />
-                                <Button Content="2" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="2" />
-                                <Button Content="3" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="3" />
-                                <Button Content="Recall" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ResumeCommand}" ToolTip="Bring back a parked sale (choose it under More functions)" />
-                                <Button Content="." Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="." />
-                                <Button Content="0" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="0" />
-                                <Button Content="Void" Style="{StaticResource FunctionButton}" Height="54" Background="#F5D6D3" Command="{Binding VoidSaleCommand}" ToolTip="Void a completed sale: type its number in the PLU box and the reason in the note box; a supervisor authorises and is recorded" />
-                                <Button Content="Receipt" Style="{StaticResource FunctionButton}" Height="54" Click="PrintReceipt_Click" ToolTip="Print the last receipt" />
-                                <Button Content="No sale" Style="{StaticResource FunctionButton}" Height="54" Background="#F5EBD3" Command="{Binding NoSaleCommand}" ToolTip="Open the drawer without a sale: type the reason in the note box; a supervisor authorises and the opening is logged" />
-                            </UniformGrid>
-                        </StackPanel>
-                        <StackPanel Grid.Column="1">
-                            <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" FontSize="20" Background="#2980B9" Command="{Binding TenderCashCommand}" ToolTip="Type the cash handed over, then press CASH" />
-                            <Button Content="CARD" Style="{StaticResource PadButton}" Height="48" FontSize="16" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
-                            <Button Content="MOBILE MONEY" Style="{StaticResource PadButton}" Height="48" FontSize="15" Background="#117A65" Command="{Binding TenderMobileMoneyCommand}" />
-                            <Button Content="SELL GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#7D6608" Command="{Binding SellGiftCardCommand}" ToolTip="Card number in the gift card box, value on the number pad: printed stock activates, an active card tops up, when the sale posts" />
-                            <Button Content="VOUCHER / GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#B9770E" Command="{Binding TenderVoucherCommand}" ToolTip="Type the gift card number under More functions first" />
-                            <ItemsControl ItemsSource="{Binding CurrencyButtons}" Margin="3,2,3,0" ToolTip="{Binding PayingInText}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Content="{Binding Code}" ToolTip="{Binding Tip}" MinWidth="56" Height="30" Margin="1" FontSize="12" FontWeight="SemiBold" Cursor="Hand"
-                                                Command="{Binding DataContext.PayInCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Code}">
-                                            <Button.Style>
-                                                <Style TargetType="Button">
-                                                    <Setter Property="Background" Value="#E6EBF0" />
-                                                    <Setter Property="Foreground" Value="#1C2833" />
-                                                    <Setter Property="BorderThickness" Value="1" />
-                                                    <Setter Property="BorderBrush" Value="#C9D1D9" />
-                                                    <Style.Triggers>
-                                                        <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                                                            <Setter Property="Background" Value="#1F618D" />
-                                                            <Setter Property="Foreground" Value="White" />
-                                                        </DataTrigger>
-                                                    </Style.Triggers>
-                                                </Style>
-                                            </Button.Style>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <TextBlock Text="{Binding BalanceInTenderCurrencyText}" Foreground="{DynamicResource Muted}" FontSize="11" Margin="4,0,0,0" />
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- Totals and PAY -->
-                    <Border Grid.Row="4" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="3,8,3,0">
-                        <DockPanel>
-                            <Button DockPanel.Dock="Right" Content="PAY" Style="{StaticResource PadButton}" Width="190" Height="86" FontSize="26" Background="#27AE60" Command="{Binding PayCommand}"
-                                    ToolTip="Completes the sale once the tenders cover the total" />
-                            <Grid VerticalAlignment="Center">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0">
-                                    <DockPanel><TextBlock Text="Subtotal" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding SubtotalText}" Foreground="{DynamicResource Ink}" FontSize="12" DockPanel.Dock="Right" Margin="10,0,14,0" /></DockPanel>
-                                    <DockPanel><TextBlock Text="Tax" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding TaxText}" Foreground="{DynamicResource Ink}" FontSize="12" DockPanel.Dock="Right" Margin="10,0,14,0" /></DockPanel>
-                                    <DockPanel Margin="0,2,0,0"><TextBlock Text="TOTAL" Foreground="{DynamicResource Ink}" FontWeight="Bold" FontSize="20" /><TextBlock Text="{Binding GrossText}" Foreground="#1E8449" FontWeight="Bold" FontSize="22" DockPanel.Dock="Right" Margin="10,0,14,0" /></DockPanel>
-                                </StackPanel>
-                                <StackPanel Grid.Column="1">
-                                    <DockPanel><TextBlock Text="Tendered" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding TenderedText}" Foreground="{DynamicResource Ink}" FontSize="12" DockPanel.Dock="Right" Margin="10,0,10,0" /></DockPanel>
-                                    <DockPanel><TextBlock Text="Still to pay" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding BalanceText}" Foreground="#D35400" FontWeight="SemiBold" FontSize="12" DockPanel.Dock="Right" Margin="10,0,10,0" /></DockPanel>
-                                    <DockPanel Margin="0,2,0,0"><TextBlock Text="CHANGE" Foreground="{DynamicResource Ink}" FontWeight="Bold" FontSize="18" /><TextBlock Text="{Binding ChangeText}" Foreground="#1F618D" FontWeight="Bold" FontSize="20" DockPanel.Dock="Right" Margin="10,0,10,0" /></DockPanel>
-                                </StackPanel>
-                            </Grid>
-                        </DockPanel>
-                    </Border>
                 </Grid>
             </Border>
 
@@ -517,6 +424,106 @@
                     </ScrollViewer>
                 </DockPanel>
             </Border>
+            <!-- RIGHT PANEL: number pad, tenders, totals and PAY -->
+            <Border Grid.Column="2" Background="{DynamicResource Panel}" CornerRadius="10" Padding="10" Margin="8,0,0,0">
+                <DockPanel LastChildFill="False">
+                        <!-- Keypad + tenders -->
+                        <Grid DockPanel.Dock="Top">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="150" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0">
+                                <Border Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="6" Padding="8,4" Margin="3">
+                                    <DockPanel>
+                                        <TextBlock Text="Amount" Foreground="{DynamicResource Muted}" FontSize="12" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding TenderEntry}" Foreground="{DynamicResource Ink}" FontSize="22" FontWeight="SemiBold" TextAlignment="Right" MinHeight="28" />
+                                    </DockPanel>
+                                </Border>
+                                <UniformGrid Columns="4">
+                                    <Button Content="7" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="7" />
+                                    <Button Content="8" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="8" />
+                                    <Button Content="9" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="9" />
+                                    <Button Content="⌫" Style="{StaticResource KeyButton}" FontSize="18" Command="{Binding ClearEntryCommand}" ToolTip="Clear the amount" />
+                                    <Button Content="4" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="4" />
+                                    <Button Content="5" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="5" />
+                                    <Button Content="6" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="6" />
+                                    <Button Content="Hold" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ParkCommand}" ToolTip="Park this sale to serve someone else; Recall brings it back" />
+                                    <Button Content="1" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="1" />
+                                    <Button Content="2" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="2" />
+                                    <Button Content="3" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="3" />
+                                    <Button Content="Recall" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ResumeCommand}" ToolTip="Bring back a parked sale (choose it under More functions)" />
+                                    <Button Content="." Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="." />
+                                    <Button Content="0" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="0" />
+                                    <Button Content="Void" Style="{StaticResource FunctionButton}" Height="54" Background="#F5D6D3" Command="{Binding VoidSaleCommand}" ToolTip="Void a completed sale: type its number in the PLU box and the reason in the note box; a supervisor authorises and is recorded" />
+                                    <Button Content="Receipt" Style="{StaticResource FunctionButton}" Height="54" Click="PrintReceipt_Click" ToolTip="Print the last receipt" />
+                                    <Button Content="No sale" Style="{StaticResource FunctionButton}" Height="54" Background="#F5EBD3" Command="{Binding NoSaleCommand}" ToolTip="Open the drawer without a sale: type the reason in the note box; a supervisor authorises and the opening is logged" />
+                                </UniformGrid>
+                            </StackPanel>
+                            <StackPanel Grid.Column="1">
+                                <Button Content="CASH" Style="{StaticResource PadButton}" Height="64" FontSize="20" Background="#2980B9" Command="{Binding TenderCashCommand}" ToolTip="Type the cash handed over, then press CASH" />
+                                <Button Content="CARD" Style="{StaticResource PadButton}" Height="48" FontSize="16" Background="#8E44AD" Command="{Binding TenderCardCommand}" />
+                                <Button Content="MOBILE MONEY" Style="{StaticResource PadButton}" Height="48" FontSize="15" Background="#117A65" Command="{Binding TenderMobileMoneyCommand}" />
+                                <Button Content="SELL GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#7D6608" Command="{Binding SellGiftCardCommand}" ToolTip="Card number in the gift card box, value on the number pad: printed stock activates, an active card tops up, when the sale posts" />
+                                <Button Content="VOUCHER / GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#B9770E" Command="{Binding TenderVoucherCommand}" ToolTip="Type the gift card number under More functions first" />
+                                <ItemsControl ItemsSource="{Binding CurrencyButtons}" Margin="3,2,3,0" ToolTip="{Binding PayingInText}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Code}" ToolTip="{Binding Tip}" MinWidth="56" Height="30" Margin="1" FontSize="12" FontWeight="SemiBold" Cursor="Hand"
+                                                    Command="{Binding DataContext.PayInCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}" CommandParameter="{Binding Code}">
+                                                <Button.Style>
+                                                    <Style TargetType="Button">
+                                                        <Setter Property="Background" Value="#E6EBF0" />
+                                                        <Setter Property="Foreground" Value="#1C2833" />
+                                                        <Setter Property="BorderThickness" Value="1" />
+                                                        <Setter Property="BorderBrush" Value="#C9D1D9" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                                <Setter Property="Background" Value="#1F618D" />
+                                                                <Setter Property="Foreground" Value="White" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Button.Style>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding BalanceInTenderCurrencyText}" Foreground="{DynamicResource Muted}" FontSize="11" Margin="4,0,0,0" />
+                            <Button Content="RECEIPT PREVIEW" Style="{StaticResource PadButton}" Height="40" FontSize="12" Background="#566573" Click="PreviewReceipt_Click"
+                                    ToolTip="See the last receipt as it prints, then print it again" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- Totals and PAY -->
+                        <Border DockPanel.Dock="Bottom" Background="{DynamicResource Card}" BorderBrush="{DynamicResource Line}" BorderThickness="1" CornerRadius="8" Padding="10,8" Margin="3,8,3,0">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Bottom" Content="PAY" Style="{StaticResource PadButton}" Height="80" Margin="0,8,0,0" FontSize="26" Background="#27AE60" Command="{Binding PayCommand}"
+                                        ToolTip="Completes the sale once the tenders cover the total" />
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <DockPanel><TextBlock Text="Subtotal" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding SubtotalText}" Foreground="{DynamicResource Ink}" FontSize="12" DockPanel.Dock="Right" Margin="10,0,14,0" /></DockPanel>
+                                        <DockPanel><TextBlock Text="Tax" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding TaxText}" Foreground="{DynamicResource Ink}" FontSize="12" DockPanel.Dock="Right" Margin="10,0,14,0" /></DockPanel>
+                                        <DockPanel Margin="0,2,0,0"><TextBlock Text="TOTAL" Foreground="{DynamicResource Ink}" FontWeight="Bold" FontSize="20" /><TextBlock Text="{Binding GrossText}" Foreground="#1E8449" FontWeight="Bold" FontSize="22" DockPanel.Dock="Right" Margin="10,0,14,0" /></DockPanel>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <DockPanel><TextBlock Text="Tendered" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding TenderedText}" Foreground="{DynamicResource Ink}" FontSize="12" DockPanel.Dock="Right" Margin="10,0,10,0" /></DockPanel>
+                                        <DockPanel><TextBlock Text="Still to pay" Foreground="{DynamicResource Muted}" FontSize="12" /><TextBlock Text="{Binding BalanceText}" Foreground="#D35400" FontWeight="SemiBold" FontSize="12" DockPanel.Dock="Right" Margin="10,0,10,0" /></DockPanel>
+                                        <DockPanel Margin="0,2,0,0"><TextBlock Text="CHANGE" Foreground="{DynamicResource Ink}" FontWeight="Bold" FontSize="18" /><TextBlock Text="{Binding ChangeText}" Foreground="#1F618D" FontWeight="Bold" FontSize="20" DockPanel.Dock="Right" Margin="10,0,10,0" /></DockPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </DockPanel>
+                        </Border>
+                </DockPanel>
+            </Border>
+
         </Grid>
 
         <!-- Status bar -->

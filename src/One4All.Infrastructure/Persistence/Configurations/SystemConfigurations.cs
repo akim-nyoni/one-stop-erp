@@ -217,7 +217,9 @@ internal sealed class WorkstationPrinterConfiguration : IEntityTypeConfiguration
         b.Property(x => x.Purpose).HasConversion<int>();
         b.Property(x => x.PrinterName).HasMaxLength(200);
         b.Property(x => x.Tray).HasMaxLength(40);
-        b.HasIndex(x => new { x.CompanyId, x.Workstation, x.Purpose }).IsUnique();
+        b.Property(x => x.Connection).HasConversion<int>();
+        b.Property(x => x.Host).HasMaxLength(100);
+        b.HasIndex(x => new { x.CompanyId, x.Workstation, x.Purpose, x.PrinterName }).IsUnique();
     }
 }
 
