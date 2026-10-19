@@ -84,4 +84,6 @@ public sealed record DunningGroupInput(string Code, string Name, DunningStages S
 /// <param name="Queued">Reminders queued.</param>
 /// <param name="NoEmail">Customers due a reminder with no email address (to post).</param>
 /// <param name="AlreadySent">Customers already sent this level within the resend interval.</param>
-public sealed record DunningSend(long? BatchId, int Queued, int NoEmail, int AlreadySent);
+/// <param name="BySms">Of those queued, the reminders sent by SMS (customers with a mobile number and no email address).</param>
+/// <param name="ToPost">The customers to send a printed letter (no email address, and no mobile number or no SMS template).</param>
+public sealed record DunningSend(long? BatchId, int Queued, int NoEmail, int AlreadySent, int BySms = 0, IReadOnlyList<string>? ToPost = null);

@@ -91,9 +91,24 @@ public sealed class DunningService : IDunningService
         var logs = await _db.Set<DunningLog>().AsNoTracking().Where(l => l.CompanyId == companyId && ids.Contains(l.CustomerId) && l.SentOn > since).Select(l => new { l.CustomerId, l.Level })
             .ToListAsync(ct).ConfigureAwait(false);
         Dictionary<long, Customer> customers = await _db.Customers.AsNoTracking().Where(c => ids.Contains(c.Id)).ToDictionaryAsync(c => c.Id, ct).ConfigureAwait(false);
+
+        // Each level can have its own wording (REMINDER1, REMINDER2, REMINDER3 beside REMINDER), and each channel its own template; a customer with no email
+        // address is sent an SMS when there is a mobile number and an SMS template, otherwise a letter is printed and posted.
+        string baseCode = (templateCode ?? string.Empty).Trim().ToUpperInvariant();
+        HashSet<(string Code, Core.Communications.MessageChannel Channel)> templates = [.. (await _db.Set<Core.Communications.MessageTemplate>().AsNoTracking()
+            .Where(t => t.CompanyId == companyId && t.Code.StartsWith(baseCode)).Select(t => new { t.Code, t.Channel }).ToListAsync(ct).ConfigureAwait(false))
+            .Select(t => (t.Code.ToUpperInvariant(), t.Channel))];
+        string? TemplateFor(int level, Core.Communications.MessageChannel channel)
+        {
+            string forLevel = baseCode + level.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return templates.Contains((forLevel, channel)) ? forLevel : templates.Contains((baseCode, channel)) || channel == Core.Communications.MessageChannel.Email ? baseCode : null;
+        }
+
+        Dictionary<(string Code, Core.Communications.MessageChannel Channel), List<Application.Abstractions.Communications.DespatchRecipient>> batches = [];
         List<Application.Abstractions.Communications.DespatchRecipient> recipients = [];
         List<DunningNotice> sent = [];
-        int noEmail = 0, already = 0;
+        List<string> toPost = [];
+        int noEmail = 0, already = 0, bySms = 0;
         foreach (DunningNotice notice in assessed.Value)
         {
             if (logs.Any(l => l.CustomerId == notice.CustomerId && l.Level == notice.Level))
@@ -103,9 +118,13 @@ public sealed class DunningService : IDunningService
             }
 
             Customer customer = customers[notice.CustomerId];
-            if (string.IsNullOrWhiteSpace(customer.Email))
+            Core.Communications.MessageChannel? picked = !string.IsNullOrWhiteSpace(customer.Email) ? Core.Communications.MessageChannel.Email
+                : !string.IsNullOrWhiteSpace(customer.MobileNumber) && TemplateFor(notice.Level, Core.Communications.MessageChannel.Sms) is not null ? Core.Communications.MessageChannel.Sms
+                : null;
+            if (picked is not Core.Communications.MessageChannel channel)
             {
                 noEmail++;
+                toPost.Add(customer.Code);
                 continue;
             }
 
@@ -115,28 +134,44 @@ public sealed class DunningService : IDunningService
                 return letter.Error;
             }
 
-            recipients.Add(new Application.Abstractions.Communications.DespatchRecipient(customer.Email.Trim(), new Dictionary<string, string>
+            Application.Abstractions.Communications.DespatchRecipient recipient = new(channel == Core.Communications.MessageChannel.Email ? customer.Email!.Trim() : customer.MobileNumber!.Trim(),
+                new Dictionary<string, string>
+                {
+                    ["Name"] = customer.Name, ["Account"] = customer.Code, ["Level"] = notice.LevelLabel,
+                    ["Overdue"] = notice.OverdueAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture), ["Letter"] = letter.Value,
+                });
+            (string Code, Core.Communications.MessageChannel Channel) key = (TemplateFor(notice.Level, channel)!, channel);
+            if (!batches.TryGetValue(key, out List<Application.Abstractions.Communications.DespatchRecipient>? group))
             {
-                ["Name"] = customer.Name, ["Account"] = customer.Code, ["Level"] = notice.LevelLabel,
-                ["Overdue"] = notice.OverdueAmount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture), ["Letter"] = letter.Value,
-            }));
+                batches[key] = group = [];
+            }
+
+            group.Add(recipient);
+            recipients.Add(recipient);
+            bySms += channel == Core.Communications.MessageChannel.Sms ? 1 : 0;
             sent.Add(notice);
         }
 
         if (recipients.Count == 0)
         {
-            return new DunningSend(null, 0, noEmail, already);
+            return new DunningSend(null, 0, noEmail, already, 0, toPost);
         }
 
-        Result<long> batch = await _messages.QueueAsync(companyId, $"Reminders {asAtDate:yyyy-MM-dd}", templateCode, language, Core.Communications.MessageChannel.Email, recipients, ct).ConfigureAwait(false);
-        if (batch.IsFailure)
+        long? firstBatch = null;
+        foreach (((string code, Core.Communications.MessageChannel channel), List<Application.Abstractions.Communications.DespatchRecipient> group) in batches.OrderBy(b => b.Key.Channel).ThenBy(b => b.Key.Code, StringComparer.Ordinal))
         {
-            return batch.Error;
+            Result<long> batch = await _messages.QueueAsync(companyId, $"Reminders {asAtDate:yyyy-MM-dd} {code} {channel}", code, language, channel, group, ct).ConfigureAwait(false);
+            if (batch.IsFailure)
+            {
+                return batch.Error;
+            }
+
+            firstBatch ??= batch.Value;
         }
 
         _db.Set<DunningLog>().AddRange(sent.Select(n => new DunningLog(companyId, n.CustomerId, n.Level, asAtDate, n.OverdueAmount)));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new DunningSend(batch.Value, recipients.Count, noEmail, already);
+        return new DunningSend(firstBatch, recipients.Count, noEmail, already, bySms, toPost);
     }
 
     /// <inheritdoc />

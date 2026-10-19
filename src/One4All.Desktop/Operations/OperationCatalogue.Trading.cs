@@ -524,7 +524,8 @@ public static partial class OperationCatalogue
                     case "Send":
                         DunningSend sent = Check(await dunning.SendAsync(c.CompanyId, i.Date("Date"), stages, i.Optional("Template") ?? "REMINDER", Localization.UiText.Catalog.Culture.TwoLetterISOLanguageName,
                             i.Whole("Resend")).ConfigureAwait(true));
-                        return $"{sent.Queued} reminder(s) queued for email; {sent.NoEmail} to post (no email address); {sent.AlreadySent} already sent recently.";
+                        return $"{sent.Queued} reminder(s) queued ({sent.BySms} by SMS); {sent.NoEmail} to post"
+                            + (sent.ToPost is { Count: > 0 } post ? $" ({string.Join(", ", post)}: print each with Letter)" : string.Empty) + $"; {sent.AlreadySent} already sent recently.";
                     case "Save group":
                         return Check(await dunning.SaveGroupAsync(c.CompanyId, new DunningGroupInput(i.Optional("Group") ?? string.Empty, i.Optional("GroupName") ?? i.Optional("Group") ?? string.Empty, stages,
                             i.Flag("Exempt"))).ConfigureAwait(true), "Dunning group saved.");

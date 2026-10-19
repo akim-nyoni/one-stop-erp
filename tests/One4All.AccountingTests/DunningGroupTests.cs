@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Trading;
@@ -62,5 +63,24 @@ public sealed class DunningGroupTests
         (first.Queued, first.NoEmail, first.AlreadySent).Should().Be((1, 1, 0), "the shop is emailed, the kiosk has no address");
         DunningSend again = (await dunning.SendAsync(companyId, asAt, DunningStages.Default, "REMINDER", "en")).Value;
         (again.Queued, again.AlreadySent).Should().Be((0, 1), "the shop was sent this level today");
+        again.ToPost.Should().Equal("DG-K");
+
+        // The kiosk has a mobile number and there is an SMS reminder: it is texted. A new debtor gets the first level's own wording (REMINDER1).
+        INotificationService notifications = scope.ServiceProvider.GetRequiredService<INotificationService>();
+        (await notifications.SaveTemplateAsync(companyId, "REMINDER", "Reminder", "en", MessageChannel.Sms, string.Empty, "{{Name}}: {{Overdue}} overdue on {{Account}}.")).IsSuccess.Should().BeTrue();
+        (await notifications.SaveTemplateAsync(companyId, "REMINDER1", "Reminder", "en", MessageChannel.Email, "FIRST {{Account}}", "Dear {{Name}},\n{{Letter}}")).IsSuccess.Should().BeTrue();
+        (await db.Customers.SingleAsync(c => c.Id == kiosk.Id)).MobileNumber = "+263771000111";
+        Customer cafe = new(companyId, "DG-CAFE", "Cafe", Scenario.Usd) { Email = "cafe@example.com" };
+        db.Customers.Add(cafe);
+        await db.SaveChangesAsync();
+        (await ar.PostInvoiceAsync(new SalesInvoiceRequest
+        {
+            CompanyId = companyId, CustomerId = cafe.Id, DocumentNumber = "DG-CAFE", DocumentDate = new DateOnly(2026, 1, 1), Currency = Scenario.Usd, NetAmount = 80m, SalesAccountCode = "4000",
+        })).IsSuccess.Should().BeTrue();
+        DunningSend third = (await dunning.SendAsync(companyId, asAt, DunningStages.Default, "REMINDER", "en")).Value;
+        (third.Queued, third.BySms, third.NoEmail).Should().Be((2, 1, 0));
+        List<OutboundMessage> messages = await db.Set<OutboundMessage>().AsNoTracking().Where(m => m.CompanyId == companyId && (m.Recipient == "+263771000111" || m.Recipient == "cafe@example.com")).ToListAsync();
+        messages.Should().Contain(m => m.Recipient == "+263771000111" && m.Channel == MessageChannel.Sms && m.Body.Contains("overdue on DG-K"));
+        messages.Should().Contain(m => m.Recipient == "cafe@example.com" && m.Subject == "FIRST DG-CAFE");
     }
 }
