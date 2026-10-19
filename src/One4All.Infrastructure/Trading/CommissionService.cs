@@ -211,6 +211,18 @@ public sealed class CommissionService : ICommissionService
         List<CommissionLine> lines = [.. bases
             .OrderBy(b => customers[b.Key], StringComparer.Ordinal)
             .Select(b => new CommissionLine(b.Key, customers[b.Key], b.Value, decimal.Round(b.Value * rep.RatePercent / 100m, 2, MidpointRounding.AwayFromZero)))];
+
+        // Till sales the rep made (brief §4.1 commission at the point of sale): paid for on the spot, so counted when made - net of tax, or as collected
+        // (with tax) on a collections basis. A voided sale does not count.
+        var till = await _db.Set<Core.Pos.Sale>().AsNoTracking()
+            .Where(s => s.CompanyId == rep.CompanyId && s.SalesRepId == rep.Id && s.Status == Core.Pos.SaleStatus.Completed && s.SaleDate >= start && s.SaleDate <= end)
+            .SelectMany(s => s.Lines).GroupBy(l => 1).Select(g => new { Net = g.Sum(l => l.LineNet), Tax = g.Sum(l => l.TaxAmount) }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        decimal tillBase = till is null ? 0m : rep.Basis is CommissionBasis.Invoiced or CommissionBasis.Margin ? till.Net : till.Net + till.Tax;
+        if (tillBase != 0m)
+        {
+            lines.Add(new CommissionLine(0, "TILL", tillBase, decimal.Round(tillBase * rep.RatePercent / 100m, 2, MidpointRounding.AwayFromZero)));
+        }
+
         return new CommissionStatement(rep.Id, rep.Code, start, end, lines);
     }
 

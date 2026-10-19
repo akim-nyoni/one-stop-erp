@@ -38,7 +38,8 @@ public sealed record PosSaleContext(
     string? DiscountAccountCode = null,
     long? CustomerId = null,
     PosChangeQuote? Change = null,
-    string? TipsAccountCode = null);
+    string? TipsAccountCode = null,
+    long? SalesRepId = null);
 
 /// <summary>Change given in another currency, rounded to what can be handed over (brief §4.1).</summary>
 /// <param name="Currency">The change currency.</param>
@@ -680,6 +681,7 @@ public sealed class PosTicket
             AgeVerified = context.AgeVerified,
             PrescriptionReference = context.PrescriptionReference,
             CustomerId = context.CustomerId,
+            SalesRepId = context.SalesRepId,
             Lines = lines,
         };
     }

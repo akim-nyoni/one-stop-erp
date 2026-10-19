@@ -73,6 +73,9 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
     /// <summary>The customer an on-account sale is charged to (brief §4.1).</summary>
     public long? CustomerId { get; set; }
 
+    /// <summary>Gets or sets the sales rep (agent) credited with the sale for commission.</summary>
+    public long? SalesRepId { get; set; }
+
     /// <summary>The status.</summary>
     public SaleStatus Status { get; private set; }
 

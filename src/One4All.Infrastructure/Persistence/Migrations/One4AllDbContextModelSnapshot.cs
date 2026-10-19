@@ -23936,6 +23936,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(40)")
                         .HasColumnName("sale_number");
 
+                    b.Property<long?>("SalesRepId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("sales_rep_id");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer")
                         .HasColumnName("status");

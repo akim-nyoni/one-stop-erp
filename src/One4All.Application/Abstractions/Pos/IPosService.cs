@@ -55,6 +55,9 @@ public sealed class CompleteSaleRequest
     /// <summary>The customer: an on-account (credit) tender charges their account as an invoice, within their credit limit.</summary>
     public long? CustomerId { get; init; }
 
+    /// <summary>The sales rep (agent) credited with the sale: it counts on the rep's commission statement.</summary>
+    public long? SalesRepId { get; init; }
+
     /// <summary>The output-tax account (credited).</summary>
     public string? TaxAccountCode { get; init; }
 

@@ -446,6 +446,7 @@
                                         <StackPanel Margin="2"><TextBlock Text="Supervisor PIN" Style="{StaticResource FieldLabel}" /><PasswordBox x:Name="SupervisorPinBox" PasswordChanged="SupervisorPin_Changed" /></StackPanel>
                                         <StackPanel Margin="2"><TextBlock Text="Loyalty member" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding LoyaltyMember}" /></StackPanel>
                                         <StackPanel Margin="2"><TextBlock Text="Customer account (On account)" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding AccountCustomer, UpdateSourceTrigger=PropertyChanged}" /></StackPanel>
+                                        <StackPanel Margin="2"><TextBlock Text="Sales rep (commission)" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding SalesRep, UpdateSourceTrigger=PropertyChanged}" /></StackPanel>
                                     </UniformGrid>
                                     <WrapPanel Margin="0,4,0,0">
                                         <Button Content="Line % off" Style="{StaticResource FunctionButton}" Height="36" Width="100" Command="{Binding DiscountLineCommand}" ToolTip="Tap the line, type the % on the keypad, press" />

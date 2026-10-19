@@ -349,6 +349,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _accountCustomer = string.Empty;
 
+    /// <summary>The sales rep (agent) code credited with the sale for commission (blank: none).</summary>
+    [ObservableProperty]
+    private string _salesRep = string.Empty;
+
     partial void OnSelectedTenderCurrencyChanged(TillCurrency? value) => RefreshTotals();
 
     /// <summary>
@@ -1756,6 +1760,19 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         StatusMessage = _ticket.IsFullyTendered ? $"Charged to {AccountCustomer.Trim().ToUpperInvariant()}. Press Pay to complete." : $"Balance {BalanceText} due.";
     }
 
+    private async Task<long?> SalesRepIdAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SalesRep))
+        {
+            return null;
+        }
+
+        string code = SalesRep.Trim().ToUpperInvariant();
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().Set<Core.Trading.SalesRep>().AsNoTracking()
+            .Where(r => r.CompanyId == _companyId && r.Code.ToUpper() == code).Select(r => (long?)r.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+    }
+
     private async Task<long?> AccountCustomerIdAsync()
     {
         if (string.IsNullOrWhiteSpace(AccountCustomer))
@@ -2147,7 +2164,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
         PosChangeQuote? quote = await ChangeQuoteAsync().ConfigureAwait(true);
-        PosSaleContext context = SaleContext(saleNumber) with { CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true), Change = quote };
+        PosSaleContext context = SaleContext(saleNumber) with { CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true), Change = quote, SalesRepId = await SalesRepIdAsync().ConfigureAwait(true) };
         Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
         if (build.IsFailure)
         {

@@ -289,6 +289,17 @@ public sealed class PosService : IPosService
             sale.CustomerId = customer.Id;
         }
 
+        // The agent credited with the sale: an active sales rep of the company.
+        if (request.SalesRepId is long repId)
+        {
+            if (!await _db.Set<SalesRep>().AnyAsync(r => r.Id == repId && r.CompanyId == request.CompanyId && r.IsActive, ct).ConfigureAwait(false))
+            {
+                return Error.Validation("Pos.SalesRep", "The sales rep is not an active rep of this company.");
+            }
+
+            sale.SalesRepId = repId;
+        }
+
         List<JournalLineRequest> journalLines = [];
         foreach (PosTenderRequest tender in request.Tenders)
         {
