@@ -35,6 +35,7 @@ internal sealed class SalesOrderLineConfiguration : IEntityTypeConfiguration<Sal
         b.Property(x => x.ListUnitPrice).HasPrecision(19, 6);
         b.Property(x => x.DespatchedQuantity).HasPrecision(19, 4);
         b.Property(x => x.InvoicedQuantity).HasPrecision(19, 4);
+        b.Property(x => x.ReturnedQuantity).HasPrecision(19, 4);
     }
 }
 

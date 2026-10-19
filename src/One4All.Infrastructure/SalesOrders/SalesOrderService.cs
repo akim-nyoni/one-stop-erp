@@ -489,6 +489,107 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
+    public Task<Result<SalesReturnResult>> ReturnInvoicedAsync(SalesReturnRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return _db.AtomicAsync(() => ReturnInvoicedCoreAsync(request, ct), ct);
+    }
+
+    private async Task<Result<SalesReturnResult>> ReturnInvoicedCoreAsync(SalesReturnRequest request, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Reason) || string.IsNullOrWhiteSpace(request.CreditNoteNumber) || request.Lines.Count == 0)
+        {
+            return Error.Validation("Sop.ReturnDetails", "A return needs the credit note number, the reason and at least one line.");
+        }
+
+        SalesOrder? order = await _db.Set<SalesOrder>().Include(o => o.Lines)
+            .FirstOrDefaultAsync(o => o.Id == request.SalesOrderId && o.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (order is null)
+        {
+            return Error.NotFound("Sop.OrderNotFound", $"Sales order {request.SalesOrderId} not found.");
+        }
+
+        List<(SalesOrderLine Line, decimal Quantity, decimal Net, decimal Tax)> returned = [];
+        foreach (IGrouping<long, SalesReturnLine> byLine in request.Lines.GroupBy(l => l.SalesOrderLineId))
+        {
+            SalesOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == byLine.Key);
+            if (line is null)
+            {
+                return Error.NotFound("Sop.LineNotFound", $"Order line {byLine.Key} not found.");
+            }
+
+            decimal quantity = byLine.Sum(l => l.Quantity);
+            decimal returnable = line.InvoicedQuantity - line.ReturnedQuantity;
+            if (quantity <= 0m || quantity > returnable + 0.0001m)
+            {
+                return Error.Rule("Sop.NotReturnable", $"Order line {line.Id}: cannot take back {quantity}; {returnable} invoiced and not yet returned.");
+            }
+
+            returned.Add((line, quantity, decimal.Round(quantity * line.UnitPrice, 4, MidpointRounding.ToEven), byLine.Sum(l => l.TaxAmount)));
+        }
+
+        // The goods come back at what they cost when this order despatched them (the average of its issues), not today's average.
+        List<string> deliveries = await _db.SalesDeliveries.Where(d => d.CompanyId == request.CompanyId && d.SalesOrderId == order.Id).Select(d => d.Reference).ToListAsync(ct)
+            .ConfigureAwait(false);
+        decimal restocked = 0m;
+        foreach ((SalesOrderLine line, decimal quantity, _, _) in returned)
+        {
+            foreach ((Item item, decimal back) in await Inventory.KitExplosion.StockLinesAsync(_db, request.CompanyId, line.ItemId, quantity, ct).ConfigureAwait(false))
+            {
+                var issued = await _db.Set<StockMovement>().Where(m => m.CompanyId == request.CompanyId && m.ItemId == item.Id && m.Type == StockMovementType.Issue && !m.IsReversed
+                        && m.Reference != null && deliveries.Contains(m.Reference))
+                    .GroupBy(m => 1).Select(g => new { Quantity = g.Sum(m => Math.Abs(m.Quantity)), Value = g.Sum(m => Math.Abs(m.Value)) }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                decimal unitCost = issued is { Quantity: > 0m }
+                    ? decimal.Round(issued.Value / issued.Quantity, 4, MidpointRounding.ToEven)
+                    : await _db.Set<StockBalance>().Where(b => b.CompanyId == request.CompanyId && b.ItemId == item.Id && b.WarehouseId == request.WarehouseId)
+                        .Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                Result<StockMovementResult> receipt = await _inventory.ReceiveAsync(new ReceiveStockRequest
+                {
+                    CompanyId = request.CompanyId, ItemId = item.Id, WarehouseId = request.WarehouseId, Date = request.Date, Quantity = back, UnitCost = unitCost,
+                    CreditAccountCode = item.CostOfSalesAccountCode!, Reference = $"CRN:{request.CreditNoteNumber.Trim()}",
+                }, ct).ConfigureAwait(false);
+                if (receipt.IsFailure)
+                {
+                    return receipt.Error;
+                }
+
+                restocked += receipt.Value.Value;
+            }
+        }
+
+        // An itemised credit at the invoiced price: one credit note per revenue account, each carrying its lines' tax.
+        List<string> numbers = [];
+        decimal credited = 0m;
+        int n = 0;
+        foreach (IGrouping<string, (SalesOrderLine Line, decimal Quantity, decimal Net, decimal Tax)> account in returned.GroupBy(r => r.Line.RevenueAccountCode, StringComparer.Ordinal))
+        {
+            string number = n++ == 0 ? request.CreditNoteNumber.Trim() : $"{request.CreditNoteNumber.Trim()}-{n}";
+            decimal net = account.Sum(r => r.Net);
+            decimal tax = account.Sum(r => r.Tax);
+            Result<TradingPostingResult> credit = await _salesLedger.PostCreditNoteAsync(new SalesCreditNoteRequest
+            {
+                CompanyId = request.CompanyId, CustomerId = order.CustomerId, DocumentNumber = number, DocumentDate = request.Date, Currency = order.Currency, NetAmount = net, TaxAmount = tax,
+                SalesAccountCode = account.Key, TaxAccountCode = request.TaxAccountCode, Narrative = $"Goods returned on order {order.OrderNumber}: {request.Reason.Trim()}",
+            }, ct).ConfigureAwait(false);
+            if (credit.IsFailure)
+            {
+                return credit.Error;
+            }
+
+            numbers.Add(number);
+            credited += net + tax;
+        }
+
+        foreach ((SalesOrderLine line, decimal quantity, _, _) in returned)
+        {
+            line.ReturnInvoiced(quantity);
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return new SalesReturnResult(numbers, credited, restocked);
+    }
+
+    /// <inheritdoc />
     public Task<Result<InvoiceOrderResult>> InvoiceAsync(InvoiceOrderRequest request, CancellationToken ct = default)
         => _db.AtomicAsync(() => InvoiceCoreAsync(request, ct), ct);
 

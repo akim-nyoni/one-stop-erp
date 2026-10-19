@@ -128,6 +128,46 @@ public readonly record struct DespatchResult(decimal CostOfSales);
 /// <param name="InvoiceValue">The gross invoice value.</param>
 public readonly record struct InvoiceOrderResult(long OpenItemId, string JournalNumber, decimal InvoiceValue);
 
+/// <summary>One line of a customer return after invoicing.</summary>
+/// <param name="SalesOrderLineId">The order line.</param>
+/// <param name="Quantity">The quantity returned.</param>
+/// <param name="TaxAmount">The output tax credited on it.</param>
+public readonly record struct SalesReturnLine(long SalesOrderLineId, decimal Quantity, decimal TaxAmount = 0m);
+
+/// <summary>Goods the customer sends back after they were invoiced: credited at the invoiced price and restocked at what they cost when despatched.</summary>
+public sealed class SalesReturnRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the sales order.</summary>
+    public long SalesOrderId { get; init; }
+
+    /// <summary>Gets the credit note number.</summary>
+    public string CreditNoteNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the return date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the warehouse the goods come back to.</summary>
+    public long WarehouseId { get; init; }
+
+    /// <summary>Gets why they came back.</summary>
+    public string Reason { get; init; } = string.Empty;
+
+    /// <summary>Gets the output tax account (blank: the company's).</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Gets the lines returned.</summary>
+    public IReadOnlyList<SalesReturnLine> Lines { get; init; } = [];
+}
+
+/// <summary>A customer return posted.</summary>
+/// <param name="CreditNoteNumbers">The credit note(s) raised (one per revenue account).</param>
+/// <param name="CreditValue">The value credited, tax included.</param>
+/// <param name="RestockedCost">The cost the goods came back into stock at.</param>
+public sealed record SalesReturnResult(IReadOnlyList<string> CreditNoteNumbers, decimal CreditValue, decimal RestockedCost);
+
 /// <summary>Sales Order Processing / Distribution (brief §4.13): order → despatch (stock issue) → invoice (AR).</summary>
 public interface ISalesOrderService
 {
@@ -195,6 +235,15 @@ public interface ISalesOrderService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The invoice result.</returns>
     Task<Result<InvoiceOrderResult>> InvoiceAsync(InvoiceOrderRequest request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Takes back goods returned after they were invoiced, in one unit: an itemised credit note at the invoiced price (one per revenue account), and the goods
+    /// (a kit's components) back into stock at the cost they were despatched at, reversing cost of sales.
+    /// </summary>
+    /// <param name="request">The return.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The credit notes and amounts, or why not.</returns>
+    Task<Result<SalesReturnResult>> ReturnInvoicedAsync(SalesReturnRequest request, CancellationToken ct = default);
 
     /// <summary>Records proof of delivery on a delivery note: when it arrived and who signed (not before it was despatched, and only once).</summary>
     /// <param name="companyId">The company.</param>

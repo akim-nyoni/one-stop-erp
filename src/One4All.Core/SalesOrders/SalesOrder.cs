@@ -333,4 +333,11 @@ public sealed class SalesOrderLine : Entity
     /// <summary>Records an invoiced quantity.</summary>
     /// <param name="quantity">The quantity.</param>
     public void Invoice(decimal quantity) => InvoicedQuantity += quantity;
+
+    /// <summary>Gets the quantity the customer returned after it was invoiced (credited and restocked).</summary>
+    public decimal ReturnedQuantity { get; private set; }
+
+    /// <summary>Records goods returned after invoicing.</summary>
+    /// <param name="quantity">The quantity.</param>
+    public void ReturnInvoiced(decimal quantity) => ReturnedQuantity += quantity;
 }

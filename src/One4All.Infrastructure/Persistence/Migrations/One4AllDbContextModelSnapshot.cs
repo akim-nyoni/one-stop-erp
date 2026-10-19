@@ -30110,6 +30110,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("reserved_warehouse_id");
 
+                    b.Property<decimal>("ReturnedQuantity")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("returned_quantity");
+
                     b.Property<string>("RevenueAccountCode")
                         .IsRequired()
                         .HasMaxLength(8)

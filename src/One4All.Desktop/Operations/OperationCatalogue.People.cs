@@ -1608,11 +1608,12 @@ public static partial class OperationCatalogue
             Module = "Sales & Schools", Title = "Sales order processing", ListTitle = "Open sales orders",
             Description = "Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; "
                 + "lines ITEM:quantity, or blank for everything outstanding - a part despatch leaves the rest on back order), invoice what has been despatched (tax at each "
-                + "line's tax code), take back goods returned from a despatch, or cancel what is left of the order.",
-            Fields = [Pick("Step", "Step", ["Create", "Despatch", "Invoice", "Return", "Cancel"]), Req("Order", "Order number"), Today(), Opt("Customer", "Customer code (create)"),
-                Opt("Lines", "Lines (create: ITEM:qty[:price[:tax]]; despatch/return: ITEM:qty)"), Opt("Revenue", "Revenue account (create; blank: the item's)"),
-                Opt("Warehouse", "Warehouse code (despatch, return)"), Opt("Reference", "Delivery / invoice number"), Opt("Vehicle", "Vehicle (despatch)"), Opt("Driver", "Driver (despatch)"),
-                Opt("TaxAccount", "Output tax account (invoice)"), Opt("Reason", "Reason (return, cancel)")],
+                + "line's tax code), take back goods returned from a despatch, take back invoiced goods (an itemised credit note at the invoiced price, the goods restocked at the "
+                + "cost they went out at), or cancel what is left of the order.",
+            Fields = [Pick("Step", "Step", ["Create", "Despatch", "Invoice", "Return", "Return invoiced", "Cancel"]), Req("Order", "Order number"), Today(), Opt("Customer", "Customer code (create)"),
+                Opt("Lines", "Lines (create: ITEM:qty[:price[:tax]]; despatch / return / return invoiced: ITEM:qty)"), Opt("Revenue", "Revenue account (create; blank: the item's)"),
+                Opt("Warehouse", "Warehouse code (despatch, return)"), Opt("Reference", "Delivery / invoice / credit note number"), Opt("Vehicle", "Vehicle (despatch)"), Opt("Driver", "Driver (despatch)"),
+                Opt("TaxAccount", "Output tax account (invoice, return invoiced)"), Opt("Reason", "Reason (return, cancel)")],
             Run = async (c, i) =>
             {
                 ISalesOrderService orders = c.Get<ISalesOrderService>();
@@ -1724,6 +1725,26 @@ public static partial class OperationCatalogue
                         }
 
                         return $"Goods returned to stock ({M(cost)} back from cost of sales).";
+                    }
+
+                    case "Return invoiced":
+                    {
+                        long warehouse = await WarehouseAsync(c, i.Optional("Warehouse") ?? throw new OperationException("Give the warehouse the goods come back to.")).ConfigureAwait(true);
+                        List<(Core.SalesOrders.SalesOrderLine Line, decimal Quantity)> lines = i.Optional("Lines") is null
+                            ? throw new OperationException("Give the returned lines as ITEM:quantity.")
+                            : Given(l => l.InvoicedQuantity - l.ReturnedQuantity);
+                        List<string> taxCodes = [.. lines.Select(l => l.Line.TaxCode).OfType<string>().Distinct()];
+                        List<Core.Accounting.TaxCode> taxes = await c.Db.Set<Core.Accounting.TaxCode>().AsNoTracking().Include(t => t.Rates).Where(t => t.CompanyId == c.CompanyId && taxCodes.Contains(t.Code))
+                            .ToListAsync().ConfigureAwait(true);
+                        decimal Tax(Core.SalesOrders.SalesOrderLine line, decimal quantity) => line.TaxCode is string code && taxes.FirstOrDefault(t => t.Code == code) is { } tax
+                            ? decimal.Round(quantity * line.UnitPrice * tax.RateOn(date) / 100m, 2, MidpointRounding.AwayFromZero) : 0m;
+                        SalesReturnResult back = Check(await orders.ReturnInvoicedAsync(new SalesReturnRequest
+                        {
+                            CompanyId = c.CompanyId, SalesOrderId = order.Id, CreditNoteNumber = i.Optional("Reference") ?? $"CRN-{number}-{date:yyyyMMdd}", Date = date, WarehouseId = warehouse,
+                            Reason = i.Optional("Reason") ?? throw new OperationException("Give the reason for the return."), TaxAccountCode = i.Optional("TaxAccount"),
+                            Lines = [.. lines.Select(l => new SalesReturnLine(l.Line.Id, l.Quantity, Tax(l.Line, l.Quantity)))],
+                        }).ConfigureAwait(true));
+                        return $"Credited {M(back.CreditValue)} ({string.Join(", ", back.CreditNoteNumbers)}); goods back in stock at {M(back.RestockedCost)}.";
                     }
 
                     default:
