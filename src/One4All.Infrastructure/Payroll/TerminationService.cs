@@ -201,6 +201,63 @@ public sealed class TerminationService : ITerminationService
         return sb.ToString();
     }
 
+    /// <inheritdoc />
+    public async Task<Result<string>> FinalPaySlipAsync(long companyId, string employeeNumber, CancellationToken ct = default)
+    {
+        Termination? termination = await LatestAsync(companyId, employeeNumber, ct).ConfigureAwait(false);
+        if (termination is null)
+        {
+            return NotTerminated(employeeNumber);
+        }
+
+        Employee employee = await _db.Employees.AsNoTracking().SingleAsync(e => e.Id == termination.EmployeeId, ct).ConfigureAwait(false);
+        var company = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => new { c.Name, c.BaseCurrency }).SingleAsync(ct).ConfigureAwait(false);
+        const int width = 48;
+        string rule = new('-', width);
+        StringBuilder sb = new();
+        string Row(string label, decimal amount) => label.PadRight(width - 14) + amount.ToString("N2", CultureInfo.InvariantCulture).PadLeft(14);
+        sb.AppendLine(company.Name);
+        sb.AppendLine("FINAL PAY SLIP");
+        sb.AppendLine(rule);
+        sb.AppendLine(CultureInfo.InvariantCulture, $"{employee.EmployeeNumber} {employee.FullName}");
+        if (employee.TaxNumber is string taxNumber)
+        {
+            sb.AppendLine(CultureInfo.InvariantCulture, $"Tax number {taxNumber}");
+        }
+
+        sb.AppendLine(CultureInfo.InvariantCulture, $"Last day {termination.LastDay:yyyy-MM-dd}; {termination.YearsOfService} completed year(s); {(TerminationType)termination.Type}");
+        sb.AppendLine(rule);
+        sb.AppendLine("EARNINGS");
+        foreach ((string label, decimal amount) in new[]
+        {
+            ("Salary to the last day", termination.ProRataSalary), ("Notice pay", termination.Notice),
+            ($"Leave paid out ({termination.LeaveDays.ToString("0.##", CultureInfo.InvariantCulture)} days)", termination.Leave), ("Gratuity", termination.Gratuity), ("Severance", termination.Severance),
+        }.Where(e => e.Item2 != 0m))
+        {
+            sb.AppendLine(Row("  " + label, amount));
+        }
+
+        decimal gross = termination.ProRataSalary + termination.Notice + termination.Leave + termination.Gratuity + termination.Severance;
+        sb.AppendLine(Row("Gross", gross));
+        sb.AppendLine("DEDUCTIONS");
+        foreach ((string label, decimal amount) in new[] { ("PAYE", termination.OrdinaryTax), ("Terminal benefits tax", termination.TerminalTax), ("Loans and recoveries", gross - termination.OrdinaryTax - termination.TerminalTax - termination.NetPay) }
+            .Where(d => d.Item2 != 0m))
+        {
+            sb.AppendLine(Row("  " + label, amount));
+        }
+
+        sb.AppendLine(rule);
+        sb.AppendLine(Row($"NET PAY ({company.BaseCurrency.Value})", termination.NetPay));
+        if (termination.UnrecoveredLoans > 0m)
+        {
+            sb.AppendLine(Row("Loans still owed", termination.UnrecoveredLoans));
+        }
+
+        sb.AppendLine(rule);
+        sb.AppendLine(termination.PaymentJournalNumber is string paid ? $"Paid ({paid})." : "Not yet paid: released once the clearance checklist is complete.");
+        return sb.ToString();
+    }
+
     // The leaver, the statement and their open loans.
     private async Task<Result<(Employee, FinalPayStatement, List<EmployeeLoan>)>> WorkOutAsync(TerminationRequest request, CancellationToken ct)
     {

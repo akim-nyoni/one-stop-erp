@@ -80,4 +80,14 @@ public interface ITerminationService
 
     /// <summary>The certificate of service (dates, position and reason - not pay).</summary>
     Task<Result<string>> CertificateOfServiceAsync(long companyId, string employeeNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// The leaver's final pay slip (brief §4.15.8): the last pay worked out on termination - salary to the last day, notice, leave paid out, gratuity and
+    /// severance, less PAYE, terminal tax and recoveries - with the net, and whether it has been paid.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeNumber">The leaver.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The slip, or why not.</returns>
+    Task<Result<string>> FinalPaySlipAsync(long companyId, string employeeNumber, CancellationToken ct = default);
 }

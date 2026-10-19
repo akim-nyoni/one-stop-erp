@@ -90,6 +90,10 @@ public sealed class TerminationTests
         Employee gone = await db.Employees.AsNoTracking().SingleAsync(e => e.Id == retrenched);
         (gone.Status, gone.TerminationDate).Should().Be((EmployeeStatus.Terminated, new DateOnly(2026, 4, 15)));
         (await terminations.TerminateAsync(Request("TM-001", TerminationType.Retrenchment))).Error.Code.Should().Be("Payroll.AlreadyTerminated");
+        string slip = (await terminations.FinalPaySlipAsync(companyId, "TM-001")).Value;
+        slip.Should().Contain("FINAL PAY SLIP").And.Contain("Severance").And.Contain("5,538.46").And.Contain("Terminal benefits tax").And.Contain("830.77")
+            .And.Contain("8,631.47").And.Contain("Not yet paid");
+        (await terminations.FinalPaySlipAsync(companyId, "NOBODY")).IsFailure.Should().BeTrue();
 
         // The final pay is on the PAYE return for April and on the leaver's tax certificate: 509.09 PAYE and 830.77 terminal tax.
         await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();

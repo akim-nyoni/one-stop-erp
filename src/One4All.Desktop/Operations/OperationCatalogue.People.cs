@@ -27,7 +27,7 @@ public static partial class OperationCatalogue
                 + "amount, the terminal tax table's bands when one is given, else the terminal rate; loans "
                 + "recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are "
                 + "cleared, release the final pay from the bank; print the certificate.",
-            Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Release final pay", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
+            Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Release final pay", "Final pay slip", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
                 Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
                 Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
                 Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id"),
@@ -44,6 +44,8 @@ public static partial class OperationCatalogue
                         return "Item cleared.";
                     case "Certificate of service":
                         return Check(await terminations.CertificateOfServiceAsync(c.CompanyId, i.Text("Number")).ConfigureAwait(true));
+                    case "Final pay slip":
+                        return Check(await terminations.FinalPaySlipAsync(c.CompanyId, i.Text("Number")).ConfigureAwait(true));
                     case "Release final pay":
                         string? paid = Check(await terminations.ReleaseFinalPayAsync(c.CompanyId, i.Text("Number"), i.Date("LastDay"),
                             i.Optional("Bank") ?? throw new OperationException("Give the bank account paying.")).ConfigureAwait(true));
