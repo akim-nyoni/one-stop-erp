@@ -165,6 +165,18 @@ public interface IPurchaseLedgerService
     /// <returns>The posting result.</returns>
     Task<Result<TradingPostingResult>> PostPaymentAsync(PaymentRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Reverses a supplier payment that did not go through (a cancelled or stopped cheque, a returned EFT): its allocations are undone so the invoices are
+    /// owed again, its journal is reversed in full (bank, payables and any withholding tax) on the date, and the payment no longer stands open.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="paymentNumber">The payment's document number.</param>
+    /// <param name="date">The reversal date.</param>
+    /// <param name="reason">Why it is reversed.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The reversal journal number, or why not.</returns>
+    Task<Result<string>> ReversePaymentAsync(long companyId, string paymentNumber, DateOnly date, string reason, CancellationToken ct = default);
+
     /// <summary>Posts a supplier credit note: Dr AP control, Cr expense/stock, Cr input tax; creates an AP (debit) open item.</summary>
     /// <param name="request">The credit-note request.</param>
     /// <param name="ct">Cancellation token.</param>

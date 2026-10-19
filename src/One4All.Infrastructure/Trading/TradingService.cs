@@ -1340,6 +1340,59 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
+    public Task<Result<string>> ReversePaymentAsync(long companyId, string paymentNumber, DateOnly date, string reason, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                return Error.Validation("Ap.ReversalReason", "Reversing a payment needs the reason.");
+            }
+
+            string number = (paymentNumber ?? string.Empty).Trim();
+            OpenItem? payment = await _db.OpenItems.FirstOrDefaultAsync(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.ItemType == OpenItemType.Payment
+                && i.DocumentNumber == number, ct).ConfigureAwait(false);
+            if (payment is null)
+            {
+                return Error.NotFound("Ap.PaymentNotFound", $"No supplier payment {number}.");
+            }
+
+            if (payment.JournalEntryId is not long journalId)
+            {
+                return Error.Rule("Ap.PaymentNoJournal", $"Payment {number} has no journal to reverse.");
+            }
+
+            // Already backed out: nothing left open on it and nothing allocated from it.
+            if (payment.OutstandingTransaction == 0m
+                && !await _db.Set<Allocation>().AnyAsync(a => a.CompanyId == companyId && (a.DebitItemId == payment.Id || a.CreditItemId == payment.Id) && !a.IsReversed, ct).ConfigureAwait(false))
+            {
+                return Error.Rule("Ap.PaymentReversed", $"Payment {number} has already been reversed.");
+            }
+
+            // The invoices it paid are owed again.
+            foreach (long allocation in await _db.Set<Allocation>().Where(a => a.CompanyId == companyId && (a.DebitItemId == payment.Id || a.CreditItemId == payment.Id) && !a.IsReversed)
+                .Select(a => a.Id).ToListAsync(ct).ConfigureAwait(false))
+            {
+                Result<UnallocationResult> undone = await UnallocateAsync(companyId, allocation, date, ct).ConfigureAwait(false);
+                if (undone.IsFailure)
+                {
+                    return undone.Error;
+                }
+            }
+
+            // The whole journal backed out (bank, payables control, withholding), and the payment no longer stands as a debit on the account.
+            Result<PostingReceipt> reversal = await _postingEngine.ReverseAsync(companyId, journalId, date, $"Payment {number} reversed: {reason.Trim()}", ct).ConfigureAwait(false);
+            if (reversal.IsFailure)
+            {
+                return reversal.Error;
+            }
+
+            OpenItem settled = await _db.OpenItems.FirstAsync(i => i.Id == payment.Id, ct).ConfigureAwait(false);
+            settled.ReduceOutstanding(settled.OutstandingTransaction, settled.OutstandingBase);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result<string>.Success(reversal.Value.JournalNumber);
+        }, ct);
+
+    /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default)
         => _db.AtomicAsync(() => PostReceiptReversalCoreAsync(companyId, customerId, documentNumber, date, currency, amount, bankAccountCode, exchangeRate, ct), ct);
 

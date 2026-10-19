@@ -13,7 +13,14 @@ public sealed class ChequeService : IChequeService
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
-    public ChequeService(One4AllDbContext db) => _db = db;
+    /// <param name="purchases">Reverses the supplier payment a cancelled cheque paid.</param>
+    public ChequeService(One4AllDbContext db, Application.Abstractions.Trading.IPurchaseLedgerService? purchases = null)
+    {
+        _db = db;
+        _purchases = purchases;
+    }
+
+    private readonly Application.Abstractions.Trading.IPurchaseLedgerService? _purchases;
 
     /// <inheritdoc />
     public async Task<Result<long>> IssueAsync(long companyId, long bankAccountId, string chequeNumber, DateOnly issuedOn, string payee, decimal amount, string? documentNumber, CancellationToken ct = default)
@@ -74,7 +81,29 @@ public sealed class ChequeService : IChequeService
     public Task<Result> CancelAsync(long companyId, long chequeId, DateOnly date, string reason, CancellationToken ct = default)
         => string.IsNullOrWhiteSpace(reason)
             ? Task.FromResult(Result.Failure(Error.Validation("Bank.ReasonRequired", "Cancelling a cheque needs a reason.")))
-            : MoveAsync(companyId, chequeId, ChequeStatus.Cancelled, date, reason.Trim(), ct);
+            : _db.AtomicAsync(async () =>
+            {
+                Result moved = await MoveAsync(companyId, chequeId, ChequeStatus.Cancelled, date, reason.Trim(), ct).ConfigureAwait(false);
+                if (moved.IsFailure)
+                {
+                    return moved;
+                }
+
+                // A cheque that paid a supplier: the payment never happened, so it is reversed (the invoices owed again, the bank put back).
+                string? paid = await _db.Cheques.Where(c => c.Id == chequeId).Select(c => c.DocumentNumber).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                if (_purchases is not null && paid is not null
+                    && await _db.OpenItems.AnyAsync(i => i.CompanyId == companyId && i.Ledger == Core.Trading.TradingLedger.AccountsPayable && i.ItemType == Core.Trading.OpenItemType.Payment
+                        && i.DocumentNumber == paid, ct).ConfigureAwait(false))
+                {
+                    Result<string> reversed = await _purchases.ReversePaymentAsync(companyId, paid, date, $"Cheque cancelled: {reason.Trim()}", ct).ConfigureAwait(false);
+                    if (reversed.IsFailure)
+                    {
+                        return Result.Failure(reversed.Error);
+                    }
+                }
+
+                return Result.Success();
+            }, ct);
 
     private async Task<Result> MoveAsync(long companyId, long chequeId, ChequeStatus status, DateOnly date, string? reason, CancellationToken ct)
     {
