@@ -93,5 +93,13 @@ public sealed class TraderDirectoryTests
         (await directory.RemoveContactAsync(companyId, buyer)).IsSuccess.Should().BeTrue();
         (await directory.EmailPurchaseOrderAsync(companyId, order.Id)).Error.Code.Should().Be("Trader.NoRecipient");
         (await directory.EmailStatementAsync(companyId, TradingLedger.AccountsPayable, "TD-NONE", new DateOnly(2026, 6, 30))).Error.Code.Should().Be("Trader.NoRecipient");
+
+        // A run's remittances in one go: emailed where someone receives them, listed to post where nobody does, and unknown numbers reported.
+        (await ap.PostPaymentAsync(new PaymentRequest { CompanyId = companyId, SupplierId = silent.Id, DocumentNumber = "TD-PAY2", PaymentDate = new DateOnly(2026, 3, 20), Currency = Scenario.Usd, Amount = 10m, BankAccountCode = "1100" }))
+            .IsSuccess.Should().BeTrue();
+        RemittanceBatch advices = await directory.EmailRemittancesAsync(companyId, ["TD-PAY1", "TD-PAY2", "TD-NOPE"]);
+        advices.Queued.Should().Be(1);
+        advices.ToPost.Should().Equal("TD-PAY2");
+        advices.Failed.Should().ContainSingle().Which.Should().StartWith("TD-NOPE");
     }
 }

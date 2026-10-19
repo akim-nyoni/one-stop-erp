@@ -223,6 +223,42 @@ public sealed class TraderDirectoryService : ITraderDirectoryService
     }
 
     /// <inheritdoc />
+    public async Task<RemittanceBatch> EmailRemittancesAsync(long companyId, IReadOnlyCollection<string> paymentNumbers, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(paymentNumbers);
+        List<string> numbers = [.. paymentNumbers.Where(n => !string.IsNullOrWhiteSpace(n)).Select(n => n.Trim()).Distinct(StringComparer.Ordinal)];
+        Dictionary<string, long> payments = await _db.OpenItems.AsNoTracking()
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.ItemType == OpenItemType.Payment && numbers.Contains(i.DocumentNumber))
+            .GroupBy(i => i.DocumentNumber).Select(g => new { Number = g.Key, Id = g.Min(i => i.Id) }).ToDictionaryAsync(x => x.Number, x => x.Id, StringComparer.Ordinal, ct).ConfigureAwait(false);
+        int queued = 0;
+        List<string> toPost = [], failed = [];
+        foreach (string number in numbers)
+        {
+            if (!payments.TryGetValue(number, out long id))
+            {
+                failed.Add($"{number}: no supplier payment with this number");
+                continue;
+            }
+
+            Result<long> sent = await EmailRemittanceAsync(companyId, id, ct).ConfigureAwait(false);
+            if (sent.IsSuccess)
+            {
+                queued++;
+            }
+            else if (sent.Error.Code == "Trader.NoRecipient")
+            {
+                toPost.Add(number);
+            }
+            else
+            {
+                failed.Add($"{number}: {sent.Error.Message}");
+            }
+        }
+
+        return new RemittanceBatch(queued, toPost, failed);
+    }
+
+    /// <inheritdoc />
     public async Task<Result<long>> EmailPurchaseOrderAsync(long companyId, long purchaseOrderId, CancellationToken ct = default)
     {
         var order = await _db.PurchaseOrders.AsNoTracking().Where(o => o.Id == purchaseOrderId && o.CompanyId == companyId).Select(o => new { o.SupplierId, o.OrderNumber })

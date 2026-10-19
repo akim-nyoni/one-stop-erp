@@ -56,6 +56,22 @@ public interface ITraderDirectoryService
     /// <summary>Emails a supplier payment's remittance advice to the supplier's remittance contacts.</summary>
     Task<Result<long>> EmailRemittanceAsync(long companyId, long paymentOpenItemId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Emails the remittance advice of each payment a payment run made (brief §4.6: remittances go out with the run), by payment number: queued for those
+    /// whose supplier has someone to send to, listed when nobody receives remittances there (to post instead) or the payment is not found.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="paymentNumbers">The run's payment numbers.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>What was queued and what was not.</returns>
+    Task<RemittanceBatch> EmailRemittancesAsync(long companyId, IReadOnlyCollection<string> paymentNumbers, CancellationToken ct = default);
+
     /// <summary>Emails a purchase order to the supplier's order contacts.</summary>
     Task<Result<long>> EmailPurchaseOrderAsync(long companyId, long purchaseOrderId, CancellationToken ct = default);
 }
+
+/// <summary>The remittance advices of a payment run sent by email.</summary>
+/// <param name="Queued">Advices queued for email.</param>
+/// <param name="ToPost">Payments whose supplier has nobody to email (print and post these).</param>
+/// <param name="Failed">Payments not found or whose advice could not be rendered, with why.</param>
+public sealed record RemittanceBatch(int Queued, IReadOnlyList<string> ToPost, IReadOnlyList<string> Failed);

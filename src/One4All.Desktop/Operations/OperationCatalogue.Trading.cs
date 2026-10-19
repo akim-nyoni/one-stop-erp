@@ -442,7 +442,8 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Save proposal", "Set line", "Approve", "Cancel", "Show", "Require approval", "Allow direct runs"]), Opt("Run", "Run number"),
                 Today("Date", "Payment date"), Today("Due", "Pay invoices due on or before"), Req("Bank", "Bank account", "1100"), Opt("Currency", "Currency (blank: all)"),
                 Opt("Wht", "Withholding tax code"), Opt("Layout", "Bank file layout"), Pick("Method", "Pay by", Enum.GetNames<PaymentRunMethod>()), Opt("Cheque", "First cheque number (cheques)"),
-                Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true), OptNum("Amount", "Amount (blank: all due)"), OptNum("Funds", "Funds available (save proposal)")],
+                Opt("Supplier", "Supplier code (set line)"), Tick("Include", "Pay this supplier", true), OptNum("Amount", "Amount (blank: all due)"), OptNum("Funds", "Funds available (save proposal)"),
+                Tick("Remit", "Email the remittance advices (approve)", true)],
             Run = async (c, i) =>
             {
                 IPaymentRunService runs = c.Get<IPaymentRunService>();
@@ -470,8 +471,18 @@ public static partial class OperationCatalogue
                             .ConfigureAwait(true)));
                     case "Approve":
                         PaymentRunResult paid = Check(await runs.ApproveAsync(c.CompanyId, run, c.UserId).ConfigureAwait(true));
+                        string remitted = string.Empty;
+                        if (i.Flag("Remit"))
+                        {
+                            RemittanceBatch advices = await c.Get<ITraderDirectoryService>().EmailRemittancesAsync(c.CompanyId, [.. paid.Lines.Where(l => l.PaymentNumber.Length > 0).Select(l => l.PaymentNumber)])
+                                .ConfigureAwait(true);
+                            remitted = $" {advices.Queued} remittance advice(s) queued for email"
+                                + (advices.ToPost.Count > 0 ? $"; print and post {string.Join(", ", advices.ToPost)} (nobody to email)" : string.Empty)
+                                + (advices.Failed.Count > 0 ? $"; not sent: {string.Join("; ", advices.Failed)}" : string.Empty) + ".";
+                        }
+
                         return $"Run {run} approved: {paid.Lines.Count(l => l.PaymentNumber.Length > 0)} payment(s), {M(paid.Total)} base."
-                            + (paid.ChequeNumbers is { Count: > 0 } cheques ? $" Cheques {cheques[0]} to {cheques[^1]} written; print them from Banking." : string.Empty);
+                            + (paid.ChequeNumbers is { Count: > 0 } cheques ? $" Cheques {cheques[0]} to {cheques[^1]} written; print them from Banking." : string.Empty) + remitted;
                     case "Cancel":
                         return Check(await runs.CancelAsync(c.CompanyId, run).ConfigureAwait(true), $"Run {run} cancelled.");
                     default:

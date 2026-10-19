@@ -193,7 +193,11 @@ public sealed partial class PaymentRunViewModel : ObservableObject
             int paid = result.Value.Lines.Count(l => l.Amount > 0m);
             Rows.Clear();
             HasPayments = false;
-            Summary = $"Paid {paid} supplier(s), {Money(result.Value.Total)} in base currency.";
+            // The remittance advices go out with the run, to each supplier's remittance contacts.
+            RemittanceBatch advices = await scope.ServiceProvider.GetRequiredService<ITraderDirectoryService>()
+                .EmailRemittancesAsync(_companyId, [.. result.Value.Lines.Where(l => l.PaymentNumber.Length > 0).Select(l => l.PaymentNumber)]).ConfigureAwait(true);
+            Summary = $"Paid {paid} supplier(s), {Money(result.Value.Total)} in base currency. {advices.Queued} remittance advice(s) queued for email"
+                + (advices.ToPost.Count > 0 ? $"; print and post {string.Join(", ", advices.ToPost)}." : ".");
             StatusMessage = HasEftFile ? "Run complete. Save the EFT file for the bank." : "Run complete; everything was settled by credits.";
         }
         catch (Exception ex)
