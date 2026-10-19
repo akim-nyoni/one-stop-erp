@@ -234,6 +234,12 @@ public sealed class WeighbridgeTicket : AuditableEntity, ICompanyScoped
     /// <summary>Gets or sets the sales order the load is delivered against (its customer must match).</summary>
     public long? SalesOrderId { get; set; }
 
+    /// <summary>Gets or sets the purchase order an inbound load is received against (its supplier must match).</summary>
+    public long? PurchaseOrderId { get; set; }
+
+    /// <summary>Gets or sets the goods received note the inbound load was booked on when the ticket completed.</summary>
+    public string? GrnNumber { get; set; }
+
     /// <summary>Gets the sales invoice the load was billed on (null: not yet invoiced); a ticket is invoiced once.</summary>
     public string? InvoiceNumber { get; private set; }
 

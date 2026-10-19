@@ -58,6 +58,8 @@ internal sealed class WeighbridgeTicketConfiguration : IEntityTypeConfiguration<
         b.ToTable("weighbridge_ticket", Schemas.JobCosting);
         b.HasKey(x => x.Id);
         b.HasIndex(x => x.SalesOrderId);
+        b.HasIndex(x => x.PurchaseOrderId);
+        b.Property(x => x.GrnNumber).HasMaxLength(40);
         b.Property(x => x.TicketNumber).HasMaxLength(40);
         b.Property(x => x.VehicleRegistration).HasMaxLength(20);
         b.Property(x => x.Product).HasMaxLength(80);

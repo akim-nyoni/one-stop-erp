@@ -28,9 +28,11 @@ public sealed class WeighbridgeService : IWeighbridgeService
     /// <param name="ar">Posts the customer's invoice.</param>
     /// <param name="orders">Despatches a load against its sales order.</param>
     /// <param name="pricing">Prices a load from the customer's price book when no price is given.</param>
+    /// <param name="procurement">Books an inbound load received against a purchase order on a goods received note.</param>
     public WeighbridgeService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, IClock clock, ISalesLedgerService ar,
-        Application.Abstractions.SalesOrders.ISalesOrderService? orders = null, IPricingService? pricing = null)
+        Application.Abstractions.SalesOrders.ISalesOrderService? orders = null, IPricingService? pricing = null, Application.Abstractions.Procurement.IProcurementService? procurement = null)
     {
+        _procurement = procurement;
         _orders = orders;
         _pricing = pricing;
         _db = db;
@@ -43,6 +45,7 @@ public sealed class WeighbridgeService : IWeighbridgeService
     private readonly ISalesLedgerService _ar;
     private readonly Application.Abstractions.SalesOrders.ISalesOrderService? _orders;
     private readonly IPricingService? _pricing;
+    private readonly Application.Abstractions.Procurement.IProcurementService? _procurement;
 
     /// <inheritdoc />
     public Task<Result<WeighbridgeInvoice>> InvoiceTicketsAsync(WeighbridgeInvoiceRequest request, CancellationToken ct = default)
@@ -296,6 +299,32 @@ public sealed class WeighbridgeService : IWeighbridgeService
             orderId = order.Id;
         }
 
+        // A load received against a purchase order: an open order of the same supplier with a line for the product, received into a named warehouse.
+        long? purchaseOrderId = null;
+        if (!string.IsNullOrWhiteSpace(request.PurchaseOrderNumber))
+        {
+            string orderNumber = request.PurchaseOrderNumber.Trim().ToUpperInvariant();
+            var order = await _db.PurchaseOrders.AsNoTracking().Where(o => o.CompanyId == request.CompanyId && o.OrderNumber.ToUpper() == orderNumber)
+                .Select(o => new { o.Id, o.SupplierId, o.Status, HasProduct = o.Lines.Any(l => l.ItemId == request.ItemId) }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (order is null)
+            {
+                return Error.NotFound("Wb.OrderNotFound", $"No purchase order {orderNumber}.");
+            }
+
+            if (request.Direction != WeighDirection.Inbound || order.SupplierId != request.SupplierId || !order.HasProduct
+                || order.Status is not (Core.Procurement.PurchaseOrderStatus.Open or Core.Procurement.PurchaseOrderStatus.PartReceived))
+            {
+                return Error.Rule("Wb.OrderMismatch", $"Purchase order {orderNumber} is not an open order from this supplier for this product.");
+            }
+
+            if (request.WarehouseId is null)
+            {
+                return Error.Validation("Wb.ReceiptWarehouse", "A load received against a purchase order needs the warehouse or stockpile it goes into.");
+            }
+
+            purchaseOrderId = order.Id;
+        }
+
         Result<string> number = await _numbers.AllocateAsync(request.CompanyId, "WB", request.Date, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
@@ -314,6 +343,7 @@ public sealed class WeighbridgeService : IWeighbridgeService
         ticket.DistanceKm = request.DistanceKm;
         ticket.BatchRunNumber = request.BatchRunNumber;
         ticket.SalesOrderId = orderId;
+        ticket.PurchaseOrderId = purchaseOrderId;
         ticket.TimeInUtc = _clock.UtcNow;
         ticket.OperatorUserId = request.OperatorUserId;
         if (request.IsManual)
@@ -418,6 +448,34 @@ public sealed class WeighbridgeService : IWeighbridgeService
                     return issue.Error;
                 }
             }
+        }
+
+        // An inbound load against a purchase order is received on a GRN numbered after the ticket: stock in at the order price, accrued to GRNI.
+        if (ticket is { Direction: WeighDirection.Inbound, PurchaseOrderId: long purchaseOrder, WarehouseId: long store, ItemId: long received })
+        {
+            if (_procurement is null)
+            {
+                return Error.Rule("Wb.NoProcurement", "Receiving against a purchase order needs purchasing.");
+            }
+
+            long? lineId = await _db.Set<Core.Procurement.PurchaseOrderLine>().AsNoTracking().Where(l => l.PurchaseOrderId == purchaseOrder && l.ItemId == received)
+                .OrderBy(l => l.Id).Select(l => (long?)l.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (lineId is null)
+            {
+                return Error.Rule("Wb.OrderMismatch", "The purchase order no longer has a line for the product.");
+            }
+
+            Result<Application.Abstractions.Procurement.GrnResult> grn = await _procurement.ReceiveGoodsAsync(new Application.Abstractions.Procurement.ReceiveGoodsRequest
+            {
+                CompanyId = request.CompanyId, PurchaseOrderId = purchaseOrder, WarehouseId = store, GrnNumber = ticket.TicketNumber, Date = ticket.Date,
+                Lines = [new Application.Abstractions.Procurement.ReceiveLine(lineId.Value, ticket.NetTonnes)], ReceivedByUserId = request.OperatorUserId ?? ticket.OperatorUserId ?? 0,
+            }, ct).ConfigureAwait(false);
+            if (grn.IsFailure)
+            {
+                return grn.Error;
+            }
+
+            ticket.GrnNumber = ticket.TicketNumber;
         }
 
         decimal? maxGross = await _db.WeighbridgeVehicles.AsNoTracking().Where(v => v.CompanyId == request.CompanyId && v.Registration == ticket.VehicleRegistration)

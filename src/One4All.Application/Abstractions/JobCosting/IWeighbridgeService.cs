@@ -33,7 +33,7 @@ public sealed class FirstWeighRequest
     /// <summary>Gets the delivery site.</summary>
     public string? Site { get; init; }
 
-    /// <summary>Gets the stockpile the load is drawn from (outbound) - its stock is issued when the ticket completes.</summary>
+    /// <summary>Gets the stockpile the load is drawn from (outbound) - its stock is issued when the ticket completes - or received into (inbound against a purchase order).</summary>
     public long? WarehouseId { get; init; }
 
     /// <summary>Gets the haulage distance.</summary>
@@ -44,6 +44,12 @@ public sealed class FirstWeighRequest
 
     /// <summary>Gets the sales order the load is delivered against (outbound; open, for the same customer, with a line for the product).</summary>
     public string? SalesOrderNumber { get; init; }
+
+    /// <summary>
+    /// Gets the purchase order an inbound load is received against (open, for the same supplier, with a line for the product): when the ticket completes
+    /// the net tonnes are booked on a goods received note into the warehouse (brief §4.14 weighbridge to GRN).
+    /// </summary>
+    public string? PurchaseOrderNumber { get; init; }
 
     /// <summary>Gets the date.</summary>
     public DateOnly Date { get; init; }

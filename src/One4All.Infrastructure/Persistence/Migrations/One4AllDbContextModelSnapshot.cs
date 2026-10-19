@@ -16181,6 +16181,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("driver_name");
 
+                    b.Property<string>("GrnNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("grn_number");
+
                     b.Property<decimal>("GrossWeightKg")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -16240,6 +16245,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(80)")
                         .HasColumnName("product");
 
+                    b.Property<long?>("PurchaseOrderId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("purchase_order_id");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -16290,6 +16299,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_weighbridge_ticket");
+
+                    b.HasIndex("PurchaseOrderId")
+                        .HasDatabaseName("ix_weighbridge_ticket_purchase_order_id");
 
                     b.HasIndex("SalesOrderId")
                         .HasDatabaseName("ix_weighbridge_ticket_sales_order_id");

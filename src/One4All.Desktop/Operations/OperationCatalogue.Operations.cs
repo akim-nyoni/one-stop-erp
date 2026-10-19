@@ -60,14 +60,16 @@ public static partial class OperationCatalogue
             Fields = [Pick("Direction", "Direction", "Outbound", "Inbound"), Req("Vehicle", "Vehicle registration"), Req("Item", "Product (item code)"), Num("Density", "m³ per tonne", "0.6"), Today(),
                 OptNum("Weight", "Weight kg (blank = stored tare)"), CustomerPick("Customer", "Customer", required: false), SupplierPick("Supplier", "Supplier", required: false), Opt("Driver", "Driver"), Opt("Site", "Delivery site"),
                 Opt("Stockpile", "Stockpile (warehouse code)"), OptNum("Distance", "Haulage distance km"), Opt("Batch", "Concrete batch run"), Tick("Manual", "Weight keyed by hand"), Opt("Reason", "Why keyed"),
-                Opt("AuthorisedBy", "Authorised by (user name)"), Opt("Order", "Sales order number (outbound)"), Tick("Scale", "Read the weight from the scale")],
+                Opt("AuthorisedBy", "Authorised by (user name)"), Opt("Order", "Sales order (outbound) or purchase order (inbound)"), Tick("Scale", "Read the weight from the scale")],
             Run = async (c, i) =>
             {
                 decimal? weight = i.Flag("Scale") ? await ScaleWeightAsync(c).ConfigureAwait(true) : i.OptionalNumber("Weight");
                 var (_, number) = Check(await c.Get<IWeighbridgeService>().FirstWeighAsync(new FirstWeighRequest
                 {
                     CompanyId = c.CompanyId, Direction = Enum.Parse<WeighDirection>(i.Text("Direction")), Vehicle = i.Text("Vehicle"), ItemId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
-                    CubicMetresPerTonne = i.Number("Density"), Date = i.Date("Date"), WeightKg = weight, SalesOrderNumber = i.Optional("Order"),
+                    CubicMetresPerTonne = i.Number("Density"), Date = i.Date("Date"), WeightKg = weight,
+                    SalesOrderNumber = i.Text("Direction") == nameof(WeighDirection.Outbound) ? i.Optional("Order") : null,
+                    PurchaseOrderNumber = i.Text("Direction") == nameof(WeighDirection.Inbound) ? i.Optional("Order") : null,
                     CustomerId = i.Optional("Customer") is string cu ? await CustomerAsync(c, cu).ConfigureAwait(true) : null,
                     SupplierId = i.Optional("Supplier") is string su ? await SupplierAsync(c, su).ConfigureAwait(true) : null,
                     Driver = i.Optional("Driver"), Site = i.Optional("Site"), WarehouseId = i.Optional("Stockpile") is string sp ? await WarehouseAsync(c, sp).ConfigureAwait(true) : null,
