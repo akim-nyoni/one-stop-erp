@@ -773,7 +773,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Supplementary payroll run", ListTitle = "Payroll runs", Description = "Corrects a committed period with extra (or negative) element amounts - a visible run with its own payslips and journal.",
             Fields = [Req("Period", "Committed period"), Today(), Req("Document", "Run document number"), Req("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420"),
-                Req("Lines", "Lines: EMPLOYEE:ELEMENT:amount; …")],
+                Req("Lines", "Lines: EMPLOYEE:ELEMENT:amount; …"), Opt("Approver", "Approved by (user name; required where payroll needs approval)")],
             Run = async (c, i) =>
             {
                 List<SupplementaryLine> lines = [];
@@ -791,6 +791,7 @@ public static partial class OperationCatalogue
                 PayrollRunResult run = Check(await c.Get<IPayrollAdjustmentService>().RunSupplementaryAsync(new SupplementaryRunRequest
                 {
                     CompanyId = c.CompanyId, PeriodLabel = i.Text("Period"), PayDate = i.Date("Date"), NetPayAccountCode = i.Text("NetPay"), DocumentNumber = i.Text("Document"), Reason = i.Text("Reason"), Lines = lines,
+                    RequestedByUserId = c.UserId, ApprovedByUserId = await OptionalUserAsync(c, i.Optional("Approver")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
                 return $"{run.PayslipCount} payslip(s), net {M(run.TotalNet)}, journal {run.JournalNumber}.";
             },
@@ -813,7 +814,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Backpay for a salary change", ListTitle = "Payroll runs",
             Description = "Recalculates every period paid since the effective date at the new basic salary and pays the difference. Untick 'Pay now' to preview.",
             Fields = [EmployeePick("Employee", "Employee"), Num("Basic", "New basic salary"), Today("From", "Effective from"), Tick("Pay", "Pay now"), Req("Period", "Pay in period"), Today("PayDate", "Pay date"),
-                Opt("Document", "Run document number"), Opt("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420")],
+                Opt("Document", "Run document number"), Opt("Reason", "Reason"), Req("NetPay", "Net pay control account", "2420"),
+                Opt("Approver", "Approved by (user name; required where payroll needs approval)")],
             Run = async (c, i) =>
             {
                 IPayrollAdjustmentService service = c.Get<IPayrollAdjustmentService>();
@@ -829,6 +831,7 @@ public static partial class OperationCatalogue
                 {
                     CompanyId = c.CompanyId, EmployeeId = employee, NewBasicSalary = i.Number("Basic"), EffectiveFrom = i.Date("From"), PeriodLabel = i.Text("Period"), PayDate = i.Date("PayDate"),
                     NetPayAccountCode = i.Text("NetPay"), DocumentNumber = i.Text("Document"), Reason = i.Text("Reason"),
+                    RequestedByUserId = c.UserId, ApprovedByUserId = await OptionalUserAsync(c, i.Optional("Approver")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
                 return $"{preview}{Environment.NewLine}{Environment.NewLine}Backpay net {M(run.TotalNet)} paid, journal {run.JournalNumber}; basic salary updated.";
             },
@@ -986,6 +989,20 @@ public static partial class OperationCatalogue
                 employee.PayGroup = i.Optional("Group")?.ToUpperInvariant();
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return $"{employee.EmployeeNumber} is now on the {employee.PayGroup ?? "default"} payroll.";
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Set payroll approval",
+            Description = "Whether payroll needs a second user: regular runs then go calculate, approve (by someone else), commit, and supplementary and backpay runs name "
+                + "their approver. Nobody ever approves a run that pays themselves.",
+            Fields = [Tick("Required", "Payroll needs approval by a second user")],
+            Run = async (c, i) =>
+            {
+                Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                company.PayrollApprovalRequired = i.Flag("Required");
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return company.PayrollApprovalRequired ? "Payroll now needs approval by a second user." : "Payroll may be run and committed in one step.";
             },
         };
         yield return new Operation

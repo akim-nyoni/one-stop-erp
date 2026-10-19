@@ -95,6 +95,34 @@ public sealed partial class PayrollService
     public Task<Result<int>> ImportLegacyPayrollAsync(long companyId, string periodLabel, string csv, CancellationToken ct = default)
         => _db.AtomicAsync(() => ImportLegacyCoreAsync(companyId, periodLabel, csv, ct), ct);
 
+    // Where payroll needs approval (brief §4.15.10), a correction is approved by a second user too; and nobody prepares or approves one paying themselves.
+    private async Task<Error?> AdjustmentApprovalAsync(Company company, long requestedBy, long? approvedBy, IReadOnlyCollection<long> employeeIds, CancellationToken ct)
+    {
+        long approver = approvedBy ?? 0;
+        if (company.PayrollApprovalRequired)
+        {
+            if (approver == 0 || !await _db.Set<Core.Security.User>().AnyAsync(u => u.Id == approver, ct).ConfigureAwait(false))
+            {
+                return Error.Rule("Payroll.ApprovalRequired", "This company's payroll corrections must be approved by a second user.");
+            }
+
+            if (approver == requestedBy)
+            {
+                return Error.Rule("Payroll.SelfApproval", "A payroll correction is approved by someone other than whoever prepared it.");
+            }
+        }
+
+        foreach (long user in new[] { requestedBy, approver })
+        {
+            if (await OwnRecordAsync(user, employeeIds, ct).ConfigureAwait(false) is string own)
+            {
+                return OwnPay(own);
+            }
+        }
+
+        return null;
+    }
+
     private async Task<Result<PayrollRunResult>> RunSupplementaryCoreAsync(SupplementaryRunRequest request, CancellationToken ct)
     {
         Result<(Company Company, string Period, string Document)> header = await CheckAdjustmentAsync(request.CompanyId, request.PeriodLabel, request.DocumentNumber, request.Reason, ct).ConfigureAwait(false);
@@ -116,6 +144,11 @@ public sealed partial class PayrollService
 
         Dictionary<long, PayElement> elements = await LoadElementsAsync(company.Id, ct).ConfigureAwait(false);
         List<long> employeeIds = [.. request.Lines.Select(l => l.EmployeeId).Distinct()];
+        if (await AdjustmentApprovalAsync(company, request.RequestedByUserId, request.ApprovedByUserId, employeeIds, ct).ConfigureAwait(false) is Error refused)
+        {
+            return refused;
+        }
+
         HashSet<long> known = [.. await _db.Set<Employee>().Where(e => e.CompanyId == company.Id && employeeIds.Contains(e.Id)).Select(e => e.Id).ToListAsync(ct).ConfigureAwait(false)];
         List<Payslip> slips = [];
         foreach (IGrouping<long, SupplementaryLine> employeeLines in request.Lines.GroupBy(l => l.EmployeeId))
@@ -271,6 +304,11 @@ public sealed partial class PayrollService
         }
 
         (Company company, string period, string document) = header.Value;
+        if (await AdjustmentApprovalAsync(company, request.RequestedByUserId, request.ApprovedByUserId, [request.EmployeeId], ct).ConfigureAwait(false) is Error refused)
+        {
+            return refused;
+        }
+
         Result<IReadOnlyList<BackpayPreviewLine>> calculated = await CalculateBackpayAsync(company.Id, request.EmployeeId, request.NewBasicSalary, request.EffectiveFrom, ct).ConfigureAwait(false);
         if (calculated.IsFailure)
         {

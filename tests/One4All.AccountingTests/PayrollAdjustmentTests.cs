@@ -101,6 +101,26 @@ public sealed class PayrollAdjustmentTests
         (await adjustments.CalculateBackpayAsync(companyId, bea.Id, 2200m, new DateOnly(2026, 1, 1))).Value.Should().BeEmpty();
         (await adjustments.PayBackpayAsync(Backpay("PA-BP2"))).Error.Code.Should().Be("Payroll.NoBackpay");
 
+        // Where payroll needs approval, a correction names a second user who is not on it.
+        User clerk = new($"pa-clerk-{companyId}", "Payroll Clerk");
+        db.Users.Add(clerk);
+        (await db.Companies.SingleAsync(c => c.Id == companyId)).PayrollApprovalRequired = true;
+        await db.SaveChangesAsync();
+        (await adjustments.RunSupplementaryAsync(Supplementary("2026-02", "PA-S2", "Late overtime", new SupplementaryLine(al.Id, "BASIC", 50m)) with { RequestedByUserId = clerk.Id }))
+            .Error.Code.Should().Be("Payroll.ApprovalRequired");
+        (await adjustments.RunSupplementaryAsync(Supplementary("2026-02", "PA-S2", "Late overtime", new SupplementaryLine(al.Id, "BASIC", 50m))
+            with { RequestedByUserId = clerk.Id, ApprovedByUserId = clerk.Id })).Error.Code.Should().Be("Payroll.SelfApproval");
+        (await db.Employees.SingleAsync(e => e.Id == al.Id)).UserId = approver.Id;
+        await db.SaveChangesAsync();
+        (await adjustments.RunSupplementaryAsync(Supplementary("2026-02", "PA-S2", "Late overtime", new SupplementaryLine(al.Id, "BASIC", 50m))
+            with { RequestedByUserId = clerk.Id, ApprovedByUserId = approver.Id })).Error.Code.Should().Be("Payroll.OwnPay");
+        (await adjustments.PayBackpayAsync(Backpay("PA-BP3") with { NewBasicSalary = 2300m })).Error.Code.Should().Be("Payroll.ApprovalRequired");
+        (await adjustments.RunSupplementaryAsync(Supplementary("2026-02", "PA-S2", "Late overtime", new SupplementaryLine(bea.Id, "BASIC", 10m))
+            with { RequestedByUserId = clerk.Id, ApprovedByUserId = approver.Id })).IsSuccess.Should().BeTrue();
+        (await db.Companies.SingleAsync(c => c.Id == companyId)).PayrollApprovalRequired = false;
+        (await db.Employees.SingleAsync(e => e.Id == al.Id)).UserId = null;
+        await db.SaveChangesAsync();
+
         // Legacy import for the parallel run (header skipped, a bad line refused).
         (await adjustments.ImportLegacyPayrollAsync(companyId, "2026-01", "Employee,Element,Amount\nPA-1,BASIC\n")).Error.Code.Should().Be("Payroll.LegacyLine");
         (await adjustments.ImportLegacyPayrollAsync(companyId, "2026-01", "Employee,Element,Amount\nPA-1,BASIC,1100\nPA-1,NET,990\npa-2,basic,2000\nPA-2,PAYE,190\nPA-2,NET,1810\n"))
@@ -109,7 +129,7 @@ public sealed class PayrollAdjustmentTests
         // The ledger: net pay carries January (2,700 + 90), February once (2,700) and the backpay (360).
         TrialBalanceReport tb = await scope.ServiceProvider.GetRequiredService<IGeneralLedgerReports>().TrialBalanceAsync(companyId, new DateOnly(2026, 3, 31));
         tb.IsBalanced.Should().BeTrue();
-        tb.Rows.Should().Contain(r => r.AccountCode == "2420" && r.Credit == 5850m);
+        tb.Rows.Should().Contain(r => r.AccountCode == "2420" && r.Credit == 5860m);
 
         IReportRunner runner = scope.ServiceProvider.GetRequiredService<IReportRunner>();
         async Task<string> Render(string code, DateOnly from, DateOnly to)

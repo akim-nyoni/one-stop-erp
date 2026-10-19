@@ -31,6 +31,12 @@ public sealed record SupplementaryRunRequest
 
     /// <summary>Gets the lines.</summary>
     public IReadOnlyList<SupplementaryLine> Lines { get; init; } = [];
+
+    /// <summary>Gets the user preparing the run (0 when not known).</summary>
+    public long RequestedByUserId { get; init; }
+
+    /// <summary>Gets the user approving it: required, and someone else, where the company's payroll needs approval.</summary>
+    public long? ApprovedByUserId { get; init; }
 }
 
 /// <summary>One element of a backpay calculation for a period already paid.</summary>
@@ -73,6 +79,12 @@ public sealed record BackpayRequest
 
     /// <summary>Gets the reason (e.g. the award or agreement).</summary>
     public string Reason { get; init; } = string.Empty;
+
+    /// <summary>Gets the user preparing the backpay (0 when not known).</summary>
+    public long RequestedByUserId { get; init; }
+
+    /// <summary>Gets the user approving it: required, and someone else, where the company's payroll needs approval.</summary>
+    public long? ApprovedByUserId { get; init; }
 }
 
 /// <summary>
