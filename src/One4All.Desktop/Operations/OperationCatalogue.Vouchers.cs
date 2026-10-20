@@ -92,10 +92,12 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = pos, Title = "Promotional codes", ListTitle = "Promo campaigns",
+            Module = pos, Title = "Promotional codes", ListTitle = "Promo campaigns", KeyColumn = "Campaign",
+            Delete = Retire<PromoCampaign>(x => x.Code, x => x.IsActive = false, "campaign"),
             Description = "A campaign of discount codes (a % or an amount off, a minimum spend, uses per code, a cap on redemptions, a validity window); quote or redeem a code against "
                 + "a spend; and analyse a campaign (codes used, redemptions, spend and discount given). A campaign may be limited to customer types and to item categories "
-                + "(the minimum spend and discount then count only those lines: give the basket as CATEGORY:amount; …).",
+                + "(the minimum spend and discount then count only those lines: give the basket as CATEGORY:amount; …). Create campaign with an existing campaign code changes it "
+                + "(and adds any new codes given; the discount is fixed once a code is redeemed); Delete stops its codes working.",
             Fields = [Pick("Step", "Step", ["Create campaign", "Quote", "Redeem", "Analyse"]), Opt("Campaign", "Campaign code"), Opt("Name", "Name (create)"),
                 Pick("DiscountType", "Discount", Enum.GetNames<PromoDiscountType>()), Num("Discount", "Discount value", "0"), Today("From", "Valid from"), Today("To", "Valid to"),
                 Num("MinSpend", "Minimum spend", "0"), Num("Uses", "Uses per code", "1"), OptNum("Max", "Most redemptions (blank: no cap)"), Opt("Codes", "Codes: A1, A2, … (create) / the code (quote, redeem)"),
@@ -124,6 +126,11 @@ public static partial class OperationCatalogue
                 {
                     case "Create campaign":
                         IReadOnlyList<string> list = codes.Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        if (await ExistingAsync<PromoCampaign>(c, campaign, x => x.Code).ConfigureAwait(true) is { } existing)
+                        {
+                            return await ChangeCampaignAsync(c, i, existing, list).ConfigureAwait(true);
+                        }
+
                         return Check(await promos.CreateCampaignAsync(c.CompanyId, new PromoCampaignRequest(campaign, i.Optional("Name") ?? campaign, Enum.Parse<PromoDiscountType>(i.Text("DiscountType")),
                             i.Number("Discount"), i.Date("From"), i.Date("To"), i.Number("MinSpend"), i.Whole("Uses"), i.OptionalNumber("Max") is decimal max ? (int)max : null, list,
                             i.Optional("CustomerTypes"), i.Optional("Categories"))).ConfigureAwait(true),
@@ -141,8 +148,10 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.Set<PromoCampaign>().AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderByDescending(p => p.ValidTo).ToListAsync().ConfigureAwait(true),
-                ("Campaign", p => p.Code), ("Name", p => p.Name), ("Discount", p => p.DiscountType == PromoDiscountType.Percent ? $"{p.DiscountValue}%" : M(p.DiscountValue)),
-                ("From", p => D(p.ValidFrom)), ("To", p => D(p.ValidTo)), ("Minimum spend", p => M(p.MinimumSpend))),
+                ("Campaign", p => p.Code), ("Name", p => p.Name), ("Discount type", p => p.DiscountType), ("Discount value", p => p.DiscountValue.ToString("0.##", CultureInfo.InvariantCulture)),
+                ("From", p => D(p.ValidFrom)), ("To", p => D(p.ValidTo)), ("Minimum spend", p => M(p.MinimumSpend)), ("Uses per code", p => p.UsesPerCode),
+                ("Max", p => p.MaxRedemptions?.ToString(CultureInfo.InvariantCulture) ?? string.Empty), ("Customer types", p => p.CustomerTypes ?? string.Empty),
+                ("Categories", p => p.ItemCategories ?? string.Empty), ("Redemptions", p => p.Redemptions), ("Active", p => p.IsActive)),
         };
         yield return new Operation
         {
@@ -180,5 +189,44 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Db.Set<GiftCard>().AsNoTracking().Where(g => g.CompanyId == c.CompanyId && g.Balance != 0m).OrderBy(g => g.CardNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Card", g => g.CardNumber), ("Balance", g => M(g.Balance)), ("Issued", g => D(g.IssuedDate)), ("Expires", g => g.ExpiryDate is DateOnly e ? D(e) : string.Empty), ("Status", g => g.Status)),
         };
+    }
+
+    // Changes an existing promo campaign from the form: its name, window, minimum spend, uses, cap and limits; its discount only while no code has been redeemed;
+    // new codes typed are added (each unique across the company's campaigns); a retired campaign is brought back into use.
+    private static async Task<string> ChangeCampaignAsync(OperationContext c, OperationInput i, PromoCampaign campaign, IReadOnlyList<string> newCodes)
+    {
+        PromoDiscountType type = Enum.Parse<PromoDiscountType>(i.Text("DiscountType"));
+        decimal value = i.Number("Discount");
+        int uses = i.Whole("Uses");
+        int? max = i.OptionalNumber("Max") is decimal cap ? (int)cap : null;
+        if (i.Date("To") < i.Date("From") || value <= 0m || (type == PromoDiscountType.Percent && value > 100m) || uses < 1 || max < 1)
+        {
+            throw new OperationException("A campaign needs a validity window, a positive discount (at most 100%), at least one use per code and a cap of at least 1 (or none).");
+        }
+
+        if (campaign.Redemptions > 0 && (type != campaign.DiscountType || value != campaign.DiscountValue))
+        {
+            throw new OperationException($"Campaign {campaign.Code} has been redeemed {campaign.Redemptions} time(s); its discount cannot change. Start a new campaign for a different discount.");
+        }
+
+        List<string> adding = [.. newCodes.Select(x => x.Trim().ToUpperInvariant()).Where(x => x.Length > 0).Distinct(StringComparer.Ordinal)];
+        if (adding.Count > 0)
+        {
+            List<string> taken = await c.Db.Set<PromoCampaign>().Where(x => x.CompanyId == c.CompanyId).SelectMany(x => x.Codes).Select(x => x.Code).ToListAsync().ConfigureAwait(true);
+            adding = [.. adding.Where(x => !taken.Contains(x, StringComparer.Ordinal))];
+        }
+
+        campaign.Name = i.Optional("Name") ?? campaign.Name;
+        campaign.ChangeTerms(type, value, i.Date("From"), i.Date("To"), i.Number("MinSpend"), uses, max);
+        campaign.CustomerTypes = i.Optional("CustomerTypes");
+        campaign.ItemCategories = i.Optional("Categories");
+        campaign.IsActive = true;
+        foreach (string code in adding)
+        {
+            campaign.AddCode(code);
+        }
+
+        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+        return $"Campaign {campaign.Code} changed" + (adding.Count == 0 ? "." : $"; {adding.Count} code(s) added.");
     }
 }

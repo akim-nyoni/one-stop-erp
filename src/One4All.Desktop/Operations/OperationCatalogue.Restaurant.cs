@@ -50,9 +50,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Restaurant", Title = "Kitchen station printers", ListTitle = "Station printers",
+            Module = "Restaurant", Title = "Kitchen station printers", ListTitle = "Station printers", KeyColumn = "Station",
             Description = "Which printer each preparation station's tickets print on (KITCHEN for dishes with no station): a Windows printer by name, or a network printer by host "
-                + "and port. A station with no printer works from its kitchen display. Reprint sends a ticket (and its per-station tickets) again, marked REPRINT.",
+                + "and port. A station with no printer works from its kitchen display. Setting a station that already has a printer changes it. Reprint sends a ticket (and its "
+                + "per-station tickets) again, marked REPRINT.",
             Fields = [Pick("Step", "Step", ["Set", "Remove", "Reprint"]), Opt("Station", "Station"), Opt("Printer", "Windows printer name"), Opt("Host", "Network printer host"),
                 Num("Port", "Port", "9100"), Num("Copies", "Copies", "1"), Opt("Ticket", "Ticket number (reprint)")],
             Run = async (c, i) =>
@@ -67,12 +68,25 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Get<IKitchenPrintService>().StationPrintersAsync(c.CompanyId).ConfigureAwait(true),
-                ("Station", p => p.Station), ("Printer", p => p.PrinterName ?? $"{p.Host}:{p.Port}"), ("Copies", p => p.Copies)),
+                ("Station", p => p.Station), ("Printer", p => p.PrinterName ?? string.Empty), ("Host", p => p.Host ?? string.Empty), ("Port", p => p.Port), ("Copies", p => p.Copies)),
+            Delete = async (c, station) => Check(await c.Get<IKitchenPrintService>().SetStationPrinterAsync(c.CompanyId, new StationPrinterSetting(station, null, null), remove: true)
+                .ConfigureAwait(true), $"Station printer for {station} removed; the station works from its kitchen display."),
         };
         yield return new Operation
         {
             Module = module, Title = "Menu items", ListTitle = "Menu",
-            Description = "Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed), sets a price for a price level (happy hour, staff…), "
+            Delete = async (c, code) =>
+            {
+                MenuItem menu = await ExistingAsync<MenuItem>(c, code, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No menu item {code}.");
+                if (await c.Db.Set<TableOrder>().AnyAsync(o => o.CompanyId == c.CompanyId && o.Status == TableOrderStatus.Open && o.Lines.Any(l => l.MenuItemId == menu.Id)).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Menu item {menu.Code} is on an open order; bill or cancel the order first, or mark the item unavailable.");
+                }
+
+                return await SoftDelete<MenuItem>(x => x.Code, "menu item")(c, code).ConfigureAwait(true);
+            },
+            Description = "Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed); Create with an existing code changes its name, price and tax code "
+                + "(its accounts and recipe stay). Also sets a price for a price level (happy hour, staff…), "
                 + "marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) - fired orders "
                 + "give each station its own ticket - and shows a station's queue.",
             Fields = [Pick("Step", "Step", ["Create", "Price level", "Available", "Unavailable", "Refresh availability", "Prep station", "Station queue"]), Opt("Station", "Preparation station"), Opt("Code", "Menu item code"), Opt("Name", "Name (create)"),
@@ -85,6 +99,15 @@ public static partial class OperationCatalogue
                 switch (i.Text("Step"))
                 {
                     case "Create":
+                        if (await ExistingAsync<MenuItem>(c, code, x => x.Code).ConfigureAwait(true) is { } existing)
+                        {
+                            existing.Name = i.Optional("Name")?.Trim() ?? existing.Name;
+                            existing.Price = i.Number("Price");
+                            existing.TaxCode = i.Optional("Tax")?.Trim();
+                            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                            return $"Menu item {existing.Code} changed.";
+                        }
+
                         List<RecipeIngredient> recipe = [];
                         foreach (string part in (i.Optional("Recipe") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                         {
@@ -120,14 +143,25 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Db.Set<MenuItem>().AsNoTracking().Where(m => m.CompanyId == c.CompanyId).OrderBy(m => m.Code).ToListAsync().ConfigureAwait(true),
-                ("Item", m => m.Code), ("Name", m => m.Name), ("Price", m => M(m.Price)), ("Tax", m => m.TaxCode ?? string.Empty), ("Available", m => m.IsAvailable),
+                ("Code", m => m.Code), ("Name", m => m.Name), ("Price", m => M(m.Price)), ("Tax", m => m.TaxCode ?? string.Empty), ("Available", m => m.IsAvailable),
                 ("Station", m => m.PrepStation ?? string.Empty)),
         };
         yield return new Operation
         {
-            Module = module, Title = "Tables and sections", ListTitle = "Tables",
-            Description = "Sets up the floor: tables and their seats, sections (with a server; on or off), combined tables for a large party, and the automatic gratuity "
-                + "added for parties of a given size.",
+            Module = module, Title = "Tables and sections", ListTitle = "Tables", KeyColumn = "Table",
+            Description = "Sets up the floor: tables and their seats (Create table with an existing number changes its seats), sections (with a server; on or off), combined tables "
+                + "for a large party, and the automatic gratuity added for parties of a given size.",
+            Delete = async (c, number) =>
+            {
+                RestaurantTable table = await ExistingAsync<RestaurantTable>(c, number, x => x.TableNumber).ConfigureAwait(true) ?? throw new OperationException($"No table {number}.");
+                if (table.Status != TableStatus.Free || table.GroupId is not null
+                    || await c.Db.Set<TableOrder>().AnyAsync(o => o.CompanyId == c.CompanyId && o.TableId == table.Id && o.Status == TableOrderStatus.Open).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Table {table.TableNumber} has an open order or is combined; settle or move the order and uncombine it first.");
+                }
+
+                return await SoftDelete<RestaurantTable>(x => x.TableNumber, "table")(c, number).ConfigureAwait(true);
+            },
             Fields = [Pick("Step", "Step", ["Create table", "Create section", "Table to section", "Section server", "Section on", "Section off", "Combine tables", "Uncombine", "Auto-gratuity policy"]),
                 Opt("Table", "Table number(s): T1, T2 …"), Num("Seats", "Seats / smallest party (gratuity)", "4"), Opt("Section", "Section code"), Opt("Name", "Section name"),
                 Opt("Server", "Server user name (blank: none)"), Opt("Group", "Combined group label (uncombine)"), Num("Percent", "Gratuity %", "0"), Opt("Account", "Service charge account (gratuity)")],
@@ -138,6 +172,13 @@ public static partial class OperationCatalogue
                 switch (i.Text("Step"))
                 {
                     case "Create table":
+                        if (await ExistingAsync<RestaurantTable>(c, table, x => x.TableNumber).ConfigureAwait(true) is { } existingTable)
+                        {
+                            existingTable.Seats = i.Whole("Seats") > 0 ? i.Whole("Seats") : throw new OperationException("A table needs at least one seat.");
+                            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                            return $"Table {existingTable.TableNumber} changed.";
+                        }
+
                         return Check(await restaurant.CreateTableAsync(c.CompanyId, table, i.Whole("Seats")).ConfigureAwait(true), _ => $"Table {table} created.");
                     case "Create section":
                         return Check(await restaurant.CreateSectionAsync(c.CompanyId, section, i.Optional("Name") ?? section).ConfigureAwait(true), _ => $"Section {section} created.");

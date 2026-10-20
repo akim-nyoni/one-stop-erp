@@ -101,16 +101,31 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Fault ticket categories", ListTitle = "Fault ticket categories",
+            Module = module, Title = "Fault ticket categories", ListTitle = "Fault ticket categories", Editable = true,
             Description = "The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times - "
-                + "the clocks the fault desk measures every ticket against.",
+                + "the clocks the fault desk measures every ticket against. An existing code changes that category (tickets already logged keep their due times).",
             Fields = [Req("Code", "Category code"), Req("Name", "Name"), Pick("Service", "Service", ["(none)", .. Enum.GetNames<ServiceType>()]), Num("Response", "Respond within (hours)", "4"),
                 Num("Resolution", "Resolve within (hours)", "48")],
-            Run = async (c, i) => Check(await c.Get<IServiceDeskService>().DefineCategoryAsync(c.CompanyId, i.Text("Code"), i.Text("Name"),
-                    i.Text("Service") == "(none)" ? null : Enum.Parse<ServiceType>(i.Text("Service")), i.Number("Response"), i.Number("Resolution")).ConfigureAwait(true),
-                id => $"Category {i.Text("Code").ToUpperInvariant()} saved."),
+            Run = async (c, i) =>
+            {
+                ServiceType? service = i.Text("Service") == "(none)" ? null : Enum.Parse<ServiceType>(i.Text("Service"));
+                if (await ExistingAsync<TicketCategory>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
+                {
+                    if (i.Number("Response") <= 0m || i.Number("Resolution") < i.Number("Response"))
+                    {
+                        throw new OperationException("The response target must be above zero and no longer than the resolution target.");
+                    }
+
+                    existing.Change(i.Text("Name"), service, i.Number("Response"), i.Number("Resolution"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Category {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IServiceDeskService>().DefineCategoryAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), service, i.Number("Response"), i.Number("Resolution"))
+                    .ConfigureAwait(true), id => $"Category {i.Text("Code").ToUpperInvariant()} saved.");
+            },
             List = async c => Table(await c.Db.Set<TicketCategory>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Service", x => x.ServiceType?.ToString() ?? "-"), ("Respond (h)", x => x.ResponseHours), ("Resolve (h)", x => x.ResolutionHours)),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Service", x => x.ServiceType?.ToString() ?? "(none)"), ("Response", x => x.ResponseHours), ("Resolution", x => x.ResolutionHours)),
         };
         yield return new Operation
         {
@@ -227,13 +242,32 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Council service types", ListTitle = "Service types",
-            Description = "The council's own services (e.g. extra refuse bins, fire levy): billed like a built-in category, metered or not, with the deposit a new connection pays.",
+            Delete = Retire<MunicipalServiceType>(x => x.Code, x => x.IsActive = false, "service type"),
+            Description = "The council's own services (e.g. extra refuse bins, fire levy): billed like a built-in category, metered or not, with the deposit a new connection pays. "
+                + "An existing code changes that service (and brings a retired one back into use); Delete stops new connections to it, existing ones carry on.",
             Fields = [Req("Code", "Code"), Req("Name", "Name"), Pick("Category", "Bills as", Enum.GetNames<ServiceType>()), Tick("Metered", "Metered"), Num("Deposit", "Deposit on connection", "0"),
                 Opt("Account", "Deposit account")],
-            Run = async (c, i) => Check(await c.Get<IMunicipalServiceTypeService>().SaveAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<ServiceType>(i.Text("Category")), i.Flag("Metered"),
-                i.Number("Deposit"), i.Optional("Account")).ConfigureAwait(true), "Service type saved."),
+            Run = async (c, i) =>
+            {
+                MunicipalServiceType? existing = await ExistingAsync<MunicipalServiceType>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true);
+                _ = Check(await c.Get<IMunicipalServiceTypeService>().SaveAsync(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<ServiceType>(i.Text("Category")), i.Flag("Metered"),
+                    i.Number("Deposit"), i.Optional("Account")).ConfigureAwait(true), string.Empty);
+                if (existing is null)
+                {
+                    return "Service type saved.";
+                }
+
+                if (!existing.IsActive)
+                {
+                    existing.IsActive = true;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                }
+
+                return $"Service type {existing.Code} changed.";
+            },
             List = async c => Table(await c.Db.MunicipalServiceTypes.AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", t => t.Code), ("Name", t => t.Name), ("Bills as", t => t.Category), ("Metered", t => t.IsMetered), ("Deposit", t => M(t.DefaultDeposit)), ("Account", t => t.DepositAccountCode ?? "-")),
+                ("Code", t => t.Code), ("Name", t => t.Name), ("Bills as", t => t.Category), ("Metered", t => t.IsMetered), ("Deposit", t => M(t.DefaultDeposit)), ("Account", t => t.DepositAccountCode ?? string.Empty),
+                ("Active", t => t.IsActive)),
         };
         yield return new Operation
         {

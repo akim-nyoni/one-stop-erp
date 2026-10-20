@@ -116,6 +116,28 @@ public sealed class PromoCampaign : AuditableEntity, ICompanyScoped
     /// <param name="code">The code.</param>
     public void AddCode(string code) => _codes.Add(new PromoCode(code.Trim().ToUpperInvariant()));
 
+    /// <summary>
+    /// Changes the campaign's terms (its code stays; redemptions already made keep the discount they were given). The caller has checked the window
+    /// runs forwards, the discount is positive (at most 100%), each code may be used at least once, and the discount is unchanged once a code is redeemed.
+    /// </summary>
+    /// <param name="discountType">Percentage or amount off.</param>
+    /// <param name="discountValue">The percentage or amount.</param>
+    /// <param name="validFrom">The first day codes work.</param>
+    /// <param name="validTo">The last day codes work.</param>
+    /// <param name="minimumSpend">The smallest spend a code applies to.</param>
+    /// <param name="usesPerCode">How many times each code may be used.</param>
+    /// <param name="maxRedemptions">The cap across the whole campaign, or null for none.</param>
+    public void ChangeTerms(PromoDiscountType discountType, decimal discountValue, DateOnly validFrom, DateOnly validTo, decimal minimumSpend, int usesPerCode, int? maxRedemptions)
+    {
+        DiscountType = discountType;
+        DiscountValue = discountValue;
+        ValidFrom = validFrom;
+        ValidTo = validTo;
+        MinimumSpend = minimumSpend;
+        UsesPerCode = usesPerCode;
+        MaxRedemptions = maxRedemptions;
+    }
+
     /// <summary>Records a redemption of one of the campaign's codes.</summary>
     /// <param name="code">The code redeemed.</param>
     public void Redeem(PromoCode code)

@@ -38,10 +38,13 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Point of Sale", Title = "Receipt layout", ListTitle = "Receipt layouts",
+            Module = "Point of Sale", Title = "Receipt layout", ListTitle = "Receipt layouts", KeyColumn = "Terminal",
+            Delete = async (c, terminal) => string.IsNullOrWhiteSpace(terminal)
+                ? throw new OperationException("The company's own layout cannot be deleted; change it instead (every till without its own layout prints it).")
+                : Check(await c.Get<IReceiptLayoutService>().RemoveAsync(c.CompanyId, terminal).ConfigureAwait(true), $"Till {terminal} prints the company's layout again."),
             Description = "How receipts print: 80mm (48 characters) or 58mm (32) paper, a logo picture printed at the top, the title, header and footer lines (separate lines with |), "
                 + "what is shown and how many copies. Blank till: the company's layout; a till code gives that till its own. Preview shows the receipt as it prints, inside the paper's edges, "
-                + "without saving; Save keeps it; Remove takes a till's own layout away.",
+                + "without saving; Save keeps it (a till or the company that already has a layout has it changed); Remove (or Delete in the list) takes a till's own layout away.",
             Fields = [Pick("Step", "Step", ["Preview", "Save", "Show saved", "Set logo", "Remove logo", "Remove till layout"]), Opt("Terminal", "Till code (blank: every till)"), Pick("Paper", "Paper", ["80mm", "58mm"]),
                 Opt("Logo", "Logo picture file (PNG, JPG, BMP; set logo)"),
                 Opt("Title", "Title", "SALES RECEIPT"), Opt("Header", "Header lines (address | phone | message)"), Opt("Footer", "Footer lines (blank: Thank you!)"),
@@ -72,9 +75,10 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.ReceiptLayouts.AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderBy(l => l.TerminalId).ToListAsync().ConfigureAwait(true),
-                ("Till", l => l.TerminalId is long t ? c.Db.Set<PosTerminal>().Where(x => x.Id == t).Select(x => x.Code).FirstOrDefault() ?? t.ToString(System.Globalization.CultureInfo.InvariantCulture) : "(company)"),
+                ("Terminal", l => l.TerminalId is long t ? c.Db.Set<PosTerminal>().Where(x => x.Id == t).Select(x => x.Code).FirstOrDefault() ?? t.ToString(System.Globalization.CultureInfo.InvariantCulture) : string.Empty),
                 ("Paper", l => $"{l.PaperWidthMm}mm"), ("Title", l => l.Title), ("Header", l => (l.HeaderText ?? string.Empty).Replace('\n', '|')), ("Footer", l => (l.FooterText ?? string.Empty).Replace('\n', '|')),
-                ("Copies", l => l.Copies)),
+                ("Cashier", l => l.ShowCashier), ("Till", l => l.ShowTerminal), ("Unit price", l => l.ShowUnitPrice), ("Tax summary", l => l.ShowTaxSummary), ("Tax number", l => l.ShowTaxNumber),
+                ("Fiscal", l => l.ShowFiscal), ("Copies", l => l.Copies)),
         };
         yield return new Operation
         {
@@ -93,9 +97,20 @@ public static partial class OperationCatalogue
         string[] kinds = [.. Enum.GetNames<PosEventKind>().Where(k => k != nameof(PosEventKind.Refund))];
         yield return new Operation
         {
-            Module = module, Title = "Till favourites", ListTitle = "Favourites",
+            Module = module, Title = "Till favourites", ListTitle = "Favourites", KeyColumn = "Id",
+            Delete = async (c, key) =>
+            {
+                long id = long.TryParse(key, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out long parsed) ? parsed : 0;
+                PosFavourite pin = await c.Db.PosFavourites.AsNoTracking().FirstOrDefaultAsync(f => f.CompanyId == c.CompanyId && f.Id == id).ConfigureAwait(true)
+                    ?? throw new OperationException($"No favourite {key}.");
+                string item = await c.Db.Items.AsNoTracking().Where(x => x.Id == pin.ItemId).Select(x => x.Code).FirstOrDefaultAsync().ConfigureAwait(true)
+                    ?? throw new OperationException("The favourite's item no longer exists.");
+                return Check(await c.Get<IPosCatalogueService>().SetFavouriteAsync(c.CompanyId, pin.TerminalId, pin.UserId, item, pin.SortOrder, pin.Page, pin.Colour, remove: true)
+                    .ConfigureAwait(true), $"Favourite {item} removed.");
+            },
             Description = "Items pinned to the till's ★ Favourites tabs - for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
-                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. "
+                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name); an item already pinned there has its position, page and colour changed. "
+                + "Profile: what kind of counter the terminal is. "
                 + "Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.",
             Fields = [Pick("Step", "Step", ["Favourite", "Profile", "Function keys"]), ItemPick("Item", "Product", required: false), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
                 Num("Order", "Position", "10"), Num("Page", "Page", "1"), Opt("Colour", "Tile colour"), Tick("Remove", "Remove it"),
@@ -142,10 +157,14 @@ public static partial class OperationCatalogue
                                            join it in c.Db.Items.AsNoTracking() on f.ItemId equals it.Id
                                            join t in c.Db.PosTerminals.AsNoTracking() on f.TerminalId equals (long?)t.Id into terminals
                                            from t in terminals.DefaultIfEmpty()
+                                           join u in c.Db.Users.AsNoTracking() on f.UserId equals (long?)u.Id into cashiers
+                                           from u in cashiers.DefaultIfEmpty()
                                            where f.CompanyId == c.CompanyId
                                            orderby f.TerminalId, f.SortOrder
-                                           select new { Till = t == null ? "every till" : t.Code, it.Code, it.Description, f.SortOrder }).ToListAsync().ConfigureAwait(true),
-                ("Till", r => r.Till), ("Item", r => r.Code), ("Description", r => r.Description), ("Position", r => r.SortOrder)),
+                                           select new { f.Id, Till = t == null ? string.Empty : t.Code, Cashier = u == null ? string.Empty : u.Username, it.Code, it.Description, f.SortOrder, f.Page, f.Colour })
+                                           .ToListAsync().ConfigureAwait(true),
+                ("Id", r => r.Id), ("Terminal", r => r.Till), ("Item", r => r.Code), ("Description", r => r.Description), ("Cashier", r => r.Cashier), ("Position", r => r.SortOrder), ("Page", r => r.Page),
+                ("Colour", r => r.Colour ?? string.Empty)),
         };
         yield return new Operation
         {
@@ -161,14 +180,42 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Category under a category", ListTitle = "Item categories",
-            Description = "Places a category under another so the till can drill down (blank parent: top level), and sets the costing method items created in it take when none is given.",
-            Fields = [Req("Category", "Category code"), Opt("Parent", "Parent category code"), Pick("Costing", "Costing method for new items", ["Keep", .. Enum.GetNames<CostingMethod>()])],
+            Module = module, Title = "Category under a category", ListTitle = "Item categories", KeyColumn = "Category",
+            Delete = async (c, key) =>
+            {
+                string code = key.Trim().ToUpperInvariant();
+                if (await c.Db.ItemCategories.AnyAsync(x => x.CompanyId == c.CompanyId && x.ParentCode == code && x.IsActive).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Category {code} has sub-categories in use; move or delete them first.");
+                }
+
+                if (await c.Db.Items.AnyAsync(x => x.CompanyId == c.CompanyId && x.IsActive && x.Category != null && x.Category.ToUpper() == code).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Category {code} still has active items; move them to another category first.");
+                }
+
+                return await Retire<ItemCategory>(x => x.Code, x => x.IsActive = false, "category")(c, code).ConfigureAwait(true);
+            },
+            Description = "Adds an item category (a new code) or changes one (an existing code: its name, and a retired one comes back into use); places it under another so the till "
+                + "can drill down (blank parent: top level), and sets the costing method items created in it take when none is given. Delete retires a category with no active items.",
+            Fields = [Req("Category", "Category code"), Opt("Name", "Name (blank: as it is)"), Opt("Parent", "Parent category code"),
+                Pick("Costing", "Costing method for new items", ["Keep", .. Enum.GetNames<CostingMethod>()])],
             Run = async (c, i) =>
             {
                 string code = i.Text("Category").ToUpperInvariant(), parent = (i.Optional("Parent") ?? string.Empty).ToUpperInvariant();
-                ItemCategory category = await c.Db.ItemCategories.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true)
-                    ?? throw new OperationException($"Category {code} not found.");
+                ItemCategory? found = await c.Db.ItemCategories.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true);
+                bool added = found is null;
+                ItemCategory category = found ?? new ItemCategory(c.CompanyId, code, i.Optional("Name") ?? throw new OperationException($"Category {code} is new; give its name."));
+                if (added)
+                {
+                    c.Db.ItemCategories.Add(category);
+                }
+                else
+                {
+                    category.Name = i.Optional("Name") ?? category.Name;
+                    category.IsActive = true;
+                }
+
                 if (parent.Length > 0)
                 {
                     List<ItemCategory> all = await c.Db.ItemCategories.Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true);
@@ -188,10 +235,10 @@ public static partial class OperationCatalogue
                 }
 
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                return parent.Length == 0 ? $"{code} is a top-level category." : $"{code} now sits under {parent}.";
+                return (added ? $"Category {code} added; " : $"Category {code} changed; ") + (parent.Length == 0 ? "it is a top-level category." : $"it sits under {parent}.");
             },
             List = async c => Table(await c.Db.ItemCategories.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.ParentCode).ThenBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Under", x => x.ParentCode ?? "-"), ("Costing", x => x.CostingMethod?.ToString() ?? "-"), ("Active", x => x.IsActive)),
+                ("Category", x => x.Code), ("Name", x => x.Name), ("Parent", x => x.ParentCode ?? string.Empty), ("Costing", x => x.CostingMethod?.ToString() ?? "Keep"), ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {
@@ -209,7 +256,9 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Save a promotion", ListTitle = "Promotions",
-            Description = "NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','.",
+            Delete = Retire<Promotion>(x => x.Code, x => x.IsActive = false, "promotion"),
+            Description = "NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','. "
+                + "An existing code changes that promotion (its kind stays; a stopped one runs again); Delete stops it running (sales already made keep it).",
             Fields = [Req("Code", "Code"), Req("Name", "Name on receipts"), Pick("Kind", "Kind", Enum.GetNames<PromotionKind>()), Req("Account", "Discount account"), Num("Quantity", "N / X", "0"),
                 Num("Reward", "Y", "0"), OptNum("Price", "Set price"), OptNum("Percent", "Percent off"), Opt("Category", "Category"), Opt("Items", "Items"), Opt("RewardItems", "Reward items"),
                 Opt("Courses", "Meal courses: A,B|C|D"), Num("Priority", "Priority (lower first)", "10"), Tick("Compounding", "Stacks on other promotions"), Tick("Member", "Members only"),
@@ -218,7 +267,8 @@ public static partial class OperationCatalogue
             {
                 static IReadOnlyList<string> Codes(string? text) => [.. (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
                 static TimeOnly? Clock(string? text) => text is null ? null : TimeOnly.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
-                return Check(await c.Get<IPromotionService>().SaveAsync(new PromotionRequest
+                Promotion? existing = await ExistingAsync<Promotion>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true);
+                string saved = Check(await c.Get<IPromotionService>().SaveAsync(new PromotionRequest
                 {
                     CompanyId = c.CompanyId, Code = i.Text("Code"), Name = i.Text("Name"), Kind = Enum.Parse<PromotionKind>(i.Text("Kind")), DiscountAccountCode = i.Text("Account"),
                     Quantity = i.Whole("Quantity"), RewardQuantity = i.Whole("Reward"), Price = i.OptionalNumber("Price"), Percent = i.OptionalNumber("Percent"), Category = i.Optional("Category"),
@@ -227,11 +277,33 @@ public static partial class OperationCatalogue
                     Priority = i.Whole("Priority"), Compounding = i.Flag("Compounding"), MemberOnly = i.Flag("Member"), CustomerTypes = Codes(i.Optional("Types")), CouponCode = i.Optional("Coupon"),
                     StartsOn = i.Date("From"),
                     EndsOn = i.OptionalDate("To"), DailyFrom = Clock(i.Optional("DailyFrom")), DailyTo = Clock(i.Optional("DailyTo")),
-                }).ConfigureAwait(true), id => $"Promotion {i.Text("Code").ToUpperInvariant()} saved.");
+                }).ConfigureAwait(true), id => existing is null ? $"Promotion {i.Text("Code").ToUpperInvariant()} saved." : $"Promotion {existing.Code} changed.");
+                if (existing is { IsActive: false })
+                {
+                    existing.IsActive = true;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                }
+
+                return saved;
             },
-            List = async c => Table(await c.Db.Promotions.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.Priority).ThenBy(p => p.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", p => p.Code), ("Name", p => p.Name), ("Kind", p => p.Kind), ("Priority", p => p.Priority), ("Runs", p => $"{D(p.StartsOn)} – {(p.EndsOn is DateOnly e ? D(e) : "open")}"),
-                ("Hours", p => p.DailyFrom is TimeOnly f ? $"{f:HH\\:mm}–{p.DailyTo:HH\\:mm}" : "all day"), ("Members", p => p.MemberOnly ? "Yes" : string.Empty), ("Coupon", p => p.CouponCode)),
+            List = async c =>
+            {
+                List<Promotion> promotions = await c.Db.Promotions.AsNoTracking().Include(p => p.Items).Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.Priority).ThenBy(p => p.Code)
+                    .ToListAsync().ConfigureAwait(true);
+                List<long> ids = [.. promotions.SelectMany(p => p.Items).Select(x => x.ItemId).Distinct()];
+                Dictionary<long, string> codes = await c.Db.Items.AsNoTracking().IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Code).ConfigureAwait(true);
+                string Group(Promotion p, Func<int, bool> group) => string.Join(",", p.Items.Where(x => group(x.Group)).Select(x => codes.GetValueOrDefault(x.ItemId, string.Empty)));
+                string Courses(Promotion p) => p.Kind != PromotionKind.MealDeal ? string.Empty
+                    : string.Join("|", p.Items.Where(x => x.Group >= 1).GroupBy(x => x.Group).OrderBy(g => g.Key).Select(g => string.Join(",", g.Select(x => codes.GetValueOrDefault(x.ItemId, string.Empty)))));
+                return Table(promotions,
+                    ("Code", p => p.Code), ("Name", p => p.Name), ("Kind", p => p.Kind), ("Account", p => p.DiscountAccountCode), ("Quantity", p => p.Quantity), ("Reward", p => p.RewardQuantity),
+                    ("Price", p => p.Price), ("Percent", p => p.Percent), ("Category", p => p.Category ?? string.Empty), ("Items", p => Group(p, g => g == 0)),
+                    ("Reward items", p => p.Kind == PromotionKind.MealDeal ? string.Empty : Group(p, g => g == 1)), ("Courses", p => Courses(p)), ("Priority", p => p.Priority),
+                    ("Compounding", p => p.Compounding), ("Member", p => p.MemberOnly), ("Types", p => p.CustomerTypes ?? string.Empty), ("Coupon", p => p.CouponCode ?? string.Empty),
+                    ("From", p => D(p.StartsOn)), ("To", p => p.EndsOn is DateOnly e ? D(e) : string.Empty),
+                    ("Daily from", p => p.DailyFrom is TimeOnly f ? f.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) : string.Empty),
+                    ("Daily to", p => p.DailyTo is TimeOnly t ? t.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture) : string.Empty), ("Active", p => p.IsActive));
+            },
         };
         yield return new Operation
         {
@@ -457,9 +529,20 @@ public static partial class OperationCatalogue
         const string module = "Stock";
         yield return new Operation
         {
-            Module = module, Title = "Item variants", ListTitle = "Variants",
+            Module = module, Title = "Item variants", ListTitle = "Variants", KeyColumn = "Variant",
+            Delete = async (c, key) =>
+            {
+                Core.Inventory.Item variant = await ExistingAsync<Core.Inventory.Item>(c, key, x => x.Code).ConfigureAwait(true) is { ParentItemId: not null } found
+                    ? found : throw new OperationException($"No variant {key}.");
+                if (await c.Db.StockBalances.AnyAsync(b => b.ItemId == variant.Id && b.QuantityOnHand != 0m).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Variant {variant.Code} still has stock on hand; sell, transfer or adjust it to nil first.");
+                }
+
+                return await SoftDelete<Core.Inventory.Item>(x => x.Code, "variant")(c, key).ConfigureAwait(true);
+            },
             Description = "Sizes and colours of one product: a variant is its own stock item (own code, barcode, stock and price), made from the base item - its unit, tax code, category, "
-                + "accounts, tracking and brand copied - and kept under it so the variants list and report together.",
+                + "accounts, tracking and brand copied - and kept under it so the variants list and report together. Add with an existing variant code changes its size and colour.",
             Fields = [Pick("Step", "Step", ["Add", "List"]), Req("Item", "Base item code"), Opt("Variant", "Variant item code (add)"), Opt("Size", "Size"), Opt("Colour", "Colour")],
             Run = async (c, i) =>
             {
@@ -485,14 +568,29 @@ public static partial class OperationCatalogue
                     throw new OperationException("A variant needs a size, a colour or both.");
                 }
 
-                if (await c.Db.Items.AnyAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true))
+                Core.Inventory.Item? existing = await c.Db.Items.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true);
+                if (existing is not null && existing.ParentItemId != baseId)
                 {
-                    throw new OperationException($"Item {code} already exists.");
+                    throw new OperationException($"Item {code} already exists{(existing.ParentItemId is null ? string.Empty : " under another base item")}.");
                 }
 
-                if (await c.Db.Items.AnyAsync(x => x.CompanyId == c.CompanyId && x.ParentItemId == baseId && x.Size == size && x.Colour == colour).ConfigureAwait(true))
+                if (await c.Db.Items.AnyAsync(x => x.CompanyId == c.CompanyId && x.ParentItemId == baseId && x.Size == size && x.Colour == colour && x.Code != code).ConfigureAwait(true))
                 {
                     throw new OperationException($"{parent.Code} already has a {string.Join(" ", new[] { size, colour }.OfType<string>())} variant.");
+                }
+
+                if (existing is not null)
+                {
+                    // The description follows the size and colour while it is still the one the variant was made with.
+                    if (existing.Description == $"{parent.Description} {string.Join(" ", new[] { existing.Size, existing.Colour }.OfType<string>())}")
+                    {
+                        existing.Description = $"{parent.Description} {string.Join(" ", new[] { size, colour }.OfType<string>())}";
+                    }
+
+                    existing.Size = size;
+                    existing.Colour = colour;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Variant {code} changed ({string.Join(", ", new[] { size, colour }.OfType<string>())}).";
                 }
 
                 c.Db.Items.Add(new Core.Inventory.Item(c.CompanyId, code, $"{parent.Description} {string.Join(" ", new[] { size, colour }.OfType<string>())}", parent.ItemType, parent.CostingMethod)
@@ -509,7 +607,7 @@ public static partial class OperationCatalogue
                                            where v.CompanyId == c.CompanyId
                                            orderby b.Code, v.Code
                                            select new { Base = b.Code, v.Code, v.Size, v.Colour, v.Description }).Page(c, 1000).ToListAsync().ConfigureAwait(true),
-                ("Base item", v => v.Base), ("Variant", v => v.Code), ("Size", v => v.Size), ("Colour", v => v.Colour), ("Description", v => v.Description)),
+                ("Item", v => v.Base), ("Variant", v => v.Code), ("Size", v => v.Size), ("Colour", v => v.Colour), ("Description", v => v.Description)),
         };
         yield return new Operation
         {
@@ -576,8 +674,16 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Price a list from cost", ListTitle = "Price lists",
-            Description = "Items with no price on the list are priced from cost (average, else standard): a markup on cost or a margin on price, rounded to a price point. Basis None turns it off.",
+            Module = module, Title = "Price a list from cost", ListTitle = "Price lists", KeyColumn = "List",
+            Delete = async (c, key) =>
+            {
+                PriceList list = await ExistingAsync<PriceList>(c, key, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No price list {key}.");
+                list.CostPlusBasis = CostPlusBasis.None;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Pricing from cost turned off on {list.Code} (the price list itself stays): its items need a price on the list again.";
+            },
+            Description = "Items with no price on the list are priced from cost (average, else standard): a markup on cost or a margin on price, rounded to a price point. Saving a list "
+                + "again changes its settings; Basis None (or Delete in the list) turns it off - the price list itself stays.",
             Fields = [Req("List", "Price list code"), Pick("Basis", "Basis", Enum.GetNames<CostPlusBasis>()), Num("Percent", "Markup or margin %", "0"), Num("RoundTo", "Price point", "0.05"),
                 Pick("Rounding", "Rounding", Enum.GetNames<PriceRounding>())],
             Run = async (c, i) =>
@@ -587,8 +693,8 @@ public static partial class OperationCatalogue
                     Enum.Parse<PriceRounding>(i.Text("Rounding"))).ConfigureAwait(true), "Cost-plus pricing updated.");
             },
             List = async c => Table(await c.Db.PriceLists.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.Code).ToListAsync().ConfigureAwait(true),
-                ("List", p => p.Code), ("Name", p => p.Name), ("Currency", p => p.Currency.Value), ("Default", p => p.IsDefault), ("From cost", p => p.CostPlusBasis), ("Percent", p => Q(p.CostPlusPercent)),
-                ("Price point", p => Q(p.CostPlusRoundTo))),
+                ("List", p => p.Code), ("Name", p => p.Name), ("Currency", p => p.Currency.Value), ("Default", p => p.IsDefault), ("Basis", p => p.CostPlusBasis), ("Percent", p => Q(p.CostPlusPercent)),
+                ("Price point", p => Q(p.CostPlusRoundTo)), ("Rounding", p => ((PriceRounding)p.CostPlusRounding).ToString())),
         };
         yield return new Operation
         {
@@ -621,8 +727,11 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Set item sale limits", ListTitle = "Items with sale limits",
-            Description = "Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference.",
+            Module = module, Title = "Set item sale limits", ListTitle = "Items with sale limits", KeyColumn = "Item",
+            Delete = async (c, key) => Check(await c.Get<IItemCatalogueService>().SetSaleLimitsAsync(c.CompanyId, await ItemAsync(c, key).ConfigureAwait(true), null, null, false).ConfigureAwait(true),
+                $"Sale limits on {key} cleared."),
+            Description = "Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference. "
+                + "Saving an item again changes its limits; Delete in the list clears them.",
             Fields = [ItemPick("Item", "Product"), OptNum("Age", "Minimum age"), OptNum("Max", "Most per sale"), Tick("Rx", "Prescription only")],
             Run = async (c, i) => Check(await c.Get<IItemCatalogueService>().SetSaleLimitsAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
                 i.OptionalNumber("Age") is decimal age ? (int)age : null, i.OptionalNumber("Max"), i.Flag("Rx")).ConfigureAwait(true), "Sale limits updated."),
@@ -716,10 +825,12 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Set an item's replenishment policy", ListTitle = "Replenishment policies",
+            Module = module, Title = "Set an item's replenishment policy", ListTitle = "Replenishment policies", KeyColumn = "Item",
+            Delete = async (c, key) => Check(await c.Get<IReplenishmentService>().SetPolicyAsync(c.CompanyId, await ItemAsync(c, key).ConfigureAwait(true), new ReplenishmentPolicy(0m, 0m, 0m, 0, 0))
+                .ConfigureAwait(true), $"Replenishment policy on {key} cleared."),
             Description = "Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. "
                 + "With a forecast window, the reorder level rises to the average daily issues over that window times the lead time - scaled, with seasonal factors, by the "
-                + "factor for the month the lead time ends in (twelve numbers, January first).",
+                + "factor for the month the lead time ends in (twelve numbers, January first). Saving an item again changes its policy; Delete in the list clears it.",
             Fields = [ItemPick("Item", "Product"), Num("Level", "Reorder level (minimum)", "0"), Num("Quantity", "Reorder quantity", "0"), Num("Maximum", "Maximum stock", "0"),
                 Num("LeadTime", "Lead time (days)", "0"), Num("Window", "Forecast window (days, 0 = none)", "0"), Opt("Seasonal", "Seasonal factors Jan…Dec (e.g. 0.8,0.8,1,…)")],
             Run = async (c, i) => Check(await c.Get<IReplenishmentService>().SetPolicyAsync(c.CompanyId, await ItemAsync(c, i.Text("Item")).ConfigureAwait(true),
@@ -729,8 +840,8 @@ public static partial class OperationCatalogue
                 }).ConfigureAwait(true), "Replenishment policy saved."),
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.ReorderLevel > 0m || x.MaximumStock > 0m || x.ForecastWindowDays > 0))
                     .OrderBy(x => x.Code).Page(c, 200).ToListAsync().ConfigureAwait(true),
-                ("Item", x => x.Code), ("Minimum", x => Q(x.ReorderLevel)), ("Reorder qty", x => Q(x.ReorderQuantity)), ("Maximum", x => Q(x.MaximumStock)),
-                ("Lead time", x => x.LeadTimeDays), ("Window", x => x.ForecastWindowDays), ("Seasonal factors", x => x.SeasonalFactors ?? string.Empty)),
+                ("Item", x => x.Code), ("Level", x => Q(x.ReorderLevel)), ("Reorder quantity", x => Q(x.ReorderQuantity)), ("Maximum stock", x => Q(x.MaximumStock)),
+                ("Lead time (days)", x => x.LeadTimeDays), ("Window", x => x.ForecastWindowDays), ("Seasonal", x => x.SeasonalFactors ?? string.Empty)),
         };
         yield return new Operation
         {

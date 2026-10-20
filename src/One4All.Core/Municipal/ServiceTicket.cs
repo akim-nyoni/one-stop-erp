@@ -81,6 +81,22 @@ public sealed class TicketCategory : AuditableEntity, ICompanyScoped
 
     /// <summary>The resolution target in hours.</summary>
     public decimal ResolutionHours { get; private set; }
+
+    /// <summary>
+    /// Changes the category's name, service and targets (its code stays; tickets already logged keep the due times they were given). The caller has
+    /// checked the name is given and the response target is above zero and no longer than the resolution target.
+    /// </summary>
+    /// <param name="name">The name.</param>
+    /// <param name="serviceType">The service it concerns, if any.</param>
+    /// <param name="responseHours">The response target.</param>
+    /// <param name="resolutionHours">The resolution target.</param>
+    public void Change(string name, ServiceType? serviceType, decimal responseHours, decimal resolutionHours)
+    {
+        Name = name.Trim();
+        ServiceType = serviceType;
+        ResponseHours = responseHours;
+        ResolutionHours = resolutionHours;
+    }
 }
 
 /// <summary>
