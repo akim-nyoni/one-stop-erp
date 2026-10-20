@@ -3,10 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:loc="clr-namespace:One4All.Desktop.Localization"
         xmlns:local="clr-namespace:One4All.Desktop"
-        Title="{Binding Selected.ListTitle, Converter={StaticResource Text}}" FlowDirection="{x:Static loc:UiText.Direction}" Height="640" Width="1100"
+        FlowDirection="{x:Static loc:UiText.Direction}" Height="640" Width="1100"
         WindowStartupLocation="CenterOwner" Background="White" FontFamily="Segoe UI">
     <Window.Resources>
         <loc:TextConverter x:Key="Text" />
     </Window.Resources>
+    <!-- Bound after the resources so the Text converter exists when the title is resolved. -->
+    <Window.Title>
+        <Binding Path="Selected.ListTitle" Converter="{StaticResource Text}" />
+    </Window.Title>
     <local:OperationsListView x:Name="View" />
 </Window>
