@@ -316,7 +316,11 @@ public sealed partial class OperationsViewModel : ObservableObject
                 case FieldKind.Flag:
                     field.IsTicked = text is "True" or "Yes" or "true";
                     break;
+                case FieldKind.Text when field.IsDateText && DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, out DateTime picked):
+                    field.DateValue = picked;
+                    break;
                 case FieldKind.Choice:
+                case FieldKind.Text when field.AutoLookup is not null:
                     field.Value = field.Choices.FirstOrDefault(choice => Ops.CodeOf(choice)?.Equals(text, StringComparison.OrdinalIgnoreCase) == true || choice.Equals(text, StringComparison.OrdinalIgnoreCase)) ?? text;
                     break;
                 default:

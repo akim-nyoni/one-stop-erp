@@ -94,7 +94,10 @@ public sealed class Operation
     public Func<OperationContext, string, Task<string>>? Delete { get; init; }
 
     /// <summary>Gets a value indicating whether a list row can be opened in the form to change it (the form adds or changes, rather than only adds).</summary>
-    public bool CanEdit => HasList && (Delete is not null || System.Text.RegularExpressions.Regex.IsMatch(Title, @"\b(change|update|edit|set|or|amend|maintain|policy|policies|rules|settings|limits)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+    public bool CanEdit => HasList && (Editable || Delete is not null || System.Text.RegularExpressions.Regex.IsMatch(Title, @"\b(change|update|edit|set|or|amend|maintain|policy|policies|rules|settings|limits)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase));
+
+    /// <summary>Gets a value indicating whether a list row can be changed in the form even though the record cannot be deleted (an existing key changes it).</summary>
+    public bool Editable { get; init; }
 
     /// <summary>Gets a value indicating whether the result is a printable document (shown in full, monospaced).</summary>
     public bool IsDocument { get; init; }
@@ -453,6 +456,24 @@ public static class Ops
             record.DeletedByUserId = c.UserId;
             await c.Db.SaveChangesAsync().ConfigureAwait(true);
             return $"{char.ToUpperInvariant(what[0])}{what[1..]} {code} deleted (kept in history).";
+        };
+
+    /// <summary>
+    /// A delete for a master record that is retired rather than removed (it has no soft-delete; typically it is made inactive): the record is found
+    /// by its key among the company's records and <paramref name="retire"/> takes it out of use, so its history stays. Refused when nothing matches.
+    /// </summary>
+    /// <typeparam name="T">The record type.</typeparam>
+    /// <param name="key">Reads the record's key (the value of the list's key column).</param>
+    /// <param name="retire">Takes the record out of use (for example <c>x =&gt; x.IsActive = false</c>).</param>
+    /// <param name="what">What the record is called, for the message.</param>
+    /// <returns>The delete.</returns>
+    public static Func<OperationContext, string, Task<string>> Retire<T>(Func<T, string> key, Action<T> retire, string what) where T : class, Core.Common.ICompanyScoped
+        => async (c, code) =>
+        {
+            T record = await ExistingAsync(c, code, key).ConfigureAwait(true) ?? throw new OperationException($"No {what} {code}.");
+            retire(record);
+            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+            return $"{char.ToUpperInvariant(what[0])}{what[1..]} {code} taken out of use (kept in history).";
         };
 
     /// <summary>The company's record with the code, when there is one (so a form adds a new record or changes the existing one).</summary>
