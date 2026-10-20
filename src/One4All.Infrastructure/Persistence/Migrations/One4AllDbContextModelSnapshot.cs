@@ -12585,6 +12585,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
 
+                    b.Property<string>("SectionalSchemeCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("sectional_scheme_code");
+
+                    b.Property<decimal?>("SharePercent")
+                        .HasPrecision(9, 4)
+                        .HasColumnType("numeric(9,4)")
+                        .HasColumnName("share_percent");
+
                     b.Property<long>("StandId")
                         .HasColumnType("bigint")
                         .HasColumnName("stand_id");
@@ -12604,6 +12614,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<int>("TransferType")
                         .HasColumnType("integer")
                         .HasColumnName("transfer_type");
+
+                    b.Property<string>("UnitNumber")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("unit_number");
 
                     b.HasKey("Id")
                         .HasName("pk_transfer_application");

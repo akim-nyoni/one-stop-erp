@@ -2044,8 +2044,11 @@ api.MapPost("/api/housing/stands/{standId:long}/holders", async (long standId, l
 .RequireAuthorization()
 .WithName("RegisterJointHolders");
 
-api.MapPost("/api/housing/stands/{standId:long}/holders/transfer-share", async (long standId, long companyId, long fromCustomerId, long toCustomerId, decimal portion, DateOnly date, One4All.Application.Abstractions.Housing.IJointOwnershipService joint, CancellationToken ct) =>
-    ActionResponse(await joint.TransferShareAsync(companyId, standId, fromCustomerId, toCustomerId, portion, date, ct).ConfigureAwait(false)))
+api.MapPost("/api/housing/stands/{standId:long}/holders/transfer-share", async (long standId, long companyId, long fromCustomerId, long toCustomerId, decimal portion, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ValueResponse(await transfers.LodgeAsync(new One4All.Application.Abstractions.Housing.TransferLodgement
+    {
+        CompanyId = companyId, StandId = standId, TransferType = One4All.Core.Housing.TransferType.Sale, FromCustomerId = fromCustomerId, ToCustomerId = toCustomerId, SharePercent = portion, Date = date,
+    }, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("TransferStandShare");
 
@@ -2064,8 +2067,11 @@ api.MapPost("/api/housing/sectional", async (long companyId, string code, string
 .RequireAuthorization()
 .WithName("RegisterSectionalScheme");
 
-api.MapPost("/api/housing/sectional/{code}/units/{unitNumber}/transfer", async (string code, string unitNumber, long companyId, long toCustomerId, decimal consideration, DateOnly date, One4All.Application.Abstractions.Housing.ISectionalTitleService sectional, CancellationToken ct) =>
-    ActionResponse(await sectional.TransferUnitAsync(companyId, code, unitNumber, toCustomerId, consideration, date, ct).ConfigureAwait(false)))
+api.MapPost("/api/housing/sectional/{code}/units/{unitNumber}/transfer", async (string code, string unitNumber, long companyId, long toCustomerId, decimal consideration, DateOnly date, One4All.Application.Abstractions.Housing.ITransferApplicationService transfers, CancellationToken ct) =>
+    ValueResponse(await transfers.LodgeAsync(new One4All.Application.Abstractions.Housing.TransferLodgement
+    {
+        CompanyId = companyId, TransferType = One4All.Core.Housing.TransferType.Sale, SectionalSchemeCode = code, UnitNumber = unitNumber, ToCustomerId = toCustomerId, Consideration = consideration, Date = date,
+    }, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("TransferSectionalUnit");
 

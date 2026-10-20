@@ -802,6 +802,10 @@ internal sealed class TransferApplicationConfiguration : IEntityTypeConfiguratio
     public void Configure(EntityTypeBuilder<TransferApplication> b)
     {
         b.ToTable("transfer_application", Schemas.Housing);
+        b.Property(x => x.SharePercent).HasPrecision(9, 4);
+        b.Property(x => x.SectionalSchemeCode).HasMaxLength(20);
+        b.Property(x => x.UnitNumber).HasMaxLength(20);
+        b.Ignore(x => x.Subject);
         b.HasKey(x => x.Id);
         b.Property(x => x.ApplicationNumber).HasMaxLength(30);
         b.Property(x => x.TransferType).HasConversion<int>();

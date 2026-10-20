@@ -31,6 +31,8 @@ public sealed class TransferApplicationService : ITransferApplicationService
     private readonly ISalesLedgerService _ar;
     private readonly Application.Abstractions.Trading.IAllocationService _allocations;
     private readonly Lazy<IWorkflowService>? _workflow;
+    private readonly IJointOwnershipService? _joint;
+    private readonly ISectionalTitleService? _sectional;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -40,9 +42,15 @@ public sealed class TransferApplicationService : ITransferApplicationService
     /// <param name="ownership">The municipal owner register.</param>
     /// <param name="ar">The sales ledger, for a balance assumed by the transferee.</param>
     /// <param name="allocations">The allocations, to match the credit notes to the items they clear.</param>
+    /// <param name="workflow">The workflow engine, when transfers are routed through it.</param>
+    /// <param name="joint">The joint-holding register, for a share transfer.</param>
+    /// <param name="sectional">The sectional-title register, for a unit transfer.</param>
     public TransferApplicationService(One4AllDbContext db, INumberSequenceService numbers, IPermissionService permissions, IHousingService housing, IOwnershipService ownership,
-        ISalesLedgerService ar, Application.Abstractions.Trading.IAllocationService allocations, Lazy<IWorkflowService>? workflow = null)
+        ISalesLedgerService ar, Application.Abstractions.Trading.IAllocationService allocations, Lazy<IWorkflowService>? workflow = null, IJointOwnershipService? joint = null,
+        ISectionalTitleService? sectional = null)
     {
+        _joint = joint;
+        _sectional = sectional;
         _workflow = workflow;
         _ar = ar;
         _allocations = allocations;
@@ -62,13 +70,50 @@ public sealed class TransferApplicationService : ITransferApplicationService
             return Error.Validation("Hse.TransferDetails", "A transfer needs its type and no negative consideration.");
         }
 
-        HousingStand? stand = await _db.HousingStands.AsNoTracking().FirstOrDefaultAsync(s => s.Id == lodgement.StandId && s.CompanyId == lodgement.CompanyId, ct).ConfigureAwait(false);
-        if (stand is null)
+        // A unit in a sectional scheme passes on the scheme's stand; its owner is the transferor.
+        string? schemeCode = string.IsNullOrWhiteSpace(lodgement.SectionalSchemeCode) ? null : lodgement.SectionalSchemeCode.Trim().ToUpperInvariant();
+        string? unitNumber = string.IsNullOrWhiteSpace(lodgement.UnitNumber) ? null : lodgement.UnitNumber.Trim().ToUpperInvariant();
+        long standId = lodgement.StandId;
+        long? unitOwner = null;
+        if (schemeCode is not null || unitNumber is not null)
         {
-            return Error.NotFound("Hse.StandNotFound", $"Stand {lodgement.StandId} not found.");
+            SectionalScheme? scheme = await _db.Set<SectionalScheme>().AsNoTracking().Include(s => s.Units).ThenInclude(u => u.Owners)
+                .FirstOrDefaultAsync(s => s.CompanyId == lodgement.CompanyId && s.Code == schemeCode, ct).ConfigureAwait(false);
+            SectionalUnit? unit = scheme?.Units.FirstOrDefault(u => u.UnitNumber == unitNumber);
+            if (scheme is null || unit is null)
+            {
+                return Error.NotFound("Hse.UnitNotFound", $"Unit {unitNumber} is not in sectional scheme {schemeCode}.");
+            }
+
+            if (unit.CurrentOwnerCustomerId is null)
+            {
+                return Error.Rule("Hse.NoHolder", $"Unit {unitNumber} has no owner to transfer from.");
+            }
+
+            standId = scheme.StandId;
+            unitOwner = unit.CurrentOwnerCustomerId;
         }
 
-        if (stand.CurrentHolderCustomerId is not long holderId)
+        HousingStand? stand = await _db.HousingStands.AsNoTracking().FirstOrDefaultAsync(s => s.Id == standId && s.CompanyId == lodgement.CompanyId, ct).ConfigureAwait(false);
+        if (stand is null)
+        {
+            return Error.NotFound("Hse.StandNotFound", $"Stand {standId} not found.");
+        }
+
+        // A share passes from one of the joint holders; a unit from its owner; otherwise from the stand's holder.
+        long? from = unitOwner;
+        if (lodgement.SharePercent is decimal share)
+        {
+            if (share <= 0m || share > 100m || lodgement.FromCustomerId is not long jointHolder
+                || !await _db.Set<StandHolding>().AnyAsync(h => h.StandId == stand.Id && h.CustomerId == jointHolder && h.HeldTo == null && h.SharePercent >= share, ct).ConfigureAwait(false))
+            {
+                return Error.Rule("Hse.ShareTransfer", "A share transfer needs a joint holder of the stand holding at least the share passing.");
+            }
+
+            from = jointHolder;
+        }
+
+        if ((from ?? stand.CurrentHolderCustomerId) is not long holderId)
         {
             return Error.Rule("Hse.NoHolder", $"Stand {stand.StandNumber} has no holder to transfer from.");
         }
@@ -89,9 +134,10 @@ public sealed class TransferApplicationService : ITransferApplicationService
             return Error.Rule("Hse.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute and cannot be transferred.");
         }
 
-        if (await _db.Set<TransferApplication>().AnyAsync(a => a.StandId == stand.Id && a.Status != TransferStatus.Completed && a.Status != TransferStatus.Rejected, ct).ConfigureAwait(false))
+        if (await _db.Set<TransferApplication>().AnyAsync(a => a.StandId == stand.Id && a.UnitNumber == unitNumber && a.SectionalSchemeCode == schemeCode
+            && a.Status != TransferStatus.Completed && a.Status != TransferStatus.Rejected, ct).ConfigureAwait(false))
         {
-            return Error.Conflict("Hse.TransferOpen", $"Stand {stand.StandNumber} already has a transfer application open.");
+            return Error.Conflict("Hse.TransferOpen", $"{(unitNumber is null ? $"Stand {stand.StandNumber}" : $"Unit {unitNumber}")} already has a transfer application open.");
         }
 
         Result<string> number = await _numbers.AllocateAsync(lodgement.CompanyId, "TRF", lodgement.Date, ct: ct).ConfigureAwait(false);
@@ -100,7 +146,9 @@ public sealed class TransferApplicationService : ITransferApplicationService
             return number.Error;
         }
 
-        _db.Set<TransferApplication>().Add(new TransferApplication(lodgement.CompanyId, number.Value, stand.Id, lodgement.TransferType, holderId, lodgement.ToCustomerId, lodgement.Consideration, lodgement.Date));
+        TransferApplication application = new(lodgement.CompanyId, number.Value, stand.Id, lodgement.TransferType, holderId, lodgement.ToCustomerId, lodgement.Consideration, lodgement.Date);
+        application.Narrow(lodgement.SharePercent, schemeCode, unitNumber);
+        _db.Set<TransferApplication>().Add(application);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return number.Value;
     }
@@ -266,7 +314,8 @@ public sealed class TransferApplicationService : ITransferApplicationService
         }
 
         HousingStand stand = await _db.HousingStands.AsNoTracking().FirstAsync(s => s.Id == application.StandId, ct).ConfigureAwait(false);
-        if (stand.CurrentHolderCustomerId != application.FromCustomerId)
+        bool partial = application.SharePercent is not null || application.UnitNumber is not null;
+        if (!partial && stand.CurrentHolderCustomerId != application.FromCustomerId)
         {
             return Result.Failure(Error.Conflict("Hse.HolderChanged", $"Stand {stand.StandNumber} no longer belongs to the transferor."));
         }
@@ -276,6 +325,35 @@ public sealed class TransferApplicationService : ITransferApplicationService
         if (failing.Count > 0)
         {
             return Result.Failure(Error.Rule("Hse.LiveCheckFailed", string.Join("; ", failing.Select(l => $"{l.Requirement}: {l.Detail}")) + "."));
+        }
+
+        // A share or a unit passes on its own register (the share's holders, the unit's owners); the stand's holder is unchanged.
+        if (application.SharePercent is decimal share)
+        {
+            Result moved = _joint is null ? Result.Failure(Error.Rule("Hse.ShareTransfer", "The joint-holding register is not available."))
+                : await _joint.TransferShareAsync(companyId, stand.Id, application.FromCustomerId, application.ToCustomerId, share, date, ct).ConfigureAwait(false);
+            if (moved.IsFailure)
+            {
+                return moved;
+            }
+
+            application.Complete(date);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
+        }
+
+        if (application.UnitNumber is string unitNumber)
+        {
+            Result moved = _sectional is null ? Result.Failure(Error.Rule("Hse.UnitTransfer", "The sectional-title register is not available."))
+                : await _sectional.TransferUnitAsync(companyId, application.SectionalSchemeCode!, unitNumber, application.ToCustomerId, application.Consideration, date, ct).ConfigureAwait(false);
+            if (moved.IsFailure)
+            {
+                return moved;
+            }
+
+            application.Complete(date);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
         }
 
         Clearance clearance = await MunicipalClearanceAsync(application, date, ct).ConfigureAwait(false);

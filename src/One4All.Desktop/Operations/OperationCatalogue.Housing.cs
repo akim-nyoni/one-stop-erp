@@ -1256,8 +1256,15 @@ public static partial class OperationCatalogue
 
                         return Check(await joint.RegisterAsync(c.CompanyId, stand, Enum.Parse<CoOwnershipRegime>(i.Text("Regime")), shares, i.Date("Date")).ConfigureAwait(true), "Holders registered.");
                     case "Transfer share":
-                        return Check(await joint.TransferShareAsync(c.CompanyId, stand, await CustomerAsync(c, i.Optional("From") ?? string.Empty).ConfigureAwait(true),
-                            await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true), i.Number("Portion"), i.Date("Date")).ConfigureAwait(true), "Share transferred.");
+                    {
+                        // A share passes like a stand: lodged, verified, approved by two officers and completed on the ownership transfer screen.
+                        string lodged = Check(await c.Get<ITransferApplicationService>().LodgeAsync(new TransferLodgement
+                        {
+                            CompanyId = c.CompanyId, StandId = stand, TransferType = TransferType.Sale, FromCustomerId = await CustomerAsync(c, i.Optional("From") ?? string.Empty).ConfigureAwait(true),
+                            ToCustomerId = await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true), SharePercent = i.Number("Portion"), Date = i.Date("Date"),
+                        }).ConfigureAwait(true));
+                        return $"Share transfer lodged as {lodged}: verify, submit, approve and complete it under the ownership transfer.";
+                    }
                     case "Record death":
                         return Show(Check(await joint.RecordDeathAsync(c.CompanyId, stand, await CustomerAsync(c, i.Optional("From") ?? string.Empty).ConfigureAwait(true), i.Date("Date")).ConfigureAwait(true)));
                     default:
@@ -1296,8 +1303,15 @@ public static partial class OperationCatalogue
 
                         return Show(Check(await sectional.RegisterAsync(c.CompanyId, scheme, i.Optional("Name") ?? scheme, stand, areas).ConfigureAwait(true)));
                     case "Transfer unit":
-                        return Check(await sectional.TransferUnitAsync(c.CompanyId, scheme, i.Optional("Unit") ?? string.Empty, await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true),
-                            i.Number("Amount"), i.Date("Date")).ConfigureAwait(true), "Unit transferred.");
+                    {
+                        // A unit passes through the transfer pipeline too: lodged here, completed under the ownership transfer once approved.
+                        string lodged = Check(await c.Get<ITransferApplicationService>().LodgeAsync(new TransferLodgement
+                        {
+                            CompanyId = c.CompanyId, TransferType = TransferType.Sale, SectionalSchemeCode = scheme, UnitNumber = i.Optional("Unit") ?? string.Empty,
+                            ToCustomerId = await CustomerAsync(c, i.Optional("To") ?? string.Empty).ConfigureAwait(true), Consideration = i.Number("Amount"), Date = i.Date("Date"),
+                        }).ConfigureAwait(true));
+                        return $"Unit transfer lodged as {lodged}: verify, submit, approve and complete it under the ownership transfer.";
+                    }
                     case "Units":
                         return Show(Check(await sectional.UnitsAsync(c.CompanyId, scheme).ConfigureAwait(true)));
                     default:

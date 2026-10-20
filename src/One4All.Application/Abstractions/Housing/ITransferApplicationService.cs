@@ -23,6 +23,18 @@ public sealed class TransferLodgement
 
     /// <summary>When it is lodged.</summary>
     public DateOnly Date { get; init; }
+
+    /// <summary>For a share of a jointly held stand: the joint holder transferring it.</summary>
+    public long? FromCustomerId { get; init; }
+
+    /// <summary>For a share of a jointly held stand: the percentage passing (null: the whole stand).</summary>
+    public decimal? SharePercent { get; init; }
+
+    /// <summary>For a sectional-title unit: the scheme (the stand is the scheme's; StandId may be left 0).</summary>
+    public string? SectionalSchemeCode { get; init; }
+
+    /// <summary>For a sectional-title unit: the unit number.</summary>
+    public string? UnitNumber { get; init; }
 }
 
 /// <summary>One checklist line of an application.</summary>

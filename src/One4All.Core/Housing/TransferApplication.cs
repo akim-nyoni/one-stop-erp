@@ -139,6 +139,29 @@ public sealed class TransferApplication : AuditableEntity, ICompanyScoped
     /// <summary>The incoming holder.</summary>
     public long ToCustomerId { get; private set; }
 
+    /// <summary>For a share of a jointly held stand: the percentage passing from the transferor (null: the whole stand).</summary>
+    public decimal? SharePercent { get; private set; }
+
+    /// <summary>For a sectional-title unit: the scheme (null: the stand itself).</summary>
+    public string? SectionalSchemeCode { get; private set; }
+
+    /// <summary>For a sectional-title unit: the unit number.</summary>
+    public string? UnitNumber { get; private set; }
+
+    /// <summary>Gets what passes: the whole stand, a share of it, or a unit in a sectional scheme on it.</summary>
+    public string Subject => SharePercent is decimal share ? $"{share:0.####}% share" : UnitNumber is string unit ? $"unit {SectionalSchemeCode}/{unit}" : "stand";
+
+    /// <summary>Narrows the application to a share of the stand or to one sectional-title unit on it.</summary>
+    /// <param name="sharePercent">The share passing (null: not a share transfer).</param>
+    /// <param name="schemeCode">The sectional scheme (null: not a unit transfer).</param>
+    /// <param name="unitNumber">The unit.</param>
+    public void Narrow(decimal? sharePercent, string? schemeCode, string? unitNumber)
+    {
+        SharePercent = sharePercent;
+        SectionalSchemeCode = schemeCode;
+        UnitNumber = unitNumber;
+    }
+
     /// <summary>The consideration.</summary>
     public decimal Consideration { get; private set; }
 
