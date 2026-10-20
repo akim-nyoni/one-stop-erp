@@ -150,6 +150,7 @@ public static partial class OperationCatalogue
                 Opt("Description", "Description (register, maintenance)"), Opt("Class", "Asset class (register)"), OptNum("Amount", "Cost / proceeds / new carrying amount / maintenance cost"),
                 Opt("Funding", "Funding account (register: credited; dispose: debited with proceeds)"), Opt("Parent", "Parent asset (register a component)"),
                 Opt("CostCentre", "Cost centre (register)"), Opt("Department", "Department (register)"), Opt("Gain", "Gain on disposal account"), Opt("Loss", "Loss on disposal account"),
+                Opt("Customer", "Sold to customer (dispose: invoiced; Funding is then the proceeds account)"), Opt("TaxCode", "Tax code on the sale (dispose to a customer)"),
                 Opt("Reserve", "Revaluation reserve account"), Opt("WriteDown", "Revaluation write-down expense account"), Opt("Location", "New location (move)"),
                 Opt("Custodian", "New custodian (move)"), Opt("Provider", "Service provider (maintenance)"), Opt("Document", "Document number"),
                 Opt("Tag", "Barcode / tag number (register, move)")],
@@ -184,8 +185,15 @@ public static partial class OperationCatalogue
                 switch (step)
                 {
                     case "Dispose":
-                        DisposalResult disposal = Check(await assets.DisposeAsync(c.CompanyId, asset, i.OptionalNumber("Amount") ?? 0m, date, i.Optional("Funding") ?? string.Empty,
-                            i.Optional("Gain") ?? string.Empty, i.Optional("Loss") ?? string.Empty, document).ConfigureAwait(true));
+                        DisposalResult disposal = i.Optional("Customer") is string buyer
+                            ? Check(await assets.SellToCustomerAsync(new AssetSaleRequest
+                            {
+                                CompanyId = c.CompanyId, AssetId = asset, CustomerId = await CustomerAsync(c, buyer).ConfigureAwait(true), NetProceeds = i.OptionalNumber("Amount") ?? 0m,
+                                TaxCode = i.Optional("TaxCode"), Date = date, InvoiceNumber = document, ProceedsAccountCode = i.Optional("Funding") ?? string.Empty,
+                                GainAccountCode = i.Optional("Gain") ?? string.Empty, LossAccountCode = i.Optional("Loss") ?? string.Empty,
+                            }).ConfigureAwait(true))
+                            : Check(await assets.DisposeAsync(c.CompanyId, asset, i.OptionalNumber("Amount") ?? 0m, date, i.Optional("Funding") ?? string.Empty,
+                                i.Optional("Gain") ?? string.Empty, i.Optional("Loss") ?? string.Empty, document).ConfigureAwait(true));
                         return $"{number} disposed: proceeds {M(disposal.Proceeds)} against book value {M(disposal.NetBookValue)}, "
                             + (disposal.GainOrLoss >= 0m ? $"profit {M(disposal.GainOrLoss)}" : $"loss {M(-disposal.GainOrLoss)}") + $" (journal {disposal.JournalNumber}).";
                     case "Revalue":

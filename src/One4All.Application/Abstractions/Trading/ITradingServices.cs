@@ -177,6 +177,23 @@ public interface IPurchaseLedgerService
     /// <returns>The reversal journal number, or why not.</returns>
     Task<Result<string>> ReversePaymentAsync(long companyId, string paymentNumber, DateOnly date, string reason, CancellationToken ct = default);
 
+    /// <summary>
+    /// Banks money a supplier pays back (an overpayment or a credit note refunded): Dr bank, Cr payables, as a credit item on the supplier's account,
+    /// matched at once to the overpayment or debit note it settles when that is named.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="supplierId">The supplier.</param>
+    /// <param name="documentNumber">The refund's document number.</param>
+    /// <param name="date">The date banked.</param>
+    /// <param name="currency">The currency.</param>
+    /// <param name="amount">The amount.</param>
+    /// <param name="bankAccountCode">The bank account it is banked to.</param>
+    /// <param name="againstDocumentNumber">The overpayment or debit note it settles (null: left open to allocate later).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The posting.</returns>
+    Task<Result<TradingPostingResult>> PostRefundReceiptAsync(long companyId, long supplierId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode,
+        string? againstDocumentNumber = null, CancellationToken ct = default);
+
     /// <summary>Posts a supplier credit note: Dr AP control, Cr expense/stock, Cr input tax; creates an AP (debit) open item.</summary>
     /// <param name="request">The credit-note request.</param>
     /// <param name="ct">Cancellation token.</param>

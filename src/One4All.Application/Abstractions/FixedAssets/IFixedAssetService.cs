@@ -128,6 +128,43 @@ public readonly record struct DisposalResult(decimal Proceeds, decimal NetBookVa
 /// <param name="JournalNumber">The revaluation journal number.</param>
 public readonly record struct RevaluationResult(decimal Delta, decimal NewCarryingAmount, string JournalNumber, decimal ToReserve = 0m, decimal ToProfit = 0m);
 
+/// <summary>An asset sold to a customer on credit, invoiced with output VAT.</summary>
+public sealed class AssetSaleRequest
+{
+    /// <summary>Gets the company.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>Gets the asset.</summary>
+    public long AssetId { get; init; }
+
+    /// <summary>Gets the buyer.</summary>
+    public long CustomerId { get; init; }
+
+    /// <summary>Gets the selling price before VAT.</summary>
+    public decimal NetProceeds { get; init; }
+
+    /// <summary>Gets the tax code the sale is taxed at (null: no VAT).</summary>
+    public string? TaxCode { get; init; }
+
+    /// <summary>Gets the output tax account (blank: the tax code's).</summary>
+    public string? TaxAccountCode { get; init; }
+
+    /// <summary>Gets the sale date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>Gets the invoice number (also the disposal's document).</summary>
+    public string InvoiceNumber { get; init; } = string.Empty;
+
+    /// <summary>Gets the disposal proceeds account the invoice credits and the disposal clears.</summary>
+    public string ProceedsAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the profit-on-disposal account.</summary>
+    public string GainAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Gets the loss-on-disposal account.</summary>
+    public string LossAccountCode { get; init; } = string.Empty;
+}
+
 /// <summary>
 /// Fixed Assets (brief §4.14). Registers assets, runs monthly depreciation posting to the GL, and disposes
 /// assets recognising the profit or loss - all through the central posting engine.
@@ -203,6 +240,15 @@ public interface IFixedAssetService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The disposal result.</returns>
     Task<Result<DisposalResult>> DisposeAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct = default);
+
+    /// <summary>
+    /// Sells an asset to a customer on credit, in one unit: a tax invoice for the net proceeds plus output VAT at the tax code (the proceeds through a
+    /// disposal proceeds account), then the disposal against those proceeds - cost and depreciation cleared and the profit or loss recognised.
+    /// </summary>
+    /// <param name="request">The sale.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The disposal, or why not.</returns>
+    Task<Result<DisposalResult>> SellToCustomerAsync(AssetSaleRequest request, CancellationToken ct = default);
 
     /// <summary>
     /// Revalues an active asset to a new carrying amount (IAS 16.39-40, per asset): an uplift first reverses decreases this asset charged to

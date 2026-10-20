@@ -404,14 +404,23 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Suppliers", Title = "Supplier payment", ListTitle = "Open supplier items",
-            Description = "A single payment to a supplier from the bank (several at once go through the payment run).",
-            Fields = [SupplierPick("Supplier", "Supplier"), Req("Number", "Payment number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
-                Opt("Currency", "Currency (blank: the supplier's)"), Opt("Narrative", "Narrative")],
+            Description = "A single payment to a supplier from the bank (several at once go through the payment run), or money the supplier pays back (tick Refund): banked "
+                + "against the supplier's account and matched to the overpayment or debit note it settles.",
+            Fields = [SupplierPick("Supplier", "Supplier"), Req("Number", "Payment / refund number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
+                Opt("Currency", "Currency (blank: the supplier's)"), Opt("Narrative", "Narrative"), Tick("Refund", "A refund from the supplier (money in)"),
+                Opt("Against", "Overpayment / debit note the refund settles")],
             Run = async (c, i) =>
             {
                 long supplier = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true);
                 CurrencyCode currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code)
                     : await c.Db.Suppliers.AsNoTracking().Where(x => x.Id == supplier).Select(x => x.Currency).SingleAsync().ConfigureAwait(true);
+                if (i.Flag("Refund"))
+                {
+                    TradingPostingResult refund = Check(await c.Get<IPurchaseLedgerService>().PostRefundReceiptAsync(c.CompanyId, supplier, i.Text("Number"), i.Date("Date"), currency,
+                        i.Number("Amount"), i.Text("Bank"), i.Optional("Against")).ConfigureAwait(true));
+                    return $"Refund {i.Text("Number")} banked: {M(refund.BaseAmount)} base (journal {refund.JournalNumber}).";
+                }
+
                 TradingPostingResult posted = Check(await c.Get<IPurchaseLedgerService>().PostPaymentAsync(new PaymentRequest
                 {
                     CompanyId = c.CompanyId, SupplierId = supplier, DocumentNumber = i.Text("Number"), PaymentDate = i.Date("Date"), Currency = currency, Amount = i.Number("Amount"),

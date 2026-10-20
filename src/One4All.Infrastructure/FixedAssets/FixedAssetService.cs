@@ -17,11 +17,15 @@ public sealed class FixedAssetService : IFixedAssetService
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _posting;
 
+    private readonly Application.Abstractions.Trading.ISalesLedgerService? _sales;
+
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The central posting engine.</param>
-    public FixedAssetService(One4AllDbContext db, IPostingEngine posting)
+    /// <param name="sales">The sales ledger, for an asset sold to a customer on an invoice.</param>
+    public FixedAssetService(One4AllDbContext db, IPostingEngine posting, Application.Abstractions.Trading.ISalesLedgerService? sales = null)
     {
+        _sales = sales;
         _db = db;
         _posting = posting;
     }
@@ -381,6 +385,55 @@ public sealed class FixedAssetService : IFixedAssetService
     /// <inheritdoc />
     public Task<Result<DisposalResult>> DisposeAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct = default)
         => _db.AtomicAsync(() => DisposeCoreAsync(companyId, assetId, proceeds, date, fundingAccountCode, gainAccountCode, lossAccountCode, documentNumber, ct), ct);
+
+    /// <inheritdoc />
+    public Task<Result<DisposalResult>> SellToCustomerAsync(AssetSaleRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return _db.AtomicAsync(async () =>
+        {
+            if (_sales is null || request.NetProceeds < 0m || string.IsNullOrWhiteSpace(request.InvoiceNumber) || string.IsNullOrWhiteSpace(request.ProceedsAccountCode))
+            {
+                return Error.Validation("Fa.SaleDetails", "An asset sale needs the invoice number, the proceeds account and a price of zero or more.");
+            }
+
+            Core.Trading.Customer? customer = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.CustomerId && c.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+            if (customer is null)
+            {
+                return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
+            }
+
+            // Output VAT at the tax code's rate on the day (a disposal of a business asset is a taxable supply).
+            decimal tax = 0m;
+            string? taxCode = string.IsNullOrWhiteSpace(request.TaxCode) ? null : request.TaxCode.Trim().ToUpperInvariant();
+            string? taxAccount = string.IsNullOrWhiteSpace(request.TaxAccountCode) ? null : request.TaxAccountCode.Trim();
+            if (taxCode is not null)
+            {
+                Core.Accounting.TaxCode? code = await _db.TaxCodes.AsNoTracking().Include(t => t.Rates).FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == taxCode, ct).ConfigureAwait(false);
+                if (code is null)
+                {
+                    return Error.NotFound("Tax.CodeNotFound", $"No tax code {taxCode}.");
+                }
+
+                tax = decimal.Round(request.NetProceeds * code.RateOn(request.Date) / 100m, 2, MidpointRounding.AwayFromZero);
+                taxAccount ??= code.OutputAccountCode;
+            }
+
+            Result<Application.Abstractions.Trading.TradingPostingResult> invoiced = await _sales.PostInvoiceAsync(new Application.Abstractions.Trading.SalesInvoiceRequest
+            {
+                CompanyId = request.CompanyId, CustomerId = customer.Id, DocumentNumber = request.InvoiceNumber.Trim(), DocumentDate = request.Date, Currency = customer.Currency,
+                NetAmount = request.NetProceeds, TaxAmount = tax, TaxCode = taxCode, TaxAccountCode = taxAccount, SalesAccountCode = request.ProceedsAccountCode.Trim(),
+                Narrative = $"Sale of asset {request.AssetId}",
+            }, ct).ConfigureAwait(false);
+            if (invoiced.IsFailure)
+            {
+                return invoiced.Error;
+            }
+
+            return await DisposeCoreAsync(request.CompanyId, request.AssetId, request.NetProceeds, request.Date, request.ProceedsAccountCode.Trim(), request.GainAccountCode, request.LossAccountCode,
+                request.InvoiceNumber.Trim(), ct).ConfigureAwait(false);
+        }, ct);
+    }
 
     // One unit of work: its postings and record changes commit together or not at all.
     private async Task<Result<DisposalResult>> DisposeCoreAsync(long companyId, long assetId, decimal proceeds, DateOnly date, string fundingAccountCode, string gainAccountCode, string lossAccountCode, string documentNumber, CancellationToken ct)

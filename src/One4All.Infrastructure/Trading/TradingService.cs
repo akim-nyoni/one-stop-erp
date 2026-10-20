@@ -1393,6 +1393,59 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         }, ct);
 
     /// <inheritdoc />
+    public Task<Result<TradingPostingResult>> PostRefundReceiptAsync(long companyId, long supplierId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode,
+        string? againstDocumentNumber = null, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            if (amount <= 0m || string.IsNullOrWhiteSpace(documentNumber) || string.IsNullOrWhiteSpace(bankAccountCode))
+            {
+                return Error.Validation("Ap.RefundDetails", "A supplier refund needs a positive amount, its document number and the bank account.");
+            }
+
+            Supplier? supplier = await _db.Suppliers.FirstOrDefaultAsync(s => s.Id == supplierId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+            if (supplier is null)
+            {
+                return Error.NotFound("Ap.SupplierNotFound", $"Supplier {supplierId} not found.");
+            }
+
+            Result<string> control = await ControlCodeAsync(companyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
+            if (control.IsFailure)
+            {
+                return control.Error;
+            }
+
+            Result<decimal> rateResult = await ResolveRateAsync(companyId, currency, null, date, ct, supplier.RateType).ConfigureAwait(false);
+            if (rateResult.IsFailure)
+            {
+                return rateResult.Error;
+            }
+
+            decimal rate = rateResult.Value;
+            decimal baseAmount = Round(amount * rate);
+
+            // The opposite of a payment: Dr bank, Cr payables control - a credit item that clears the supplier's debit balance.
+            Result<TradingPostingResult> posted = await PostAndOpenAsync(companyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Journal, LedgerSign.Credit,
+                documentNumber.Trim(), date, date, currency, rate, amount, baseAmount, "Supplier refund",
+                [Line(bankAccountCode.Trim(), JournalSide.Debit, amount, rate, baseAmount), Line(control.Value, JournalSide.Credit, amount, rate, baseAmount)], ct).ConfigureAwait(false);
+            if (posted.IsFailure || string.IsNullOrWhiteSpace(againstDocumentNumber))
+            {
+                return posted;
+            }
+
+            string against = againstDocumentNumber.Trim();
+            OpenItem? debit = await _db.OpenItems.FirstOrDefaultAsync(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.TraderId == supplier.Id
+                && i.DocumentNumber == against && i.Sign == LedgerSign.Debit && i.OutstandingTransaction > 0m, ct).ConfigureAwait(false);
+            if (debit is null)
+            {
+                return Error.NotFound("Ap.RefundAgainst", $"{supplier.Code} has no open overpayment or debit note {against}.");
+            }
+
+            Result<AllocationResult> matched = await AllocateCoreAsync(companyId, TradingLedger.AccountsPayable, debit.Id, posted.Value.OpenItemId,
+                Math.Min(amount, debit.OutstandingTransaction), date, ct).ConfigureAwait(false);
+            return matched.IsFailure ? matched.Error : posted;
+        }, ct);
+
+    /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PostReceiptReversalAsync(long companyId, long customerId, string documentNumber, DateOnly date, CurrencyCode currency, decimal amount, string bankAccountCode, decimal? exchangeRate = null, CancellationToken ct = default)
         => _db.AtomicAsync(() => PostReceiptReversalCoreAsync(companyId, customerId, documentNumber, date, currency, amount, bankAccountCode, exchangeRate, ct), ct);
 
