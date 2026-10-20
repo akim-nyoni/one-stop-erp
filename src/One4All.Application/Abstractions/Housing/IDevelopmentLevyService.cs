@@ -36,6 +36,18 @@ public interface IDevelopmentLevyService
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> DeactivateAsync(long companyId, string code, CancellationToken ct = default);
 
+    /// <summary>
+    /// Spreads a levy's income over months (a connection fee earned over the service it pays for): its invoices credit the deferred income account,
+    /// and a schedule releases a share to income each month.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="code">The levy.</param>
+    /// <param name="months">The months (0: recognised at once again).</param>
+    /// <param name="deferredIncomeAccountCode">The deferred income account.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why not.</returns>
+    Task<Result> SetDeferralAsync(long companyId, string code, int months, string? deferredIncomeAccountCode, CancellationToken ct = default);
+
     /// <summary>Raises the allocation levies on an accepted allocation's beneficiary (their customer account is found by national ID).</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="certificateNumber">The allocation certificate.</param>

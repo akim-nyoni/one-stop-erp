@@ -69,6 +69,12 @@ public sealed class PrepaymentSchedule : AuditableEntity, ICompanyScoped
     /// <summary>Gets how many months it covers.</summary>
     public int Months { get; private set; }
 
+    /// <summary>
+    /// Whether the schedule releases deferred income rather than a prepaid expense: each month debits the deferred income account (held in
+    /// <see cref="PrepaymentAccountCode"/>) and credits the income account (held in <see cref="ExpenseAccountCode"/>).
+    /// </summary>
+    public bool IsDeferredIncome { get; set; }
+
     /// <summary>Gets how many months have been released.</summary>
     public int ReleasedMonths { get; private set; }
 

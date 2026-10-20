@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Housing;
+using One4All.Core.Accounting;
 using One4All.Core.Housing;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
@@ -96,7 +97,16 @@ public sealed class DevelopmentLevyTests
         refused.Reject(new DateOnly(2026, 6, 2), "Incomplete");
         db.Set<TransferApplication>().AddRange(sale, refused);
         await db.SaveChangesAsync();
+        // The connection fee is earned over 10 months: invoiced to deferred income, a tenth released each month.
+        db.Accounts.Add(new LedgerAccount(companyId, "2490", "Deferred Connection Fees", AccountType.Liability));
+        await db.SaveChangesAsync();
+        (await levies.SetDeferralAsync(companyId, "CONN", 10, null)).Error.Code.Should().Be("Hse.LevyDeferral");
+        (await levies.SetDeferralAsync(companyId, "conn", 10, "2490")).IsSuccess.Should().BeTrue();
         (await levies.ChargeTransferAsync(companyId, sale.ApplicationNumber, new DateOnly(2026, 6, 3))).Value.Select(r => (r.LevyCode, r.Amount)).Should().Equal(("CONN", 100m), ("XFER", 400m));
+        (await scope.ServiceProvider.GetRequiredService<One4All.Application.Abstractions.Accounting.IAccrualService>().ReleasePrepaymentsAsync(companyId, new DateOnly(2026, 8, 31)))
+            .Value.Amount.Should().Be(30m, "June, July and August");
+        (await db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId).SelectMany(j => j.Lines).Where(l => l.AccountCode == "2490").SumAsync(l => l.BaseCredit - l.BaseDebit))
+            .Should().Be(70m);
         (await levies.ChargeTransferAsync(companyId, sale.ApplicationNumber, new DateOnly(2026, 6, 4))).Value.Should().BeEmpty();
         (await levies.ChargeTransferAsync(companyId, refused.ApplicationNumber, new DateOnly(2026, 6, 3))).Error.Code.Should().Be("Hse.TransferClosed");
         (await db.Set<LevyCharge>().CountAsync(c => c.CompanyId == companyId)).Should().Be(5);

@@ -66,6 +66,21 @@ public sealed class DevelopmentLevy : AuditableEntity, ICompanyScoped
     /// <summary>The levy code.</summary>
     public string Code { get; private set; }
 
+    /// <summary>Months the levy's income is spread over (a connection fee recognised over the service it pays for); null: recognised at once.</summary>
+    public int? DeferMonths { get; private set; }
+
+    /// <summary>The deferred income account the levy sits in until it is recognised.</summary>
+    public string? DeferredIncomeAccountCode { get; private set; }
+
+    /// <summary>Spreads the levy's income over months, through a deferred income account (0 or null months: recognised at once).</summary>
+    /// <param name="months">The months.</param>
+    /// <param name="deferredIncomeAccountCode">The deferred income account.</param>
+    public void Defer(int? months, string? deferredIncomeAccountCode)
+    {
+        DeferMonths = months is > 0 ? months : null;
+        DeferredIncomeAccountCode = DeferMonths is null ? null : deferredIncomeAccountCode;
+    }
+
     /// <summary>Its name.</summary>
     public string Name { get; private set; }
 

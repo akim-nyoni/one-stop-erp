@@ -3,6 +3,7 @@ using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Numbering;
 using One4All.Application.Abstractions.Trading;
 using One4All.Application.Housing;
+using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Housing;
 using One4All.Core.Trading;
@@ -60,6 +61,26 @@ public sealed class DevelopmentLevyService : IDevelopmentLevyService
         }
 
         levy.Deactivate();
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> SetDeferralAsync(long companyId, string code, int months, string? deferredIncomeAccountCode, CancellationToken ct = default)
+    {
+        string key = (code ?? string.Empty).Trim().ToUpperInvariant();
+        DevelopmentLevy? levy = await _db.Set<DevelopmentLevy>().FirstOrDefaultAsync(l => l.CompanyId == companyId && l.Code == key, ct).ConfigureAwait(false);
+        if (levy is null)
+        {
+            return Result.Failure(Error.NotFound("Hse.LevyNotFound", $"No levy {key}."));
+        }
+
+        if (months < 0 || (months > 0 && string.IsNullOrWhiteSpace(deferredIncomeAccountCode)))
+        {
+            return Result.Failure(Error.Validation("Hse.LevyDeferral", "A deferred levy needs a positive number of months and the deferred income account."));
+        }
+
+        levy.Defer(months, deferredIncomeAccountCode?.Trim());
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -143,14 +164,22 @@ public sealed class DevelopmentLevyService : IDevelopmentLevyService
                 return document.Error;
             }
 
+            // A deferred levy is invoiced to its deferred income account and released to income month by month.
+            bool deferred = levy.DeferMonths is > 0 && levy.DeferredIncomeAccountCode is not null;
             Result<TradingPostingResult> invoiced = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
             {
                 CompanyId = companyId, CustomerId = customer.Id, DocumentNumber = document.Value, DocumentDate = date, Currency = customer.Currency,
-                NetAmount = amount.Value, SalesAccountCode = levy.IncomeAccountCode, Narrative = $"{levy.Name} ({eventReference})",
+                NetAmount = amount.Value, SalesAccountCode = deferred ? levy.DeferredIncomeAccountCode! : levy.IncomeAccountCode, Narrative = $"{levy.Name} ({eventReference})",
             }, ct).ConfigureAwait(false);
             if (invoiced.IsFailure)
             {
                 return invoiced.Error;
+            }
+
+            if (deferred)
+            {
+                _db.Set<PrepaymentSchedule>().Add(new PrepaymentSchedule(companyId, document.Value, $"{levy.Name} ({eventReference}) recognised", levy.DeferredIncomeAccountCode!,
+                    levy.IncomeAccountCode, amount.Value, new DateOnly(date.Year, date.Month, 1), levy.DeferMonths!.Value) { IsDeferredIncome = true });
             }
 
             _db.Set<LevyCharge>().Add(new LevyCharge(companyId, levy.Id, standId, customer.Id, eventReference, amount.Value, document.Value, date));

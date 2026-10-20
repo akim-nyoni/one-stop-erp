@@ -80,8 +80,12 @@ public sealed class AccrualService : IAccrualService
                         DocumentNumber = $"{schedule.Reference}-{index + 1:00}", Narrative = $"{schedule.Description} - month {index + 1} of {schedule.Months}",
                         Lines =
                         [
-                            new JournalLineRequest { AccountCode = schedule.ExpenseAccountCode, Side = JournalSide.Debit, TransactionAmount = month, CostCentre = schedule.CostCentre, Department = schedule.Department },
-                            new JournalLineRequest { AccountCode = schedule.PrepaymentAccountCode, Side = JournalSide.Credit, TransactionAmount = month },
+                            new JournalLineRequest
+                            {
+                                AccountCode = schedule.ExpenseAccountCode, Side = schedule.IsDeferredIncome ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = month,
+                                CostCentre = schedule.CostCentre, Department = schedule.Department,
+                            },
+                            new JournalLineRequest { AccountCode = schedule.PrepaymentAccountCode, Side = schedule.IsDeferredIncome ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = month },
                         ],
                     }, ct).ConfigureAwait(false);
                     if (posted.IsFailure)

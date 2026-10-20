@@ -1051,7 +1051,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Development levies", ListTitle = "Levies",
             Description = "Defines a levy charged on allocation or on transfer - flat, per m² or a percentage of the price - to an income account, or deactivates it; charges the "
                 + "levies due on an allocation certificate or a transfer application.",
-            Fields = [Pick("Step", "Step", ["Define", "Deactivate", "Charge allocation", "Charge transfer"]), Opt("Code", "Levy code"), Opt("Name", "Name"),
+            Fields = [Pick("Step", "Step", ["Define", "Deactivate", "Defer", "Charge allocation", "Charge transfer"]), Opt("Code", "Levy code"), Opt("Name", "Name"),
+                OptNum("Months", "Months its income is spread over (defer; 0: at once)"), Opt("Deferred", "Deferred income account (defer)"),
                 Pick("Trigger", "Charged on", Enum.GetNames<LevyTrigger>()), Pick("Basis", "Basis", Enum.GetNames<LevyBasis>()), Num("Rate", "Rate / amount", "0"), Opt("Income", "Income account"),
                 Opt("Document", "Certificate / application number (charge)"), Today()],
             Run = async (c, i) =>
@@ -1063,6 +1064,8 @@ public static partial class OperationCatalogue
                     "Define" => Check(await levies.DefineAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, Enum.Parse<LevyTrigger>(i.Text("Trigger")),
                         Enum.Parse<LevyBasis>(i.Text("Basis")), i.Number("Rate"), i.Optional("Income") ?? string.Empty).ConfigureAwait(true), _ => "Levy defined."),
                     "Deactivate" => Check(await levies.DeactivateAsync(c.CompanyId, i.Optional("Code") ?? string.Empty).ConfigureAwait(true), "Levy deactivated."),
+                    "Defer" => Check(await levies.SetDeferralAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, (int)(i.OptionalNumber("Months") ?? 0m), i.Optional("Deferred")).ConfigureAwait(true),
+                        "Levy deferral saved; its income is released monthly with the prepayment releases."),
                     "Charge allocation" => Raised(Check(await levies.ChargeAllocationAsync(c.CompanyId, i.Optional("Document") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))),
                     _ => Raised(Check(await levies.ChargeTransferAsync(c.CompanyId, i.Optional("Document") ?? string.Empty, i.Date("Date")).ConfigureAwait(true))),
                 };

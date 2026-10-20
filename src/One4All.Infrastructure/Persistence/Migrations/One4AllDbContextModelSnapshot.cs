@@ -1212,6 +1212,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("date")
                         .HasColumnName("first_month");
 
+                    b.Property<bool>("IsDeferredIncome")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deferred_income");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");
@@ -7622,6 +7626,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
+
+                    b.Property<int?>("DeferMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("defer_months");
+
+                    b.Property<string>("DeferredIncomeAccountCode")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("deferred_income_account_code");
 
                     b.Property<string>("IncomeAccountCode")
                         .IsRequired()
