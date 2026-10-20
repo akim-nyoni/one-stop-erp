@@ -135,7 +135,15 @@ public sealed class ProcurementService : IProcurementService
         };
         foreach (PurchaseOrderLineRequest line in request.Lines)
         {
-            PurchaseOrderLine added = order.AddLine(line.ItemId, line.Description, line.Quantity, line.UnitPrice);
+            // Ordered in a pack (a box of 12): the line holds the item's own units and unit price, and remembers the pack it was ordered in.
+            Result<(string? Unit, decimal Factor)> unit = await Inventory.ItemUnits.FactorAsync(_db, request.CompanyId, line.ItemId, line.UnitCode, ct).ConfigureAwait(false);
+            if (unit.IsFailure)
+            {
+                return unit.Error;
+            }
+
+            PurchaseOrderLine added = order.AddLine(line.ItemId, line.Description, line.Quantity * unit.Value.Factor, decimal.Round(line.UnitPrice / unit.Value.Factor, 6, MidpointRounding.ToEven));
+            added.OrderedIn(unit.Value.Unit, unit.Value.Factor);
             added.ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
             added.JobContractId = line.JobContractId;
             added.JobCostHead = line.JobContractId is null ? null : string.IsNullOrWhiteSpace(line.JobCostHead) ? "Materials" : line.JobCostHead.Trim();

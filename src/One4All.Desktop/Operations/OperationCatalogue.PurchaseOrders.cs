@@ -30,9 +30,9 @@ public static partial class OperationCatalogue
                 if (i.Text("Step") == "Create")
                 {
                     List<PurchaseRequisitionLineRequest> lines = [];
-                    foreach ((long item, string description, decimal quantity, decimal price) in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
+                    foreach (OrderLineText line in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
                     {
-                        lines.Add(new PurchaseRequisitionLineRequest(item, description, quantity, price, i.Optional("Account")));
+                        lines.Add(new PurchaseRequisitionLineRequest(line.Item, line.Description, line.BaseQuantity, line.BasePrice, i.Optional("Account")));
                     }
 
                     DateOnly? requiredBy = i.Optional("RequiredBy") is string needed
@@ -83,9 +83,9 @@ public static partial class OperationCatalogue
                         ? await FindAsync(c.Db.JobContracts, j => j.CompanyId == c.CompanyId && j.ContractNumber.ToUpper() == jobNumber.ToUpper(), j => j.Id, "contract", jobNumber).ConfigureAwait(true)
                         : null;
                     List<PurchaseOrderLineRequest> lines = [];
-                    foreach ((long item, string description, decimal quantity, decimal price) in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
+                    foreach (OrderLineText line in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
                     {
-                        lines.Add(new PurchaseOrderLineRequest(item, description, quantity, price, job is null ? null : i.Optional("JobAccount"), job, i.Optional("JobHead")));
+                        lines.Add(new PurchaseOrderLineRequest(line.Item, line.Description, line.Quantity, line.Price, job is null ? null : i.Optional("JobAccount"), job, i.Optional("JobHead"), line.Unit));
                     }
 
                     PurchaseOrderResult created = Check(await procurement.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
@@ -188,7 +188,7 @@ public static partial class OperationCatalogue
                 long orderId = OrderId(c, i.Text("Order"));
                 PurchaseOrder order = await c.Db.PurchaseOrders.AsNoTracking().Include(o => o.Lines).SingleAsync(o => o.Id == orderId).ConfigureAwait(true);
                 List<InvoiceMatchLine> lines = i.Optional("Lines") is string text
-                    ? [.. (await OrderLinesAsync(c, text).ConfigureAwait(true)).Select(l => new InvoiceMatchLine(LineFor(order, l.Item).Id, l.Quantity, l.Price))]
+                    ? [.. (await OrderLinesAsync(c, text).ConfigureAwait(true)).Select(l => new InvoiceMatchLine(LineFor(order, l.Item).Id, l.BaseQuantity, l.BasePrice))]
                     : [.. order.Lines.Where(l => l.ReceivedQuantity > l.InvoicedQuantity).Select(l => new InvoiceMatchLine(l.Id, l.ReceivedQuantity - l.InvoicedQuantity, l.UnitPrice))];
                 MatchInvoiceResult matched = Check(await c.Get<IProcurementService>().MatchInvoiceAsync(new MatchInvoiceRequest
                 {
@@ -300,7 +300,7 @@ public static partial class OperationCatalogue
                         long orderId = OrderId(c, i.Optional("Order") ?? string.Empty);
                         PurchaseOrder order = await c.Db.PurchaseOrders.AsNoTracking().Include(o => o.Lines).SingleAsync(o => o.Id == orderId).ConfigureAwait(true);
                         List<InvoiceMatchLine> lines = i.Optional("Lines") is string text
-                            ? [.. (await OrderLinesAsync(c, text).ConfigureAwait(true)).Select(l => new InvoiceMatchLine(LineFor(order, l.Item).Id, l.Quantity, l.Price))]
+                            ? [.. (await OrderLinesAsync(c, text).ConfigureAwait(true)).Select(l => new InvoiceMatchLine(LineFor(order, l.Item).Id, l.BaseQuantity, l.BasePrice))]
                             : [.. order.Lines.Where(l => l.ReceivedQuantity > l.InvoicedQuantity).Select(l => new InvoiceMatchLine(l.Id, l.ReceivedQuantity - l.InvoicedQuantity, l.UnitPrice))];
                         InvoiceSubmission submitted = Check(await disputes.SubmitAsync(new MatchInvoiceRequest
                         {
@@ -334,7 +334,7 @@ public static partial class OperationCatalogue
                 {
                     case "Amend":
                         PurchaseOrder order = await c.Db.PurchaseOrders.AsNoTracking().Include(o => o.Lines).SingleAsync(o => o.Id == orderId).ConfigureAwait(true);
-                        List<AmendedLine> lines = [.. (await OrderLinesAsync(c, i.Optional("Lines") ?? string.Empty).ConfigureAwait(true)).Select(l => new AmendedLine(LineFor(order, l.Item).Id, l.Quantity, l.Price))];
+                        List<AmendedLine> lines = [.. (await OrderLinesAsync(c, i.Optional("Lines") ?? string.Empty).ConfigureAwait(true)).Select(l => new AmendedLine(LineFor(order, l.Item).Id, l.BaseQuantity, l.BasePrice))];
                         AmendmentResult amended = Check(await amendments.AmendAsync(c.CompanyId, orderId, new AmendmentRequest(i.Date("Date"), c.UserId, i.Optional("Reason") ?? string.Empty, lines, i.Number("Threshold")))
                             .ConfigureAwait(true));
                         return $"Version {amended.Version}: {M(amended.PreviousTotal)} → {M(amended.NewTotal)}{(amended.AwaitingReapproval ? "; awaiting re-approval" : string.Empty)}.";
@@ -409,25 +409,59 @@ public static partial class OperationCatalogue
         => order.Lines.FirstOrDefault(l => l.ItemId == itemId) ?? throw new OperationException($"Order {order.OrderNumber} has no line for item {itemId}.");
 
     // "ITEM:qty@price; ITEM:qty@price"
-    private static async Task<List<(long Item, string Description, decimal Quantity, decimal Price)>> OrderLinesAsync(OperationContext c, string text)
+    // "ITEM:quantity[ UNIT]@price; ..." - a quantity in a pack ("2 BOX@120") is kept with its unit; Quantity and Price are then in the item's own unit.
+    private static async Task<List<OrderLineText>> OrderLinesAsync(OperationContext c, string text)
     {
-        List<(long, string, decimal, decimal)> lines = [];
+        List<OrderLineText> lines = [];
         foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
             string[] codeRest = part.Split(':', 2, StringSplitOptions.TrimEntries);
             string[] qtyPrice = codeRest.Length == 2 ? codeRest[1].Split('@', StringSplitOptions.TrimEntries) : [];
-            if (qtyPrice.Length != 2 || !decimal.TryParse(qtyPrice[0], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity)
-                || !decimal.TryParse(qtyPrice[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal price))
+            (decimal Quantity, string? Unit)? parsed = qtyPrice.Length == 2 ? QuantityInUnit(qtyPrice[0]) : null;
+            if (parsed is null || !decimal.TryParse(qtyPrice[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal price))
             {
-                throw new OperationException($"\"{part}\" should be ITEM:quantity@price.");
+                throw new OperationException($"\"{part}\" should be ITEM:quantity[ UNIT]@price.");
             }
 
+            (decimal quantity, string? unit) = parsed.Value;
+
             long item = await ItemAsync(c, codeRest[0]).ConfigureAwait(true);
-            string description = await c.Db.Items.AsNoTracking().Where(x => x.Id == item).Select(x => x.Description).SingleAsync().ConfigureAwait(true);
-            lines.Add((item, description, quantity, price));
+            var found = await c.Db.Items.AsNoTracking().Where(x => x.Id == item).Select(x => new { x.Description, x.UnitOfMeasure }).SingleAsync().ConfigureAwait(true);
+            decimal factor = 1m;
+            if (unit is not null && !string.Equals(unit, found.UnitOfMeasure, StringComparison.OrdinalIgnoreCase))
+            {
+                factor = await c.Db.Set<Core.Inventory.ItemUnit>().AsNoTracking().Where(u => u.ItemId == item && u.UnitCode.ToUpper() == unit).Select(u => (decimal?)u.Factor)
+                    .FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"{codeRest[0]} has no unit {unit}.");
+            }
+
+            lines.Add(new OrderLineText(item, found.Description, quantity, price, factor == 1m ? null : unit, factor));
         }
 
         return lines.Count > 0 ? lines : throw new OperationException("Give at least one line.");
+    }
+
+    // "2", "2 BOX" or "2BOX": the quantity and the unit it is in (null: the item's own).
+    private static (decimal Quantity, string? Unit)? QuantityInUnit(string text)
+    {
+        string trimmed = text.Trim();
+        int split = 0;
+        while (split < trimmed.Length && (char.IsDigit(trimmed[split]) || trimmed[split] is '.' or ',' or '-'))
+        {
+            split++;
+        }
+
+        string unit = trimmed[split..].Trim().ToUpperInvariant();
+        return decimal.TryParse(trimmed[..split], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity) ? (quantity, unit.Length == 0 ? null : unit) : null;
+    }
+
+    /// <summary>A keyed order line: Quantity and Price as keyed (in Unit when given), Factor of the item's own units in one Unit.</summary>
+    private sealed record OrderLineText(long Item, string Description, decimal Quantity, decimal Price, string? Unit, decimal Factor)
+    {
+        /// <summary>Gets the quantity in the item's own unit.</summary>
+        public decimal BaseQuantity => Quantity * Factor;
+
+        /// <summary>Gets the price per item's own unit.</summary>
+        public decimal BasePrice => Factor == 1m ? Price : decimal.Round(Price / Factor, 6, MidpointRounding.ToEven);
     }
 
     // "ITEM:qty; ITEM:qty"

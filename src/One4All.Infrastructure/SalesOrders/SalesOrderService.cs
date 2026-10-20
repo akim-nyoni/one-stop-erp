@@ -83,8 +83,20 @@ public sealed class SalesOrderService : ISalesOrderService
         decimal? limit = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.MaxSalesDiscountPercent).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         decimal deepest = 0m;
         List<(SalesOrderLineRequest Line, decimal? ListPrice)> listed = [];
-        foreach (SalesOrderLineRequest line in request.Lines)
+        foreach (SalesOrderLineRequest keyed in request.Lines)
         {
+            // Sold in a pack (a case of 24): the line holds the item's own units and unit price, and remembers the pack it was sold in.
+            Result<(string? Unit, decimal Factor)> unit = await Inventory.ItemUnits.FactorAsync(_db, request.CompanyId, keyed.ItemId, keyed.UnitCode, ct).ConfigureAwait(false);
+            if (unit.IsFailure)
+            {
+                return unit.Error;
+            }
+
+            SalesOrderLineRequest line = keyed with
+            {
+                Quantity = keyed.Quantity * unit.Value.Factor,
+                UnitPrice = keyed.UnitPrice is decimal perPack ? decimal.Round(perPack / unit.Value.Factor, 6, MidpointRounding.ToEven) : null,
+            };
             decimal unitPrice;
             if (line.UnitPrice is { } given)
             {
@@ -115,7 +127,7 @@ public sealed class SalesOrderService : ISalesOrderService
                 unitPrice = price.Value.UnitPrice;
             }
 
-            order.AddLine(line.ItemId, line.Description, line.Quantity, unitPrice, line.TaxCode, line.RevenueAccountCode);
+            order.AddLine(line.ItemId, line.Description, line.Quantity, unitPrice, line.TaxCode, line.RevenueAccountCode).OrderedIn(unit.Value.Unit, unit.Value.Factor);
         }
 
         foreach ((SalesOrderLineRequest line, decimal? listPrice) in listed)

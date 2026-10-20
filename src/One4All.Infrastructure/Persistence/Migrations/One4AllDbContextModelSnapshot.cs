@@ -25358,6 +25358,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
 
+                    b.Property<string>("UnitCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("unit_code");
+
+                    b.Property<decimal>("UnitFactor")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasDefaultValue(1m)
+                        .HasColumnName("unit_factor");
+
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(19, 6)
                         .HasColumnType("numeric(19,6)")
@@ -30135,6 +30147,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("tax_code");
+
+                    b.Property<string>("UnitCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("unit_code");
+
+                    b.Property<decimal>("UnitFactor")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(19, 6)
+                        .HasColumnType("numeric(19,6)")
+                        .HasDefaultValue(1m)
+                        .HasColumnName("unit_factor");
 
                     b.Property<decimal>("UnitPrice")
                         .HasPrecision(19, 6)

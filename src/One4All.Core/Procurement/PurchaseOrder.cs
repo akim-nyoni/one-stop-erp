@@ -280,6 +280,27 @@ public sealed class PurchaseOrderLine : Entity
     /// <summary>The job cost head it is charged to.</summary>
     public string? JobCostHead { get; set; }
 
+    /// <summary>The unit the line was ordered in (null: the item's own unit); quantities and prices on the line are in the item's own unit.</summary>
+    public string? UnitCode { get; private set; }
+
+    /// <summary>How many of the item's own unit one ordering unit holds (1 for the item's own unit).</summary>
+    public decimal UnitFactor { get; private set; } = 1m;
+
+    /// <summary>The quantity in the ordering unit.</summary>
+    public decimal UnitQuantity => UnitFactor == 0m ? OrderedQuantity : OrderedQuantity / UnitFactor;
+
+    /// <summary>The price per ordering unit.</summary>
+    public decimal PricePerUnit => UnitPrice * UnitFactor;
+
+    /// <summary>Records the unit the line was ordered in.</summary>
+    /// <param name="unitCode">The unit (null: the item's own).</param>
+    /// <param name="factor">The item's own units in one of it.</param>
+    public void OrderedIn(string? unitCode, decimal factor)
+    {
+        UnitCode = unitCode;
+        UnitFactor = factor <= 0m ? 1m : factor;
+    }
+
     /// <summary>Records a received quantity.</summary>
     /// <param name="quantity">The quantity received.</param>
     public void Receive(decimal quantity) => ReceivedQuantity += quantity;

@@ -1611,7 +1611,7 @@ public static partial class OperationCatalogue
                 + "line's tax code), take back goods returned from a despatch, take back invoiced goods (an itemised credit note at the invoiced price, the goods restocked at the "
                 + "cost they went out at), or cancel what is left of the order.",
             Fields = [Pick("Step", "Step", ["Create", "Despatch", "Invoice", "Return", "Return invoiced", "Cancel"]), Req("Order", "Order number"), Today(), Opt("Customer", "Customer code (create)"),
-                Opt("Lines", "Lines (create: ITEM:qty[:price[:tax]]; despatch / return / return invoiced: ITEM:qty)"), Opt("Revenue", "Revenue account (create; blank: the item's)"),
+                Opt("Lines", "Lines (create: ITEM:qty[ UNIT][:price[:tax]]; despatch / return / return invoiced: ITEM:qty)"), Opt("Revenue", "Revenue account (create; blank: the item's)"),
                 Opt("Warehouse", "Warehouse code (despatch, return)"), Opt("Reference", "Delivery / invoice / credit note number"), Opt("Vehicle", "Vehicle (despatch)"), Opt("Driver", "Driver (despatch)"),
                 Opt("TaxAccount", "Output tax account (invoice, return invoiced)"), Opt("Reason", "Reason (return, cancel)")],
             Run = async (c, i) =>
@@ -1627,16 +1627,24 @@ public static partial class OperationCatalogue
                     foreach (string part in (i.Optional("Lines") ?? throw new OperationException("Give the order lines.")).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                     {
                         string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
-                        if (bits.Length < 2 || !decimal.TryParse(bits[1], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal quantity))
+                        string qtyText = bits.Length > 1 ? bits[1].Trim() : string.Empty;
+                        int digits = 0;
+                        while (digits < qtyText.Length && (char.IsDigit(qtyText[digits]) || qtyText[digits] is '.' or ','))
                         {
-                            throw new OperationException($"'{part}' is not ITEM:quantity[:price[:tax code]].");
+                            digits++;
+                        }
+
+                        string? unit = qtyText[digits..].Trim() is { Length: > 0 } u ? u.ToUpperInvariant() : null;
+                        if (bits.Length < 2 || !decimal.TryParse(qtyText[..digits], System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out decimal quantity))
+                        {
+                            throw new OperationException($"'{part}' is not ITEM:quantity[ UNIT][:price[:tax code]].");
                         }
 
                         long itemId = await ItemAsync(c, bits[0]).ConfigureAwait(true);
                         Core.Inventory.Item item = await c.Db.Items.AsNoTracking().FirstAsync(x => x.Id == itemId).ConfigureAwait(true);
                         decimal? price = bits.Length > 2 && bits[2].Length > 0 ? decimal.Parse(bits[2], System.Globalization.CultureInfo.InvariantCulture) : null;
                         string revenue = i.Optional("Revenue") ?? item.RevenueAccountCode ?? throw new OperationException($"Item {item.Code} has no revenue account; give one.");
-                        lines.Add(new SalesOrderLineRequest(itemId, item.Description, quantity, price, bits.Length > 3 && bits[3].Length > 0 ? bits[3].ToUpperInvariant() : null, revenue));
+                        lines.Add(new SalesOrderLineRequest(itemId, item.Description, quantity, price, bits.Length > 3 && bits[3].Length > 0 ? bits[3].ToUpperInvariant() : null, revenue, unit));
                     }
 
                     SalesOrderResult created = Check(await orders.CreateOrderAsync(new CreateSalesOrderRequest
