@@ -40,6 +40,50 @@ public static class Barcodes
         new EmbeddedBarcodeRule("22", 5, 5, EmbeddedValueKind.Price, 2),
     ];
 
+    /// <summary>The EAN-13 check digit for twelve digits.</summary>
+    /// <param name="twelve">The first twelve digits.</param>
+    /// <returns>The check digit.</returns>
+    public static char Ean13CheckDigit(string twelve)
+    {
+        ArgumentNullException.ThrowIfNull(twelve);
+        if (twelve.Length != 12 || !twelve.All(char.IsAsciiDigit))
+        {
+            throw new ArgumentException("An EAN-13 check digit is worked out from twelve digits.", nameof(twelve));
+        }
+
+        int sum = 0;
+        for (int i = 0; i < 12; i++)
+        {
+            sum += (twelve[i] - '0') * (i % 2 == 0 ? 1 : 3);
+        }
+
+        return (char)('0' + ((10 - (sum % 10)) % 10));
+    }
+
+    /// <summary>
+    /// Builds the in-store EAN-13 a scale prints for a weighed or priced pack: the template's prefix, the item's PLU and the value (a weight or a
+    /// price at the template's decimals), with the check digit - the code the till reads back through the same template.
+    /// </summary>
+    /// <param name="rule">The template.</param>
+    /// <param name="plu">The item's PLU (digits; padded with leading zeros).</param>
+    /// <param name="value">The weight or price.</param>
+    /// <returns>The barcode, or null when the PLU or value does not fit the template.</returns>
+    public static string? BuildEmbedded(EmbeddedBarcodeRule rule, string plu, decimal value)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        string item = (plu ?? string.Empty).Trim();
+        long scaled = (long)decimal.Round(value * (decimal)Math.Pow(10, rule.Decimals), 0, MidpointRounding.AwayFromZero);
+        string digits = scaled.ToString(CultureInfo.InvariantCulture);
+        if (item.Length == 0 || item.Length > rule.ItemDigits || !item.All(char.IsAsciiDigit) || scaled < 0 || digits.Length > rule.ValueDigits
+            || rule.Prefix.Length + rule.ItemDigits + rule.ValueDigits != 12)
+        {
+            return null;
+        }
+
+        string twelve = rule.Prefix + item.PadLeft(rule.ItemDigits, '0') + digits.PadLeft(rule.ValueDigits, '0');
+        return twelve + Ean13CheckDigit(twelve);
+    }
+
     /// <summary>Whether a code is a 13-digit EAN with a correct check digit.</summary>
     /// <param name="code">The code.</param>
     /// <returns>True when valid.</returns>

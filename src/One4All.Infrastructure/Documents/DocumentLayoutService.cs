@@ -426,7 +426,8 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
     private static Result<string> Text(Result<BusinessDocument> built, int width) => built.IsSuccess ? BusinessDocumentFormatter.ToPlainText(built.Value, width) : built.Error;
 
     /// <inheritdoc />
-    public async Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, CancellationToken ct = default)
+    public async Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, LabelLanguage language = LabelLanguage.Text,
+        CancellationToken ct = default)
     {
         PriceList? list = await _db.PriceLists.AsNoTracking().Include(p => p.Lines).FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Code == priceListCode, ct).ConfigureAwait(false);
         if (list is null)
@@ -439,6 +440,11 @@ public sealed class DocumentLayoutService : IDocumentLayoutService
         List<ShelfLabel> labels = [.. list.Lines.Where(l => l.MinimumQuantity <= 1m && items.ContainsKey(l.ItemId) && (wanted is null || wanted.Contains(items[l.ItemId].Code)))
             .OrderBy(l => items[l.ItemId].Code, StringComparer.Ordinal)
             .Select(l => new ShelfLabel(items[l.ItemId].Code, items[l.ItemId].Description, l.UnitPrice, list.Currency.ToString(), items[l.ItemId].Barcode ?? items[l.ItemId].Code))];
-        return labels.Count == 0 ? Error.Rule("Doc.NoLabels", "No items on the price list to label.") : ShelfLabelFormatter.ToPlainText(labels, perRow);
+        return labels.Count == 0 ? Error.Rule("Doc.NoLabels", "No items on the price list to label.") : language switch
+        {
+            LabelLanguage.Zpl => ShelfLabelFormatter.ToZpl(labels),
+            LabelLanguage.Epl => ShelfLabelFormatter.ToEpl(labels),
+            _ => ShelfLabelFormatter.ToPlainText(labels, perRow),
+        };
     }
 }

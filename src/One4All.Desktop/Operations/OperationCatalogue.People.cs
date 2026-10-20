@@ -2101,11 +2101,13 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Shelf labels", Description = "Prints shelf labels at a price list's prices (all items, or a comma-separated list).", IsDocument = true,
-            Fields = [Req("PriceList", "Price list code"), Opt("Items", "Item codes (comma-separated)"), Num("PerRow", "Labels per row", "2"), Tick("Print", "Send to the label printer (System Manager › Devices)")],
+            Fields = [Req("PriceList", "Price list code"), Opt("Items", "Item codes (comma-separated)"), Num("PerRow", "Labels per row", "2"),
+                Pick("Format", "Format", ["Text", "ZPL", "EPL"]), Tick("Print", "Send to the label printer (System Manager › Devices)")],
             Run = async (c, i) =>
             {
+                LabelLanguage language = i.Text("Format") switch { "ZPL" => LabelLanguage.Zpl, "EPL" => LabelLanguage.Epl, _ => LabelLanguage.Text };
                 string labels = Check(await c.Get<IDocumentLayoutService>().ShelfLabelsAsync(c.CompanyId, i.Text("PriceList"),
-                    i.Optional("Items")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), i.Whole("PerRow")).ConfigureAwait(true));
+                    i.Optional("Items")?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries), i.Whole("PerRow"), language).ConfigureAwait(true));
                 if (!i.Flag("Print"))
                 {
                     return labels;
@@ -2118,6 +2120,41 @@ public static partial class OperationCatalogue
 
                 string? outcome = await printer.PrintAsync(System.Text.Encoding.UTF8.GetBytes(labels + Environment.NewLine)).ConfigureAwait(true);
                 return labels + Environment.NewLine + (outcome ?? "Sent to the label printer.");
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Scale label", IsDocument = true,
+            Description = "A weighed pack's label (deli, butchery): the weight, the price per kilogram and the pack's price, with the price-embedded EAN-13 (22 + PLU + cents) the "
+                + "till reads back - in ZPL for the label printer.",
+            Fields = [ItemPick("Item", "Item"), Num("Weight", "Weight (kg)"), OptNum("PerKg", "Price per kg (blank: the price list's)"), Opt("PriceList", "Price list code (for the price)"),
+                Tick("Print", "Send to the label printer (System Manager › Devices)")],
+            Run = async (c, i) =>
+            {
+                long itemId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true);
+                Core.Inventory.Item item = await c.Db.Items.AsNoTracking().FirstAsync(x => x.Id == itemId).ConfigureAwait(true);
+                string plu = item.Plu ?? throw new OperationException($"{item.Code} has no PLU for the scale (set it on the item).");
+                decimal perKg = i.OptionalNumber("PerKg") ?? (i.Optional("PriceList") is string listCode
+                    ? await c.Db.PriceLists.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.Code == listCode.ToUpper()).SelectMany(p => p.Lines)
+                        .Where(l => l.ItemId == itemId && l.MinimumQuantity <= 1m).Select(l => (decimal?)l.UnitPrice).FirstOrDefaultAsync().ConfigureAwait(true)
+                        ?? throw new OperationException($"{item.Code} is not on price list {listCode}.")
+                    : throw new OperationException("Give the price per kg or the price list."));
+                string currency = (await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).FirstAsync().ConfigureAwait(true)).Value;
+                Application.Documents.ScaleLabel label = Application.Documents.ScaleLabel.For(plu, item.Description, i.Number("Weight"), perKg, currency)
+                    ?? throw new OperationException("The PLU must be up to 5 digits and the pack under 1,000.00 for the price barcode.");
+                string job = label.ToZpl();
+                string shown = $"{item.Description}: {i.Number("Weight"):0.000} kg at {M(perKg)}/kg = {M(label.Price)}; barcode {label.Barcode}";
+                if (!i.Flag("Print"))
+                {
+                    return shown + Environment.NewLine + job;
+                }
+
+                if (c.Get<Application.Abstractions.Pos.IDeviceProvider>().LabelPrinter is not Application.Abstractions.Pos.ILabelPrinter printer)
+                {
+                    throw new OperationException("No label printer is set up (System Manager › Devices).");
+                }
+
+                return shown + Environment.NewLine + (await printer.PrintAsync(System.Text.Encoding.UTF8.GetBytes(job)).ConfigureAwait(true) ?? "Sent to the label printer.");
             },
         };
     }

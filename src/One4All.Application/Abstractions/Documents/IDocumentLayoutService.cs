@@ -3,6 +3,19 @@ using One4All.Core.Common;
 
 namespace One4All.Application.Abstractions.Documents;
 
+/// <summary>The language a label job is written in.</summary>
+public enum LabelLanguage
+{
+    /// <summary>A plain-text sheet.</summary>
+    Text = 0,
+
+    /// <summary>Zebra ZPL.</summary>
+    Zpl = 1,
+
+    /// <summary>Eltron / Zebra EPL.</summary>
+    Epl = 2,
+}
+
 /// <summary>The standard business document layouts (brief §14 S and the layouts named in B 50, C 67, E 94, H 139).</summary>
 public interface IDocumentLayoutService
 {
@@ -93,9 +106,10 @@ public interface IDocumentLayoutService
     /// <param name="priceListCode">The price list.</param>
     /// <param name="itemCodes">The items to print (all on the list when empty).</param>
     /// <param name="perRow">Labels across.</param>
+    /// <param name="language">Plain text for a sheet, or ZPL / EPL for a label printer.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The label sheet, or an error.</returns>
-    Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, CancellationToken ct = default);
+    Task<Result<string>> ShelfLabelsAsync(long companyId, string priceListCode, IReadOnlyList<string>? itemCodes = null, int perRow = 2, LabelLanguage language = LabelLanguage.Text, CancellationToken ct = default);
 
     /// <summary>
     /// Builds one of the business documents (the kinds in <see cref="DocumentKinds"/> except the tax invoice and purchase order, which have their own
