@@ -73,6 +73,14 @@ public sealed class TaxDefaultsTests
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             (await db.OpenItems.AsNoTracking().SingleAsync(i => i.Id == taxed.Value.OpenItemId)).OriginalTransaction.Should().Be(115m);
             (await db.OpenItems.AsNoTracking().SingleAsync(i => i.Id == plain.Value.OpenItemId)).OriginalTransaction.Should().Be(100m);
+
+            // A tax code keyed with the tax left at nil works the VAT out from the code - never silently without VAT.
+            var keyed = await ap.PostInvoiceAsync(new PurchaseInvoiceRequest
+            {
+                CompanyId = companyId, SupplierId = plainSupplierId, DocumentNumber = "DTX-4", DocumentDate = date, Currency = Scenario.Usd, NetAmount = 100m, ExpenseAccountCode = "6800", TaxCode = "dvat",
+            });
+            keyed.IsSuccess.Should().BeTrue(keyed.IsFailure ? keyed.Error.ToString() : null);
+            (await db.OpenItems.AsNoTracking().SingleAsync(i => i.Id == keyed.Value.OpenItemId)).OriginalTransaction.Should().Be(115m);
             (await db.OpenItems.AsNoTracking().SingleAsync(i => i.Id == sale.Value.OpenItemId)).OriginalTransaction.Should().Be(230m);
             JournalEntry purchase = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.DocumentNumber == "DTX-1");
             purchase.Lines.Should().Contain(l => l.AccountCode == "2210" && l.TransactionDebit == 15m && l.TaxCode == "DVAT");

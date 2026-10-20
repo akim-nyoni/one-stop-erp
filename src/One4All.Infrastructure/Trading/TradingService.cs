@@ -1868,16 +1868,17 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
     private static string? Clean(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
 
-    // Default tax (brief §3.5): a sales invoice entered without a tax code or amount takes the customer's default code, else the revenue account's,
+    // Default tax (brief §3.5): a sales invoice entered without a tax amount takes its keyed tax code, else the customer's default code, else the revenue account's,
     // and the tax at that code's rate on the document date, posted to the code's output account (else the VAT output control).
     private async Task<SalesInvoiceRequest> WithTaxDefaultsAsync(SalesInvoiceRequest request, Customer customer, CancellationToken ct)
     {
-        if (request.TaxCode is not null || request.TaxAmount != 0m)
+        // A tax code keyed with no amount works the tax out from the code (it is never silently left without VAT).
+        if (request.TaxAmount != 0m)
         {
             return request;
         }
 
-        string? code = Clean(customer.DefaultTaxCode) ?? await AccountTaxCodeAsync(request.CompanyId, request.SalesAccountCode, ct).ConfigureAwait(false);
+        string? code = Clean(request.TaxCode) ?? Clean(customer.DefaultTaxCode) ?? await AccountTaxCodeAsync(request.CompanyId, request.SalesAccountCode, ct).ConfigureAwait(false);
         if (code is null)
         {
             return request;
@@ -1890,12 +1891,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     // As above for a purchase invoice: the supplier's default code, else the expense account's, to the code's input account (else the VAT input control).
     private async Task<PurchaseInvoiceRequest> WithTaxDefaultsAsync(PurchaseInvoiceRequest request, Supplier supplier, CancellationToken ct)
     {
-        if (request.TaxCode is not null || request.TaxAmount != 0m)
+        // A tax code keyed with no amount works the tax out from the code (it is never silently left without VAT).
+        if (request.TaxAmount != 0m)
         {
             return request;
         }
 
-        string? code = Clean(supplier.DefaultTaxCode) ?? await AccountTaxCodeAsync(request.CompanyId, request.ExpenseAccountCode, ct).ConfigureAwait(false);
+        string? code = Clean(request.TaxCode) ?? Clean(supplier.DefaultTaxCode) ?? await AccountTaxCodeAsync(request.CompanyId, request.ExpenseAccountCode, ct).ConfigureAwait(false);
         if (code is null)
         {
             return request;
