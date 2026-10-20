@@ -550,7 +550,8 @@ public static class Ops
     public static OperationField CurrencyPick(string name, string label) => new(name, label, FieldKind.Choice, Required: false, Choices: [], ChoicesFrom: async c =>
     {
         Core.Accounting.CurrencyCode baseCurrency = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).FirstAsync().ConfigureAwait(true);
-        List<Core.Accounting.CurrencyCode> others = await c.Db.ExchangeRates.Where(r => r.ToCurrency == baseCurrency).Select(r => r.FromCurrency).Distinct().ToListAsync().ConfigureAwait(true);
-        return [baseCurrency.Value, .. others.Select(o => o.Value).Where(o => o != baseCurrency.Value).Order(StringComparer.Ordinal)];
+        // Every currency in the currency table, the base first (a currency without a rate yet is still offered; the rate is asked for when it is used).
+        List<Core.Accounting.CurrencyCode> others = await c.Db.Currencies.Select(x => x.Code).ToListAsync().ConfigureAwait(true);
+        return [baseCurrency.Value, .. others.Select(o => o.Value).Where(o => o != baseCurrency.Value).Distinct().Order(StringComparer.Ordinal)];
     });
 }

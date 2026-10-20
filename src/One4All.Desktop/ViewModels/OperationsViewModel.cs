@@ -78,6 +78,14 @@ public sealed partial class OperationFieldVm : ObservableObject
             }
 
             string label = Field.Label.ToLowerInvariant();
+
+            // A currency is picked from the currency table; a list of currency-to-account pairs ("EUR:1120; ZAR:1130") stays typed.
+            if (label.Contains("currency", StringComparison.Ordinal))
+            {
+                return label.Contains("account", StringComparison.Ordinal) || label.Contains(':', StringComparison.Ordinal) || label.Contains("amount", StringComparison.Ordinal)
+                    || label.Contains("rate", StringComparison.Ordinal) || label.Contains("balance", StringComparison.Ordinal) ? null : "Currencies";
+            }
+
             if (label.Contains("customer", StringComparison.Ordinal) && label.Contains("code", StringComparison.Ordinal))
             {
                 return "Customers";
@@ -208,8 +216,11 @@ public sealed partial class OperationFieldVm : ObservableObject
         }));
     }
 
-    /// <summary>Gets a value indicating whether the choices are the company's records (typed codes are accepted too).</summary>
-    public bool IsLookup => Field.ChoicesFrom is not null || AutoLookup is not null;
+    /// <summary>Gets a value indicating whether the choices are the company's records (typed codes are accepted too; a currency is only picked).</summary>
+    public bool IsLookup => !IsCurrency && (Field.ChoicesFrom is not null || AutoLookup is not null);
+
+    /// <summary>Gets whether the field is a currency: picked from the currency table, never typed.</summary>
+    public bool IsCurrency => AutoLookup == "Currencies" || (Field.ChoicesFrom is not null && Field.Label.Contains("currency", StringComparison.OrdinalIgnoreCase));
 }
 
 /// <summary>
@@ -466,6 +477,8 @@ public sealed partial class OperationsViewModel : ObservableObject
                         .ToListAsync().ConfigureAwait(true),
                     "Suppliers" => await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.Code).Select(x => x.Code + " - " + x.Name).Take(5000)
                         .ToListAsync().ConfigureAwait(true),
+                    "Currencies" => (await c.Db.Currencies.AsNoTracking().ToListAsync().ConfigureAwait(true)).OrderBy(x => x.Code.Value, StringComparer.Ordinal)
+                        .Select(x => x.Code.Value + " - " + x.Name).ToList(),
                     "Users" => await c.Db.Users.AsNoTracking().OrderBy(x => x.Username).Select(x => x.Username + " - " + x.DisplayName).Take(2000).ToListAsync().ConfigureAwait(true),
                     _ => await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.AccountCode).Select(x => x.AccountCode + " - " + x.Name)
                         .ToListAsync().ConfigureAwait(true),
@@ -474,12 +487,22 @@ public sealed partial class OperationsViewModel : ObservableObject
                 {
                     string? keep = field.Value;
                     field.Choices.Clear();
+
+                    // An optional currency can be left blank (the base, the customer's and so on), so the list starts with a blank entry.
+                    if (field.IsCurrency && !field.Field.Required)
+                    {
+                        field.Choices.Add(string.Empty);
+                    }
+
                     foreach (string row in rows)
                     {
                         field.Choices.Add(row);
                     }
 
-                    field.Value = keep;
+                    // A picked-only list shows its default ("USD") as the matching row ("USD - US Dollar").
+                    field.Value = field.IsCurrency && !string.IsNullOrWhiteSpace(keep)
+                        ? rows.FirstOrDefault(r => r.StartsWith(keep.Trim() + " - ", StringComparison.OrdinalIgnoreCase)) ?? keep
+                        : keep;
                 }
             }
             catch (InvalidOperationException)
