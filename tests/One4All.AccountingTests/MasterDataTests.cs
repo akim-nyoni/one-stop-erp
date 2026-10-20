@@ -66,6 +66,12 @@ public sealed class MasterDataTests
         Item vaccine = await db.Items.AsNoTracking().SingleAsync(x => x.Id == batch);
         (vaccine.CostingMethod, vaccine.Tracking, vaccine.ShelfLifeDays, vaccine.Category).Should().Be((CostingMethod.Fifo, ItemTracking.Batch, 180, "PHARMA"));
 
+        // An item keyed by name, unit and barcode alone takes its accounts from another item in the category; a barcode belongs to one item.
+        long syringe = (await master.CreateItemAsync(new NewItem(companyId, "SYR-1", "Syringe", ItemType.Stock, null, null, Category: "Pharma", Unit: "box", Barcode: "6001234567890"))).Value;
+        Item boxed = await db.Items.AsNoTracking().SingleAsync(x => x.Id == syringe);
+        (boxed.RevenueAccountCode, boxed.UnitOfMeasure, boxed.Barcode).Should().Be(("4000", "BOX", "6001234567890"));
+        (await master.CreateItemAsync(new NewItem(companyId, "SYR-2", "Syringe 2", ItemType.Stock, null, null, Barcode: "6001234567890"))).Error.Code.Should().Be("Master.BarcodeInUse");
+
         // The new company posts.
         (await scope.ServiceProvider.GetRequiredService<IPostingEngine>().PostAsync(new JournalRequest
         {

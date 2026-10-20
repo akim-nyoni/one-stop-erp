@@ -448,6 +448,22 @@ public sealed class MasterDataService : IMasterDataService
         item.PriceVarianceAccountCode = Code(update.PriceVarianceAccountCode);
         item.UsageVarianceAccountCode = Code(update.UsageVarianceAccountCode);
         item.Category = string.IsNullOrWhiteSpace(update.Category) ? null : update.Category.Trim().ToUpperInvariant();
+        if (!string.IsNullOrWhiteSpace(update.Unit))
+        {
+            item.UnitOfMeasure = update.Unit.Trim().ToUpperInvariant();
+        }
+
+        if (!string.IsNullOrWhiteSpace(update.Barcode))
+        {
+            string barcode = update.Barcode.Trim();
+            if (await _db.Items.AnyAsync(i => i.CompanyId == companyId && i.Barcode == barcode && i.Id != item.Id, ct).ConfigureAwait(false))
+            {
+                return Result.Failure(Error.Conflict("Master.BarcodeInUse", $"Barcode {barcode} is already on another item."));
+            }
+
+            item.Barcode = barcode;
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -498,12 +514,33 @@ public sealed class MasterDataService : IMasterDataService
             }
         }
 
+        string? barcode = string.IsNullOrWhiteSpace(item.Barcode) ? null : item.Barcode.Trim();
+        if (barcode is not null && await _db.Items.AnyAsync(i => i.CompanyId == item.CompanyId && i.Barcode == barcode, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Master.BarcodeInUse", $"Barcode {barcode} is already on another item.");
+        }
+
+        // An item keyed without its accounts takes them from another item in its category, so a shop adds items by name, price and barcode alone.
+        string? revenue = item.RevenueAccountCode, cost = item.CostOfSalesAccountCode;
+        if (categoryCode is not null && (string.IsNullOrWhiteSpace(revenue) || string.IsNullOrWhiteSpace(cost))
+            && await _db.Items.AsNoTracking().Where(i => i.CompanyId == item.CompanyId && i.Category == categoryCode && i.RevenueAccountCode != null).OrderByDescending(i => i.Id)
+                .Select(i => new { i.RevenueAccountCode, i.CostOfSalesAccountCode }).FirstOrDefaultAsync(ct).ConfigureAwait(false) is { } sibling)
+        {
+            revenue = string.IsNullOrWhiteSpace(revenue) ? sibling.RevenueAccountCode : revenue;
+            cost = string.IsNullOrWhiteSpace(cost) ? sibling.CostOfSalesAccountCode : cost;
+        }
+
         Item created = new(item.CompanyId, key, item.Description.Trim(), item.Type, costing)
         {
-            RevenueAccountCode = Code(item.RevenueAccountCode), CostOfSalesAccountCode = Code(item.CostOfSalesAccountCode), StandardCost = item.StandardCost,
+            RevenueAccountCode = Code(revenue), CostOfSalesAccountCode = Code(cost), StandardCost = item.StandardCost, Barcode = barcode,
             Tracking = item.Tracking, ShelfLifeDays = item.ShelfLifeDays, PriceVarianceAccountCode = Code(item.PriceVarianceAccountCode),
             UsageVarianceAccountCode = Code(item.UsageVarianceAccountCode), Category = string.IsNullOrWhiteSpace(item.Category) ? null : item.Category.Trim().ToUpperInvariant(),
         };
+        if (!string.IsNullOrWhiteSpace(item.Unit))
+        {
+            created.UnitOfMeasure = item.Unit.Trim().ToUpperInvariant();
+        }
+
         _db.Items.Add(created);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return created.Id;

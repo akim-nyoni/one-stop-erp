@@ -847,11 +847,14 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Add an item", ListTitle = "Items", Delete = SoftDelete<Core.Inventory.Item>(x => x.Code, "item"),
-            Description = "A stock, service or other item with the accounts its sales and cost post to, how its stock is costed (weighted average, FIFO, standard with its "
-                + "variance accounts, or specific identification), batch or serial tracking and a shelf life.",
-            Fields = [Req("Code", "Item code"), Req("Description", "Description"), Pick("Type", "Type", Enum.GetNames<ItemType>()), Opt("Revenue", "Revenue account"), Opt("Cost", "Cost of sales account"),
+            Description = "A stock, service or other item: its unit, barcode and selling price (on the default price list), and the accounts its sales and cost post to - "
+                + "left blank, they are taken from another item in the same category. How its stock is costed (weighted average, FIFO, standard with its "
+                + "variance accounts, or specific identification), batch or serial tracking and a shelf life are further down.",
+            Fields = [Req("Code", "Item code"), Req("Description", "Description"), Pick("Type", "Type", Enum.GetNames<ItemType>()), Opt("Category", "Category"),
+                Opt("Unit", "Unit (EA, KG, L; blank is EA)"), Opt("Barcode", "Barcode"), OptNum("Price", "Selling price (default price list)"),
+                Opt("Revenue", "Revenue account (blank: as the category)"), Opt("Cost", "Cost of sales account (blank: as the category)"),
                 Pick("Costing", "Costing method", Enum.GetNames<CostingMethod>()), OptNum("Standard", "Standard cost"), Opt("PriceVariance", "Price variance account (standard)"),
-                Opt("UsageVariance", "Usage variance account (standard)"), Pick("Tracking", "Tracking", Enum.GetNames<ItemTracking>()), OptNum("ShelfLife", "Shelf life (days)"), Opt("Category", "Category")],
+                Opt("UsageVariance", "Usage variance account (standard)"), Pick("Tracking", "Tracking", Enum.GetNames<ItemTracking>()), OptNum("ShelfLife", "Shelf life (days)")],
             Run = async (c, i) =>
             {
                 if (await ExistingAsync<Core.Inventory.Item>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true) is { } existing)
@@ -859,17 +862,20 @@ public static partial class OperationCatalogue
                     // The description, accounts, standard cost and category can change; the type, costing method and tracking are fixed once there is stock history,
                     // and a standard cost on stock on hand changes only by revaluation.
                     _ = Check(await c.Get<IMasterDataService>().UpdateItemAsync(c.CompanyId, new ItemUpdate(existing.Code, i.Text("Description"), i.Optional("Revenue"), i.Optional("Cost"),
-                        i.OptionalNumber("Standard"), i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"))).ConfigureAwait(true), string.Empty);
-                    return $"Item {existing.Code} changed.";
+                        i.OptionalNumber("Standard"), i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"), i.Optional("Unit"), i.Optional("Barcode"))).ConfigureAwait(true),
+                        string.Empty);
+                    return $"Item {existing.Code} changed.{await ItemPriceAsync(c, existing.Id, i.OptionalNumber("Price")).ConfigureAwait(true)}";
                 }
 
-                return Check(await c.Get<IMasterDataService>().CreateItemAsync(new NewItem(c.CompanyId, i.Text("Code"), i.Text("Description"), Enum.Parse<ItemType>(i.Text("Type")),
+                long id = Check(await c.Get<IMasterDataService>().CreateItemAsync(new NewItem(c.CompanyId, i.Text("Code"), i.Text("Description"), Enum.Parse<ItemType>(i.Text("Type")),
                     i.Optional("Revenue"), i.Optional("Cost"), i.OptionalNumber("Standard"), Enum.Parse<CostingMethod>(i.Text("Costing")), Enum.Parse<ItemTracking>(i.Text("Tracking")),
-                    i.OptionalNumber("ShelfLife") is decimal days ? (int)days : null, i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"))).ConfigureAwait(true),
-                    id => "Item added.");
+                    i.OptionalNumber("ShelfLife") is decimal days ? (int)days : null, i.Optional("PriceVariance"), i.Optional("UsageVariance"), i.Optional("Category"), i.Optional("Unit"),
+                    i.Optional("Barcode"))).ConfigureAwait(true));
+                return $"Item added.{await ItemPriceAsync(c, id, i.OptionalNumber("Price")).ConfigureAwait(true)}";
             },
             List = async c => Table(await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode),
+                ("Code", x => x.Code), ("Description", x => x.Description), ("Type", x => x.ItemType), ("Unit", x => x.UnitOfMeasure), ("Barcode", x => x.Barcode),
+                ("Revenue", x => x.RevenueAccountCode), ("Cost of sales", x => x.CostOfSalesAccountCode),
                 ("Costing", x => x.CostingMethod.ToString()), ("Tracking", x => x.Tracking.ToString()), ("Shelf life", x => x.ShelfLifeDays)),
         };
         yield return new Operation
@@ -1096,5 +1102,23 @@ public static partial class OperationCatalogue
             ("Ready to go live", r.Ready && registersAgree ? "yes" : "no", string.Empty, string.Empty),
         ];
         return Table(rows, ("Check", x => x.Check), ("Ledger / balance", x => x.Ledger), ("Sub-ledger", x => x.Sub), ("Status", x => x.Status));
+    }
+
+    // Sets an item's selling price on the company's default price list; says so when there is no such list.
+    private static async Task<string> ItemPriceAsync(OperationContext c, long itemId, decimal? price)
+    {
+        if (price is not decimal unitPrice)
+        {
+            return string.Empty;
+        }
+
+        long? listId = await c.Db.PriceLists.AsNoTracking().Where(l => l.CompanyId == c.CompanyId && l.IsDefault).Select(l => (long?)l.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+        if (listId is not long list)
+        {
+            return " No price was set: there is no default price list (create one under Customers, Price lists).";
+        }
+
+        _ = Check(await c.Get<Application.Abstractions.Inventory.IPricingService>().SetPriceAsync(c.CompanyId, list, itemId, 1m, unitPrice).ConfigureAwait(true), string.Empty);
+        return $" Selling price {unitPrice:N2} set on the default price list.";
     }
 }

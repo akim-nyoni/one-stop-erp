@@ -40,8 +40,10 @@ public sealed record NewTaxCode(long CompanyId, string Code, string Name, TaxTyp
 /// <param name="PriceVarianceAccountCode">Where purchase price variances go.</param>
 /// <param name="UsageVarianceAccountCode">Where usage variances go.</param>
 /// <param name="Category">The item category.</param>
+/// <param name="Unit">The unit it is stocked and sold in (unchanged when null).</param>
+/// <param name="Barcode">Its barcode (unchanged when null).</param>
 public sealed record ItemUpdate(string Code, string Description, string? RevenueAccountCode, string? CostOfSalesAccountCode, decimal? StandardCost, string? PriceVarianceAccountCode,
-    string? UsageVarianceAccountCode, string? Category);
+    string? UsageVarianceAccountCode, string? Category, string? Unit = null, string? Barcode = null);
 
 /// <summary>A new stock or service item.</summary>
 /// <param name="CompanyId">The company.</param>
@@ -56,10 +58,12 @@ public sealed record ItemUpdate(string Code, string Description, string? Revenue
 /// <param name="ShelfLifeDays">Days from receipt to expiry for a batch received without one.</param>
 /// <param name="PriceVarianceAccountCode">Where purchase price variances go (standard costing).</param>
 /// <param name="UsageVarianceAccountCode">Where usage variances go (standard costing).</param>
-/// <param name="Category">The item category.</param>
+/// <param name="Category">The item category; an item without accounts of its own takes them from another item in the category.</param>
+/// <param name="Unit">The unit it is stocked and sold in (EA when not given).</param>
+/// <param name="Barcode">Its barcode, unique in the company.</param>
 public sealed record NewItem(long CompanyId, string Code, string Description, ItemType Type, string? RevenueAccountCode, string? CostOfSalesAccountCode, decimal? StandardCost = null,
     CostingMethod Costing = CostingMethod.WeightedAverage, ItemTracking Tracking = ItemTracking.None, int? ShelfLifeDays = null, string? PriceVarianceAccountCode = null,
-    string? UsageVarianceAccountCode = null, string? Category = null);
+    string? UsageVarianceAccountCode = null, string? Category = null, string? Unit = null, string? Barcode = null);
 
 /// <summary>
 /// Creates the master data the rest of the system runs on (brief §4.17 System Manager): companies, branches, fiscal years, the chart of
