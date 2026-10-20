@@ -112,24 +112,51 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Receive goods", ListTitle = "Purchase orders",
-            Description = "Books a goods received note against an order into a warehouse (stock in, goods-received-not-invoiced accrued). Leave Lines blank to receive everything still outstanding; "
-                + "otherwise ITEM:quantity; ITEM:quantity.",
-            Fields = [Req("Order", "Order number"), WarehousePick("Warehouse", "Warehouse"), Req("Grn", "GRN number"), Opt("Lines", "Lines (blank: all outstanding)"), Today("Date", "Date"),
-                Opt("Supervisor", "Supervisor authorising an over-receipt (user name)")],
+            Description = "Books a goods received note into a warehouse (stock in, goods-received-not-invoiced accrued). Pick the order and leave Lines blank to receive everything "
+                + "still outstanding, or give ITEM:quantity; ITEM:quantity. Goods that came without an order: leave the order blank, give the supplier and the lines as "
+                + "ITEM:quantity@price - an order is raised for them and received at once. The GRN number is given the next in sequence when left blank.",
+            Fields = [Lookup("Order", "Order (blank: goods without an order)", false, async c => (await c.Db.PurchaseOrders.AsNoTracking()
+                    .Where(o => o.CompanyId == c.CompanyId && (o.Status == PurchaseOrderStatus.Open || o.Status == PurchaseOrderStatus.PartReceived))
+                    .OrderByDescending(o => o.Id).Take(500).Join(c.Db.Suppliers, o => o.SupplierId, s => s.Id, (o, s) => new { o.OrderNumber, s.Name }).ToListAsync().ConfigureAwait(true))
+                    .Select(x => (x.OrderNumber, x.Name)).ToList()),
+                WarehousePick("Warehouse", "Warehouse"), Opt("Supplier", "Supplier code (no order)"), Opt("Lines", "Lines (blank: all outstanding; no order: ITEM:quantity@price)"),
+                Opt("Grn", "GRN number (blank: next in sequence)"), Today("Date", "Date"), Opt("Supervisor", "Supervisor authorising an over-receipt (user name)")],
             Run = async (c, i) =>
             {
-                long orderId = OrderId(c, i.Text("Order"));
+                long orderId;
+                if (i.Optional("Order") is string orderNumber)
+                {
+                    orderId = OrderId(c, orderNumber);
+                }
+                else
+                {
+                    // Goods without an order: one is raised for what came and received straight away, so stock and the accrual follow the usual path.
+                    string supplier = i.Optional("Supplier") ?? throw new OperationException("Pick the order, or give the supplier for goods that came without one.");
+                    string given = i.Optional("Lines") ?? throw new OperationException("Give the lines received as ITEM:quantity@price.");
+                    List<PurchaseOrderLineRequest> ordered = [.. (await OrderLinesAsync(c, given).ConfigureAwait(true))
+                        .Select(l => new PurchaseOrderLineRequest(l.Item, l.Description, l.Quantity, l.Price, null, null, null, l.Unit))];
+                    long supplierId = await SupplierAsync(c, supplier).ConfigureAwait(true);
+                    CurrencyCode currency = await c.Db.Suppliers.Where(s => s.Id == supplierId).Select(s => s.Currency).SingleAsync().ConfigureAwait(true);
+                    string number = Check(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().AllocateAsync(c.CompanyId, "PO", i.Date("Date")).ConfigureAwait(true));
+                    orderId = Check(await c.Get<IProcurementService>().CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
+                    {
+                        CompanyId = c.CompanyId, SupplierId = supplierId, OrderNumber = number, OrderDate = i.Date("Date"), Currency = currency, Lines = ordered, RaisedByUserId = c.UserId,
+                    }).ConfigureAwait(true)).PurchaseOrderId;
+                }
+
                 PurchaseOrder order = await c.Db.PurchaseOrders.AsNoTracking().Include(o => o.Lines).SingleAsync(o => o.Id == orderId).ConfigureAwait(true);
-                List<ReceiveLine> lines = i.Optional("Lines") is string text
+                List<ReceiveLine> lines = i.Optional("Order") is not null && i.Optional("Lines") is string text
                     ? [.. (await QuantitiesAsync(c, text).ConfigureAwait(true)).Select(q => new ReceiveLine(LineFor(order, q.Item).Id, q.Quantity))]
                     : [.. order.Lines.Where(l => l.OrderedQuantity > l.ReceivedQuantity).Select(l => new ReceiveLine(l.Id, l.OrderedQuantity - l.ReceivedQuantity))];
+                string grnNumber = i.Optional("Grn")
+                    ?? Check(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().AllocateAsync(c.CompanyId, "GRN", i.Date("Date")).ConfigureAwait(true));
                 GrnResult grn = Check(await c.Get<IProcurementService>().ReceiveGoodsAsync(new ReceiveGoodsRequest
                 {
-                    CompanyId = c.CompanyId, PurchaseOrderId = order.Id, WarehouseId = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), GrnNumber = i.Text("Grn"),
+                    CompanyId = c.CompanyId, PurchaseOrderId = order.Id, WarehouseId = await WarehouseAsync(c, i.Text("Warehouse")).ConfigureAwait(true), GrnNumber = grnNumber,
                     Date = i.Date("Date"), Lines = lines, ReceivedByUserId = c.UserId,
                     OverReceiptAuthorisedByUserId = await OptionalUserAsync(c, i.Optional("Supervisor")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
-                return $"GRN {i.Text("Grn")} booked: {lines.Count} line(s), {M(grn.AccruedValue)} accrued.";
+                return $"GRN {grnNumber} booked against order {order.OrderNumber}: {lines.Count} line(s), {M(grn.AccruedValue)} accrued.";
             },
             List = PurchaseOrdersAsync,
         };
