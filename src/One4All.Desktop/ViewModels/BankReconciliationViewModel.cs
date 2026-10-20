@@ -101,6 +101,16 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
     [ObservableProperty]
     private string _postReference = string.Empty;
 
+    /// <summary>The tax code a line posted to an account includes (blank: none): its VAT goes to the code's input or output account.</summary>
+    [ObservableProperty]
+    private string _postTaxCode = string.Empty;
+
+    /// <summary>The company's tax codes, offered for a line posted to an account (a blank first for none).</summary>
+    public ObservableCollection<string> TaxCodes { get; } = [];
+
+    /// <summary>Gets whether the tax code shows: only a line posted straight to an account carries one.</summary>
+    public bool ShowTaxCode => PostKind == ToAccount;
+
     private const string CustomerReceipt = "Customer receipt";
     private const string SupplierPayment = "Supplier payment";
     private const string ToAccount = "Post to account";
@@ -111,7 +121,11 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
 
     private bool CanPostLine => SelectedStatementLine is { IsMatched: false } && PostTarget is not null && !IsBusy;
 
-    partial void OnPostKindChanged(string value) => RefillTargets();
+    partial void OnPostKindChanged(string value)
+    {
+        RefillTargets();
+        OnPropertyChanged(nameof(ShowTaxCode));
+    }
 
     partial void OnSelectedStatementLineChanged(StatementRowVm? value)
     {
@@ -150,6 +164,7 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
 
         string? reference = string.IsNullOrWhiteSpace(PostReference) ? null : PostReference.Trim();
         string kind = PostKind;
+        string? taxCode = string.IsNullOrWhiteSpace(PostTaxCode) ? null : PostTaxCode.Split(' ')[0].Trim();
         return ActAsync(async (_, bank) =>
         {
             await using AsyncServiceScope scope = _services.CreateAsyncScope();
@@ -158,11 +173,12 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             {
                 CustomerReceipt => await posting.PostCustomerReceiptAsync(_companyId, bank.Id, line.Id, long.Parse(target.Key, CultureInfo.InvariantCulture), reference).ConfigureAwait(true),
                 SupplierPayment => await posting.PostSupplierPaymentAsync(_companyId, bank.Id, line.Id, long.Parse(target.Key, CultureInfo.InvariantCulture), reference).ConfigureAwait(true),
-                _ => await posting.PostToAccountAsync(_companyId, bank.Id, line.Id, target.Key, reference).ConfigureAwait(true),
+                _ => await posting.PostToAccountAsync(_companyId, bank.Id, line.Id, target.Key, reference, taxCode: taxCode).ConfigureAwait(true),
             };
             if (posted.IsSuccess)
             {
                 PostReference = string.Empty;
+                PostTaxCode = string.Empty;
             }
 
             return posted.IsSuccess ? Result.Success() : Result.Failure(posted.Error);
@@ -236,6 +252,13 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
             _suppliers.AddRange(suppliers.Select(s => new PostTargetVm(s.Id.ToString(CultureInfo.InvariantCulture), $"{s.Code} - {s.Name}")));
             _accounts.Clear();
             _accounts.AddRange(accounts.Select(a => new PostTargetVm(a.AccountCode, $"{a.AccountCode} - {a.Name}")));
+            TaxCodes.Clear();
+            TaxCodes.Add(string.Empty);
+            foreach (var code in await db.TaxCodes.Where(x => x.CompanyId == _companyId && x.IsActive).OrderBy(x => x.Code).Select(x => new { x.Code, x.Name }).ToListAsync(ct).ConfigureAwait(true))
+            {
+                TaxCodes.Add($"{code.Code} - {code.Name}");
+            }
+
             RefillTargets();
 
             StatusMessage = Banks.Count == 0 ? "No bank accounts are set up." : "Choose a bank account.";

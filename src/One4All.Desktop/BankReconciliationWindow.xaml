@@ -5,6 +5,7 @@
         Title="Bank Reconciliation" Height="700" Width="1200"
         WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="Visible" />
         <Style x:Key="Tile" TargetType="Border">
             <Setter Property="Background" Value="White" />
             <Setter Property="BorderBrush" Value="#D9E0D9" />
@@ -115,6 +116,9 @@
                             <StackPanel Orientation="Horizontal">
                                 <ComboBox ItemsSource="{Binding PostKinds}" SelectedItem="{Binding PostKind}" Width="140" />
                                 <ComboBox ItemsSource="{Binding PostTargets}" SelectedItem="{Binding PostTarget}" DisplayMemberPath="Label" Width="210" Margin="6,0,0,0" IsTextSearchEnabled="True" />
+                                <ComboBox ItemsSource="{Binding TaxCodes}" SelectedItem="{Binding PostTaxCode}" Width="120" Margin="6,0,0,0"
+                                          Visibility="{Binding ShowTaxCode, Converter={StaticResource Visible}}"
+                                          ToolTip="Tax code when the amount includes VAT (bank charges, utilities): the net posts to the account, the VAT to the code's account" />
                                 <TextBox Text="{Binding PostReference, UpdateSourceTrigger=PropertyChanged}" Width="110" Margin="6,0,0,0" Padding="4,2"
                                          ToolTip="Document number (receipts / payments) or narrative (account postings); blank uses the bank reference." />
                             </StackPanel>
