@@ -40,7 +40,7 @@ public static partial class OperationCatalogue
             Module = stock, Title = "Stock availability and back orders", ListTitle = "Back orders",
             Description = "An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether "
                 + "stock now covers it.",
-            Fields = [ItemPick("Item", "Product"), Opt("Warehouse", "Warehouse code (blank: all)")],
+            Fields = [ItemPick("Item", "Product"), WarehousePick("Warehouse", "Warehouse (blank: all)", required: false)],
             Run = async (c, i) =>
             {
                 long? warehouse = i.Optional("Warehouse") is string code ? await WarehouseAsync(c, code).ConfigureAwait(true) : null;
@@ -50,6 +50,33 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Get<IStockAvailabilityService>().BackOrdersAsync(c.CompanyId).ConfigureAwait(true),
                 ("Order", b => b.OrderNumber), ("Date", b => D(b.OrderDate)), ("Item", b => b.ItemCode), ("Outstanding", b => Q(b.Outstanding)), ("On hand", b => Q(b.OnHand)), ("Can fulfil", b => b.CanFulfil),
                 ("Short", b => Q(b.Shortfall))),
+        };
+        yield return new Operation
+        {
+            Module = stock, Title = "Stock on hand", ListTitle = "Stock on hand", KeyColumn = "Product",
+            Description = "How many of each product are in stock, per warehouse. Pick a product (and a warehouse) to see just that one; the list shows every product with stock.",
+            Fields = [ItemPick("Item", "Product", required: false), WarehousePick("Warehouse", "Warehouse (blank: all)", required: false)],
+            Run = async (c, i) =>
+            {
+                string? item = i.Optional("Item")?.Trim().ToUpperInvariant();
+                string? warehouse = i.Optional("Warehouse")?.Trim().ToUpperInvariant();
+                var rows = await (from b in c.Db.StockBalances.AsNoTracking()
+                                  join it in c.Db.Items.AsNoTracking() on b.ItemId equals it.Id
+                                  join w in c.Db.Warehouses.AsNoTracking() on b.WarehouseId equals w.Id
+                                  where b.CompanyId == c.CompanyId && (item == null || it.Code == item) && (warehouse == null || w.Code == warehouse)
+                                  orderby it.Code, w.Code
+                                  select new { it.Code, it.Description, it.UnitOfMeasure, Warehouse = w.Code, b.QuantityOnHand }).Take(500).ToListAsync().ConfigureAwait(true);
+                return rows.Count == 0 ? "None in stock."
+                    : string.Join(Environment.NewLine, rows.Select(r => $"{r.Code,-14} {r.Description,-34} {r.Warehouse,-8} {Q(r.QuantityOnHand),12} {r.UnitOfMeasure}"))
+                        + (rows.Select(r => r.Code).Distinct().Count() == 1 ? Environment.NewLine + $"Total {Q(rows.Sum(r => r.QuantityOnHand))} {rows[0].UnitOfMeasure}" : string.Empty);
+            },
+            List = async c => Table(await (from b in c.Db.StockBalances.AsNoTracking()
+                                           join it in c.Db.Items.AsNoTracking() on b.ItemId equals it.Id
+                                           join w in c.Db.Warehouses.AsNoTracking() on b.WarehouseId equals w.Id
+                                           where b.CompanyId == c.CompanyId && b.QuantityOnHand != 0m
+                                           orderby it.Code, w.Code
+                                           select new { it.Code, it.Description, it.UnitOfMeasure, Warehouse = w.Code, b.QuantityOnHand }).Page(c, 1000).ToListAsync().ConfigureAwait(true),
+                ("Product", r => r.Code), ("Description", r => r.Description), ("Warehouse", r => r.Warehouse), ("On hand", r => Q(r.QuantityOnHand)), ("Unit", r => r.UnitOfMeasure)),
         };
         yield return new Operation
         {

@@ -383,6 +383,7 @@ Stock	Set item sale limits	False
 Stock	Start a cycle count	False	
 Stock	Start a stocktake	False	
 Stock	Stock availability and back orders	False	
+Stock	Stock on hand	False	
 Stock	Stock write-down provision	False	
 Stock	Store requisitions	False	
 Stock	Suggest picks (first expiry, first out)	False	

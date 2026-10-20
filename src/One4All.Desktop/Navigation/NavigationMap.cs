@@ -129,7 +129,7 @@ public static class NavigationMap
             G("Production",
                 O("Stock: Run an assembly / production batch", "Make or assemble products"), O("Stock: Disassemble finished goods")),
             G("Look up",
-                O("Stock: Stock availability and back orders", "Stock on hand and back orders"), O("Stock: Recall trace of a batch / serial", "Trace a batch or serial (recall)"),
+                O("Stock: Stock on hand", "How many do I have? (stock on hand)"), O("Stock: Stock availability and back orders", "Available to promise and back orders"), O("Stock: Recall trace of a batch / serial", "Trace a batch or serial (recall)"),
                 O("Stock: Suggest picks (first expiry, first out)"), O("Stock: Classify items A / B / C", "Classify products A / B / C")),
             G("Valuation",
                 O("Stock: Revalue an item's standard cost"), O("Stock: Stock write-down provision")),
