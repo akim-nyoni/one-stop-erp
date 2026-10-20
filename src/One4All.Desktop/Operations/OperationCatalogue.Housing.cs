@@ -134,9 +134,13 @@ public static partial class OperationCatalogue
                             + "Lineage:" + Environment.NewLine + string.Join(Environment.NewLine, h.Lineage.Select(l => "  " + l));
                 }
             },
-            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
-                ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Size m²", s => s.SizeSquareMetres), ("Cost", s => M(s.AllocatedCost)), ("Parent", s => s.ParentStandId),
-                ("Consolidated into", s => s.ConsolidatedIntoStandId)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
+                    ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Size m²", s => s.SizeSquareMetres), ("Cost", s => M(s.AllocatedCost)), ("Parent", s => n.Stand(s.ParentStandId)),
+                    ("Consolidated into", s => n.Stand(s.ConsolidatedIntoStandId)));
+            },
         };
         yield return new Operation
         {
@@ -235,10 +239,14 @@ public static partial class OperationCatalogue
                             : $"NOT verified - inputs unchanged: {v.HashMatches}; same order: {v.OrderMatches}.";
                 }
             },
-            List = async c => Table(await c.Db.Set<AllocationRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
-                ("Run", r => r.RunNumber), ("Scheme", r => r.SchemeId), ("Category", r => r.Category), ("Method", r => r.Method), ("Status", r => r.Status), ("Approved by", r => r.ApprovedByUserId),
-                ("Approved", r => r.ApprovedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Resolution", r => r.CommitteeResolution ?? string.Empty),
-                ("Meeting", r => r.MeetingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty), ("Members", r => r.CommitteeMembers ?? string.Empty)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.Set<AllocationRun>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Page(c, 100).ToListAsync().ConfigureAwait(true),
+                    ("Run", r => r.RunNumber), ("Scheme", r => n.Scheme(r.SchemeId)), ("Category", r => r.Category), ("Method", r => r.Method), ("Status", r => r.Status), ("Approved by", r => r.ApprovedByUserId),
+                    ("Approved", r => r.ApprovedOn?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)), ("Resolution", r => r.CommitteeResolution ?? string.Empty),
+                    ("Meeting", r => r.MeetingDate?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? string.Empty), ("Members", r => r.CommitteeMembers ?? string.Empty));
+            },
         };
         yield return new Operation
         {
@@ -265,9 +273,13 @@ public static partial class OperationCatalogue
                 _ = Check(await allocation.DeclineAsync(c.CompanyId, i.Text("Certificate"), i.Date("Date"), i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), string.Empty);
                 return "Offer declined; the stand is available again.";
             },
-            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
-                ("Stand", s => s.StandNumber), ("Scheme", s => s.SchemeId), ("Size m²", s => Q(s.SizeSquareMetres)), ("Price", s => M(s.SellingPrice)), ("Cost", s => M(s.AllocatedCost)),
-                ("Status", s => s.Status), ("Holder", s => s.CurrentHolderCustomerId)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
+                    ("Stand", s => s.StandNumber), ("Scheme", s => n.Scheme(s.SchemeId)), ("Size m²", s => Q(s.SizeSquareMetres)), ("Price", s => M(s.SellingPrice)), ("Cost", s => M(s.AllocatedCost)),
+                    ("Status", s => s.Status), ("Holder", s => n.Customer(s.CurrentHolderCustomerId)));
+            },
         };
         yield return new Operation
         {
@@ -398,7 +410,7 @@ public static partial class OperationCatalogue
                 + "or withdraw. Ids for objections, offers and disputes are given when they are recorded.",
             Fields = [Pick("Step", "Step", ["Lodge", "Serve notice", "Objection", "Decide objection", "Assess", "Provide", "Offer", "Answer offer", "Dispute", "Award", "Pay part", "Settle", "Possession", "Withdraw"]),
                 Opt("Claim", "Claim number"), Opt("Parcel", "Land parcel number (lodge)"), Opt("Party", "Claimant / objector / assessor / forum / notice reference"), Opt("Note", "Grounds / note"),
-                OptNum("Amount", "Amount"), OptNum("Id", "Objection / offer / dispute id"), Tick("Yes", "Upheld / accepted"), Num("Days", "Objection window (days)", "30"),
+                OptNum("Amount", "Amount"), OptNum("Id", "Objection / offer / dispute id (from the list, under Open steps)"), Tick("Yes", "Upheld / accepted"), Num("Days", "Objection window (days)", "30"),
                 Opt("LandAccount", "Land cost account (lodge)"), Opt("ProvisionAccount", "Provision account (lodge)"), Opt("Bank", "Bank account (pay)"), Today()],
             Run = async (c, i) =>
             {
@@ -497,9 +509,13 @@ public static partial class OperationCatalogue
                         return $"Settled early: {M(settled.PrincipalOutstanding)} principal, {M(settled.InterestRebated)} interest rebated.";
                 }
             },
-            List = async c => Table(await c.Db.Set<InstalmentAgreement>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
-                ("Agreement", a => a.AgreementNumber), ("Stand", a => a.StandId), ("Buyer", a => a.BuyerCustomerId), ("Price", a => M(a.CashPrice)), ("Deposit", a => M(a.Deposit)),
-                ("Rate %", a => Q(a.AnnualRatePercent)), ("Term", a => a.TermMonths), ("Signed", a => D(a.SignedOn)), ("Status", a => a.Status)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.Set<InstalmentAgreement>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
+                    ("Agreement", a => a.AgreementNumber), ("Stand", a => n.Stand(a.StandId)), ("Buyer", a => n.Customer(a.BuyerCustomerId)), ("Price", a => M(a.CashPrice)), ("Deposit", a => M(a.Deposit)),
+                    ("Rate %", a => Q(a.AnnualRatePercent)), ("Term", a => a.TermMonths), ("Signed", a => D(a.SignedOn)), ("Status", a => a.Status));
+            },
         };
         yield return new Operation
         {
@@ -507,7 +523,7 @@ public static partial class OperationCatalogue
             Description = "Lodge a transfer (sale, cession, inheritance, donation, court order) to a new holder; verify each requirement with its document; the checklist shows what is "
                 + "outstanding (rates and housing account clearances are checked live); an approving officer may record that the transferee assumes the housing balance; submit, approve (by someone else), complete or reject.",
             Fields = [Pick("Step", "Step", ["Lodge", "Verify", "Checklist", "Assume balance", "Submit", "Approve", "Complete", "Reject"]), Opt("Application", "Application number"), Opt("Stand", "Stand number (lodge)"),
-                Pick("Type", "Transfer type", Enum.GetNames<TransferType>()), Opt("To", "New holder customer code (lodge)"), Num("Consideration", "Consideration", "0"),
+                Pick("Type", "Transfer type", Enum.GetNames<TransferType>()), Opt("To", "New holder customer code (lodge)"), Num("Consideration", "Sale price", "0"),
                 Pick("Requirement", "Requirement (verify)", Enum.GetNames<TransferRequirement>()), Opt("Document", "Document reference / reason"), Opt("Clearing", "Clearing account (assume balance)"), Today()],
             Run = async (c, i) =>
             {
@@ -545,8 +561,12 @@ public static partial class OperationCatalogue
                         return Check(await transfers.RejectAsync(c.CompanyId, application, i.Optional("Document") ?? string.Empty, date).ConfigureAwait(true), "Rejected.");
                 }
             },
-            List = async c => Table(await c.Db.Set<TransferApplication>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
-                ("Application", a => a.ApplicationNumber), ("Stand", a => a.StandId), ("Type", a => a.TransferType), ("Consideration", a => M(a.Consideration)), ("Status", a => a.Status)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.Set<TransferApplication>().AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
+                    ("Application", a => a.ApplicationNumber), ("Stand", a => n.Stand(a.StandId)), ("Type", a => a.TransferType), ("Sale price", a => M(a.Consideration)), ("Status", a => a.Status));
+            },
         };
         yield return new Operation
         {
@@ -785,7 +805,7 @@ public static partial class OperationCatalogue
                 + "which raises the repair that carries its cost.",
             Fields = [Pick("Step", "Step", ["Report repair", "Complete repair", "Inspection", "Close follow-up", "History", "Void details", "Plan task", "Planned due", "Planned done"]),
                 Opt("Unit", "Unit code"), Opt("Repair", "Repair number (complete)"), Opt("Reason", "Void reason"), Opt("Job", "Refurbishment job (contract) number"),
-                Num("Every", "Planned: every (months, 0 = once)", "12"), OptNum("Task", "Planned task id"),
+                Num("Every", "Planned: every (months, 0 = once)", "12"), OptNum("Task", "Planned task id (as listed by Planned due)"),
                 Opt("Description", "Description / findings"), Num("Cost", "Cost", "0"), Opt("Expense", "Repairs expense account"), Opt("PaidFrom", "Paid from account"), Tick("TenantCaused", "Tenant caused it"),
                 Opt("Recharge", "Recharge income account"), Opt("Inspector", "Inspector"), Num("Grade", "Condition grade (1–5)", "3"), Tick("FollowUp", "Needs follow-up"),
                 OptNum("Inspection", "Inspection id (close)"), Today()],
@@ -896,7 +916,7 @@ public static partial class OperationCatalogue
                 + "Reject (removes the second) or Clear a case, with a reason.",
             Fields = [Pick("Step", "Step", ["Contact", "Lodge document", "Verify document", "Death", "Scan", "Merge", "Reject", "Clear"]), Opt("Applicant", "Waiting-list number"),
                 Pick("Gender", "Gender", Enum.GetNames<Core.Payroll.Gender>()), Opt("Physical", "Physical address"), Opt("Postal", "Postal address"), Opt("Phone", "Phone"), Opt("Employer", "Employer"),
-                Pick("DocType", "Document", Enum.GetNames<ApplicantDocumentType>()), Opt("Description", "Description / name (death)"), OptNum("Id", "Document / case id"),
+                Pick("DocType", "Document", Enum.GetNames<ApplicantDocumentType>()), Opt("Description", "Description / name (death)"), OptNum("Id", "Document / case id (case from the list)"),
                 Opt("Officer", "Verifying officer"), Opt("IdNumber", "National ID (death)"), Opt("Reason", "Reason (decision)"), Today()],
             Run = async (c, i) =>
             {
@@ -1133,7 +1153,7 @@ public static partial class OperationCatalogue
             Description = "Take a deposit against an allocation (held as a liability), apply it when the sale goes ahead or refund it; cancel an instalment agreement at the buyer's "
                 + "request (requested by you, approved by another user): what was paid less occupation rental, the admin charge and arrears is refunded and the stand repossessed.",
             Fields = [Pick("Step", "Step", ["Take deposit", "Apply deposit", "Refund deposit", "Cancel agreement"]), Opt("Certificate", "Allocation certificate (deposit)"),
-                Opt("Agreement", "Instalment agreement (cancel)"), Opt("Customer", "Customer code (take)"), Num("Amount", "Amount (take) / NRV (cancel)", "0"), Opt("Reference", "Receipt reference / reason"),
+                Opt("Agreement", "Instalment agreement (cancel)"), Opt("Customer", "Customer code (take)"), Num("Amount", "Amount (take) / current market value (cancel)", "0"), Opt("Reference", "Receipt reference / reason"),
                 Opt("Bank", "Bank account"), Opt("Liability", "Deposit liability account (take)"), Num("Rental", "Monthly occupation rental (cancel)", "0"), Num("Admin", "Admin charge % (cancel)", "0"),
                 Opt("Approver", "Approving user name (cancel)"), Opt("Available", "Stands available account (cancel)"), Opt("GainLoss", "Gain / loss account (cancel)"), Today()],
             Run = async (c, i) =>
@@ -1165,9 +1185,13 @@ public static partial class OperationCatalogue
                             + $"{M(cancelled.Arrears)} = refund {M(cancelled.Refund)}; repossession {cancelled.RepossessionReference}.";
                 }
             },
-            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.CurrentHolderCustomerId != null).OrderBy(x => x.StandNumber).Page(c, 500)
-                    .ToListAsync().ConfigureAwait(true),
-                ("Stand", x => x.StandNumber), ("Status", x => x.Status), ("Holder", x => x.CurrentHolderCustomerId), ("Price", x => M(x.SellingPrice))),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.HousingStands.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.CurrentHolderCustomerId != null).OrderBy(x => x.StandNumber).Page(c, 500)
+                        .ToListAsync().ConfigureAwait(true),
+                    ("Stand", x => x.StandNumber), ("Status", x => x.Status), ("Holder", x => n.Customer(x.CurrentHolderCustomerId)), ("Price", x => M(x.SellingPrice)));
+            },
         };
         yield return new Operation
         {
@@ -1331,8 +1355,12 @@ public static partial class OperationCatalogue
                         return Show(await joint.HoldersAsync(c.CompanyId, stand, i.Date("Date")).ConfigureAwait(true));
                 }
             },
-            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
-                ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => s.CurrentHolderCustomerId)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
+                    ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => n.Customer(s.CurrentHolderCustomerId)));
+            },
         };
         yield return new Operation
         {
@@ -1340,7 +1368,7 @@ public static partial class OperationCatalogue
             Description = "Registers a sectional title scheme on a stand with its units' floor areas (\"U1:80; U2:120\" - participation quotas follow from the areas), transfers a unit, "
                 + "lists the units and their owners, and raises a period's levy shared by participation quota.",
             Fields = [Pick("Step", "Step", ["Register", "Transfer unit", "Units", "Raise levy"]), Req("Scheme", "Scheme code"), Opt("Name", "Name (register)"), Opt("Stand", "Stand number (register)"),
-                Opt("Units", "Units: number:floor area; … (register)"), Opt("Unit", "Unit number (transfer)"), Opt("To", "To customer code (transfer)"), Num("Amount", "Consideration / levy", "0"),
+                Opt("Units", "Units: number:floor area; … (register)"), Opt("Unit", "Unit number (transfer)"), Opt("To", "To customer code (transfer)"), Num("Amount", "Sale price / levy", "0"),
                 Num("Period", "Levy period (yyyyMM)", "0"), Opt("Income", "Levy income account"), Today()],
             Run = async (c, i) =>
             {
@@ -1379,8 +1407,12 @@ public static partial class OperationCatalogue
                         return string.Join(Environment.NewLine, levy.Billed.Select(b => $"{b.UnitNumber,-8} {M(b.Amount)}")) + Environment.NewLine + $"Not billed (no owner): {M(levy.Unbilled)}.";
                 }
             },
-            List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
-                ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => s.CurrentHolderCustomerId)),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
+                    ("Stand", s => s.StandNumber), ("Status", s => s.Status), ("Holder", s => n.Customer(s.CurrentHolderCustomerId)));
+            },
         };
         yield return new Operation
         {
@@ -1435,9 +1467,13 @@ public static partial class OperationCatalogue
                         return $"{M(Check(await developers.ChargePenaltiesAsync(c.CompanyId, agreement, date, i.Optional("Income") ?? string.Empty).ConfigureAwait(true)))} penalties charged.";
                 }
             },
-            List = async c => Table(await c.Db.Set<DeveloperAgreement>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
-                ("Agreement", x => x.AgreementNumber), ("Scheme", x => x.SchemeId), ("Developer", x => x.DeveloperCustomerId), ("Council stands", x => x.CouncilQuota), ("Developer stands", x => x.DeveloperQuota),
-                ("Deadline", x => D(x.DeliveryDeadline))),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.Set<DeveloperAgreement>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
+                    ("Agreement", x => x.AgreementNumber), ("Scheme", x => n.Scheme(x.SchemeId)), ("Developer", x => n.Customer(x.DeveloperCustomerId)), ("Council stands", x => x.CouncilQuota),
+                    ("Developer stands", x => x.DeveloperQuota), ("Deadline", x => D(x.DeliveryDeadline)));
+            },
         };
         yield return new Operation
         {
@@ -1540,9 +1576,13 @@ public static partial class OperationCatalogue
                         return $"{run.LeasesBilled} lease(s) billed {M(run.RentBilled)}; income recognised {M(run.IncomeRecognised)}.";
                 }
             },
-            List = async c => Table(await c.Db.Set<StandLease>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
-                ("Lease", x => x.LeaseNumber), ("Stand", x => x.StandId), ("Lessee", x => x.LesseeCustomerId), ("Use", x => x.Use), ("From", x => D(x.StartDate)), ("Years", x => x.TermYears),
-                ("Rent", x => M(x.AnnualRent))),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.Set<StandLease>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 300).ToListAsync().ConfigureAwait(true),
+                    ("Lease", x => x.LeaseNumber), ("Stand", x => n.Stand(x.StandId)), ("Lessee", x => n.Customer(x.LesseeCustomerId)), ("Use", x => x.Use), ("From", x => D(x.StartDate)),
+                    ("Years", x => x.TermYears), ("Rent", x => M(x.AnnualRent)));
+            },
         };
         yield return new Operation
         {
@@ -1655,7 +1695,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Encumbrance", "Lift encumbrance", "Open dispute", "Advance dispute", "Dispose"]), Opt("Parcel", "Parcel number"), Pick("EncType", "Encumbrance type", Enum.GetNames<EncumbranceType>()),
                 OptNum("Encumbrance", "Encumbrance id (lift)"), Opt("Reference", "Reference / resolution"), Opt("Party", "In favour of / claimant / counterparty"), Opt("Text", "Description / particulars / note"),
                 Pick("DisputeType", "Dispute type", Enum.GetNames<LandDisputeType>()), Opt("Dispute", "Dispute number (advance)"), Pick("Stage", "Dispute stage", Enum.GetNames<LandDisputeStage>()),
-                Opt("Stand", "Stand number (dispute, optional)"), Pick("DisposalType", "Disposal", Enum.GetNames<LandDisposalType>()), Num("Area", "Area m² (disposal)", "0"), Num("Consideration", "Consideration", "0"),
+                Opt("Stand", "Stand number (dispute, optional)"), Pick("DisposalType", "Disposal", Enum.GetNames<LandDisposalType>()), Num("Area", "Area m² (disposal)", "0"), Num("Consideration", "Sale price", "0"),
                 Opt("LandAccount", "Land account"), Opt("Proceeds", "Proceeds account"), Opt("GainLoss", "Gain / loss account"), Opt("Exchange", "Parcel received in exchange: number"),
                 Num("ExchangeArea", "Parcel received: area m²", "0"), Today()],
             Run = async (c, i) =>
@@ -1758,7 +1798,7 @@ public static partial class OperationCatalogue
                 + "which another user approves; Quote shows a stand's price build-up under the rule in force.",
             Fields = [Pick("Step", "Step", ["Propose", "Approve", "Quote"]), Pick("Scope", "Applies to", Enum.GetNames<PricingScope>()), Opt("Scheme", "Scheme code"), OptNum("MinSize", "Size band from (m²)"),
                 OptNum("MaxSize", "Size band to (m²)"), Opt("Stand", "Stand number (stand rule / quote)"), Num("Overhead", "Overhead %", "0"), Num("LevyStand", "Levy per stand", "0"),
-                Num("LevyM2", "Levy per m²", "0"), Num("Margin", "Margin %", "0"), Num("RoundTo", "Round to", "1"), OptNum("Rule", "Rule id (approve)"), Today()],
+                Num("LevyM2", "Levy per m²", "0"), Num("Margin", "Margin %", "0"), Num("RoundTo", "Round to", "1"), OptNum("Rule", "Rule id (approve, from the list)"), Today()],
             Run = async (c, i) =>
             {
                 IStandPricingService pricing = c.Get<IStandPricingService>();
@@ -1783,9 +1823,13 @@ public static partial class OperationCatalogue
                             + $"{M(quote.BuildUp.Levy)} + margin {M(quote.BuildUp.Margin)} = {M(quote.BuildUp.Price)}.";
                 }
             },
-            List = async c => Table(await c.Db.Set<StandPricingRule>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
-                ("Rule", x => x.Id), ("Scope", x => x.Scope), ("Scheme", x => x.SchemeId), ("Stand", x => x.StandId), ("From", x => D(x.EffectiveFrom)), ("Overhead %", x => Q(x.OverheadPercent)),
-                ("Margin %", x => Q(x.MarginPercent)), ("Approved", x => x.ApprovedOn is DateOnly a ? D(a) : "pending")),
+            List = async c =>
+            {
+                HousingNames n = await HousingNamesAsync(c).ConfigureAwait(true);
+                return Table(await c.Db.Set<StandPricingRule>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderByDescending(x => x.Id).Page(c, 200).ToListAsync().ConfigureAwait(true),
+                    ("Rule", x => x.Id), ("Scope", x => x.Scope), ("Scheme", x => n.Scheme(x.SchemeId)), ("Stand", x => n.Stand(x.StandId)), ("From", x => D(x.EffectiveFrom)),
+                    ("Overhead %", x => Q(x.OverheadPercent)), ("Margin %", x => Q(x.MarginPercent)), ("Approved", x => x.ApprovedOn is DateOnly a ? D(a) : "pending"));
+            },
         };
         yield return new Operation
         {
@@ -1877,6 +1921,31 @@ public static partial class OperationCatalogue
         => Table(await c.Db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderByDescending(a => a.Id).Take(500).ToListAsync().ConfigureAwait(true),
             ("Waiting list", a => a.WaitingListNumber), ("Name", a => a.FullName), ("ID", a => a.IdNumber), ("Category", a => a.Category), ("Registered", a => a.RegistrationDate.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
             ("Status", a => a.Status), ("Verified", a => a.IsVerified));
+
+    /// <summary>Loads the company's stand numbers, scheme codes and customer codes with names, so housing lists show them instead of database ids.</summary>
+    private static async Task<HousingNames> HousingNamesAsync(OperationContext c)
+    {
+        Dictionary<long, string> stands = await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).Select(s => new { s.Id, s.StandNumber })
+            .ToDictionaryAsync(s => s.Id, s => s.StandNumber).ConfigureAwait(true);
+        Dictionary<long, string> schemes = await c.Db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).Select(s => new { s.Id, s.Code })
+            .ToDictionaryAsync(s => s.Id, s => s.Code).ConfigureAwait(true);
+        Dictionary<long, string> customers = await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).Select(x => new { x.Id, x.Code, x.Name })
+            .ToDictionaryAsync(x => x.Id, x => x.Code + " " + x.Name).ConfigureAwait(true);
+        return new HousingNames(stands, schemes, customers);
+    }
+
+    /// <summary>Stand numbers, scheme codes and customer "code name" by id; blank for no id, the id itself when the record is not found.</summary>
+    private sealed record HousingNames(IReadOnlyDictionary<long, string> Stands, IReadOnlyDictionary<long, string> Schemes, IReadOnlyDictionary<long, string> Customers)
+    {
+        public string Stand(long? id) => Name(Stands, id);
+
+        public string Scheme(long? id) => Name(Schemes, id);
+
+        public string Customer(long? id) => Name(Customers, id);
+
+        private static string Name(IReadOnlyDictionary<long, string> names, long? id)
+            => id is long key ? names.GetValueOrDefault(key, key.ToString(CultureInfo.InvariantCulture)) : string.Empty;
+    }
 
     private static DateOnly Day(string text)
         => DateOnly.TryParseExact(text.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day) ? day : throw new OperationException($"\"{text}\" is not a date (yyyy-MM-dd).");
