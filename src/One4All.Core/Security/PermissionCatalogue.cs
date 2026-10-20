@@ -91,6 +91,7 @@ public static class PermissionCatalogue
         Add(ap, LicenceModules.AccountsPayable, "Supplier", "Suppliers", master);
         Add(ap, LicenceModules.AccountsPayable, "SupplierBankDetail", "Supplier Bank Details", OperationFlags.View | OperationFlags.Edit | OperationFlags.Approve | auth);
         Add(ap, LicenceModules.AccountsPayable, "Invoice", "Supplier Invoices", txn);
+        Add(ap, LicenceModules.AccountsPayable, "Allocation", "Allocation / Matching", OperationFlags.View | OperationFlags.Edit | OperationFlags.Post | OperationFlags.VoidReverse);
         Add(ap, LicenceModules.AccountsPayable, "PaymentRun", "Payment Runs", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.Approve | auth);
         Add(ap, LicenceModules.AccountsPayable, "Statement", "Supplier Reconciliation", ro);
 

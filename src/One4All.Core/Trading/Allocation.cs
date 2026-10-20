@@ -86,11 +86,21 @@ public sealed class Allocation : AuditableEntity, ICompanyScoped
     /// <summary>The date the allocation was reversed, if any.</summary>
     public DateOnly? ReversedOn { get; private set; }
 
+    /// <summary>Why the allocation was undone (kept for the audit trail).</summary>
+    public string? ReversalReason { get; private set; }
+
+    /// <summary>Who undid it.</summary>
+    public long? ReversedByUserId { get; private set; }
+
     /// <summary>Marks the allocation reversed (brief §RCP-7).</summary>
     /// <param name="reversedOn">The reversal date.</param>
-    public void Reverse(DateOnly reversedOn)
+    /// <param name="reason">Why it was undone.</param>
+    /// <param name="userId">Who undid it.</param>
+    public void Reverse(DateOnly reversedOn, string? reason = null, long? userId = null)
     {
         IsReversed = true;
         ReversedOn = reversedOn;
+        ReversalReason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        ReversedByUserId = userId is > 0 ? userId : null;
     }
 }

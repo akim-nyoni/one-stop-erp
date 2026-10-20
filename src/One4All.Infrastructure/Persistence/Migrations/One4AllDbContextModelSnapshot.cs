@@ -33602,6 +33602,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("realised_fx_base");
 
+                    b.Property<string>("ReversalReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reversal_reason");
+
+                    b.Property<long?>("ReversedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reversed_by_user_id");
+
                     b.Property<DateOnly?>("ReversedOn")
                         .HasColumnType("date")
                         .HasColumnName("reversed_on");

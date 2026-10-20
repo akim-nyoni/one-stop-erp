@@ -63,7 +63,7 @@ public sealed class UnallocationTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IAllocationService alloc = scope.ServiceProvider.GetRequiredService<IAllocationService>();
-            var un = await alloc.UnallocateAsync(companyId, allocationId, new DateOnly(2026, 1, 20));
+            var un = await alloc.UnallocateAsync(companyId, allocationId, new DateOnly(2026, 1, 20), default, "Receipt keyed to the wrong invoice", 77);
             un.IsSuccess.Should().BeTrue(un.IsFailure ? un.Error.ToString() : null);
             un.Value.RestoredTransaction.Should().Be(300m);
             un.Value.ReversedFxBase.Should().Be(0m);
@@ -84,6 +84,8 @@ public sealed class UnallocationTests
 
             bool reversed = await db.Set<Allocation>().Where(a => a.Id == allocationId).Select(a => a.IsReversed).FirstAsync();
             reversed.Should().BeTrue();
+            (await db.Set<Allocation>().Where(a => a.Id == allocationId).Select(a => new { a.ReversalReason, a.ReversedByUserId }).FirstAsync())
+                .Should().BeEquivalentTo(new { ReversalReason = "Receipt keyed to the wrong invoice", ReversedByUserId = (long?)77 });
 
             // Net balance is unchanged (invoice 400 debit + receipt 300 credit = 100); the point is the items
             // are unmatched again, so the receipt is free to be reversed or re-allocated.

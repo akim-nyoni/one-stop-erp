@@ -1616,11 +1616,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     }
 
     /// <inheritdoc />
-    public Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default)
-        => _db.AtomicAsync(() => UnallocateCoreAsync(companyId, allocationId, reversalDate, ct), ct);
+    public Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default, string? reason = null, long? userId = null)
+        => _db.AtomicAsync(() => UnallocateCoreAsync(companyId, allocationId, reversalDate, ct, reason, userId), ct);
 
     // One unit of work, retried if another user allocates against the same items at the same moment.
-    private async Task<Result<UnallocationResult>> UnallocateCoreAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct)
+    private async Task<Result<UnallocationResult>> UnallocateCoreAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct, string? reason = null, long? userId = null)
     {
         Allocation? allocation = await _db.Allocations.FirstOrDefaultAsync(a => a.Id == allocationId && a.CompanyId == companyId, ct).ConfigureAwait(false);
         if (allocation is null)
@@ -1657,7 +1657,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         // Restore both items to their pre-allocation state using the exact base amounts drawn.
         debit.RestoreOutstanding(allocation.DebitTransactionAmount ?? allocation.TransactionAmount, allocation.DebitBase);
         credit.RestoreOutstanding(allocation.TransactionAmount, allocation.CreditBase);
-        allocation.Reverse(reversalDate);
+        allocation.Reverse(reversalDate, reason, userId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new UnallocationResult(allocation.Id, allocation.TransactionAmount, -allocation.RealisedFxBase, fxReversalJournal);

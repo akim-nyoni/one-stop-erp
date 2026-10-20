@@ -260,8 +260,10 @@ public interface IAllocationService
     /// <param name="allocationId">The allocation to reverse.</param>
     /// <param name="reversalDate">The reversal (accounting) date.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="reason">Why it is undone (kept on the allocation).</param>
+    /// <param name="userId">Who undid it.</param>
     /// <returns>The un-allocation result.</returns>
-    Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default);
+    Task<Result<UnallocationResult>> UnallocateAsync(long companyId, long allocationId, DateOnly reversalDate, CancellationToken ct = default, string? reason = null, long? userId = null);
 
     /// <summary>
     /// Offsets a customer's outstanding invoice against a supplier's outstanding invoice for the same trading

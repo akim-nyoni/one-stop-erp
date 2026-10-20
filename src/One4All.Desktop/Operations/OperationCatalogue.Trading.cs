@@ -33,7 +33,7 @@ public static partial class OperationCatalogue
                 Opt("Debit", customers ? "Invoice number" : "Debit document (payment / debit note)"), Opt("Credit", customers ? "Receipt / credit note number" : "Invoice number"),
                 OptNum("Amount", "Amount (blank: as much as is open)"), Today(), OptNum("Allocation", "Allocation id (unallocate; blank: the latest on the document)"),
                 .. (customers ? new[] { Opt("Supplier", "Supplier code (contra)"), Opt("SupplierInvoice", "Supplier invoice number (contra)"), Opt("Clearing", "Contra clearing account") } : []),
-                Opt("Account", customers ? "Bad debt expense account (write off)" : "Write-back income account"), Opt("Reason", "Reason (write off / back)"),
+                Opt("Account", customers ? "Bad debt expense account (write off)" : "Write-back income account"), Opt("Reason", "Reason (unallocate, write off / back)"),
                 .. (customers ? new[] { Num("Days", "Overdue at least (days) for VAT relief", "180") } : []), Opt("Document", "Document number (contra)")],
             Run = async (c, i) =>
             {
@@ -76,6 +76,14 @@ public static partial class OperationCatalogue
 
                     case "Unallocate":
                     {
+                        // Undoing a match reopens both documents: it needs the reverse right and a reason, both kept on the allocation.
+                        string reason = i.Optional("Reason") ?? throw new OperationException("Give the reason for undoing the allocation.");
+                        if (!(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true))
+                                .Has(customers ? "Sales.Allocation" : "Purchasing.Allocation", One4All.Core.Security.OperationFlags.VoidReverse))
+                        {
+                            throw new OperationException("Undoing an allocation needs the allocation reverse right.");
+                        }
+
                         long allocationId;
                         if (i.OptionalNumber("Allocation") is decimal given)
                         {
@@ -89,7 +97,7 @@ public static partial class OperationCatalogue
                                 .OrderByDescending(a => a.Id).Select(a => (long?)a.Id).FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"{item.DocumentNumber} has no allocation to undo.");
                         }
 
-                        UnallocationResult undone = Check(await allocations.UnallocateAsync(c.CompanyId, allocationId, date).ConfigureAwait(true));
+                        UnallocationResult undone = Check(await allocations.UnallocateAsync(c.CompanyId, allocationId, date, default, reason, c.UserId).ConfigureAwait(true));
                         return $"Allocation {undone.AllocationId} undone; {M(undone.RestoredTransaction)} open again.";
                     }
 

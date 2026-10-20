@@ -224,6 +224,7 @@ internal sealed class AllocationConfiguration : IEntityTypeConfiguration<Allocat
     public void Configure(EntityTypeBuilder<Allocation> b)
     {
         b.ToTable("allocation", Schemas.Trading);
+        b.Property(x => x.ReversalReason).HasMaxLength(500);
         b.HasKey(x => x.Id);
         b.Property(x => x.Ledger).HasConversion<int>();
         b.Property(x => x.TransactionAmount).HasPrecision(19, 4);
