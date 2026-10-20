@@ -51,6 +51,9 @@ public sealed class WaitingListService : IWaitingListService
         policy.DisabilityPoints = t.DisabilityPoints;
         policy.HomelessPoints = t.HomelessPoints;
         policy.LodgerPoints = t.LodgerPoints;
+        policy.PointsPerYearOfAge = t.PointsPerYearOfAge;
+        policy.AgePointsFromYears = Math.Max(0, t.AgePointsFromYears);
+        policy.CooperativeMemberPoints = t.CooperativeMemberPoints;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -147,7 +150,8 @@ public sealed class WaitingListService : IWaitingListService
         List<HousingApplicant> active = await _db.HousingApplicants.AsNoTracking()
             .Where(a => a.CompanyId == companyId && a.Category == category && a.Status == ApplicantStatus.Active && a.WaitingListNumber != null)
             .ToListAsync(ct).ConfigureAwait(false);
-        var scored = active.Select(a => (Applicant: a, Score: WaitingListRules.Score(Facts(a), terms, asAtDate).Total));
+        HashSet<string> members = await CooperativeMembersAsync(companyId, ct).ConfigureAwait(false);
+        var scored = active.Select(a => (Applicant: a, Score: WaitingListRules.Score(Facts(a, members), terms, asAtDate).Total));
         var ordered = order == WaitingListOrder.Score
             ? scored.OrderByDescending(s => s.Score).ThenBy(s => s.Applicant.RegistrationDate).ThenBy(s => s.Applicant.WaitingListNumber, StringComparer.Ordinal)
             : scored.OrderBy(s => s.Applicant.RegistrationDate).ThenBy(s => s.Applicant.WaitingListNumber, StringComparer.Ordinal);
@@ -173,11 +177,18 @@ public sealed class WaitingListService : IWaitingListService
             position = ranking.FirstOrDefault(p => p.WaitingListNumber == applicant.WaitingListNumber)?.Position;
         }
 
-        return new WaitingListEnquiry(applicant.WaitingListNumber!, applicant.Category, applicant.Status, position, WaitingListRules.Score(Facts(applicant), terms, asAtDate));
+        return new WaitingListEnquiry(applicant.WaitingListNumber!, applicant.Category, applicant.Status, position,
+            WaitingListRules.Score(Facts(applicant, await CooperativeMembersAsync(companyId, ct).ConfigureAwait(false)), terms, asAtDate));
     }
 
-    private static ApplicantFacts Facts(HousingApplicant a)
-        => new(a.DateOfBirth ?? a.RegistrationDate, a.ResidentSince ?? a.RegistrationDate, a.RegistrationDate, a.Dependants, a.HasDisability, a.MonthlyIncome, a.Tenure);
+    private static ApplicantFacts Facts(HousingApplicant a, IReadOnlySet<string> cooperativeMembers)
+        => new(a.DateOfBirth ?? a.RegistrationDate, a.ResidentSince ?? a.RegistrationDate, a.RegistrationDate, a.Dependants, a.HasDisability, a.MonthlyIncome, a.Tenure,
+            cooperativeMembers.Contains(NormaliseId(a.IdNumber)));
+
+    // The ID numbers of everyone in the council's registered housing cooperatives.
+    private async Task<HashSet<string>> CooperativeMembersAsync(long companyId, CancellationToken ct)
+        => [.. (await _db.Set<Cooperative>().AsNoTracking().Where(c => c.CompanyId == companyId).SelectMany(c => c.Members).Select(m => m.IdNumber).ToListAsync(ct).ConfigureAwait(false))
+            .Select(NormaliseId)];
 
     private static string NormaliseId(string? value) => (value ?? string.Empty).Replace(" ", string.Empty, StringComparison.Ordinal).Trim().ToUpperInvariant();
 

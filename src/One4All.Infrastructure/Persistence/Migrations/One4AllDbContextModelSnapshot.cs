@@ -13086,9 +13086,18 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<int>("AgePointsFromYears")
+                        .HasColumnType("integer")
+                        .HasColumnName("age_points_from_years");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
+
+                    b.Property<decimal>("CooperativeMemberPoints")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cooperative_member_points");
 
                     b.Property<long>("CreatedByUserId")
                         .HasColumnType("bigint")
@@ -13142,6 +13151,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(9, 2)
                         .HasColumnType("numeric(9,2)")
                         .HasColumnName("points_per_dependant");
+
+                    b.Property<decimal>("PointsPerYearOfAge")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("points_per_year_of_age");
 
                     b.Property<decimal>("PointsPerYearOnList")
                         .HasPrecision(9, 2)

@@ -22,7 +22,8 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Policy", "Qualification rules"]), Num("MinAge", "Minimum age", "18"), Num("Years", "Minimum years resident", "0"),
                 OptNum("Income", "Overall income ceiling (blank: none)"), Num("PerYearOnList", "Points per year on the list", "10"), Num("PerYearResident", "Points per year resident", "2"),
                 Num("PerDependant", "Points per dependant", "5"), Num("Disability", "Points for a disability", "15"), Num("Homeless", "Points if homeless", "20"),
-                Num("Lodger", "Points if lodging", "8"), Tick("FirstTime", "First-time buyers only"), Tick("Forfeited", "Refuse earlier forfeiture"), Tick("Clearance", "Require rates clearance"), Tick("RentalList", "Let rental units only from the rental waiting list"),
+                Num("Lodger", "Points if lodging", "8"), OptNum("PerYearOfAge", "Points per year of age (policy)"), OptNum("AgeFrom", "Age points from age"),
+                OptNum("Cooperative", "Points for a cooperative member"), Tick("FirstTime", "First-time buyers only"), Tick("Forfeited", "Refuse earlier forfeiture"), Tick("Clearance", "Require rates clearance"), Tick("RentalList", "Let rental units only from the rental waiting list"),
                 Pick("Category", "Category for the ceiling", Enum.GetNames<HousingCategory>()), OptNum("Ceiling", "Its income ceiling (blank: none)")],
             Run = async (c, i) =>
             {
@@ -30,7 +31,8 @@ public static partial class OperationCatalogue
                 if (i.Text("Step") == "Policy")
                 {
                     return Check(await list.SetPolicyAsync(c.CompanyId, new WaitingListPolicyInput(new WaitingListTerms(i.Whole("MinAge"), i.Whole("Years"), i.OptionalNumber("Income"),
-                        i.Number("PerYearOnList"), i.Number("PerYearResident"), i.Number("PerDependant"), i.Number("Disability"), i.Number("Homeless"), i.Number("Lodger")))).ConfigureAwait(true),
+                        i.Number("PerYearOnList"), i.Number("PerYearResident"), i.Number("PerDependant"), i.Number("Disability"), i.Number("Homeless"), i.Number("Lodger"),
+                        i.OptionalNumber("PerYearOfAge") ?? 0m, (int)(i.OptionalNumber("AgeFrom") ?? 0m), i.OptionalNumber("Cooperative") ?? 0m))).ConfigureAwait(true),
                         "Policy saved.");
                 }
 

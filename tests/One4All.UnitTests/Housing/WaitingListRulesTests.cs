@@ -61,4 +61,15 @@ public class WaitingListRulesTests
     {
         WaitingListRules.Score(Facts(disability: true), Terms, AsAt).Total.Should().Be(115m);
     }
+
+    [Fact]
+    public void Age_and_cooperative_membership_weigh_only_where_the_council_weights_them()
+    {
+        // Born March 1990: 36 on 1 June 2026, 6 years over 30 at half a point; a cooperative member earns 12 more.
+        WaitingListTerms weighted = Terms with { PointsPerYearOfAge = 0.5m, AgePointsFromYears = 30, CooperativeMemberPoints = 12m };
+        PriorityScore score = WaitingListRules.Score(Facts() with { CooperativeMember = true }, weighted, AsAt);
+        score.Total.Should().Be(115m);
+        score.Lines.Select(l => (l.Factor, l.Points)).Should().Contain([("Age", 3m), ("Cooperative member", 12m)]);
+        WaitingListRules.Score(Facts(), Terms, AsAt).Lines.Should().NotContain(l => l.Factor == "Age" || l.Factor == "Cooperative member");
+    }
 }

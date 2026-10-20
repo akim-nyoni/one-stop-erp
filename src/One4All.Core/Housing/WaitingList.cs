@@ -101,6 +101,15 @@ public sealed class WaitingListPolicy : AuditableEntity, ICompanyScoped
     /// <summary>Points for lodging or staying with relatives.</summary>
     public decimal LodgerPoints { get; set; } = 8m;
 
+    /// <summary>Points per full year of the applicant's age above <see cref="AgePointsFromYears"/> (0: age carries no weight).</summary>
+    public decimal PointsPerYearOfAge { get; set; }
+
+    /// <summary>The age from which age points start.</summary>
+    public int AgePointsFromYears { get; set; }
+
+    /// <summary>Points for an applicant who belongs to a registered housing cooperative.</summary>
+    public decimal CooperativeMemberPoints { get; set; }
+
     /// <summary>Only first-time buyers qualify: nobody who has ever held a council stand or owned property on the municipal register.</summary>
     public bool FirstTimeBuyersOnly { get; set; }
 

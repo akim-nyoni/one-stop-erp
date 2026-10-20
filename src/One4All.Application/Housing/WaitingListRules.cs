@@ -10,7 +10,9 @@ namespace One4All.Application.Housing;
 /// <param name="HasDisability">Whether the applicant has a disability.</param>
 /// <param name="MonthlyIncome">The monthly income.</param>
 /// <param name="Tenure">Where the applicant lives now.</param>
-public sealed record ApplicantFacts(DateOnly DateOfBirth, DateOnly ResidentSince, DateOnly RegistrationDate, int Dependants, bool HasDisability, decimal MonthlyIncome, CurrentTenure Tenure);
+/// <param name="CooperativeMember">Whether the applicant belongs to a registered housing cooperative.</param>
+public sealed record ApplicantFacts(DateOnly DateOfBirth, DateOnly ResidentSince, DateOnly RegistrationDate, int Dependants, bool HasDisability, decimal MonthlyIncome, CurrentTenure Tenure,
+    bool CooperativeMember = false);
 
 /// <summary>The configurable qualification rules beyond age, residency and income (brief §4.10.3).</summary>
 /// <param name="FirstTimeBuyersOnly">Only those who have never held a stand or owned property qualify.</param>
@@ -43,8 +45,12 @@ public sealed record QualificationFacts(HousingCategory Category, decimal Monthl
 /// <param name="DisabilityPoints">Points for a disability.</param>
 /// <param name="HomelessPoints">Points for being homeless.</param>
 /// <param name="LodgerPoints">Points for lodging or staying with relatives.</param>
+/// <param name="PointsPerYearOfAge">Points per full year of age above <paramref name="AgePointsFromYears"/>.</param>
+/// <param name="AgePointsFromYears">The age age points start from.</param>
+/// <param name="CooperativeMemberPoints">Points for a member of a registered housing cooperative.</param>
 public sealed record WaitingListTerms(int MinimumAge, int MinimumResidencyYears, decimal? MaximumMonthlyIncome, decimal PointsPerYearOnList, decimal PointsPerYearResident,
-    decimal PointsPerDependant, decimal DisabilityPoints, decimal HomelessPoints, decimal LodgerPoints)
+    decimal PointsPerDependant, decimal DisabilityPoints, decimal HomelessPoints, decimal LodgerPoints, decimal PointsPerYearOfAge = 0m, int AgePointsFromYears = 0,
+    decimal CooperativeMemberPoints = 0m)
 {
     /// <summary>The terms of a council's stored policy.</summary>
     /// <param name="policy">The policy.</param>
@@ -53,7 +59,8 @@ public sealed record WaitingListTerms(int MinimumAge, int MinimumResidencyYears,
     {
         ArgumentNullException.ThrowIfNull(policy);
         return new(policy.MinimumAge, policy.MinimumResidencyYears, policy.MaximumMonthlyIncome, policy.PointsPerYearOnList, policy.PointsPerYearResident,
-            policy.PointsPerDependant, policy.DisabilityPoints, policy.HomelessPoints, policy.LodgerPoints);
+            policy.PointsPerDependant, policy.DisabilityPoints, policy.HomelessPoints, policy.LodgerPoints, policy.PointsPerYearOfAge, policy.AgePointsFromYears,
+            policy.CooperativeMemberPoints);
     }
 }
 
@@ -190,6 +197,19 @@ public static class WaitingListRules
             new("Disability", facts.HasDisability ? "Yes" : "No", facts.HasDisability ? terms.DisabilityPoints : 0m),
             new("Housing conditions", facts.Tenure.ToString(), conditions),
         ];
+
+        // Age and cooperative membership count only where the council weights them.
+        if (terms.PointsPerYearOfAge != 0m)
+        {
+            int over = Math.Max(0, FullYears(facts.DateOfBirth, asAtDate) - terms.AgePointsFromYears);
+            lines.Add(new("Age", $"{over} year(s) over {terms.AgePointsFromYears} × {terms.PointsPerYearOfAge:0.##}", over * terms.PointsPerYearOfAge));
+        }
+
+        if (terms.CooperativeMemberPoints != 0m)
+        {
+            lines.Add(new("Cooperative member", facts.CooperativeMember ? "Yes" : "No", facts.CooperativeMember ? terms.CooperativeMemberPoints : 0m));
+        }
+
         return new PriorityScore(lines.Sum(l => l.Points), lines);
     }
 }
