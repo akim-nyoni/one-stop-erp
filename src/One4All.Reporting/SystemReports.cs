@@ -944,7 +944,7 @@ public static class SystemReports
         def.DataSources.Add(new ReportDataSource { Name = "Main", Kind = DataSourceKind.InMemory, Command = command });
         foreach ((string paramName, ParameterType type) in parameters)
         {
-            def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
+            def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = FriendlyPrompt(paramName), Required = false });
         }
 
         // Sales, purchasing, cash book, tax and the finance modules' listings all take the common parameters (brief §9): a reporting currency and rate basis, a branch,
@@ -957,7 +957,7 @@ public static class SystemReports
             foreach ((string paramName, ParameterType type) in CommonParameters.Where(c => (dimensions || CurrencyParameters.Contains(c.Name, StringComparer.Ordinal))
                 && def.Parameters.All(p => !string.Equals(p.Name, c.Name, StringComparison.OrdinalIgnoreCase))))
             {
-                def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = paramName, Required = false });
+                def.Parameters.Add(new ReportParameter { Name = paramName, Type = type, Prompt = FriendlyPrompt(paramName), Required = false });
             }
         }
 
@@ -1066,6 +1066,45 @@ public static class SystemReports
         ("ReportingCurrency", ParameterType.String), ("RateBasis", ParameterType.String), ("Rate", ParameterType.Decimal), ("Branch", ParameterType.String), ("CostCentre", ParameterType.String),
         ("Department", ParameterType.String), ("IncludeUnposted", ParameterType.Boolean),
     ];
+
+    /// <summary>
+    /// The words a parameter is prompted with: the common ones say what a blank means ("Branch (blank: all)"), the rest are the name in plain words
+    /// ("FromDate" is "From date", "SupplierCode" is "Supplier code").
+    /// </summary>
+    /// <param name="name">The parameter name.</param>
+    /// <returns>The prompt.</returns>
+    public static string FriendlyPrompt(string name) => name switch
+    {
+        "AsAtDate" => "As at date",
+        "IncludeUnposted" => "Include unposted (draft and deferred) journals",
+        "ReportingCurrency" => "Reporting currency (blank: base)",
+        "RateBasis" => "Rate basis: Closing, Average or Keyed (blank: daily rate)",
+        "Rate" => "Rate (Keyed basis)",
+        "CostCentre" => "Cost centre (blank: all)",
+        "Department" => "Department (blank: all)",
+        "Branch" => "Branch (blank: all)",
+        _ => Words(name),
+    };
+
+    // "SupplierCode" -> "Supplier code"; runs of capitals ("VAT") stay together.
+    private static string Words(string name)
+    {
+        System.Text.StringBuilder words = new();
+        for (int k = 0; k < name.Length; k++)
+        {
+            char ch = name[k];
+            bool boundary = k > 0 && char.IsUpper(ch) && (!char.IsUpper(name[k - 1]) || (k + 1 < name.Length && char.IsLower(name[k + 1])));
+            if (boundary)
+            {
+                words.Append(' ');
+            }
+
+            bool acronym = char.IsUpper(ch) && ((k > 0 && char.IsUpper(name[k - 1])) || (k + 1 < name.Length && char.IsUpper(name[k + 1])));
+            words.Append(k == 0 || acronym ? ch : char.ToLowerInvariant(ch));
+        }
+
+        return words.ToString();
+    }
 
     private static ReportElement Label(string name, string text, double x, double y, double w, double h, bool bold = false, double size = 9, ReportHAlign align = ReportHAlign.Left) =>
         new() { Kind = ElementKind.Label, Name = name, Text = text, X = x, Y = y, Width = w, Height = h, Bold = bold, FontSize = size, HAlign = align };

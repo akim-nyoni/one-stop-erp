@@ -204,7 +204,7 @@ public static class ReceiptingReports
         foreach (string parameter in parameters)
         {
             ParameterType type = parameter.Contains("Date", StringComparison.Ordinal) ? ParameterType.Date : ParameterType.String;
-            def.Parameters.Add(new ReportParameter { Name = parameter, Type = type, Prompt = parameter, Required = false });
+            def.Parameters.Add(new ReportParameter { Name = parameter, Type = type, Prompt = SystemReports.FriendlyPrompt(parameter), Required = false });
         }
 
         if (parameters.Length > 0)

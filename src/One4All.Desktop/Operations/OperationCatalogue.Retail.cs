@@ -264,9 +264,9 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Till pickup / paid-out / float top-up", ListTitle = "Open till sessions",
             Description = "Cash in or out of a drawer other than by sales; posted, and counted in the cash expected at cash-up. A paid-out needs a different supervisor.",
-            Fields = [Num("Session", "Till session id (from the list)"), Pick("Kind", "Kind", [.. Enum.GetNames<TillCashKind>().Where(k => k != nameof(TillCashKind.Refund))]), Num("Amount", "Amount"), Req("Cash", "Till cash account", "1000"),
+            Fields = [OpenTillSession("Session", "Till session", true), Pick("Kind", "Kind", [.. Enum.GetNames<TillCashKind>().Where(k => k != nameof(TillCashKind.Refund))]), Num("Amount", "Amount"), Req("Cash", "Till cash account", "1000"),
                 Req("Other", "Safe / bank, expense or float source account"), Req("Reason", "Reason"), Opt("Supervisor", "Supervisor (user name)"), Today()],
-            Run = async (c, i) => $"Posted: {Check(await c.Get<ITillCashService>().RecordAsync(new TillCashRequest((long)i.Number("Session"), Enum.Parse<TillCashKind>(i.Text("Kind")), i.Number("Amount"),
+            Run = async (c, i) => $"Posted: {Check(await c.Get<ITillCashService>().RecordAsync(new TillCashRequest(long.Parse(i.Text("Session"), System.Globalization.CultureInfo.InvariantCulture), Enum.Parse<TillCashKind>(i.Text("Kind")), i.Number("Amount"),
                 i.Text("Cash"), i.Text("Other"), i.Text("Reason"), c.UserId, await OptionalUserAsync(c, i.Optional("Supervisor")).ConfigureAwait(true), i.Date("Date"))).ConfigureAwait(true))}.",
             List = async c => Table(await c.Db.Set<TillSession>().AsNoTracking().Where(s => s.CompanyId == c.CompanyId && s.Status == TillSessionStatus.Open).OrderBy(s => s.Id).ToListAsync().ConfigureAwait(true),
                 ("Session", s => s.Id), ("Terminal", s => s.TerminalId), ("Opened", s => s.OpenedOnUtc.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)), ("Float", s => M(s.OpeningFloat))),
@@ -276,16 +276,17 @@ public static partial class OperationCatalogue
             Module = module, Title = "Till cash-up position", ListTitle = "Tills",
             Description = "A blind till's cashier declares the count (\"120; ZAR 500; EUR 20\") before the cash expected is shown; the position shows expected, counted and the "
                 + "variance per currency (a blind till's only after its count is declared). Blind on / off is per till.",
-            Fields = [Pick("Step", "Step", ["Position", "Blind on", "Blind off"]), OptNum("Session", "Till session id (position)"), Opt("Terminal", "Till code (blind on / off)")],
+            Fields = [Pick("Step", "Step", ["Position", "Blind on", "Blind off"]), OpenTillSession("Session", "Till session (position)", false), Lookup("Terminal", "Till (blind on / off)", false, async c => (await c.Db.Set<PosTerminal>().AsNoTracking()
+                    .Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).Select(t => new { t.Code, t.Name }).ToListAsync().ConfigureAwait(true)).Select(t => (t.Code, t.Name)).ToList())],
             Run = async (c, i) =>
             {
                 if (i.Text("Step") == "Position")
                 {
-                    IReadOnlyList<CurrencyCashUp> position = Check(await c.Get<IPosService>().ExpectedCashAsync((long)i.Number("Session")).ConfigureAwait(true));
+                    IReadOnlyList<CurrencyCashUp> position = Check(await c.Get<IPosService>().ExpectedCashAsync(long.Parse(i.Optional("Session") ?? throw new OperationException("Pick the till session."), System.Globalization.CultureInfo.InvariantCulture)).ConfigureAwait(true));
                     return string.Join(Environment.NewLine, position.Select(p => $"{p.Currency}  expected {M(p.Expected),14}  counted {M(p.Counted),14}  variance {M(p.Variance),12}  ({M(p.VarianceBase)} base)"));
                 }
 
-                string code = (i.Optional("Terminal") ?? throw new OperationException("Type the till code.")).ToUpperInvariant();
+                string code = (i.Optional("Terminal") ?? throw new OperationException("Pick the till.")).ToUpperInvariant();
                 PosTerminal terminal = await c.Db.Set<PosTerminal>().FirstOrDefaultAsync(t => t.CompanyId == c.CompanyId && t.Code.ToUpper() == code).ConfigureAwait(true)
                     ?? throw new OperationException($"Till {code} not found.");
                 terminal.BlindCashUp = i.Text("Step") == "Blind on";
@@ -985,4 +986,13 @@ public static partial class OperationCatalogue
             ("Transfer", t => t.TransferNumber), ("Dispatched", t => D(t.DispatchedOn)), ("Item", t => items.GetValueOrDefault(t.ItemId)), ("From", t => warehouses.GetValueOrDefault(t.FromWarehouseId)),
             ("To", t => warehouses.GetValueOrDefault(t.ToWarehouseId)), ("Quantity", t => Q(t.Quantity)), ("Value", t => M(t.Value)));
     }
+
+    // The till sessions open now, picked by till and opening time instead of an id.
+    private static OperationField OpenTillSession(string name, string label, bool required) => Lookup(name, label, required, async c =>
+        (await (from s in c.Db.Set<TillSession>().AsNoTracking()
+                join t in c.Db.Set<PosTerminal>().AsNoTracking() on s.TerminalId equals t.Id
+                where s.CompanyId == c.CompanyId && s.Status == TillSessionStatus.Open
+                orderby t.Code
+                select new { s.Id, t.Code, s.OpenedOnUtc }).ToListAsync().ConfigureAwait(true))
+        .Select(x => (x.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"{x.Code} opened {x.OpenedOnUtc.ToLocalTime():yyyy-MM-dd HH:mm}")).ToList());
 }
