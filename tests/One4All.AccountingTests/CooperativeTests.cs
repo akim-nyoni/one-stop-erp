@@ -49,8 +49,9 @@ public sealed class CooperativeTests
         (await cooperatives.AddMemberAsync(companyId, "UNITY", "63-100A", "Same Person", joined)).Error.Code.Should().Be("Hse.MemberExists");
 
         DateOnly date = new(2026, 3, 1);
-        (await cooperatives.AllocateStandsAsync(companyId, "UNITY", [a.Id, b.Id], date)).Value.Should().Be(2);
-        (await cooperatives.AllocateStandsAsync(companyId, "OTHER", [a.Id], date)).Error.Code.Should().Be("Hse.StandUnavailable");
+        (await cooperatives.AllocateStandsAsync(companyId, "UNITY", [a.Id, b.Id], date, 71, 71)).Error.Code.Should().Be("Hse.SelfApproval");
+        (await cooperatives.AllocateStandsAsync(companyId, "UNITY", [a.Id, b.Id], date, 71, 72)).Value.Should().Be(2);
+        (await cooperatives.AllocateStandsAsync(companyId, "OTHER", [a.Id], date, 71, 72)).Error.Code.Should().Be("Hse.StandUnavailable");
         (await db.HousingStands.AsNoTracking().Where(s => s.Id == a.Id || s.Id == b.Id).Select(s => s.Status).ToListAsync()).Should().OnlyContain(s => s == StandStatus.Allocated);
 
         (await cooperatives.SubAllocateAsync(companyId, "UNITY", a.Id, "63-100A", new DateOnly(2026, 4, 1))).IsSuccess.Should().BeTrue();

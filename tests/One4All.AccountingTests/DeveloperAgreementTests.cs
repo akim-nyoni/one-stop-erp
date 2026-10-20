@@ -90,7 +90,7 @@ public sealed class DeveloperAgreementTests
         // The handed-over council stand is free for the council's own allocation.
         ICooperativeService cooperatives = scope.ServiceProvider.GetRequiredService<ICooperativeService>();
         (await cooperatives.RegisterAsync(companyId, "DVCOOP", "Developer Coop", "REG-DV")).IsSuccess.Should().BeTrue();
-        (await cooperatives.AllocateStandsAsync(companyId, "DVCOOP", [stands[0].Id], new DateOnly(2026, 8, 2))).Value.Should().Be(1);
-        (await cooperatives.AllocateStandsAsync(companyId, "DVCOOP", [stands[2].Id], new DateOnly(2026, 8, 2))).Error.Code.Should().Be("Hse.StandUnavailable");
+        (await cooperatives.AllocateStandsAsync(companyId, "DVCOOP", [stands[0].Id], new DateOnly(2026, 8, 2), 71, 72)).Value.Should().Be(1);
+        (await cooperatives.AllocateStandsAsync(companyId, "DVCOOP", [stands[2].Id], new DateOnly(2026, 8, 2), 71, 72)).Error.Code.Should().Be("Hse.StandUnavailable");
     }
 }

@@ -74,9 +74,12 @@ public interface ICooperativeService
     /// <param name="cooperativeCode">The cooperative.</param>
     /// <param name="standIds">The stands.</param>
     /// <param name="date">When.</param>
+    /// <param name="requestedByUserId">Who requests the allocation.</param>
+    /// <param name="approvedByUserId">Who approves it (someone else).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The number allocated, or why they were refused.</returns>
-    Task<Result<int>> AllocateStandsAsync(long companyId, string cooperativeCode, IReadOnlyList<long> standIds, DateOnly date, CancellationToken ct = default);
+    Task<Result<int>> AllocateStandsAsync(long companyId, string cooperativeCode, IReadOnlyList<long> standIds, DateOnly date, long requestedByUserId, long approvedByUserId,
+        CancellationToken ct = default);
 
     /// <summary>Sub-allocates one of the cooperative's stands to one of its active members, who holds no other.</summary>
     /// <param name="companyId">The council.</param>

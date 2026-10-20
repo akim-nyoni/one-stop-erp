@@ -225,14 +225,22 @@ public sealed class CooperativeService : ICooperativeService
     }
 
     /// <inheritdoc />
-    public Task<Result<int>> AllocateStandsAsync(long companyId, string cooperativeCode, IReadOnlyList<long> standIds, DateOnly date, CancellationToken ct = default)
+    public Task<Result<int>> AllocateStandsAsync(long companyId, string cooperativeCode, IReadOnlyList<long> standIds, DateOnly date, long requestedByUserId, long approvedByUserId,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(standIds);
-        return _db.AtomicAsync(() => AllocateCoreAsync(companyId, cooperativeCode, standIds, date, ct), ct);
+        return _db.AtomicAsync(() => AllocateCoreAsync(companyId, cooperativeCode, standIds, date, requestedByUserId, approvedByUserId, ct), ct);
     }
 
-    private async Task<Result<int>> AllocateCoreAsync(long companyId, string cooperativeCode, IReadOnlyList<long> standIds, DateOnly date, CancellationToken ct)
+    private async Task<Result<int>> AllocateCoreAsync(long companyId, string cooperativeCode, IReadOnlyList<long> standIds, DateOnly date, long requestedByUserId, long approvedByUserId,
+        CancellationToken ct)
     {
+        // Stands go to a cooperative on two signatures, like a waiting-list allocation (brief §4.10.4).
+        if (approvedByUserId <= 0 || approvedByUserId == requestedByUserId)
+        {
+            return Error.Rule("Hse.SelfApproval", "A cooperative allocation is approved by someone other than whoever requested it.");
+        }
+
         if (standIds.Count == 0 || standIds.Distinct().Count() != standIds.Count)
         {
             return Error.Validation("Hse.CooperativeStands", "List each stand once.");
@@ -259,7 +267,9 @@ public sealed class CooperativeService : ICooperativeService
         foreach (HousingStand stand in stands)
         {
             stand.MarkAllocated();
-            _db.Set<CooperativeStand>().Add(new CooperativeStand(companyId, found.Value.Id, stand.Id, date));
+            CooperativeStand holding = new(companyId, found.Value.Id, stand.Id, date);
+            holding.Approved(requestedByUserId, approvedByUserId);
+            _db.Set<CooperativeStand>().Add(holding);
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);

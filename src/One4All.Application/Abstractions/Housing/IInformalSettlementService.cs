@@ -143,9 +143,11 @@ public interface IInformalSettlementService
     /// <param name="householdNumber">The household.</param>
     /// <param name="standId">The stand.</param>
     /// <param name="date">When.</param>
+    /// <param name="requestedByUserId">Who requests the regularisation.</param>
+    /// <param name="approvedByUserId">Who approves it (someone else).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>
-    Task<Result> RegulariseAsync(long companyId, string householdNumber, long standId, DateOnly date, CancellationToken ct = default);
+    Task<Result> RegulariseAsync(long companyId, string householdNumber, long standId, DateOnly date, long requestedByUserId, long approvedByUserId, CancellationToken ct = default);
 
     /// <summary>Where a settlement's regularisation stands.</summary>
     /// <param name="companyId">The council.</param>

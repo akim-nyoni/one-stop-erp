@@ -993,7 +993,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Register", "Add member", "Remove member", "Allocate stands", "Sub-allocate", "Stands", "Account", "Charge", "Contribution", "Statement"]),
                 Req("Cooperative", "Cooperative code"), Opt("Name", "Name / member name"), Opt("Registration", "Registration number"), Opt("IdNumber", "Member national ID"),
                 Opt("Stands", "Stand number(s), comma-separated"), Opt("Customer", "Account customer code"), Num("Amount", "Amount", "0"), Opt("Account", "Income account (charge) / bank (contribution)"),
-                Opt("Reference", "Document / receipt number"), Opt("Since", "Statement from (yyyy-MM-dd)"), Today()],
+                Opt("Reference", "Document / receipt number"), Opt("Since", "Statement from (yyyy-MM-dd)"), Opt("Approver", "Approving user name (allocate stands)"), Today()],
             Run = async (c, i) =>
             {
                 ICooperativeService cooperatives = c.Get<ICooperativeService>();
@@ -1018,7 +1018,8 @@ public static partial class OperationCatalogue
                     case "Remove member":
                         return Check(await cooperatives.RemoveMemberAsync(c.CompanyId, code, i.Optional("IdNumber") ?? string.Empty).ConfigureAwait(true), "Member removed.");
                     case "Allocate stands":
-                        return $"{Check(await cooperatives.AllocateStandsAsync(c.CompanyId, code, await StandIds().ConfigureAwait(true), i.Date("Date")).ConfigureAwait(true))} stand(s) allocated.";
+                        return $"{Check(await cooperatives.AllocateStandsAsync(c.CompanyId, code, await StandIds().ConfigureAwait(true), i.Date("Date"), c.UserId,
+                            await UserAsync(c, i.Optional("Approver") ?? throw new OperationException("Give the approving user.")).ConfigureAwait(true)).ConfigureAwait(true))} stand(s) allocated.";
                     case "Sub-allocate":
                         List<long> stand = await StandIds().ConfigureAwait(true);
                         return Check(await cooperatives.SubAllocateAsync(c.CompanyId, code, stand.FirstOrDefault(), i.Optional("IdNumber") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), "Sub-allocated.");
@@ -1412,7 +1413,8 @@ public static partial class OperationCatalogue
                 Opt("Settlement", "Settlement code"), Opt("Name", "Name / plan / enumeration reference"), Opt("Ward", "Ward (register)"), Today("CutOff", "Cut-off date (register)"),
                 Opt("Household", "Household number"), Opt("IdNumber", "Head's national ID"), Opt("Head", "Head's name"), Opt("Born", "Head's date of birth (yyyy-MM-dd)"), Num("Size", "Household size", "1"),
                 Num("Income", "Monthly income", "0"), Opt("Since", "Occupied since (yyyy-MM-dd)"), Pick("Structure", "Structure", Enum.GetNames<StructureType>()), Opt("StructureRef", "Structure reference"),
-                Pick("Category", "Waiting-list category", Enum.GetNames<HousingCategory>()), Opt("Stand", "Stand number (regularise)"), Today()],
+                Pick("Category", "Waiting-list category", Enum.GetNames<HousingCategory>()), Opt("Stand", "Stand number (regularise)"), Opt("Approver", "Approving user name (regularise)"),
+                Today()],
             Run = async (c, i) =>
             {
                 IInformalSettlementService settlements = c.Get<IInformalSettlementService>();
@@ -1444,7 +1446,8 @@ public static partial class OperationCatalogue
                     case "Regularise":
                         long stand = await FindAsync(c.Db.HousingStands, x => x.CompanyId == c.CompanyId && x.StandNumber == (i.Optional("Stand") ?? string.Empty).ToUpper(), x => x.Id, "stand",
                             i.Optional("Stand") ?? string.Empty).ConfigureAwait(true);
-                        return Check(await settlements.RegulariseAsync(c.CompanyId, i.Optional("Household") ?? string.Empty, stand, date).ConfigureAwait(true), "Regularised on the stand.");
+                        return Check(await settlements.RegulariseAsync(c.CompanyId, i.Optional("Household") ?? string.Empty, stand, date, c.UserId,
+                            await UserAsync(c, i.Optional("Approver") ?? throw new OperationException("Give the approving user.")).ConfigureAwait(true)).ConfigureAwait(true), "Regularised on the stand.");
                     default:
                         SettlementSummary summary = Check(await settlements.SummaryAsync(c.CompanyId, code).ConfigureAwait(true));
                         return $"{summary.Code} {summary.Name}: plan {(summary.PlanApprovedOn is DateOnly approved ? $"approved {D(approved)}" : "not approved")}; {summary.Enumerated} enumerated, "

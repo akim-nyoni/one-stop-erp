@@ -131,6 +131,21 @@ public sealed class CooperativeStand : AuditableEntity, ICompanyScoped
     /// <summary>When it was allocated to the cooperative.</summary>
     public DateOnly AllocatedOn { get; private set; }
 
+    /// <summary>Who approved it (a second person, not whoever requested it).</summary>
+    public long? ApprovedByUserId { get; private set; }
+
+    /// <summary>Records who requested and who approved it.</summary>
+    /// <param name="requestedByUserId">The requester.</param>
+    /// <param name="approvedByUserId">The approver.</param>
+    public void Approved(long requestedByUserId, long approvedByUserId)
+    {
+        RequestedByUserId = requestedByUserId;
+        ApprovedByUserId = approvedByUserId;
+    }
+
+    /// <summary>Who requested it.</summary>
+    public long? RequestedByUserId { get; private set; }
+
     /// <summary>The member it was sub-allocated to, if any.</summary>
     public long? MemberId { get; private set; }
 

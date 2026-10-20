@@ -43,7 +43,7 @@ public sealed class InformalSettlementTests
         ICooperativeService cooperatives = scope.ServiceProvider.GetRequiredService<ICooperativeService>();
         (await cooperatives.RegisterAsync(companyId, "ISCOOP", "Settlement Coop", "REG-IS")).IsSuccess.Should().BeTrue();
         (await cooperatives.AddMemberAsync(companyId, "ISCOOP", "ID-E", "Head E", new DateOnly(2026, 1, 1))).IsSuccess.Should().BeTrue();
-        (await cooperatives.AllocateStandsAsync(companyId, "ISCOOP", [standTwo.Id], new DateOnly(2026, 1, 2))).IsSuccess.Should().BeTrue();
+        (await cooperatives.AllocateStandsAsync(companyId, "ISCOOP", [standTwo.Id], new DateOnly(2026, 1, 2), 71, 72)).IsSuccess.Should().BeTrue();
         (await cooperatives.SubAllocateAsync(companyId, "ISCOOP", standTwo.Id, "ID-E", new DateOnly(2026, 1, 3))).IsSuccess.Should().BeTrue();
 
         IInformalSettlementService settlements = scope.ServiceProvider.GetRequiredService<IInformalSettlementService>();
@@ -69,21 +69,21 @@ public sealed class InformalSettlementTests
 
         // No regularisation until the upgrading plan is approved.
         DateOnly day = new(2026, 5, 1);
-        (await settlements.RegulariseAsync(companyId, a.HouseholdNumber, standOne.Id, day)).Error.Code.Should().Be("Hse.NoUpgradingPlan");
+        (await settlements.RegulariseAsync(companyId, a.HouseholdNumber, standOne.Id, day, 71, 72)).Error.Code.Should().Be("Hse.NoUpgradingPlan");
         (await settlements.ApprovePlanAsync(companyId, "EXT7", "In-situ upgrade: re-block, survey, service and regularise", new DateOnly(2026, 4, 15))).IsSuccess.Should().BeTrue();
 
-        (await settlements.RegulariseAsync(companyId, a.HouseholdNumber, standOne.Id, day)).IsSuccess.Should().BeTrue();
-        (await settlements.RegulariseAsync(companyId, a.HouseholdNumber, standOne.Id, day)).Error.Code.Should().Be("Hse.HouseholdDealtWith");
-        (await settlements.RegulariseAsync(companyId, d.HouseholdNumber, standOne.Id, day)).Error.Code.Should().Be("Hse.StandUnavailable");
-        (await settlements.RegulariseAsync(companyId, b.HouseholdNumber, standOne.Id, day)).Error.Code.Should().Be("Hse.HouseholdIneligible");
+        (await settlements.RegulariseAsync(companyId, a.HouseholdNumber, standOne.Id, day, 71, 72)).IsSuccess.Should().BeTrue();
+        (await settlements.RegulariseAsync(companyId, a.HouseholdNumber, standOne.Id, day, 71, 72)).Error.Code.Should().Be("Hse.HouseholdDealtWith");
+        (await settlements.RegulariseAsync(companyId, d.HouseholdNumber, standOne.Id, day, 71, 72)).Error.Code.Should().Be("Hse.StandUnavailable");
+        (await settlements.RegulariseAsync(companyId, b.HouseholdNumber, standOne.Id, day, 71, 72)).Error.Code.Should().Be("Hse.HouseholdIneligible");
         (await db.HousingStands.AsNoTracking().SingleAsync(s => s.Id == standOne.Id)).Status.Should().Be(StandStatus.Allocated);
 
         // A cooperative stand is not free for regularisation, and a cooperative member is already housed.
         HousingStand standThree = new(companyId, parcel.Id, null, "IS-3", 200m, 1000m);
         db.HousingStands.Add(standThree);
         await db.SaveChangesAsync();
-        (await settlements.RegulariseAsync(companyId, d.HouseholdNumber, standTwo.Id, day)).Error.Code.Should().Be("Hse.StandUnavailable");
-        (await settlements.RegulariseAsync(companyId, e.HouseholdNumber, standThree.Id, day)).Error.Code.Should().Be("Hse.AlreadyHoused");
+        (await settlements.RegulariseAsync(companyId, d.HouseholdNumber, standTwo.Id, day, 71, 72)).Error.Code.Should().Be("Hse.StandUnavailable");
+        (await settlements.RegulariseAsync(companyId, e.HouseholdNumber, standThree.Id, day, 71, 72)).Error.Code.Should().Be("Hse.AlreadyHoused");
 
         string waitingListNumber = (await settlements.ConvertToWaitingListAsync(companyId, d.HouseholdNumber, HousingCategory.HighDensity, day)).Value;
         HousingApplicant applicant = await db.HousingApplicants.AsNoTracking().SingleAsync(x => x.CompanyId == companyId && x.WaitingListNumber == waitingListNumber);

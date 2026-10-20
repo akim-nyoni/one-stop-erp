@@ -262,6 +262,21 @@ public sealed class EnumeratedHousehold : AuditableEntity, ICompanyScoped
         OutcomeDate = date;
     }
 
+    /// <summary>Who approved it (a second person, not whoever requested it).</summary>
+    public long? ApprovedByUserId { get; private set; }
+
+    /// <summary>Records who requested and who approved it.</summary>
+    /// <param name="requestedByUserId">The requester.</param>
+    /// <param name="approvedByUserId">The approver.</param>
+    public void Approved(long requestedByUserId, long approvedByUserId)
+    {
+        RequestedByUserId = requestedByUserId;
+        ApprovedByUserId = approvedByUserId;
+    }
+
+    /// <summary>Who requested it.</summary>
+    public long? RequestedByUserId { get; private set; }
+
     /// <summary>Records the stand allocated to it on regularisation.</summary>
     /// <param name="standId">The stand.</param>
     /// <param name="date">When.</param>

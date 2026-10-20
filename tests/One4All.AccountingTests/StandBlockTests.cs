@@ -79,7 +79,7 @@ public sealed class StandBlockTests
 
         ICooperativeService cooperatives = scope.ServiceProvider.GetRequiredService<ICooperativeService>();
         (await cooperatives.RegisterAsync(companyId, "BKCOOP", "Block Coop", "REG-BK")).IsSuccess.Should().BeTrue();
-        (await cooperatives.AllocateStandsAsync(companyId, "BKCOOP", [blocked.Id], day)).Error.Code.Should().Be("Hse.StandUnavailable");
+        (await cooperatives.AllocateStandsAsync(companyId, "BKCOOP", [blocked.Id], day, 71, 72)).Error.Code.Should().Be("Hse.StandUnavailable");
 
         IHousingService housing = scope.ServiceProvider.GetRequiredService<IHousingService>();
         (await housing.SellStandAsync(companyId, blocked.Id, buyer.Id, buyer.Name, 6000m, day, "4100", "1400", "5000", $"BK-INV-{companyId}")).Error.Code.Should().Be("Housing.StandBlocked");
@@ -108,6 +108,6 @@ public sealed class StandBlockTests
         history.Should().ContainSingle();
         (history[0].Reason, history[0].PlacedByUserId, history[0].LiftedByUserId, history[0].LiftReason).Should().Be((BlockReason.CourtInterdict, placer.Id, (long?)lifter.Id, "Interdict discharged"));
 
-        (await cooperatives.AllocateStandsAsync(companyId, "BKCOOP", [blocked.Id], later)).Value.Should().Be(1);
+        (await cooperatives.AllocateStandsAsync(companyId, "BKCOOP", [blocked.Id], later, 71, 72)).Value.Should().Be(1);
     }
 }

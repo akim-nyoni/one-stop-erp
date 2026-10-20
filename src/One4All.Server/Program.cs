@@ -1664,8 +1664,9 @@ api.MapDelete("/api/housing/cooperatives/{code}/members/{idNumber}", async (stri
 .RequireAuthorization()
 .WithName("RemoveCooperativeMember");
 
-api.MapPost("/api/housing/cooperatives/{code}/stands", async (string code, long companyId, DateOnly date, IReadOnlyList<long> standIds, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives, CancellationToken ct) =>
-    ValueResponse(await cooperatives.AllocateStandsAsync(companyId, code, standIds, date, ct).ConfigureAwait(false)))
+api.MapPost("/api/housing/cooperatives/{code}/stands", async (string code, long companyId, DateOnly date, long approvedByUserId, IReadOnlyList<long> standIds, One4All.Application.Abstractions.Housing.ICooperativeService cooperatives,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ValueResponse(await cooperatives.AllocateStandsAsync(companyId, code, standIds, date, caller.UserId ?? 0, approvedByUserId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("AllocateStandsToCooperative");
 
@@ -1734,8 +1735,9 @@ api.MapPost("/api/housing/settlements/households/{householdNumber}/waiting-list"
 .RequireAuthorization()
 .WithName("ConvertHouseholdToWaitingList");
 
-api.MapPost("/api/housing/settlements/households/{householdNumber}/regularise", async (string householdNumber, long companyId, long standId, DateOnly date, One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, CancellationToken ct) =>
-    ActionResponse(await settlements.RegulariseAsync(companyId, householdNumber, standId, date, ct).ConfigureAwait(false)))
+api.MapPost("/api/housing/settlements/households/{householdNumber}/regularise", async (string householdNumber, long companyId, long standId, DateOnly date, long approvedByUserId,
+    One4All.Application.Abstractions.Housing.IInformalSettlementService settlements, One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ActionResponse(await settlements.RegulariseAsync(companyId, householdNumber, standId, date, caller.UserId ?? 0, approvedByUserId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RegulariseHousehold");
 

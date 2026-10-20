@@ -210,11 +210,17 @@ public sealed class InformalSettlementService : IInformalSettlementService
     }
 
     /// <inheritdoc />
-    public Task<Result> RegulariseAsync(long companyId, string householdNumber, long standId, DateOnly date, CancellationToken ct = default)
-        => _db.AtomicAsync(() => RegulariseCoreAsync(companyId, householdNumber, standId, date, ct), ct);
+    public Task<Result> RegulariseAsync(long companyId, string householdNumber, long standId, DateOnly date, long requestedByUserId, long approvedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RegulariseCoreAsync(companyId, householdNumber, standId, date, requestedByUserId, approvedByUserId, ct), ct);
 
-    private async Task<Result> RegulariseCoreAsync(long companyId, string householdNumber, long standId, DateOnly date, CancellationToken ct)
+    private async Task<Result> RegulariseCoreAsync(long companyId, string householdNumber, long standId, DateOnly date, long requestedByUserId, long approvedByUserId, CancellationToken ct)
     {
+        // A household is given a stand on two signatures.
+        if (approvedByUserId <= 0 || approvedByUserId == requestedByUserId)
+        {
+            return Result.Failure(Error.Rule("Hse.SelfApproval", "A regularisation is approved by someone other than whoever requested it."));
+        }
+
         Result<EnumeratedHousehold> found = await PendingEligibleAsync(companyId, householdNumber, ct).ConfigureAwait(false);
         if (found.IsFailure)
         {
@@ -258,6 +264,7 @@ public sealed class InformalSettlementService : IInformalSettlementService
 
         stand.MarkAllocated();
         household.Regularise(standId, date);
+        household.Approved(requestedByUserId, approvedByUserId);
         applicant?.SetStatus(ApplicantStatus.Allocated); // off the waiting list: housed on regularisation
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
