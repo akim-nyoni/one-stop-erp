@@ -92,7 +92,7 @@
                     <TextBox Text="{Binding DateToleranceDays, UpdateSourceTrigger=PropertyChanged}" Width="50" Margin="8,0,0,0" Padding="6,4" TextAlignment="Right" />
                     <Button Content="Auto-match" Style="{StaticResource ActionButton}" Command="{Binding AutoMatchCommand}" />
                     <Button Content="Apply rules" Style="{StaticResource ActionButton}" Command="{Binding ApplyRulesCommand}"
-                            ToolTip="Posts and matches every open line a bank rule recognises (Utilities → Bank Rules)." />
+                            ToolTip="Posts and matches every open line a bank rule recognises (Cash &amp; Banking > Bank accounts > Bank rules)." />
                 </StackPanel>
             </DockPanel>
         </Border>

@@ -1783,7 +1783,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         if (NullIfBlank(LoyaltyMember) is not string member)
         {
-            StatusMessage = "Type the loyalty member number under More functions first.";
+            StatusMessage = "Type the loyalty member number under More: discounts, loyalty, coupons first.";
             return;
         }
 

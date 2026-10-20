@@ -454,7 +454,7 @@
                                     <Button Content="1" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="1" />
                                     <Button Content="2" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="2" />
                                     <Button Content="3" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="3" />
-                                    <Button Content="Recall" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ResumeCommand}" ToolTip="Bring back a parked sale (choose it under More functions)" />
+                                    <Button Content="Recall" Style="{StaticResource FunctionButton}" Height="54" Command="{Binding ResumeCommand}" ToolTip="Bring back a parked sale (choose it under More: discounts, loyalty, coupons, parked sales)" />
                                     <Button Content="." Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="." />
                                     <Button Content="0" Style="{StaticResource KeyButton}" Command="{Binding AppendDigitCommand}" CommandParameter="0" />
                                     <Button Content="Void" Style="{StaticResource FunctionButton}" Height="54" Background="#F5D6D3" Command="{Binding VoidSaleCommand}" ToolTip="Void a completed sale: type its number in the PLU box and the reason in the note box; a supervisor authorises and is recorded" />
@@ -469,10 +469,10 @@
                                 <UniformGrid Columns="3">
                                     <Button Content="CHEQUE" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#5D6D7E" Command="{Binding TenderChequeCommand}" ToolTip="A cheque for the amount on the pad (blank: the balance); no change is given" />
                                     <Button Content="TRANSFER" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#1F618D" Command="{Binding TenderBankTransferCommand}" ToolTip="A bank transfer for the amount on the pad (blank: the balance)" />
-                                    <Button Content="POINTS" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#A04000" Command="{Binding TenderPointsCommand}" ToolTip="Pay with the loyalty member's points (member number under More functions)" />
+                                    <Button Content="POINTS" Style="{StaticResource PadButton}" Height="44" FontSize="12" Background="#A04000" Command="{Binding TenderPointsCommand}" ToolTip="Pay with the loyalty member's points (enter the member under More: discounts, loyalty, coupons below first)" />
                                 </UniformGrid>
                                 <Button Content="SELL GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#7D6608" Command="{Binding SellGiftCardCommand}" ToolTip="Card number in the gift card box, value on the number pad: printed stock activates, an active card tops up, when the sale posts" />
-                                <Button Content="VOUCHER / GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#B9770E" Command="{Binding TenderVoucherCommand}" ToolTip="Type the gift card number under More functions first" />
+                                <Button Content="VOUCHER / GIFT CARD" Style="{StaticResource PadButton}" Height="48" FontSize="13" Background="#B9770E" Command="{Binding TenderVoucherCommand}" ToolTip="Type the gift card number under More: discounts, loyalty, coupons first" />
                                 <ItemsControl ItemsSource="{Binding CurrencyButtons}" Margin="3,2,3,0" ToolTip="{Binding PayingInText}">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>

@@ -1493,7 +1493,7 @@ public static partial class OperationCatalogue
         long? listId = await c.Db.PriceLists.AsNoTracking().Where(l => l.CompanyId == c.CompanyId && l.IsDefault).Select(l => (long?)l.Id).FirstOrDefaultAsync().ConfigureAwait(true);
         if (listId is not long list)
         {
-            return " No price was set: there is no default price list (create one under Customers, Price lists).";
+            return " No price was set: there is no default price list (create one under Sales & Customers > Prices and commission > Price lists).";
         }
 
         _ = Check(await c.Get<Application.Abstractions.Inventory.IPricingService>().SetPriceAsync(c.CompanyId, list, itemId, 1m, unitPrice).ConfigureAwait(true), string.Empty);

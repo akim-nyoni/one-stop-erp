@@ -101,7 +101,7 @@ public static partial class OperationCatalogue
                         ? DateOnly.TryParseExact(reverse, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly on) ? on : throw new OperationException("Write the reverse-on date as yyyy-MM-dd.")
                         : null,
                 }, c.UserId).ConfigureAwait(true));
-                return $"Journal {receipt.JournalNumber} submitted ({M(receipt.TotalBase)}); it posts when approved under Transactions → Journals Awaiting Approval.";
+                return $"Journal {receipt.JournalNumber} submitted ({M(receipt.TotalBase)}); it posts when someone else approves it (Accounting > Journals > Journals awaiting approval).";
             },
             List = async c => Table(await c.Get<IJournalApprovalService>().AwaitingApprovalAsync(c.CompanyId).ConfigureAwait(true), ("Journal", j => j.JournalNumber),
                 ("Date", j => D(j.PostingDate)), ("Narrative", j => j.Narrative), ("Value", j => M(j.TotalBaseDebit)), ("Prepared by", j => j.PreparedByUserId)),
