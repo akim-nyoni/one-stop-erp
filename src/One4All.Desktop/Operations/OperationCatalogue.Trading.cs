@@ -490,10 +490,12 @@ public static partial class OperationCatalogue
         {
             Module = "Suppliers", Title = "Supplier payment", ListTitle = "Open supplier items",
             Description = "A single payment to a supplier from the bank (several at once go through the payment run), or money the supplier pays back (tick Refund): banked "
-                + "against the supplier's account and matched to the overpayment or debit note it settles.",
+                + "against the supplier's account and matched to the overpayment or debit note it settles. A payment can be matched straight away to the invoices it pays "
+                + "(their numbers, separated by commas, in order) or to the oldest open invoices; otherwise it waits on the account for allocation.",
             Fields = [SupplierPick("Supplier", "Supplier"), Req("Number", "Payment / refund number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
                 Opt("Currency", "Currency (blank: the supplier's)"), Opt("Narrative", "Narrative"), Tick("Refund", "A refund from the supplier (money in)"),
-                Opt("Against", "Overpayment / debit note the refund settles")],
+                Opt("Against", "Overpayment / debit note the refund settles"), Opt("Invoices", "Invoices this payment settles (numbers, comma-separated)"),
+                Tick("Oldest", "Match to the oldest open invoices", false)],
             Run = async (c, i) =>
             {
                 long supplier = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true);
@@ -511,7 +513,8 @@ public static partial class OperationCatalogue
                     CompanyId = c.CompanyId, SupplierId = supplier, DocumentNumber = i.Text("Number"), PaymentDate = i.Date("Date"), Currency = currency, Amount = i.Number("Amount"),
                     BankAccountCode = i.Text("Bank"), Narrative = i.Optional("Narrative"),
                 }).ConfigureAwait(true));
-                return $"Payment {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
+                string paid = $"Payment {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
+                return paid + await AllocatePaymentAsync(c, supplier, i.Text("Number"), i.Optional("Invoices"), i.Flag("Oldest"), i.Date("Date")).ConfigureAwait(true);
             },
             List = c => OpenItemsAsync(c, TradingLedger.AccountsPayable),
         };
@@ -836,4 +839,57 @@ public static partial class OperationCatalogue
                 .ConfigureAwait(true), ("Trader", o => o.TraderId), ("Document", o => o.DocumentNumber), ("Type", o => o.ItemType), ("Date", o => D(o.DocumentDate)), ("Due", o => D(o.DueDate)),
             ("Currency", o => o.Currency), ("Original", o => M(o.Sign == LedgerSign.Debit ? o.OriginalTransaction : -o.OriginalTransaction)),
             ("Outstanding", o => M(o.Sign == LedgerSign.Debit ? o.OutstandingTransaction : -o.OutstandingTransaction)));
+
+    // Matches a supplier payment just posted to the invoices it pays (named, in order) or to the oldest open ones. The payment is already posted, so a match that
+    // cannot be made is reported and left for the allocation screen rather than undoing the payment.
+    private static async Task<string> AllocatePaymentAsync(OperationContext c, long supplierId, string paymentNumber, string? invoices, bool oldest, DateOnly date)
+    {
+        if (invoices is null && !oldest)
+        {
+            return " It waits on the account for allocation.";
+        }
+
+        if (invoices is null)
+        {
+            AutoAllocationResult auto = Check(await c.Get<IAutoAllocationService>().AllocateTraderAsync(c.CompanyId, TradingLedger.AccountsPayable, supplierId, date).ConfigureAwait(true));
+            return $" Matched {M(auto.AmountAllocated)} to the oldest open invoices ({auto.Allocations} allocation(s)).";
+        }
+
+        string number = paymentNumber.Trim().ToUpperInvariant();
+        IAllocationService allocations = c.Get<IAllocationService>();
+        List<string> done = [], problems = [];
+        foreach (string invoice in invoices.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            Core.Trading.OpenItem? payment = await c.Db.OpenItems.AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Ledger == TradingLedger.AccountsPayable && o.TraderId == supplierId
+                && o.DocumentNumber.ToUpper() == number && o.Sign == LedgerSign.Debit && o.OutstandingTransaction != 0m).FirstOrDefaultAsync().ConfigureAwait(true);
+            if (payment is null)
+            {
+                problems.Add($"{invoice}: nothing of the payment is left to match");
+                break;
+            }
+
+            string key = invoice.ToUpperInvariant();
+            Core.Trading.OpenItem? bill = await c.Db.OpenItems.AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Ledger == TradingLedger.AccountsPayable && o.TraderId == supplierId
+                && o.DocumentNumber.ToUpper() == key && o.Sign == LedgerSign.Credit && o.OutstandingTransaction != 0m).FirstOrDefaultAsync().ConfigureAwait(true);
+            if (bill is null)
+            {
+                problems.Add($"{invoice}: no open invoice");
+                continue;
+            }
+
+            decimal amount = Math.Min(Math.Abs(payment.OutstandingTransaction), Math.Abs(bill.OutstandingTransaction));
+            var matched = await allocations.AllocateAsync(c.CompanyId, TradingLedger.AccountsPayable, payment.Id, bill.Id, amount, date).ConfigureAwait(true);
+            if (matched.IsSuccess)
+            {
+                done.Add($"{invoice} {M(matched.Value.TransactionAmount)}");
+            }
+            else
+            {
+                problems.Add($"{invoice}: {matched.Error.Message}");
+            }
+        }
+
+        return (done.Count == 0 ? string.Empty : $" Matched to {string.Join(", ", done)}.")
+            + (problems.Count == 0 ? string.Empty : $" Not matched (allocate under Allocate on the supplier's account): {string.Join("; ", problems)}.");
+    }
 }
