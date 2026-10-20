@@ -78,9 +78,11 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Submit a manual journal", ListTitle = "Journals awaiting approval",
-            Description = "Lines separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch= and a narrative after '#'; e.g. "
-                + "\"6100 Dr 500 project=P-DAM fund=WATER # Contractor; 2410 Cr 500 fund=WATER\". It is validated and numbered now, and posts once someone else approves it.",
-            Fields = [Today("Date", "Posting date"), Req("Narrative", "Narrative"), Opt("Reference", "Reference"), Req("Lines", "Lines"), Opt("Currency", "Currency (blank: base)")],
+            Description = "Lines separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch=, tax= (tax code, for the VAT return), cur= and rate= "
+                + "(a line in another currency at its rate) and a narrative after '#'; e.g. \"6100 Dr 500 project=P-DAM fund=WATER # Contractor; 2410 Cr 500 fund=WATER\". "
+                + "It is validated and numbered now, and posts once someone else approves it; an accrual names the date it reverses on.",
+            Fields = [Today("Date", "Posting date"), Req("Narrative", "Narrative"), Opt("Reference", "Reference"), Req("Lines", "Lines"), Opt("Currency", "Currency (blank: base)"),
+                Opt("ReverseOn", "Reverse on (yyyy-MM-dd; blank: not reversed)")],
             Run = async (c, i) =>
             {
                 CurrencyCode currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code)
@@ -89,6 +91,9 @@ public static partial class OperationCatalogue
                 {
                     CompanyId = c.CompanyId, SourceModule = "GL", PostingDate = i.Date("Date"), TransactionCurrency = currency, Narrative = i.Text("Narrative"), Reference = i.Optional("Reference"),
                     DocumentType = "Manual", Lines = JournalLines(i.Text("Lines")),
+                    ReverseOn = i.Optional("ReverseOn") is string reverse
+                        ? DateOnly.TryParseExact(reverse, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly on) ? on : throw new OperationException("Write the reverse-on date as yyyy-MM-dd.")
+                        : null,
                 }, c.UserId).ConfigureAwait(true));
                 return $"Journal {receipt.JournalNumber} submitted ({M(receipt.TotalBase)}); it posts when approved under Transactions → Journals Awaiting Approval.";
             },
@@ -622,7 +627,7 @@ public static partial class OperationCatalogue
             if (words.Length < 3 || !decimal.TryParse(words[2], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount)
                 || words[1].ToUpperInvariant() is not ("DR" or "CR"))
             {
-                throw new OperationException($"\"{part}\" should be ACCOUNT Dr|Cr AMOUNT [cc= dept= project= fund= branch=] [# narrative].");
+                throw new OperationException($"\"{part}\" should be ACCOUNT Dr|Cr AMOUNT [cc= dept= project= fund= branch= tax= cur= rate=] [# narrative].");
             }
 
             Dictionary<string, string> tags = words.Skip(3).Select(w => w.Split('=', 2)).Where(kv => kv.Length == 2)
@@ -632,6 +637,11 @@ public static partial class OperationCatalogue
                 AccountCode = words[0], Side = words[1].Equals("dr", StringComparison.OrdinalIgnoreCase) ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = amount,
                 CostCentre = tags.GetValueOrDefault("cc"), Department = tags.GetValueOrDefault("dept"), Project = tags.GetValueOrDefault("project"), Fund = tags.GetValueOrDefault("fund"),
                 Branch = tags.GetValueOrDefault("branch"), Narrative = narrativeSplit.Length > 1 ? narrativeSplit[1] : null,
+                TaxCode = tags.GetValueOrDefault("tax")?.ToUpperInvariant(),
+                Currency = tags.GetValueOrDefault("cur") is string cur ? CurrencyCode.Parse(cur.ToUpperInvariant()) : null,
+                ExchangeRate = tags.GetValueOrDefault("rate") is string rate
+                    ? decimal.TryParse(rate, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal r) && r > 0m ? r : throw new OperationException($"\"{rate}\" is not a rate.")
+                    : null,
             });
         }
 

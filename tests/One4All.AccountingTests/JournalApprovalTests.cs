@@ -73,18 +73,24 @@ public sealed class JournalApprovalTests
         Func<Task> bypass = () => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE gl.journal SET status = 2, awaiting_approval = false WHERE id = {third.JournalId}");
         (await bypass.Should().ThrowAsync<Npgsql.PostgresException>()).Which.ConstraintName.Should().Be("ck_journal_approved_before_posting");
 
+        // An accrual names its reverse-on date: approved, it posts and reverses itself on that date.
+        (await approvals.SubmitAsync(Manual(companyId, "Bad accrual", reverseOn: new DateOnly(2026, 3, 10)), Preparer)).Error.Code.Should().Be("Posting.ReverseOn");
+        PostingReceipt accrual = (await approvals.SubmitAsync(Manual(companyId, "Accrue audit fee", reverseOn: new DateOnly(2026, 4, 1)), Preparer)).Value;
+        (await approvals.ApproveAsync(companyId, accrual.JournalId, Approver)).IsSuccess.Should().BeTrue();
+        (await db.Journals.AsNoTracking().SingleAsync(j => j.CompanyId == companyId && j.ReversalOfJournalId == accrual.JournalId)).PostingDate.Should().Be(new DateOnly(2026, 4, 1));
+
         LedgerIntegrityReport integrity = (await scope.ServiceProvider.GetRequiredService<ILedgerIntegrityService>().CheckAsync(companyId)).Value;
         integrity.Issues.Should().NotContain(i => i.Check == IntegrityCheck.JournalNumberGap);
 
         ConsolidatedTrialBalance tb = (await scope.ServiceProvider.GetRequiredService<IConsolidationService>().ConsolidatedTrialBalanceAsync([companyId], new DateOnly(2026, 3, 31))).Value;
         tb.IsBalanced.Should().BeTrue();
-        tb.Rows.Single(r => r.AccountCode == "6000").Debit.Should().Be(150m);
+        tb.Rows.Single(r => r.AccountCode == "6000").Debit.Should().Be(250m); // 50 + 100 approved + the 100 accrual (reversed in April)
     }
 
-    private static JournalRequest Manual(long companyId, string narrative, decimal amount = 100m) => new()
+    private static JournalRequest Manual(long companyId, string narrative, decimal amount = 100m, DateOnly? reverseOn = null) => new()
     {
         CompanyId = companyId, SourceModule = "GL", PostingDate = new DateOnly(2026, 3, 10), TransactionCurrency = Scenario.Usd,
-        EnforceManualJournalRules = true, Narrative = narrative,
+        EnforceManualJournalRules = true, Narrative = narrative, ReverseOn = reverseOn,
         Lines =
         [
             new JournalLineRequest { AccountCode = "6000", Side = JournalSide.Debit, TransactionAmount = amount },

@@ -41,6 +41,9 @@ public sealed class JournalRequest
     /// <summary>A user reference.</summary>
     public string? Reference { get; init; }
 
+    /// <summary>For an accrual: the date the journal is reversed on, automatically, once it posts (after the posting date).</summary>
+    public DateOnly? ReverseOn { get; init; }
+
     /// <summary>A narrative/description.</summary>
     public string? Narrative { get; init; }
 

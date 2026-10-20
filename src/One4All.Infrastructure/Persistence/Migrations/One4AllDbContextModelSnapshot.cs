@@ -646,6 +646,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("reversal_of_journal_id");
 
+                    b.Property<DateOnly?>("ReverseOn")
+                        .HasColumnType("date")
+                        .HasColumnName("reverse_on");
+
                     b.Property<uint>("RowVersion")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()

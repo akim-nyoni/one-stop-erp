@@ -79,6 +79,9 @@ public sealed class JournalEntry : AuditableEntity, ICompanyScoped
     /// <summary>A user reference.</summary>
     public string? Reference { get; set; }
 
+    /// <summary>For an accrual or prepayment adjustment: the date it is reversed on, automatically, once it posts.</summary>
+    public DateOnly? ReverseOn { get; set; }
+
     /// <summary>A narrative/description.</summary>
     public string? Narrative { get; set; }
 

@@ -69,6 +69,7 @@ public sealed class JournalApprovalService : IJournalApprovalService
             DocumentType = request.DocumentType,
             DocumentNumber = request.DocumentNumber,
             Reference = request.Reference,
+            ReverseOn = request.ReverseOn,
             Narrative = request.Narrative,
             EnforceManualJournalRules = true,
             Deferred = true,
@@ -122,7 +123,15 @@ public sealed class JournalApprovalService : IJournalApprovalService
             return Error.Rule("Gl.SelfApproval", $"Journal {held.Value.JournalNumber} was prepared by this user; a different user must approve it.");
         }
 
-        return await _engine.ReleaseDeferredAsync(companyId, journalId, ct).ConfigureAwait(false);
+        Result<PostingReceipt> posted = await _engine.ReleaseDeferredAsync(companyId, journalId, ct).ConfigureAwait(false);
+        if (posted.IsFailure || held.Value.ReverseOn is not DateOnly reverseOn)
+        {
+            return posted;
+        }
+
+        // An accrual reverses itself on its reverse-on date, in the same unit as its posting.
+        Result<PostingReceipt> reversed = await _engine.ReverseAsync(companyId, journalId, reverseOn, $"Auto-reversal of {held.Value.JournalNumber}", ct).ConfigureAwait(false);
+        return reversed.IsFailure ? reversed.Error : posted;
     }
 
     /// <inheritdoc />

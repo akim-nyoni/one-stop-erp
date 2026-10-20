@@ -181,6 +181,11 @@ public sealed class PostingEngine : IPostingEngine
     {
         CurrencyCode baseCurrency = company.BaseCurrency;
         // Build and validate the lines.
+        if (request.ReverseOn is DateOnly reverseOn && reverseOn <= request.PostingDate)
+        {
+            return Error.Validation("Posting.ReverseOn", "A journal is reversed on a date after it posts.");
+        }
+
         JournalEntry journal = new(request.CompanyId, request.SourceModule, request.PostingDate, baseCurrency, request.TransactionCurrency)
         {
             IsManual = request.EnforceManualJournalRules,
@@ -189,6 +194,7 @@ public sealed class PostingEngine : IPostingEngine
         journal.DocumentType = request.DocumentType;
         journal.DocumentNumber = request.DocumentNumber;
         journal.Reference = request.Reference;
+        journal.ReverseOn = request.ReverseOn;
         journal.Narrative = request.Narrative;
         journal.IdempotencyKey = idempotencyKey;
 
