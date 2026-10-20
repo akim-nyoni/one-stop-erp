@@ -229,9 +229,22 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Collection agents", ListTitle = "Agents",
+            Module = module, Title = "Collection agents", ListTitle = "Agents", KeyColumn = "Agent",
             Description = "Third-party agents who collect from customers for a commission: register one, record a collection (allocated to the customer's debt, owed by the agent) "
-                + "and take the agent's remittance (commission kept, the net banked).",
+                + "and take the agent's remittance (commission kept, the net banked). Register with an existing code changes the agent's name and commission (for later "
+                + "remittances); Delete takes an agent out of use once it has remitted everything it collected.",
+            Delete = async (c, code) =>
+            {
+                Agent agent = await ExistingAsync<Agent>(c, code, a => a.Code).ConfigureAwait(true) ?? throw new OperationException($"No agent {code}.");
+                if (agent.Outstanding != 0m)
+                {
+                    throw new OperationException($"Agent {agent.Code} still owes {M(agent.Outstanding)}; take its remittance first.");
+                }
+
+                agent.IsActive = false;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Agent {agent.Code} taken out of use (kept in history).";
+            },
             Fields = [Pick("Step", "Step", ["Register", "Collection", "Remittance"]), Req("Agent", "Agent code"), Opt("Name", "Name (register)"), Num("Commission", "Commission %", "0"),
                 Opt("Customer", "Customer code or stand (collection)"), Num("Amount", "Amount", "0"), Opt("Control", "Agent control account"), Opt("Bank", "Bank account (remittance)"),
                 Opt("CommissionAccount", "Commission expense account (remittance)"), Today()],
@@ -239,6 +252,20 @@ public static partial class OperationCatalogue
             {
                 IAgentService agents = c.Get<IAgentService>();
                 string code = i.Text("Agent").Trim();
+                if (i.Text("Step") == "Register" && await ExistingAsync<Agent>(c, code, a => a.Code).ConfigureAwait(true) is { } known)
+                {
+                    if (i.Number("Commission") is < 0m or > 100m)
+                    {
+                        throw new OperationException("Commission must be between 0 and 100 percent.");
+                    }
+
+                    known.Name = i.Optional("Name")?.Trim() ?? known.Name;
+                    known.ChangeCommission(i.Number("Commission"));
+                    known.IsActive = true;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Agent {known.Code} changed.";
+                }
+
                 if (i.Text("Step") == "Register")
                 {
                     return Check(await agents.RegisterAgentAsync(c.CompanyId, code, i.Optional("Name") ?? code, i.Number("Commission")).ConfigureAwait(true), _ => $"Agent {code} registered.");
@@ -258,7 +285,7 @@ public static partial class OperationCatalogue
                 return $"Remitted {M(remitted.Gross)}: commission {M(remitted.Commission)}, banked {M(remitted.Net)} ({remitted.JournalNumber}); the agent still owes {M(remitted.AgentOutstanding)}.";
             },
             List = async c => Table(await c.Db.Agents.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.Code).ToListAsync().ConfigureAwait(true),
-                ("Agent", a => a.Code), ("Name", a => a.Name), ("Commission %", a => a.CommissionPercent), ("Collected", a => M(a.CollectedToDate)), ("Remitted", a => M(a.RemittedToDate)),
+                ("Step", _ => "Register"), ("Agent", a => a.Code), ("Name", a => a.Name), ("Commission %", a => Q(a.CommissionPercent)), ("Collected", a => M(a.CollectedToDate)), ("Remitted", a => M(a.RemittedToDate)),
                 ("Active", a => a.IsActive)),
         };
         yield return new Operation
@@ -344,9 +371,20 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Receipt matching rules", ListTitle = "Matching rules (tried first, lowest priority first)",
             Description = "Your own rules for matching imported payments: when the reference or the payer's name contains, starts with or equals the text (or fits a "
-                + "regular expression), the payment goes to the account. E.g. payer name contains \"MINISTRY OF HEALTH\" → the employer's account.",
+                + "regular expression), the payment goes to the account. E.g. payer name contains \"MINISTRY OF HEALTH\" → the employer's account. Add with an existing rule id "
+                + "changes that rule (Edit fills it in); Delete or Remove takes a rule away (payments it matched stay where they went).",
+            KeyColumn = "Rule",
             Fields = [Pick("Step", "Step", ["Add", "Remove"]), Pick("Field", "Look in", Enum.GetNames<ReceiptMatchField>()), Pick("Kind", "When it", Enum.GetNames<ReceiptMatchKind>()),
-                Opt("Pattern", "Text or pattern"), Opt("Customer", "Account (customer code)"), Num("Priority", "Priority (lowest first)", "100"), OptNum("Rule", "Rule id (remove)")],
+                Opt("Pattern", "Text or pattern"), Opt("Customer", "Account (customer code)"), Num("Priority", "Priority (lowest first)", "100"), OptNum("Rule", "Rule id (change / remove)")],
+            Delete = async (c, key) =>
+            {
+                long id = long.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) ? parsed : throw new OperationException($"\"{key}\" is not a rule id.");
+                ReceiptMatchRule rule = await c.Db.Set<ReceiptMatchRule>().FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Id == id).ConfigureAwait(true)
+                    ?? throw new OperationException($"No rule {id}.");
+                c.Db.Remove(rule);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Rule {id} removed.";
+            },
             Run = async (c, i) =>
             {
                 if (i.Text("Step") == "Remove")
@@ -369,6 +407,16 @@ public static partial class OperationCatalogue
                 string code = i.Optional("Customer") ?? throw new OperationException("Give the account the payments go to.");
                 long customer = await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Code == code.Trim()).Select(x => (long?)x.Id).FirstOrDefaultAsync().ConfigureAwait(true)
                     ?? throw new OperationException($"No account {code}.");
+                if (i.OptionalNumber("Rule") is decimal ruleId)
+                {
+                    long changeId = (long)ruleId;
+                    ReceiptMatchRule changed = await c.Db.Set<ReceiptMatchRule>().FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Id == changeId).ConfigureAwait(true)
+                        ?? throw new OperationException($"No rule {changeId}.");
+                    changed.Change(Enum.Parse<ReceiptMatchField>(i.Text("Field")), kind, pattern.Trim(), customer, i.Whole("Priority"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Rule {changeId} changed: {changed.Field} {changed.Kind} \"{changed.Pattern}\" → {code.Trim()}.";
+                }
+
                 ReceiptMatchRule added = new(c.CompanyId, Enum.Parse<ReceiptMatchField>(i.Text("Field")), kind, pattern.Trim(), customer, i.Whole("Priority"));
                 c.Db.Add(added);
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
@@ -378,8 +426,8 @@ public static partial class OperationCatalogue
             {
                 var rules = await c.Db.Set<ReceiptMatchRule>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Priority).ThenBy(r => r.Id)
                     .Join(c.Db.Customers, r => r.CustomerId, x => x.Id, (r, x) => new { r.Id, r.Priority, r.Field, r.Kind, r.Pattern, Account = x.Code, x.Name }).ToListAsync().ConfigureAwait(true);
-                return Table(rules, ("Rule", r => r.Id), ("Priority", r => r.Priority), ("Look in", r => r.Field), ("When it", r => r.Kind), ("Text", r => r.Pattern),
-                    ("Account", r => r.Account), ("Name", r => r.Name));
+                return Table(rules, ("Step", _ => "Add"), ("Rule", r => r.Id), ("Priority", r => r.Priority), ("Look in", r => r.Field), ("When it", r => r.Kind), ("Pattern", r => r.Pattern),
+                    ("Customer", r => r.Account), ("Name", r => r.Name));
             },
         };
         yield return new Operation

@@ -67,11 +67,38 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Capture a lead", ListTitle = "Leads",
-            Description = "A prospective customer with an e-mail or phone and where they came from; an earlier lead with the same e-mail or phone is flagged.",
-            Fields = [Req("Name", "Name"), Opt("Organisation", "Organisation"), Opt("Email", "E-mail"), Opt("Phone", "Phone"), Req("Source", "Source", "web")],
-            Run = async (c, i) => Check(await c.Get<ICrmService>().CaptureLeadAsync(new NewLead(c.CompanyId, i.Text("Name"), i.Optional("Organisation"), i.Optional("Email"), i.Optional("Phone"),
-                i.Text("Source"), c.UserId)).ConfigureAwait(true), id => $"Lead {id} captured."),
+            Description = "A prospective customer with an e-mail or phone and where they came from; an earlier lead with the same e-mail or phone is flagged. With a lead id "
+                + "(Edit fills it in) the lead's name, organisation, e-mail and phone change (its source and status stay); Delete disqualifies a lead not yet converted (kept in history).",
+            Fields = [Req("Name", "Name"), Opt("Organisation", "Organisation"), Opt("Email", "E-mail"), Opt("Phone", "Phone"), Req("Source", "Source", "web"), OptNum("Id", "Lead id (change)")],
+            Run = async (c, i) =>
+            {
+                if (i.OptionalNumber("Id") is not decimal given)
+                {
+                    return Check(await c.Get<ICrmService>().CaptureLeadAsync(new NewLead(c.CompanyId, i.Text("Name"), i.Optional("Organisation"), i.Optional("Email"), i.Optional("Phone"),
+                        i.Text("Source"), c.UserId)).ConfigureAwait(true), id => $"Lead {id} captured.");
+                }
+
+                long leadId = (long)given;
+                Lead lead = await c.Db.Set<Lead>().FirstOrDefaultAsync(l => l.CompanyId == c.CompanyId && l.Id == leadId).ConfigureAwait(true) ?? throw new OperationException($"No lead {leadId}.");
+                string? email = i.Optional("Email")?.Trim().ToLowerInvariant();
+                string digits = new([.. (i.Optional("Phone") ?? string.Empty).Where(char.IsDigit)]);
+                string? phone = digits.Length >= 7 ? digits : null;
+                if (email is null && phone is null)
+                {
+                    throw new OperationException("A lead needs an e-mail or a phone (at least 7 digits).");
+                }
+
+                (lead.Name, lead.Organisation, lead.Email, lead.Phone) = (i.Text("Name").Trim(), i.Optional("Organisation")?.Trim(), email, phone);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Lead {leadId} changed.";
+            },
             List = LeadsAsync,
+            KeyColumn = "Id",
+            Delete = async (c, key) =>
+            {
+                long id = long.TryParse(key, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long parsed) ? parsed : throw new OperationException($"\"{key}\" is not a lead id.");
+                return Check(await c.Get<ICrmService>().DisqualifyLeadAsync(c.CompanyId, id, "Deleted from the lead list").ConfigureAwait(true), $"Lead {id} disqualified (kept in history).");
+            },
         };
         yield return new Operation
         {

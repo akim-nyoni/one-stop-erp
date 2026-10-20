@@ -165,7 +165,23 @@ public static partial class OperationCatalogue
             Module = module, Title = "Matching tolerances", ListTitle = "Matching tolerances",
             Description = "The rules a supplier invoice is matched by: its price may differ from the order price by up to the price tolerance, and its quantity may exceed what was received by up to the "
                 + "quantity tolerance; a goods receipt may exceed the order by up to the over-receipt tolerance. The company's rules apply to every supplier without rules of its own (blank a supplier's "
-                + "value to fall back). A clerk matching an invoice may tighten the price tolerance, never widen it.",
+                + "value to fall back). A clerk matching an invoice may tighten the price tolerance, never widen it. Edit fills a row in to change it; Delete puts a supplier back "
+                + "on the company's rules (the company's own rules cannot be deleted).",
+            KeyColumn = "Supplier",
+            Delete = async (c, code) =>
+            {
+                string key = code.Trim().ToUpperInvariant();
+                if (key.Length == 0)
+                {
+                    throw new OperationException("The company's rules cannot be deleted; change them instead.");
+                }
+
+                Core.Trading.Supplier supplier = await c.Db.Suppliers.SingleOrDefaultAsync(s => s.CompanyId == c.CompanyId && s.Code.ToUpper() == key).ConfigureAwait(true)
+                    ?? throw new OperationException($"No supplier {code}.");
+                (supplier.InvoicePriceTolerancePercent, supplier.InvoiceQuantityTolerancePercent, supplier.OverReceiptTolerancePercent) = (null, null, null);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{supplier.Code} is back on the company's rules.";
+            },
             Fields = [Opt("Supplier", "Supplier code (blank: the company's rules)"), OptNum("Price", "Invoice price tolerance %"), OptNum("Quantity", "Invoice quantity tolerance %"), OptNum("OverReceipt", "Over-receipt tolerance %")],
             Run = async (c, i) =>
             {
@@ -197,10 +213,12 @@ public static partial class OperationCatalogue
             List = async c =>
             {
                 Core.System.Company company = await c.Db.Companies.AsNoTracking().SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
-                List<(string Who, string Price, string Quantity, string Over)> rows = [("(company)", Pct(company.InvoicePriceTolerancePercent), Pct(company.InvoiceQuantityTolerancePercent), Pct(company.OverReceiptTolerancePercent))];
+                static string? Raw(decimal? value) => value?.ToString("0.##", CultureInfo.InvariantCulture);
+                List<(string Who, string Supplier, string? Price, string? Quantity, string? Over)> rows =
+                    [("Company", string.Empty, Raw(company.InvoicePriceTolerancePercent), Raw(company.InvoiceQuantityTolerancePercent), Raw(company.OverReceiptTolerancePercent))];
                 rows.AddRange((await c.Db.Suppliers.AsNoTracking().Where(s => s.CompanyId == c.CompanyId && (s.InvoicePriceTolerancePercent != null || s.InvoiceQuantityTolerancePercent != null || s.OverReceiptTolerancePercent != null))
-                    .OrderBy(s => s.Code).ToListAsync().ConfigureAwait(true)).Select(s => (s.Code, Pct(s.InvoicePriceTolerancePercent), Pct(s.InvoiceQuantityTolerancePercent), Pct(s.OverReceiptTolerancePercent))));
-                return Table(rows, ("Who", r => r.Who), ("Price %", r => r.Price), ("Quantity %", r => r.Quantity), ("Over-receipt %", r => r.Over));
+                    .OrderBy(s => s.Code).ToListAsync().ConfigureAwait(true)).Select(s => ("Supplier", s.Code, Raw(s.InvoicePriceTolerancePercent), Raw(s.InvoiceQuantityTolerancePercent), Raw(s.OverReceiptTolerancePercent))));
+                return Table(rows, ("Rules of", r => r.Who), ("Supplier", r => r.Supplier), ("Price %", r => r.Price), ("Quantity %", r => r.Quantity), ("Over-receipt %", r => r.Over));
             },
         };
         yield return new Operation
@@ -402,6 +420,15 @@ public static partial class OperationCatalogue
                 IReadOnlyList<RebatePosition> positions = Check(await rebates.AccrueAsync(c.CompanyId, i.Date("Date"), i.Optional("Receivable") ?? string.Empty, i.Optional("Income") ?? string.Empty).ConfigureAwait(true));
                 return positions.Count == 0 ? "No agreements in force." : string.Join(Environment.NewLine, positions.Select(x =>
                     $"{x.Code,-12} spend {M(x.Spend),14} at {x.RatePercent:0.##}% = earned {M(x.Earned),12}  booked {M(x.Booked),12}"));
+            },
+            List = async c =>
+            {
+                Dictionary<long, string> suppliers = await c.Db.Suppliers.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).ToDictionaryAsync(s => s.Id, s => s.Code).ConfigureAwait(true);
+                return Table(await c.Db.Set<RebateAgreement>().AsNoTracking().Include(r => r.Tiers).Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.ToDate).Page(c, 200)
+                        .ToListAsync().ConfigureAwait(true),
+                    ("Code", r => r.Code), ("Supplier", r => suppliers.GetValueOrDefault(r.SupplierId, string.Empty)), ("From", r => D(r.FromDate)), ("To", r => D(r.ToDate)),
+                    ("Tiers", r => string.Join("; ", r.Tiers.OrderBy(t => t.Threshold).Select(t => $"{t.Threshold.ToString("0.##", CultureInfo.InvariantCulture)}:{t.RatePercent.ToString("0.##", CultureInfo.InvariantCulture)}"))),
+                    ("Accrued", r => M(r.Accrued)));
             },
         };
         yield return new Operation

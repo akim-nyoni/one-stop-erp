@@ -158,8 +158,25 @@ public static partial class OperationCatalogue
             {
                 Module = module, Title = "Exchange-rate type", ListTitle = module == "Customers" ? "Customers on their own rate" : "Suppliers on their own rate",
                 Description = "The rate type this trader's foreign documents convert at (e.g. a contract or bank rate kept in the rate table). Daily (or blank) uses the daily rate; "
-                    + "a document dated before any rate of the type falls back to the daily rate.",
+                    + "a document dated before any rate of the type falls back to the daily rate. Saving a trader already listed changes its rate type; Delete puts it back on the daily rate.",
                 Fields = [Req("Code", module == "Customers" ? "Customer code" : "Supplier code"), Pick("RateType", "Rate type", Enum.GetNames<ExchangeRateType>())],
+                Delete = async (c, code) =>
+                {
+                    string key = code.Trim().ToUpperInvariant();
+                    if (module == "Customers")
+                    {
+                        Customer customer = await c.Db.Customers.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == key).ConfigureAwait(true) ?? throw new OperationException($"No customer {key}.");
+                        customer.RateType = null;
+                    }
+                    else
+                    {
+                        Supplier supplier = await c.Db.Suppliers.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == key).ConfigureAwait(true) ?? throw new OperationException($"No supplier {key}.");
+                        supplier.RateType = null;
+                    }
+
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"{key} converts at the daily rate again.";
+                },
                 Run = async (c, i) =>
                 {
                     string code = i.Text("Code").Trim().ToUpperInvariant();
@@ -187,17 +204,55 @@ public static partial class OperationCatalogue
             };
             yield return new Operation
             {
-                Module = module, Title = "Addresses and contacts", ListTitle = "Directory",
+                Module = module, Title = "Addresses and contacts", ListTitle = "Directory", KeyColumn = "Ref",
                 Description = "Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who "
-                    + "receive statements, remittance advices and purchase orders by email. Remove takes an address or contact id. The list shows the trader typed in Code.",
+                    + "receive statements, remittance advices and purchase orders by email. Remove takes an address or contact id. Add with an existing address or contact id "
+                    + "changes that address or contact (Edit fills it in); Delete removes an address or retires a contact.",
                 Fields = [Pick("Step", "Step", ["Add address", "Add contact", "Remove address", "Remove contact"]), Req("Code", module == "Customers" ? "Customer code" : "Supplier code"),
                     Pick("Kind", "Address kind", Enum.GetNames<AddressKind>()), Opt("Line1", "Address line 1"), Opt("Line2", "Address line 2"), Opt("City", "Town / city"), Opt("Region", "Province"),
                     Opt("Postal", "Postal code"), Opt("Country", "Country"), Opt("Name", "Contact name"), Opt("Role", "Role"), Opt("Email", "Email"), Opt("Phone", "Phone"),
                     Tick("Primary", "Primary contact"), Tick("Statements", "Receives statements"), Tick("Remittances", "Receives remittances"), Tick("Orders", "Receives purchase orders"),
-                    OptNum("Id", "Address / contact id (remove)")],
+                    OptNum("Id", "Address / contact id (change / remove)")],
                 Run = async (c, i) =>
                 {
                     ITraderDirectoryService directory = c.Get<ITraderDirectoryService>();
+                    long? changeId = i.Text("Step").StartsWith("Add", StringComparison.Ordinal) && i.OptionalNumber("Id") is decimal given ? (long)given : null;
+                    if (changeId is long contactId && i.Text("Step") == "Add contact")
+                    {
+                        TraderContact person = await c.Db.TraderContacts.FirstOrDefaultAsync(x => x.Id == contactId && x.CompanyId == c.CompanyId && x.Ledger == ledger).ConfigureAwait(true)
+                            ?? throw new OperationException($"No contact {contactId}.");
+                        person.Name = i.Optional("Name")?.Trim() ?? throw new OperationException("A contact needs a name.");
+                        (person.Role, person.Email, person.Phone) = (i.Optional("Role"), i.Optional("Email"), i.Optional("Phone"));
+                        (person.ReceivesStatements, person.ReceivesRemittances, person.ReceivesOrders) = (i.Flag("Statements"), i.Flag("Remittances"), i.Flag("Orders"));
+                        if (i.Flag("Primary") && !person.IsPrimary)
+                        {
+                            foreach (TraderContact other in await c.Db.TraderContacts.Where(x => x.CompanyId == c.CompanyId && x.Ledger == ledger && x.TraderId == person.TraderId && x.IsPrimary)
+                                .ToListAsync().ConfigureAwait(true))
+                            {
+                                other.IsPrimary = false;
+                            }
+                        }
+
+                        person.IsPrimary = i.Flag("Primary");
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Contact {contactId} changed.";
+                    }
+
+                    if (changeId is long addressId && i.Text("Step") == "Add address")
+                    {
+                        TraderAddress place = await c.Db.TraderAddresses.FirstOrDefaultAsync(x => x.Id == addressId && x.CompanyId == c.CompanyId && x.Ledger == ledger).ConfigureAwait(true)
+                            ?? throw new OperationException($"No address {addressId}.");
+                        if (place.Kind != Enum.Parse<AddressKind>(i.Text("Kind")))
+                        {
+                            throw new OperationException("An address's kind cannot change; add a new address of the other kind and remove this one.");
+                        }
+
+                        place.Line1 = i.Optional("Line1")?.Trim() ?? throw new OperationException("An address needs at least its first line.");
+                        (place.Line2, place.City, place.Region, place.PostalCode, place.Country) = (i.Optional("Line2"), i.Optional("City"), i.Optional("Region"), i.Optional("Postal"), i.Optional("Country"));
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Address {addressId} changed.";
+                    }
+
                     switch (i.Text("Step"))
                     {
                         case "Add contact":
@@ -215,6 +270,42 @@ public static partial class OperationCatalogue
                                 i.Optional("Line1") ?? string.Empty, i.Optional("Line2"), i.Optional("City"), i.Optional("Region"), i.Optional("Postal"), i.Optional("Country"))).ConfigureAwait(true));
                             return $"Address {address} added as the default {i.Text("Kind").ToLowerInvariant()} address.";
                     }
+                },
+                List = async c =>
+                {
+                    Dictionary<long, string> codes = module == "Customers"
+                        ? await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).ToDictionaryAsync(x => x.Id, x => x.Code).ConfigureAwait(true)
+                        : await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).ToDictionaryAsync(x => x.Id, x => x.Code).ConfigureAwait(true);
+                    List<TraderAddress> addresses = await c.Db.TraderAddresses.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Ledger == ledger).ToListAsync().ConfigureAwait(true);
+                    List<TraderContact> contacts = await c.Db.TraderContacts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Ledger == ledger && x.IsActive).ToListAsync().ConfigureAwait(true);
+                    var rows = addresses.Select(a => new
+                    {
+                        Ref = $"A{a.Id}", Step = "Add address", a.Id, Code = codes.GetValueOrDefault(a.TraderId, string.Empty), Kind = a.Kind.ToString(), Line1 = a.Line1, a.Line2, a.City, a.Region,
+                        Postal = a.PostalCode, a.Country, Name = (string?)null, Role = (string?)null, Email = (string?)null, Phone = (string?)null, Primary = a.IsDefault ? "Default" : string.Empty,
+                        Statements = false, Remittances = false, Orders = false,
+                    }).Concat(contacts.Select(p => new
+                    {
+                        Ref = $"C{p.Id}", Step = "Add contact", p.Id, Code = codes.GetValueOrDefault(p.TraderId, string.Empty), Kind = string.Empty, Line1 = string.Empty, Line2 = (string?)null,
+                        City = (string?)null, Region = (string?)null, Postal = (string?)null, Country = (string?)null, Name = (string?)p.Name, p.Role, p.Email, p.Phone,
+                        Primary = p.IsPrimary ? "Yes" : string.Empty, Statements = p.ReceivesStatements, Remittances = p.ReceivesRemittances, Orders = p.ReceivesOrders,
+                    }));
+                    return Table(rows.OrderBy(r => r.Code).ThenBy(r => r.Ref).Page(c, 1000),
+                        ("Ref", r => r.Ref), ("Step", r => r.Step), ("Id", r => r.Id), ("Code", r => r.Code), ("Kind", r => r.Kind), ("Address line 1", r => r.Line1), ("Address line 2", r => r.Line2),
+                        ("Town / city", r => r.City), ("Province", r => r.Region), ("Postal code", r => r.Postal), ("Country", r => r.Country), ("Contact name", r => r.Name), ("Role", r => r.Role),
+                        ("Email", r => r.Email), ("Phone", r => r.Phone), ("Primary", r => r.Primary), ("Statements", r => r.Statements), ("Remittances", r => r.Remittances), ("Orders", r => r.Orders));
+                },
+                Delete = async (c, reference) =>
+                {
+                    ITraderDirectoryService directory = c.Get<ITraderDirectoryService>();
+                    string key = reference.Trim().ToUpperInvariant();
+                    if (key.Length < 2 || !long.TryParse(key[1..], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long id) || key[0] is not ('A' or 'C'))
+                    {
+                        throw new OperationException($"\"{reference}\" is not an address (A...) or contact (C...) reference.");
+                    }
+
+                    return key[0] == 'A'
+                        ? Check(await directory.RemoveAddressAsync(c.CompanyId, id).ConfigureAwait(true), $"Address {id} removed.")
+                        : Check(await directory.RemoveContactAsync(c.CompanyId, id).ConfigureAwait(true), $"Contact {id} retired (kept in history).");
                 },
             };
             yield return new Operation

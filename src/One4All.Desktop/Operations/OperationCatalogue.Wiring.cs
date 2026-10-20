@@ -43,9 +43,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Customers", Title = "Price lists", ListTitle = "Price lists",
+            Module = "Customers", Title = "Price lists", ListTitle = "Price lists", KeyColumn = "List",
             Description = "Create a price list in a currency (one may be the default), set an item's price on it (with a minimum quantity for a quantity break), "
-                + "or put a customer on a list (blank list: back to the default).",
+                + "or put a customer on a list (blank list: back to the default). Create with an existing code changes that list's name and whether it is the default "
+                + "(its currency stays). Delete takes a list out of use; the default list and a list customers still buy from cannot be.",
             Fields = [Pick("Step", "Step", ["Create", "Set price", "Assign customer"]), Opt("List", "Price list code"), Opt("Name", "Name (create)"), Opt("Currency", "Currency (create; blank: base)"),
                 Tick("Default", "The default list (create)"), Opt("Item", "Item code (set price)"), OptNum("MinQty", "From quantity (set price)"), OptNum("Price", "Unit price (set price)"),
                 Opt("Customer", "Customer code (assign)")],
@@ -57,6 +58,23 @@ public static partial class OperationCatalogue
                 switch (i.Text("Step"))
                 {
                     case "Create":
+                        if (code is not null && await ExistingAsync<Core.Inventory.PriceList>(c, code, x => x.Code).ConfigureAwait(true) is { } existing)
+                        {
+                            if (i.Flag("Default") && !existing.IsDefault)
+                            {
+                                foreach (Core.Inventory.PriceList other in await c.Db.PriceLists.Where(l => l.CompanyId == c.CompanyId && l.IsDefault).ToListAsync().ConfigureAwait(true))
+                                {
+                                    other.IsDefault = false;
+                                }
+                            }
+
+                            existing.Name = i.Optional("Name")?.Trim() ?? existing.Name;
+                            existing.IsDefault = i.Flag("Default");
+                            existing.IsActive = true;
+                            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                            return $"Price list {existing.Code} changed.";
+                        }
+
                         CurrencyCode currency = i.Optional("Currency") is string given ? CurrencyCode.Parse(given)
                             : await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).SingleAsync().ConfigureAwait(true);
                         _ = Check(await pricing.CreatePriceListAsync(c.CompanyId, code ?? throw new OperationException("Give the list's code."), i.Optional("Name") ?? code, currency, i.Flag("Default"))
@@ -75,7 +93,26 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.PriceLists.AsNoTracking().Where(l => l.CompanyId == c.CompanyId).OrderBy(l => l.Code).Page(c, 200).ToListAsync().ConfigureAwait(true),
-                ("List", l => l.Code), ("Name", l => l.Name), ("Currency", l => l.Currency.Value), ("Default", l => l.IsDefault ? "yes" : string.Empty), ("Active", l => l.IsActive ? "yes" : "no")),
+                ("Step", _ => "Create"), ("List", l => l.Code), ("Name", l => l.Name), ("Currency", l => l.Currency.Value), ("Default", l => l.IsDefault ? "Yes" : string.Empty),
+                ("Active", l => l.IsActive ? "Yes" : "No")),
+            Delete = async (c, code) =>
+            {
+                Core.Inventory.PriceList list = await ExistingAsync<Core.Inventory.PriceList>(c, code, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No price list {code}.");
+                if (list.IsDefault)
+                {
+                    throw new OperationException($"Price list {list.Code} is the default; make another list the default first.");
+                }
+
+                int customers = await c.Db.Customers.CountAsync(x => x.CompanyId == c.CompanyId && x.PriceListId == list.Id).ConfigureAwait(true);
+                if (customers > 0)
+                {
+                    throw new OperationException($"{customers} customer(s) still buy from price list {list.Code}; move them to another list first.");
+                }
+
+                list.IsActive = false;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Price list {list.Code} taken out of use (kept in history).";
+            },
         };
         yield return new Operation
         {
@@ -97,8 +134,9 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Customers", Title = "Customer ageing basis and group", ListTitle = "Customers in groups or aged by invoice date",
-            Description = "How a customer's debts are aged (from the invoice date or the due date), and the parent account it belongs to for consolidated group statements (blank: none).",
+            Module = "Customers", Title = "Customer ageing basis and group", ListTitle = "Customers in groups or aged by invoice date", KeyColumn = "Customer",
+            Description = "How a customer's debts are aged (from the invoice date or the due date), and the parent account it belongs to for consolidated group statements (blank: none). "
+                + "Saving a customer already listed changes its setting; Delete puts it back to the default (aged by due date, no parent).",
             Fields = [CustomerPick("Customer", "Customer"), Pick("Ageing", "Age by", Enum.GetNames<AgeingBasis>()), Opt("Parent", "Parent customer code (blank: none)")],
             Run = async (c, i) =>
             {
@@ -115,9 +153,23 @@ public static partial class OperationCatalogue
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return $"{customer.Code} is aged by {customer.AgeingBasis}" + (parent is null ? "." : $", under {i.Optional("Parent")!.ToUpperInvariant()}.");
             },
-            List = async c => Table(await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.ParentCustomerId != null || x.AgeingBasis == AgeingBasis.InvoiceDate))
-                    .OrderBy(x => x.Code).Page(c, 300).ToListAsync().ConfigureAwait(true),
-                ("Customer", x => x.Code), ("Name", x => x.Name), ("Age by", x => x.AgeingBasis.ToString()), ("Parent id", x => x.ParentCustomerId)),
+            List = async c =>
+            {
+                List<Customer> rows = await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && (x.ParentCustomerId != null || x.AgeingBasis == AgeingBasis.InvoiceDate))
+                    .OrderBy(x => x.Code).Page(c, 300).ToListAsync().ConfigureAwait(true);
+                List<long> parentIds = [.. rows.Where(x => x.ParentCustomerId != null).Select(x => x.ParentCustomerId!.Value).Distinct()];
+                Dictionary<long, string> parents = await c.Db.Customers.AsNoTracking().Where(x => parentIds.Contains(x.Id)).ToDictionaryAsync(x => x.Id, x => x.Code).ConfigureAwait(true);
+                return Table(rows, ("Customer", x => x.Code), ("Name", x => x.Name), ("Age by", x => x.AgeingBasis.ToString()),
+                    ("Parent", x => x.ParentCustomerId is long p && parents.TryGetValue(p, out string? parent) ? parent : string.Empty));
+            },
+            Delete = async (c, code) =>
+            {
+                Customer customer = await ExistingAsync<Customer>(c, code, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No customer {code}.");
+                customer.AgeingBasis = AgeingBasis.DueDate;
+                customer.ParentCustomerId = null;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{customer.Code} is aged by due date again, with no parent account.";
+            },
         };
         yield return new Operation
         {
@@ -139,8 +191,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Purchasing", Title = "Framework agreements", ListTitle = "Framework agreements",
-            Description = "A supplier contract with a term and a ceiling: orders placed under it are checked against both, and report PO133 shows how much of it is used.",
+            Module = "Purchasing", Title = "Framework agreements", ListTitle = "Framework agreements", KeyColumn = "Reference",
+            Description = "A supplier contract with a term and a ceiling: orders placed under it are checked against both, and report PO133 shows how much of it is used. "
+                + "An existing reference changes that agreement's description, term and ceiling (its supplier stays). Delete ends the agreement yesterday, so no further "
+                + "orders can be called off under it (orders already placed stand).",
             Fields = [SupplierPick("Supplier", "Supplier"), Req("Reference", "Agreement reference"), Req("Description", "Description"), Today("From", "Starts"), Today("To", "Ends"), Num("Ceiling", "Ceiling value")],
             Run = async (c, i) =>
             {
@@ -151,17 +205,43 @@ public static partial class OperationCatalogue
                     throw new OperationException("An agreement needs an end on or after its start and a ceiling above nil.");
                 }
 
-                if (await c.Db.FrameworkAgreements.AnyAsync(f => f.CompanyId == c.CompanyId && f.Reference == reference).ConfigureAwait(true))
+                if (await ExistingAsync<Core.Procurement.FrameworkAgreement>(c, reference, x => x.Reference).ConfigureAwait(true) is { } existing)
                 {
-                    throw new OperationException($"Agreement {reference} already exists.");
+                    if (existing.SupplierId != supplier)
+                    {
+                        throw new OperationException($"Agreement {reference} is with another supplier; its supplier cannot change.");
+                    }
+
+                    existing.Amend(i.Text("Description"), i.Date("From"), i.Date("To"), i.Number("Ceiling"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Agreement {reference} changed: to {D(i.Date("To"))}, ceiling {M(i.Number("Ceiling"))}.";
                 }
 
                 c.Db.FrameworkAgreements.Add(new Core.Procurement.FrameworkAgreement(c.CompanyId, supplier, reference, i.Text("Description"), i.Date("From"), i.Date("To"), i.Number("Ceiling")));
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return $"Agreement {reference} with {i.Text("Supplier").ToUpperInvariant()} to {D(i.Date("To"))}, ceiling {M(i.Number("Ceiling"))}.";
             },
-            List = async c => Table(await c.Db.FrameworkAgreements.AsNoTracking().Where(f => f.CompanyId == c.CompanyId).OrderByDescending(f => f.EndDate).Page(c, 200).ToListAsync().ConfigureAwait(true),
-                ("Agreement", f => f.Reference), ("Supplier id", f => f.SupplierId), ("Ends", f => D(f.EndDate)), ("Ceiling", f => M(f.CeilingValue))),
+            List = async c => Table(await (from f in c.Db.FrameworkAgreements.AsNoTracking()
+                                           join s in c.Db.Suppliers.AsNoTracking() on f.SupplierId equals s.Id
+                                           where f.CompanyId == c.CompanyId
+                                           orderby f.EndDate descending
+                                           select new { f.Reference, Supplier = s.Code, f.Description, f.StartDate, f.EndDate, f.CeilingValue }).Page(c, 200).ToListAsync().ConfigureAwait(true),
+                ("Reference", f => f.Reference), ("Supplier", f => f.Supplier), ("Description", f => f.Description), ("Starts", f => D(f.StartDate)), ("Ends", f => D(f.EndDate)),
+                ("Ceiling", f => M(f.CeilingValue))),
+            Delete = async (c, reference) =>
+            {
+                Core.Procurement.FrameworkAgreement agreement = await ExistingAsync<Core.Procurement.FrameworkAgreement>(c, reference, x => x.Reference).ConfigureAwait(true)
+                    ?? throw new OperationException($"No agreement {reference}.");
+                DateOnly yesterday = DateOnly.FromDateTime(DateTime.Today).AddDays(-1);
+                if (agreement.EndDate <= yesterday)
+                {
+                    throw new OperationException($"Agreement {agreement.Reference} already ended on {D(agreement.EndDate)}.");
+                }
+
+                agreement.Amend(agreement.Description, agreement.StartDate, yesterday, agreement.CeilingValue);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Agreement {agreement.Reference} ended; no further orders can be called off under it (kept in history).";
+            },
         };
         yield return new Operation
         {
@@ -201,8 +281,9 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Fixed Assets", Title = "Asset insurance and warranty", ListTitle = "Insurance and warranty",
-            Description = "Who insures an asset, the policy and the sum insured with its expiry, and when the manufacturer's warranty ends (report M213 and the expiry alerts read them).",
+            Module = "Fixed Assets", Title = "Asset insurance and warranty", ListTitle = "Insurance and warranty", KeyColumn = "Asset",
+            Description = "Who insures an asset, the policy and the sum insured with its expiry, and when the manufacturer's warranty ends (report M213 and the expiry alerts read them). "
+                + "Saving an asset again changes its details (a blank keeps what is there); Delete clears the asset's insurance and warranty details (the asset itself stays).",
             Fields = [Req("Asset", "Asset number"), Opt("Insurer", "Insurer"), Opt("Policy", "Policy number"), OptNum("Insured", "Sum insured"), OptDate("InsuredTo", "Insurance expires"),
                 OptDate("WarrantyTo", "Warranty ends")],
             Run = async (c, i) =>
@@ -222,8 +303,21 @@ public static partial class OperationCatalogue
                     + $"warranty to {(asset.WarrantyExpiry is DateOnly w ? D(w) : "-")}.";
             },
             List = async c => Table(await c.Db.FixedAssets.AsNoTracking().Where(a => a.CompanyId == c.CompanyId).OrderBy(a => a.AssetNumber).Page(c, 300).ToListAsync().ConfigureAwait(true),
-                ("Asset", a => a.AssetNumber), ("Insurer", a => a.Insurer ?? "-"), ("Policy", a => a.PolicyNumber ?? "-"), ("Insured", a => a.InsuredValue is decimal v ? M(v) : "-"),
-                ("Insurance to", a => a.InsuranceExpiry is DateOnly e ? D(e) : "-"), ("Warranty to", a => a.WarrantyExpiry is DateOnly w ? D(w) : "-")),
+                ("Asset", a => a.AssetNumber), ("Insurer", a => a.Insurer), ("Policy", a => a.PolicyNumber), ("Insured", a => a.InsuredValue is decimal v ? M(v) : null),
+                ("Insurance expires", a => a.InsuranceExpiry is DateOnly e ? D(e) : null), ("Warranty ends", a => a.WarrantyExpiry is DateOnly w ? D(w) : null)),
+            Delete = async (c, number) =>
+            {
+                string key = number.Trim().ToUpperInvariant();
+                Core.FixedAssets.FixedAsset asset = await c.Db.FixedAssets.FirstOrDefaultAsync(a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == key).ConfigureAwait(true)
+                    ?? throw new OperationException($"No asset {key}.");
+                asset.Insurer = null;
+                asset.PolicyNumber = null;
+                asset.InsuredValue = null;
+                asset.InsuranceExpiry = null;
+                asset.WarrantyExpiry = null;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{key}: insurance and warranty details cleared (the asset itself stays).";
+            },
         };
     }
 }

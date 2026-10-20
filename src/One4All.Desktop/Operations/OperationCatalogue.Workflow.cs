@@ -48,12 +48,64 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Delegate my approvals", ListTitle = "Approval delegations",
-            Description = "While an approver is away, the delegate may approve anything they could, recorded as on their behalf.",
-            Fields = [Req("From", "Approver who is away (user name)"), Req("To", "Delegate (user name)"), Today("Starts", "From"), Today("Ends", "To"), Req("Reason", "Reason", "Leave")],
-            Run = async (c, i) => Check(await c.Get<IWorkflowService>().DelegateAsync(c.CompanyId, await UserAsync(c, i.Text("From")).ConfigureAwait(true), await UserAsync(c, i.Text("To")).ConfigureAwait(true),
-                i.Date("Starts"), i.Date("Ends"), i.Text("Reason")).ConfigureAwait(true), id => $"Delegation {id} recorded."),
+            Module = module, Title = "Delegate my approvals", ListTitle = "Approval delegations", KeyColumn = "Id",
+            Description = "While an approver is away, the delegate may approve anything they could, recorded as on their behalf. With a delegation id (Edit fills it in) "
+                + "the delegate, dates and reason of that delegation change (the approver stays); Delete withdraws a delegation early (kept in history).",
+            Fields = [Req("From", "Approver who is away (user name)"), Req("To", "Delegate (user name)"), Today("Starts", "Starts"), Today("Ends", "Ends"), Req("Reason", "Reason", "Leave"),
+                OptNum("Id", "Delegation id (change)")],
+            Run = async (c, i) =>
+            {
+                long from = await UserAsync(c, i.Text("From")).ConfigureAwait(true), to = await UserAsync(c, i.Text("To")).ConfigureAwait(true);
+                if (i.OptionalNumber("Id") is not decimal given)
+                {
+                    return Check(await c.Get<IWorkflowService>().DelegateAsync(c.CompanyId, from, to, i.Date("Starts"), i.Date("Ends"), i.Text("Reason")).ConfigureAwait(true), id => $"Delegation {id} recorded.");
+                }
+
+                long delegationId = (long)given;
+                Core.Workflow.ApprovalDelegation delegation = await c.Db.ApprovalDelegations.FirstOrDefaultAsync(d => d.CompanyId == c.CompanyId && d.Id == delegationId).ConfigureAwait(true)
+                    ?? throw new OperationException($"No delegation {delegationId}.");
+                if (delegation.Withdrawn)
+                {
+                    throw new OperationException($"Delegation {delegationId} was withdrawn; record a new one instead.");
+                }
+
+                if (delegation.FromUserId != from)
+                {
+                    throw new OperationException($"Delegation {delegationId} is for another approver; the approver who is away cannot change.");
+                }
+
+                (DateOnly starts, DateOnly ends) = (i.Date("Starts"), i.Date("Ends"));
+                if (from == to || ends < starts)
+                {
+                    throw new OperationException("A delegation is to someone else, for a period, with a reason.");
+                }
+
+                if (await c.Db.ApprovalDelegations.AnyAsync(d => d.CompanyId == c.CompanyId && d.Id != delegationId && d.FromUserId == from && !d.Withdrawn && d.StartsOn <= ends && d.EndsOn >= starts)
+                    .ConfigureAwait(true))
+                {
+                    throw new OperationException("The approver already has another delegation covering some of those dates.");
+                }
+
+                delegation.Change(to, starts, ends, i.Text("Reason").Trim());
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Delegation {delegationId} changed.";
+            },
             List = DelegationsAsync,
+            Delete = async (c, key) =>
+            {
+                long id = long.TryParse(key, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long parsed) ? parsed
+                    : throw new OperationException($"\"{key}\" is not a delegation id.");
+                Core.Workflow.ApprovalDelegation delegation = await c.Db.ApprovalDelegations.FirstOrDefaultAsync(d => d.CompanyId == c.CompanyId && d.Id == id).ConfigureAwait(true)
+                    ?? throw new OperationException($"No delegation {id}.");
+                if (delegation.Withdrawn)
+                {
+                    throw new OperationException($"Delegation {id} is already withdrawn.");
+                }
+
+                delegation.Withdrawn = true;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Delegation {id} withdrawn (kept in history).";
+            },
         };
         yield return new Operation
         {
@@ -118,7 +170,15 @@ public static partial class OperationCatalogue
             Description = "The approval route for a document type (brief §7): stages in order, each with its quorum, the value from which it applies, a condition on the document "
                 + "(e.g. Department = IT and Value > 5000), an approving role, named approvers, the requester's manager, and escalation after so many hours to someone. "
                 + "Stages are written one per line as sequence | name | quorum | from value | condition | role | approvers (comma-separated user names) | Manager or None | escalate hours | escalate to | group | parallel groups (comma-separated: one approval from each). "
-                + "Saving replaces the active definition for that document type (documents already in flight finish on the old one). Switch off/on by id with the Enable step.",
+                + "Saving replaces the active definition for that document type (documents already in flight finish on the old one). Switch off/on by id with the Enable step. "
+                + "Edit fills the form from a definition so a changed route can be saved over it; Delete switches a definition off (kept in history).",
+            KeyColumn = "Id",
+            Delete = async (c, key) =>
+            {
+                long id = long.TryParse(key, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out long parsed) ? parsed
+                    : throw new OperationException($"\"{key}\" is not a definition id.");
+                return Check(await c.Get<IWorkflowService>().SetDefinitionActiveAsync(c.CompanyId, id, false).ConfigureAwait(true), $"Workflow {id} switched off (kept in history).");
+            },
             Fields = [Pick("Step", "Step", ["Define", "Enable", "Disable"]), Opt("DocumentType", "Document type (" + string.Join(", ", typeof(WorkflowDocumentTypes).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static).Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!)) + ", or your own)"), Opt("Name", "Workflow name"),
                 Opt("Stages", "Stages (one per line; see above)"), OptNum("Definition", "Definition id (enable / disable)")],
             Run = async (c, i) =>
@@ -151,12 +211,19 @@ public static partial class OperationCatalogue
                 long created = Check(await workflow.DefineAsync(c.CompanyId, new WorkflowDefinitionInput(i.Optional("DocumentType") ?? string.Empty, i.Optional("Name") ?? string.Empty, stages)).ConfigureAwait(true));
                 return $"Workflow {created} defined for {i.Optional("DocumentType")} with {stages.Count} stage(s); it routes new documents of that type from now.";
             },
-            List = async c => Table(await c.Db.WorkflowDefinitions.AsNoTracking().Include(d => d.Stages).Where(d => d.CompanyId == c.CompanyId).OrderBy(d => d.DocumentType).ThenByDescending(d => d.Id)
-                    .ToListAsync().ConfigureAwait(true),
-                ("Id", d => d.Id), ("Document", d => d.DocumentType), ("Name", d => d.Name), ("Active", d => d.IsActive ? "yes" : "no"),
-                ("Stages", d => string.Join(" → ", d.Stages.Select(s => $"{s.Sequence} {s.Name} (×{s.Quorum}{(s.MinValue is decimal m ? $", from {m:N0}" : string.Empty)}"
-                    + $"{(s.RequiredRoleName is null ? string.Empty : $", role {s.RequiredRoleName}")}{(s.EligibleUserIds.Count == 0 ? string.Empty : $", {s.EligibleUserIds.Count} user(s)")}"
-                    + $"{(s.DynamicApprover == Core.Workflow.DynamicApprover.None ? string.Empty : ", manager")}{(s.EscalateAfterHours is int h ? $", escalates after {h} h" : string.Empty)})")))),
+            List = async c =>
+            {
+                Dictionary<long, string> users = await c.Db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username).ConfigureAwait(true);
+                string Line(Core.Workflow.WorkflowStage s) => string.Join(" | ", s.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture), s.Name,
+                    s.Quorum.ToString(System.Globalization.CultureInfo.InvariantCulture), s.MinValue?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty, s.Condition ?? string.Empty,
+                    s.RequiredRoleName ?? string.Empty, string.Join(",", s.EligibleUserIds.Select(u => users.GetValueOrDefault(u, u.ToString(System.Globalization.CultureInfo.InvariantCulture)))),
+                    s.DynamicApprover == Core.Workflow.DynamicApprover.None ? "None" : "Manager", s.EscalateAfterHours?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
+                    s.EscalateToUserId is long e ? users.GetValueOrDefault(e, string.Empty) : string.Empty, s.RequiredGroupName ?? string.Empty, s.ParallelGroups ?? string.Empty);
+                return Table(await c.Db.WorkflowDefinitions.AsNoTracking().Include(d => d.Stages).Where(d => d.CompanyId == c.CompanyId).OrderBy(d => d.DocumentType).ThenByDescending(d => d.Id)
+                        .ToListAsync().ConfigureAwait(true),
+                    ("Step", _ => "Define"), ("Id", d => d.Id), ("Document type", d => d.DocumentType), ("Name", d => d.Name), ("Active", d => d.IsActive ? "Yes" : "No"),
+                    ("Stages", d => string.Join("; ", d.Stages.OrderBy(s => s.Sequence).Select(Line))));
+            },
         };
         yield return new Operation
         {
@@ -196,8 +263,15 @@ public static partial class OperationCatalogue
                     i.Flag("Active") ? "Rule saved." : "Rule switched off.");
             },
             List = async c => Table(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().SodRulesAsync().ConfigureAwait(true),
-                ("Code", r => r.Code), ("Rule", r => r.Name), ("Permission", r => $"{r.PermissionA} {r.OperationA}"), ("Conflicts with", r => $"{r.PermissionB} {r.OperationB}"),
-                ("Severity", r => r.Severity)),
+                ("Code", r => r.Code), ("Name", r => r.Name), ("Permission A", r => r.PermissionA), ("Operations A", r => r.OperationA), ("Permission B", r => r.PermissionB),
+                ("Operations B", r => r.OperationB), ("Severity", r => r.Severity)),
+            Delete = async (c, code) =>
+            {
+                One4All.Application.Abstractions.Security.IPermissionService permissions = c.Get<One4All.Application.Abstractions.Security.IPermissionService>();
+                Core.Security.SodRule rule = (await permissions.SodRulesAsync().ConfigureAwait(true)).FirstOrDefault(r => string.Equals(r.Code, code.Trim(), StringComparison.OrdinalIgnoreCase))
+                    ?? throw new OperationException($"No rule {code} in force.");
+                return Check(await permissions.SaveSodRuleAsync(rule, false).ConfigureAwait(true), $"Rule {rule.Code} switched off (kept in history; save it as in force to bring it back).");
+            },
         };
     }
 
@@ -210,7 +284,7 @@ public static partial class OperationCatalogue
     {
         Dictionary<long, string> users = await c.Db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username).ConfigureAwait(true);
         return Table(await c.Db.ApprovalDelegations.AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.StartsOn).ToListAsync().ConfigureAwait(true),
-            ("From", d => users.GetValueOrDefault(d.FromUserId)), ("To", d => users.GetValueOrDefault(d.ToUserId)), ("Starts", d => D(d.StartsOn)), ("Ends", d => D(d.EndsOn)), ("Reason", d => d.Reason),
+            ("Id", d => d.Id), ("From", d => users.GetValueOrDefault(d.FromUserId)), ("To", d => users.GetValueOrDefault(d.ToUserId)), ("Starts", d => D(d.StartsOn)), ("Ends", d => D(d.EndsOn)), ("Reason", d => d.Reason),
             ("Withdrawn", d => d.Withdrawn));
     }
 }

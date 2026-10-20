@@ -275,6 +275,19 @@ public sealed class ApprovalDelegation : Entity, ICompanyScoped
     /// <summary>Gets or sets a value indicating whether it was withdrawn early.</summary>
     public bool Withdrawn { get; set; }
 
+    /// <summary>Changes the delegate, the period or the reason (the approver who is away stays; approvals already given on their behalf stand).</summary>
+    /// <param name="toUserId">The delegate.</param>
+    /// <param name="startsOn">The first day.</param>
+    /// <param name="endsOn">The last day.</param>
+    /// <param name="reason">Why.</param>
+    public void Change(long toUserId, DateOnly startsOn, DateOnly endsOn, string reason)
+    {
+        ToUserId = toUserId;
+        StartsOn = startsOn;
+        EndsOn = endsOn;
+        Reason = reason;
+    }
+
     /// <summary>Whether it is in force on a date.</summary>
     /// <param name="date">The date.</param>
     /// <returns>True when in force.</returns>

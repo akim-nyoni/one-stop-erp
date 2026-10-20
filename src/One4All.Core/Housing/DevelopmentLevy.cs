@@ -101,6 +101,18 @@ public sealed class DevelopmentLevy : AuditableEntity, ICompanyScoped
 
     /// <summary>Stops raising it (charges already raised stand).</summary>
     public void Deactivate() => IsActive = false;
+
+    /// <summary>Changes the levy's name, rate and income account for charges raised from now on, and puts it back in use (its code, trigger and basis stay; charges already raised stand).</summary>
+    /// <param name="name">The name.</param>
+    /// <param name="rate">The rate or amount.</param>
+    /// <param name="incomeAccountCode">The income account credited.</param>
+    public void Change(string name, decimal rate, string incomeAccountCode)
+    {
+        Name = name;
+        Rate = rate;
+        IncomeAccountCode = incomeAccountCode;
+        IsActive = true;
+    }
 }
 
 /// <summary>

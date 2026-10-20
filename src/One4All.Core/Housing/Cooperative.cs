@@ -52,6 +52,15 @@ public sealed class Cooperative : AuditableEntity, ICompanyScoped
     /// <summary>Adds a member.</summary>
     /// <param name="member">The member.</param>
     public void AddMember(CooperativeMember member) => _members.Add(member);
+
+    /// <summary>Corrects the cooperative's name and registration number (its code, members and stands stay).</summary>
+    /// <param name="name">The name.</param>
+    /// <param name="registrationNumber">The registration number.</param>
+    public void Rename(string name, string registrationNumber)
+    {
+        Name = name;
+        RegistrationNumber = registrationNumber;
+    }
 }
 
 /// <summary>A member of a housing cooperative (<c>hse.cooperative_member</c>).</summary>

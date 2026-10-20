@@ -16,12 +16,13 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Set a budget enforcement rule", ListTitle = "Budget enforcement rules",
-            Description = "What happens when spend overruns the available budget, by department, account prefix and value band (the most specific rule wins; none: allow).",
+            Description = "What happens when spend overruns the available budget, by department, account prefix and value band (the most specific rule wins; none: allow). "
+                + "A blank department or prefix means any. Saving the same department, prefix and value band again changes its action (Edit fills it in).",
             Fields = [Opt("Department", "Department (blank: any)"), Opt("Prefix", "Account prefix (blank: any)"), Num("From", "From value", "0"), Pick("Action", "Action", Enum.GetNames<BudgetAction>())],
             Run = async (c, i) => Check(await c.Get<IBudgetGateService>().SetRuleAsync(c.CompanyId, i.Optional("Department"), i.Optional("Prefix"), i.Number("From"),
                 Enum.Parse<BudgetAction>(i.Text("Action"))).ConfigureAwait(true), "Rule saved."),
             List = async c => Table(await c.Db.BudgetEnforcementRules.AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Department).ThenBy(r => r.AccountPrefix).ThenBy(r => r.MinimumValue)
-                .ToListAsync().ConfigureAwait(true), ("Department", r => r.Department ?? "(any)"), ("Account prefix", r => r.AccountPrefix ?? "(any)"), ("From value", r => M(r.MinimumValue)), ("Action", r => r.Action)),
+                .ToListAsync().ConfigureAwait(true), ("Department", r => r.Department), ("Prefix", r => r.AccountPrefix), ("From value", r => M(r.MinimumValue)), ("Action", r => r.Action)),
         };
         yield return new Operation
         {

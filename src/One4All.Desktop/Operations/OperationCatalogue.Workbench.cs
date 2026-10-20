@@ -273,7 +273,22 @@ public static partial class OperationCatalogue
             Module = customers, Title = "Sales commissions", ListTitle = "Sales reps",
             Description = "A sales rep's commission statement for a period (by customer, on the rep's basis: invoiced, collected or gross margin), or the month-end accrual of "
                 + "every rep's commission earned. Save a rep sets up or changes one; Assign customer puts a customer with a rep. Link employee makes a rep an employee; "
-                + "To payroll sends every linked rep's commission for From–To to the pay period's commission element (instead of accruing it).",
+                + "To payroll sends every linked rep's commission from From to To to the pay period's commission element (instead of accruing it). Delete takes a rep out of use "
+                + "once no customer is assigned to it (Save rep brings it back).",
+            KeyColumn = "Rep",
+            Delete = async (c, code) =>
+            {
+                Core.Trading.SalesRep rep = await ExistingAsync<Core.Trading.SalesRep>(c, code, r => r.Code).ConfigureAwait(true) ?? throw new OperationException($"No sales rep {code}.");
+                int assigned = await c.Db.Customers.CountAsync(x => x.CompanyId == c.CompanyId && x.SalesRepId == rep.Id).ConfigureAwait(true);
+                if (assigned > 0)
+                {
+                    throw new OperationException($"{assigned} customer(s) are assigned to {rep.Code}; assign them to another rep first.");
+                }
+
+                rep.IsActive = false;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Sales rep {rep.Code} taken out of use (kept in history).";
+            },
             Fields = [Pick("Step", "Step", ["Statement", "Accrue", "Save rep", "Assign customer", "Link employee", "To payroll"]), Opt("Rep", "Sales rep code"), Today("From", "From"), Today("To", "To / month end"),
                 Opt("Expense", "Commission expense account (accrue)"), Opt("Payable", "Commission payable account (accrue)"), Opt("Name", "Rep name (save rep)"),
                 Pick("Basis", "Commission basis", Enum.GetNames<Core.Trading.CommissionBasis>()), Num("Rate", "Commission %", "0"), Opt("Customer", "Customer code (assign)"),
@@ -297,7 +312,7 @@ public static partial class OperationCatalogue
                     }
                     else
                     {
-                        (saved.Name, saved.Basis, saved.RatePercent) = (i.Optional("Name") ?? saved.Name, basis, i.Number("Rate"));
+                        (saved.Name, saved.Basis, saved.RatePercent, saved.IsActive) = (i.Optional("Name") ?? saved.Name, basis, i.Number("Rate"), true);
                     }
 
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
@@ -345,7 +360,7 @@ public static partial class OperationCatalogue
                 return accrued.Count == 0 ? "Nothing to accrue." : string.Join(Environment.NewLine, accrued.Select(a => $"{a.RepCode,-10} earned {M(a.Earned),12}  booked now {M(a.Booked),12}"));
             },
             List = async c => Table(await c.Db.Set<Core.Trading.SalesRep>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
-                ("Rep", r => r.Code), ("Name", r => r.Name), ("Basis", r => r.Basis), ("Rate %", r => Q(r.RatePercent)), ("Active", r => r.IsActive)),
+                ("Step", _ => "Save rep"), ("Rep", r => r.Code), ("Name", r => r.Name), ("Basis", r => r.Basis), ("Rate %", r => Q(r.RatePercent)), ("Active", r => r.IsActive)),
         };
         yield return new Operation
         {
@@ -405,7 +420,20 @@ public static partial class OperationCatalogue
             yield return new Operation
             {
                 Module = ledger, Title = selling ? "Recurring sales invoices" : "Recurring purchase invoices", ListTitle = "Recurring invoices",
-                Description = $"An invoice {(selling ? "to a customer" : "from a supplier")} raised every so many months from a first date; Generate raises all that are due; Stop / restart one.",
+                Description = $"An invoice {(selling ? "to a customer" : "from a supplier")} raised every so many months from a first date; Generate raises all that are due; Stop / restart one. "
+                    + "Create with an existing reference changes that template's amounts, accounts, interval and narrative from its next run (its trader and next run date stay); "
+                    + "Delete stops it (kept in history; Restart brings it back).",
+                KeyColumn = "Reference",
+                Delete = async (c, reference) =>
+                {
+                    long id = selling
+                        ? await FindAsync(c.Db.Set<Core.Trading.RecurringSalesInvoice>(), t => t.CompanyId == c.CompanyId && t.Reference.ToUpper() == reference.ToUpper(), t => t.Id, "recurring invoice", reference).ConfigureAwait(true)
+                        : await FindAsync(c.Db.Set<Core.Trading.RecurringPurchaseInvoice>(), t => t.CompanyId == c.CompanyId && t.Reference.ToUpper() == reference.ToUpper(), t => t.Id, "recurring invoice", reference).ConfigureAwait(true);
+                    return Check(selling
+                        ? await c.Get<Application.Abstractions.Trading.IRecurringSalesInvoiceService>().SetActiveAsync(c.CompanyId, id, false).ConfigureAwait(true)
+                        : await c.Get<Application.Abstractions.Trading.IRecurringPurchaseInvoiceService>().SetActiveAsync(c.CompanyId, id, false).ConfigureAwait(true),
+                        $"Recurring invoice {reference} stopped (kept in history).");
+                },
                 Fields = [Pick("Step", "Step", ["Create", "Generate due", "Stop", "Restart"]), Opt("Trader", selling ? "Customer code (create)" : "Supplier code (create)"), Opt("Reference", "Reference"),
                     Num("Net", "Net amount", "0"), Num("Tax", "Tax amount", "0"), Opt("Account", selling ? "Sales account" : "Expense account"), Opt("TaxAccount", "Tax account"), Num("Interval", "Every (months)", "1"),
                     Today("First", "First run date"), Opt("Narrative", "Narrative"), Today("Date", "Generate as of")],
@@ -418,6 +446,25 @@ public static partial class OperationCatalogue
                     switch (i.Text("Step"))
                     {
                         case "Create":
+                            if (i.Number("Net") <= 0m || i.Number("Tax") < 0m || i.Whole("Interval") <= 0)
+                            {
+                                throw new OperationException("A recurring invoice needs a positive net amount, a tax amount of nil or more and an interval of at least one month.");
+                            }
+
+                            if (selling && await ExistingAsync<Core.Trading.RecurringSalesInvoice>(c, reference, t => t.Reference).ConfigureAwait(true) is { } sale)
+                            {
+                                sale.Amend(i.Number("Net"), i.Number("Tax"), i.Optional("Account") ?? sale.SalesAccountCode, i.Optional("TaxAccount"), i.Whole("Interval"), i.Optional("Narrative"));
+                                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                                return $"Recurring invoice {sale.Reference} changed; the next run on {D(sale.NextRunDate)} bills the new amounts.";
+                            }
+
+                            if (!selling && await ExistingAsync<Core.Trading.RecurringPurchaseInvoice>(c, reference, t => t.Reference).ConfigureAwait(true) is { } purchase)
+                            {
+                                purchase.Amend(i.Number("Net"), i.Number("Tax"), i.Optional("Account") ?? purchase.ExpenseAccountCode, i.Optional("TaxAccount"), i.Whole("Interval"), i.Optional("Narrative"));
+                                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                                return $"Recurring invoice {purchase.Reference} changed; the next run on {D(purchase.NextRunDate)} bills the new amounts.";
+                            }
+
                             if (selling)
                             {
                                 long customer = await CustomerAsync(c, i.Optional("Trader") ?? string.Empty).ConfigureAwait(true);
@@ -444,10 +491,22 @@ public static partial class OperationCatalogue
                     }
                 },
                 List = selling
-                    ? async c => Table(await c.Db.Set<Core.Trading.RecurringSalesInvoice>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Reference).ToListAsync().ConfigureAwait(true),
-                        ("Reference", t => t.Reference), ("Active", t => t.IsActive))
-                    : async c => Table(await c.Db.Set<Core.Trading.RecurringPurchaseInvoice>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Reference).ToListAsync().ConfigureAwait(true),
-                        ("Reference", t => t.Reference), ("Active", t => t.IsActive)),
+                    ? async c => Table(await (from t in c.Db.Set<Core.Trading.RecurringSalesInvoice>().AsNoTracking()
+                                              join x in c.Db.Customers.AsNoTracking() on t.CustomerId equals x.Id
+                                              where t.CompanyId == c.CompanyId
+                                              orderby t.Reference
+                                              select new { Trader = x.Code, t.Reference, t.NetAmount, t.TaxAmount, Account = t.SalesAccountCode, t.TaxAccountCode, t.IntervalMonths, t.NextRunDate, t.Narrative, t.IsActive })
+                            .ToListAsync().ConfigureAwait(true),
+                        ("Step", _ => "Create"), ("Reference", t => t.Reference), ("Trader", t => t.Trader), ("Net", t => M(t.NetAmount)), ("Tax", t => M(t.TaxAmount)), ("Account", t => t.Account),
+                        ("Tax account", t => t.TaxAccountCode), ("Interval", t => t.IntervalMonths), ("Next run", t => D(t.NextRunDate)), ("Narrative", t => t.Narrative), ("Active", t => t.IsActive))
+                    : async c => Table(await (from t in c.Db.Set<Core.Trading.RecurringPurchaseInvoice>().AsNoTracking()
+                                              join x in c.Db.Suppliers.AsNoTracking() on t.SupplierId equals x.Id
+                                              where t.CompanyId == c.CompanyId
+                                              orderby t.Reference
+                                              select new { Trader = x.Code, t.Reference, t.NetAmount, t.TaxAmount, Account = t.ExpenseAccountCode, t.TaxAccountCode, t.IntervalMonths, t.NextRunDate, t.Narrative, t.IsActive })
+                            .ToListAsync().ConfigureAwait(true),
+                        ("Step", _ => "Create"), ("Reference", t => t.Reference), ("Trader", t => t.Trader), ("Net", t => M(t.NetAmount)), ("Tax", t => M(t.TaxAmount)), ("Account", t => t.Account),
+                        ("Tax account", t => t.TaxAccountCode), ("Interval", t => t.IntervalMonths), ("Next run", t => D(t.NextRunDate)), ("Narrative", t => t.Narrative), ("Active", t => t.IsActive)),
             };
         }
 

@@ -87,4 +87,21 @@ public sealed class RecurringSalesInvoice : AuditableEntity, ICompanyScoped
     /// <summary>Activates or suspends the template.</summary>
     /// <param name="active">Whether the template should be active.</param>
     public void SetActive(bool active) => IsActive = active;
+
+    /// <summary>Changes what the template bills from its next run (the trader, reference, currency and next run date stay; invoices already raised stand).</summary>
+    /// <param name="netAmount">The net amount.</param>
+    /// <param name="taxAmount">The tax amount.</param>
+    /// <param name="accountCode">The income account.</param>
+    /// <param name="taxAccountCode">The tax account.</param>
+    /// <param name="intervalMonths">Months between runs.</param>
+    /// <param name="narrative">The narrative.</param>
+    public void Amend(decimal netAmount, decimal taxAmount, string accountCode, string? taxAccountCode, int intervalMonths, string? narrative)
+    {
+        NetAmount = netAmount;
+        TaxAmount = taxAmount;
+        SalesAccountCode = accountCode;
+        TaxAccountCode = taxAccountCode;
+        IntervalMonths = intervalMonths;
+        Narrative = narrative;
+    }
 }

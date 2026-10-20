@@ -111,7 +111,10 @@ public static partial class OperationCatalogue
             Module = module, Title = "Preparation deadlines and budget alerts", ListTitle = "Preparation board",
             Description = "Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go "
                 + "and their thresholds - with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). "
-                + "The scheduled task budget.notices does both daily.",
+                + "The scheduled task budget.notices does both daily. Edit fills a department's deadline in to change it; Delete clears a department's deadline.",
+            KeyColumn = "Department",
+            Delete = async (c, department) => Check(await c.Get<IBudgetNotificationService>().SetDeadlineAsync(c.CompanyId, department, null).ConfigureAwait(true),
+                $"Deadline for {department} cleared."),
             Fields = [Pick("Step", "Step", ["Set deadline", "Send reminders", "Alert settings", "Send alerts"]), Opt("Department", "Department"), new("Deadline", "Deadline", FieldKind.Date, Required: false),
                 Num("Year", "Fiscal year id (board / reminders)", "0"), Num("Days", "Remind this many days before", "7"), Opt("Email", "Alert email"), Opt("Thresholds", "Thresholds % (e.g. 75, 90, 100)"), Today()],
             Run = async (c, i) =>
@@ -148,7 +151,8 @@ public static partial class OperationCatalogue
             {
                 long year = await c.Db.FiscalYears.AsNoTracking().Where(y => y.CompanyId == c.CompanyId).OrderByDescending(y => y.StartDate).Select(y => y.Id).FirstOrDefaultAsync().ConfigureAwait(true);
                 return Table(await c.Get<IBudgetNotificationService>().BoardAsync(c.CompanyId, year, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
-                    ("Department", r => r.Department), ("Holder", r => r.BudgetHolder ?? "-"), ("Deadline", r => r.Deadline is DateOnly d ? D(d) : "-"), ("Status", r => r.Status ?? "not started"),
+                    ("Step", _ => "Set deadline"), ("Department", r => r.Department), ("Holder", r => r.BudgetHolder ?? "-"), ("Deadline", r => r.Deadline is DateOnly d ? D(d) : null),
+                    ("Status", r => r.Status ?? "not started"),
                     ("Days left", r => r.DaysLeft?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "-"));
             },
         };

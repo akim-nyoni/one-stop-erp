@@ -61,4 +61,8 @@ public sealed class Agent : SoftDeletableEntity, ICompanyScoped
     /// <summary>Records a remittance received from the agent.</summary>
     /// <param name="grossAmount">The gross amount remitted (before commission).</param>
     public void RecordRemittance(decimal grossAmount) => RemittedToDate += grossAmount;
+
+    /// <summary>Changes the commission deducted on later remittances (remittances already taken stand).</summary>
+    /// <param name="commissionPercent">The commission percentage.</param>
+    public void ChangeCommission(decimal commissionPercent) => CommissionPercent = commissionPercent;
 }

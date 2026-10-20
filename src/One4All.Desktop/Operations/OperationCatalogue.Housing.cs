@@ -274,7 +274,9 @@ public static partial class OperationCatalogue
             Module = module, Title = "Rent tariffs and review", ListTitle = "Rent tariffs",
             Description = "Tariff: the monthly rent for a kind of unit from the first of a month, optionally only in one suburb and for one income category (the most specific "
                 + "applies). Suburb / Income category: place a unit, classify a tenant household. Apply tariffs: from the first of a month every unit's asking rent and every "
-                + "running tenancy's rent follows its tariff. Review by %: raises every rent (or one unit type's) by a percentage.",
+                + "running tenancy's rent follows its tariff. Review by %: raises every rent (or one unit type's) by a percentage. A tariff for a unit type, suburb, "
+                + "category and date already listed changes its rent (Edit fills it in); a tariff is superseded by a later one rather than deleted.",
+            Editable = true,
             Fields = [Pick("Step", "Step", ["Tariff", "Apply tariffs", "Review by %", "Suburb", "Income category"]), Pick("Type", "Unit type", ["(any)", .. Enum.GetNames<RentalUnitType>()]),
                 Opt("Suburb", "Suburb (blank: any)"), Pick("Category", "Income category", ["(any)", .. Enum.GetNames<RentIncomeCategory>()]), Num("Rent", "Monthly rent / percentage", "0"),
                 Opt("Unit", "Unit code (suburb)"), Opt("Tenancy", "Tenancy number (income category)"), Today("Date", "Effective from (first of the month)")],
@@ -306,7 +308,7 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.Set<RentTariff>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId)
                     .OrderBy(t => t.UnitType).ThenBy(t => t.Suburb).ThenBy(t => t.IncomeCategory).ThenByDescending(t => t.EffectiveFrom).Page(c, 500).ToListAsync().ConfigureAwait(true),
-                ("Unit type", t => t.UnitType), ("Suburb", t => t.Suburb ?? "(any)"), ("Category", t => t.IncomeCategory?.ToString() ?? "(any)"), ("From", t => D(t.EffectiveFrom)),
+                ("Step", _ => "Tariff"), ("Unit type", t => t.UnitType), ("Suburb", t => t.Suburb), ("Category", t => t.IncomeCategory?.ToString() ?? "(any)"), ("Date", t => D(t.EffectiveFrom)),
                 ("Rent", t => M(t.MonthlyRent))),
         };
         yield return new Operation
@@ -853,7 +855,15 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Allocation quotas", ListTitle = "Quotas",
             Description = "Sets the share of allocations reserved for a beneficiary group (women, youth, disabled, elderly, civil servants), for a scheme or overall; declares the groups "
-                + "an applicant belongs to (comma-separated) so allocation runs can meet the quotas.",
+                + "an applicant belongs to (comma-separated) so allocation runs can meet the quotas. Setting a quota already listed changes its target; Delete sets it to 0% "
+                + "(no share reserved).",
+            KeyColumn = "Quota",
+            Delete = async (c, key) =>
+            {
+                string[] parts = key.Split(" in ", 2, StringSplitOptions.TrimEntries);
+                BeneficiaryGroups group = Enum.TryParse(parts[0], ignoreCase: true, out BeneficiaryGroups parsed) ? parsed : throw new OperationException($"\"{key}\" is not a quota.");
+                return Check(await c.Get<IAllocationQuotaService>().SetQuotaAsync(c.CompanyId, parts.Length > 1 ? parts[1] : null, group, 0m).ConfigureAwait(true), $"Quota {key} set to 0%.");
+            },
             Fields = [Pick("Step", "Step", ["Set quota", "Declare groups"]), Opt("Scheme", "Scheme code (blank: all schemes)"), Pick("Group", "Group (quota)", Enum.GetNames<BeneficiaryGroups>()),
                 Num("Percent", "Target %", "0"), Opt("Applicant", "Waiting-list number (declare)"), Opt("Groups", "Groups, e.g. Women,Youth (declare)")],
             Run = async (c, i) =>
@@ -868,8 +878,14 @@ public static partial class OperationCatalogue
                     : throw new OperationException("Name the groups from: " + string.Join(", ", Enum.GetNames<BeneficiaryGroups>()) + ".");
                 return Check(await quotas.DeclareGroupsAsync(c.CompanyId, i.Optional("Applicant") ?? string.Empty, groups).ConfigureAwait(true), "Groups declared.");
             },
-            List = async c => Table(await c.Db.Set<AllocationQuota>().AsNoTracking().Where(q => q.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true),
-                ("Scheme", q => q.SchemeId), ("Group", q => q.Group), ("Target %", q => Q(q.TargetPercent))),
+            List = async c =>
+            {
+                Dictionary<long, string> schemes = await c.Db.HousingSchemes.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).ToDictionaryAsync(s => s.Id, s => s.Code).ConfigureAwait(true);
+                string? Scheme(AllocationQuota q) => q.SchemeId is long id ? schemes.GetValueOrDefault(id, id.ToString(CultureInfo.InvariantCulture)) : null;
+                return Table(await c.Db.Set<AllocationQuota>().AsNoTracking().Where(q => q.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true),
+                    ("Step", _ => "Set quota"), ("Quota", q => Scheme(q) is string s ? $"{q.Group} in {s}" : q.Group.ToString()), ("Scheme", q => Scheme(q)), ("Group", q => q.Group),
+                    ("Target %", q => Q(q.TargetPercent)));
+            },
         };
         yield return new Operation
         {
@@ -918,7 +934,9 @@ public static partial class OperationCatalogue
             Module = module, Title = "Stand, parcel and scheme details", ListTitle = "Stand register",
             Description = "Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and the services available (water, sewer, road, electricity, storm water). "
                 + "Remark: adds a dated line to the stand's remarks history; Remarks lists it. Parcel: locality, ward, land use, tenure, improvements and occupation. "
-                + "Scheme: funding source, start / completion dates and the deposit an offer must be secured with before it is accepted.",
+                + "Scheme: funding source, start / completion dates and the deposit an offer must be secured with before it is accepted. Edit fills a stand's details in to "
+                + "change them (a stand carries cost and history, so it is never deleted here).",
+            Editable = true,
             Fields = [Pick("Step", "Step", ["Stand", "Remark", "Remarks", "Parcel", "Scheme"]), Opt("Code", "Stand / parcel / scheme number"), Opt("Address", "Street address"),
                 Opt("Ward", "Ward"), Opt("Suburb", "Suburb / locality"), Opt("Zone", "Zone"), Opt("Use", "Intended use / land use"), Opt("Zoning", "Zoning"), Opt("Phase", "Servicing phase"),
                 Tick("Water", "Water"), Tick("Sewer", "Sewer"), Tick("Road", "Road"), Tick("Power", "Electricity"), Tick("Storm", "Storm water"), Opt("Remark", "Remark / improvements"),
@@ -950,9 +968,9 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.HousingStands.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.StandNumber).Page(c, 1000).ToListAsync().ConfigureAwait(true),
-                ("Stand", s => s.StandNumber), ("Address", s => s.StreetAddress), ("Ward", s => s.Ward), ("Suburb", s => s.Suburb), ("Use", s => s.IntendedUse), ("Zoning", s => s.Zoning),
-                ("Services", s => string.Join(" ", new[] { s.HasWater ? "W" : null, s.HasSewer ? "S" : null, s.HasRoad ? "R" : null, s.HasElectricity ? "E" : null, s.HasStormWater ? "D" : null }
-                    .OfType<string>())), ("Status", s => s.Status)),
+                ("Step", _ => "Stand"), ("Code", s => s.StandNumber), ("Address", s => s.StreetAddress), ("Ward", s => s.Ward), ("Suburb", s => s.Suburb), ("Zone", s => s.Zone),
+                ("Use", s => s.IntendedUse), ("Zoning", s => s.Zoning), ("Phase", s => s.ServicingPhase), ("Water", s => s.HasWater), ("Sewer", s => s.HasSewer), ("Road", s => s.HasRoad),
+                ("Electricity", s => s.HasElectricity), ("Storm water", s => s.HasStormWater), ("Status", s => s.Status)),
         };
         yield return new Operation
         {
@@ -989,7 +1007,9 @@ public static partial class OperationCatalogue
             Module = module, Title = "Housing cooperatives", ListTitle = "Cooperatives",
             Description = "Registers a cooperative, adds and removes members, allocates stands to it (\"S1,S2\") and sub-allocates each to a member; Stands lists what it holds and to whom. "
                 + "Account: links its receivables account (customer code). Charge: invoices it. Contribution: a member's payment receipted on its account. Statement: its account for the "
-                + "period from the date in Since to Date, with each member's contributions.",
+                + "period from the date in Since to Date, with each member's contributions. Register with an existing code corrects that cooperative's name and registration "
+                + "number (a cooperative holding stands and an account is not deleted).",
+            Editable = true,
             Fields = [Pick("Step", "Step", ["Register", "Add member", "Remove member", "Allocate stands", "Sub-allocate", "Stands", "Account", "Charge", "Contribution", "Statement"]),
                 Req("Cooperative", "Cooperative code"), Opt("Name", "Name / member name"), Opt("Registration", "Registration number"), Opt("IdNumber", "Member national ID"),
                 Opt("Stands", "Stand number(s), comma-separated"), Opt("Customer", "Account customer code"), Num("Amount", "Amount", "0"), Opt("Account", "Income account (charge) / bank (contribution)"),
@@ -1012,6 +1032,18 @@ public static partial class OperationCatalogue
                 switch (i.Text("Step"))
                 {
                     case "Register":
+                        if (await ExistingAsync<Cooperative>(c, code, x => x.Code).ConfigureAwait(true) is { } known)
+                        {
+                            if (string.IsNullOrWhiteSpace(i.Optional("Name")) || string.IsNullOrWhiteSpace(i.Optional("Registration")))
+                            {
+                                throw new OperationException("A cooperative needs a name and a registration number.");
+                            }
+
+                            known.Rename(i.Optional("Name")!.Trim(), i.Optional("Registration")!.Trim());
+                            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                            return $"Cooperative {known.Code} changed.";
+                        }
+
                         return Check(await cooperatives.RegisterAsync(c.CompanyId, code, i.Optional("Name") ?? string.Empty, i.Optional("Registration") ?? string.Empty).ConfigureAwait(true), _ => "Cooperative registered.");
                     case "Add member":
                         return Check(await cooperatives.AddMemberAsync(c.CompanyId, code, i.Optional("IdNumber") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Date("Date")).ConfigureAwait(true), "Member added.");
@@ -1045,13 +1077,15 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.Set<Cooperative>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Registration", x => x.RegistrationNumber)),
+                ("Step", _ => "Register"), ("Cooperative", x => x.Code), ("Name", x => x.Name), ("Registration", x => x.RegistrationNumber)),
         };
         yield return new Operation
         {
             Module = module, Title = "Development levies", ListTitle = "Levies",
             Description = "Defines a levy charged on allocation or on transfer - flat, per m² or a percentage of the price - to an income account, or deactivates it; charges the "
-                + "levies due on an allocation certificate or a transfer application.",
+                + "levies due on an allocation certificate or a transfer application. Define with an existing code changes that levy's name, rate and income account for "
+                + "charges raised from now on (its trigger and basis stay); Delete deactivates it (charges already raised stand).",
+            Delete = async (c, code) => Check(await c.Get<IDevelopmentLevyService>().DeactivateAsync(c.CompanyId, code).ConfigureAwait(true), $"Levy {code.Trim().ToUpperInvariant()} deactivated (kept in history)."),
             Fields = [Pick("Step", "Step", ["Define", "Deactivate", "Defer", "Charge allocation", "Charge transfer"]), Opt("Code", "Levy code"), Opt("Name", "Name"),
                 OptNum("Months", "Months its income is spread over (defer; 0: at once)"), Opt("Deferred", "Deferred income account (defer)"),
                 Pick("Trigger", "Charged on", Enum.GetNames<LevyTrigger>()), Pick("Basis", "Basis", Enum.GetNames<LevyBasis>()), Num("Rate", "Rate / amount", "0"), Opt("Income", "Income account"),
@@ -1060,6 +1094,24 @@ public static partial class OperationCatalogue
             {
                 IDevelopmentLevyService levies = c.Get<IDevelopmentLevyService>();
                 static string Raised(IReadOnlyList<LevyRaised> raised) => raised.Count == 0 ? "No levies due." : string.Join(Environment.NewLine, raised.Select(r => $"{r.LevyCode}: {M(r.Amount)} ({r.DocumentNumber})"));
+                if (i.Text("Step") == "Define" && await ExistingAsync<DevelopmentLevy>(c, i.Optional("Code") ?? string.Empty, x => x.Code).ConfigureAwait(true) is { } levy)
+                {
+                    if (levy.Trigger != Enum.Parse<LevyTrigger>(i.Text("Trigger")) || levy.Basis != Enum.Parse<LevyBasis>(i.Text("Basis")))
+                    {
+                        throw new OperationException($"Levy {levy.Code}'s trigger and basis cannot change; deactivate it and define a new levy instead.");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(i.Optional("Name")) || string.IsNullOrWhiteSpace(i.Optional("Income")) || i.Number("Rate") <= 0m
+                        || (levy.Basis == LevyBasis.PercentOfPrice && i.Number("Rate") > 100m))
+                    {
+                        throw new OperationException("A levy needs a name, a positive rate (a percentage no more than 100) and its income account.");
+                    }
+
+                    levy.Change(i.Optional("Name")!.Trim(), i.Number("Rate"), i.Optional("Income")!.Trim());
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Levy {levy.Code} changed.";
+                }
+
                 return i.Text("Step") switch
                 {
                     "Define" => Check(await levies.DefineAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, Enum.Parse<LevyTrigger>(i.Text("Trigger")),
@@ -1072,7 +1124,8 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Db.Set<DevelopmentLevy>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("On", x => x.Trigger), ("Basis", x => x.Basis), ("Rate", x => Q(x.Rate)), ("Income", x => x.IncomeAccountCode), ("Active", x => x.IsActive)),
+                ("Step", _ => "Define"), ("Code", x => x.Code), ("Name", x => x.Name), ("Charged on", x => x.Trigger), ("Basis", x => x.Basis), ("Rate", x => Q(x.Rate)), ("Income", x => x.IncomeAccountCode),
+                ("Active", x => x.IsActive)),
         };
         yield return new Operation
         {
@@ -1738,7 +1791,27 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Land, schemes and stands", ListTitle = "Schemes",
             Description = "Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands (\"S1:300; S2:250\" - number:size m²), its cost apportioned "
-                + "equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available).",
+                + "equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available). "
+                + "Create scheme with an existing code changes that scheme's name and delivery model; Delete removes a scheme that has no stands, developer agreements, "
+                + "pricing rules or quotas (kept in history).",
+            KeyColumn = "Scheme",
+            Delete = async (c, code) =>
+            {
+                HousingScheme scheme = await ExistingAsync<HousingScheme>(c, code, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No scheme {code}.");
+                if (await c.Db.HousingStands.AnyAsync(s => s.CompanyId == c.CompanyId && s.SchemeId == scheme.Id).ConfigureAwait(true)
+                    || await c.Db.Set<DeveloperAgreement>().AnyAsync(a => a.CompanyId == c.CompanyId && a.SchemeId == scheme.Id).ConfigureAwait(true)
+                    || await c.Db.Set<StandPricingRule>().AnyAsync(r => r.CompanyId == c.CompanyId && r.SchemeId == scheme.Id).ConfigureAwait(true)
+                    || await c.Db.Set<AllocationQuota>().AnyAsync(q => q.CompanyId == c.CompanyId && q.SchemeId == scheme.Id && q.TargetPercent > 0m).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Scheme {scheme.Code} is in use (stands, a developer agreement, a pricing rule or a quota refer to it), so it cannot be deleted.");
+                }
+
+                scheme.IsDeleted = true;
+                scheme.DeletedOnUtc = DateTimeOffset.UtcNow;
+                scheme.DeletedByUserId = c.UserId;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Scheme {scheme.Code} deleted (kept in history).";
+            },
             Fields = [Pick("Step", "Step", ["Acquire land", "Create scheme", "Subdivide", "Sell stand"]), Opt("Parcel", "Parcel number"), Opt("Description", "Description / scheme name"),
                 Num("Area", "Area m² (acquire)", "0"), Num("Amount", "Cost (acquire) / price (sell)", "0"), Opt("Scheme", "Scheme code"), Pick("SchemeType", "Delivery model", Enum.GetNames<SchemeType>()),
                 Opt("Stands", "Stands: number:size m²; … (subdivide)"), Pick("Apportion", "Apportion cost", Enum.GetNames<ApportionMethod>()), Opt("Stand", "Stand number (sell)"),
@@ -1755,6 +1828,14 @@ public static partial class OperationCatalogue
                             i.Number("Amount"), date, i.Optional("Wip") ?? string.Empty, i.Optional("Funding") ?? string.Empty, i.Optional("Document") ?? string.Empty).ConfigureAwait(true));
                         return $"Parcel acquired ({acquired.JournalNumber}).";
                     case "Create scheme":
+                        if (await ExistingAsync<HousingScheme>(c, i.Optional("Scheme") ?? string.Empty, x => x.Code).ConfigureAwait(true) is { } known)
+                        {
+                            known.Name = i.Optional("Description")?.Trim() ?? known.Name;
+                            known.SchemeType = Enum.Parse<SchemeType>(i.Text("SchemeType"));
+                            await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                            return $"Scheme {known.Code} changed.";
+                        }
+
                         return Check(await housing.CreateSchemeAsync(c.CompanyId, i.Optional("Scheme") ?? string.Empty, i.Optional("Description") ?? string.Empty, Enum.Parse<SchemeType>(i.Text("SchemeType")))
                             .ConfigureAwait(true), _ => "Scheme created.");
                     case "Subdivide":
@@ -1783,7 +1864,8 @@ public static partial class OperationCatalogue
                         return $"Sold: invoice posted ({sold.SaleJournalNumber}); cost of sales {M(sold.CostOfSales)} ({sold.CostOfSalesJournalNumber}).";
                 }
             },
-            List = SchemesAsync,
+            List = async c => Table(await c.Db.HousingSchemes.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Step", _ => "Create scheme"), ("Scheme", x => x.Code), ("Description", x => x.Name), ("Delivery model", x => x.SchemeType)),
         };
     }
 

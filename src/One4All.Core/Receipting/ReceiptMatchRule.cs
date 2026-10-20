@@ -74,4 +74,19 @@ public sealed class ReceiptMatchRule : AuditableEntity, ICompanyScoped
 
     /// <summary>Gets its order (lowest first).</summary>
     public int Priority { get; private set; }
+
+    /// <summary>Changes the rule (payments already matched by it stay where they went).</summary>
+    /// <param name="field">What it reads.</param>
+    /// <param name="kind">How it compares.</param>
+    /// <param name="pattern">The pattern.</param>
+    /// <param name="customerId">The account the payment goes to.</param>
+    /// <param name="priority">Its order (lowest first).</param>
+    public void Change(ReceiptMatchField field, ReceiptMatchKind kind, string pattern, long customerId, int priority)
+    {
+        Field = field;
+        Kind = kind;
+        Pattern = pattern;
+        CustomerId = customerId;
+        Priority = priority;
+    }
 }
