@@ -61,7 +61,11 @@ public sealed class ServiceOrderTests
 
         string cut = (await orders.RaiseAsync(companyId, lateStand.Id, ServiceType.Water, ServiceOrderKind.Disconnect, march, 200m)).Value;
         (await orders.RaiseAsync(companyId, lateStand.Id, ServiceType.Water, ServiceOrderKind.Disconnect, march, 200m)).Error.Code.Should().Be("Mun.OrderOpen");
-        (await orders.ExecuteAsync(companyId, cut, new DateOnly(2026, 3, 11), null)).IsSuccess.Should().BeTrue();
+        (await orders.ExecuteAsync(companyId, cut, new DateOnly(2026, 3, 11), null)).Error.Code.Should().Be("Mun.DisconnectionNotAuthorised");
+        (await orders.AuthoriseAsync(companyId, cut, 0)).Error.Code.Should().Be("Mun.SelfAuthorise");
+        (await orders.AuthoriseAsync(companyId, cut, 72)).IsSuccess.Should().BeTrue();
+        (await orders.ExecuteAsync(companyId, cut, new DateOnly(2026, 3, 11), new ReconnectionFee(25m, "4900"))).IsSuccess.Should().BeTrue();
+        (await db.OpenItems.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.DocumentNumber == cut + "-FEE")).OriginalBase.Should().Be(25m, "the disconnection fee");
         (await Connected(db, lateStand.Id)).Should().BeFalse();
 
         (await orders.RaiseAsync(companyId, lateStand.Id, ServiceType.Water, ServiceOrderKind.Reconnect, new DateOnly(2026, 3, 12), 200m)).Error.Code.Should().Be("Mun.NotForReconnection");

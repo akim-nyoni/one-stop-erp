@@ -92,6 +92,25 @@ public sealed class ServiceOrderService : IServiceOrderService
         => _db.AtomicAsync(() => ExecuteCoreAsync(companyId, orderNumber, date, fee, ct), ct);
 
     // One unit: the service change, the fee invoice and the order are kept together.
+    /// <inheritdoc />
+    public async Task<Result> AuthoriseAsync(long companyId, string orderNumber, long userId, CancellationToken ct = default)
+    {
+        ServiceOrder? order = await _db.Set<ServiceOrder>().FirstOrDefaultAsync(o => o.CompanyId == companyId && o.OrderNumber == orderNumber, ct).ConfigureAwait(false);
+        if (order is null || order.Status != ServiceOrderStatus.Open || order.Kind != ServiceOrderKind.Disconnect)
+        {
+            return Result.Failure(Error.Rule("Mun.OrderNotOpen", $"Order {orderNumber} is not an open disconnection."));
+        }
+
+        if (userId <= 0 || userId == order.CreatedByUserId)
+        {
+            return Result.Failure(Error.Rule("Mun.SelfAuthorise", "A disconnection is authorised by someone other than whoever raised it."));
+        }
+
+        order.Authorise(userId);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
     private async Task<Result> ExecuteCoreAsync(long companyId, string orderNumber, DateOnly date, ReconnectionFee? fee, CancellationToken ct)
     {
         ServiceOrder? order = await _db.Set<ServiceOrder>().FirstOrDefaultAsync(o => o.CompanyId == companyId && o.OrderNumber == orderNumber, ct).ConfigureAwait(false);
@@ -105,24 +124,33 @@ public sealed class ServiceOrderService : IServiceOrderService
         string? feeInvoice = null;
         if (order.Kind == ServiceOrderKind.Disconnect)
         {
+            // Cutting a service off needs a second person's authority (brief §4.9).
+            if (order.AuthorisedByUserId is null)
+            {
+                return Result.Failure(Error.Rule("Mun.DisconnectionNotAuthorised", $"Disconnection {order.OrderNumber} has not been authorised."));
+            }
+
             link.IsActive = false;
         }
         else
         {
             link.IsActive = true;
-            if (fee is { Amount: > 0m })
+        }
+
+        // The fee for the visit, disconnection or reconnection, goes on the ratepayer's account.
+        if (fee is { Amount: > 0m })
+        {
+            Customer ratepayer = await _db.Customers.FirstAsync(c => c.Id == property.RatepayerCustomerId, ct).ConfigureAwait(false);
+            feeInvoice = $"{order.OrderNumber}-FEE";
+            Result<TradingPostingResult> invoiced = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
             {
-                Customer ratepayer = await _db.Customers.FirstAsync(c => c.Id == property.RatepayerCustomerId, ct).ConfigureAwait(false);
-                feeInvoice = $"{order.OrderNumber}-FEE";
-                Result<TradingPostingResult> invoiced = await _ar.PostInvoiceAsync(new SalesInvoiceRequest
-                {
-                    CompanyId = companyId, CustomerId = ratepayer.Id, DocumentNumber = feeInvoice, DocumentDate = date, Currency = ratepayer.Currency,
-                    NetAmount = fee.Amount, SalesAccountCode = fee.RevenueAccountCode, Narrative = $"Reconnection fee, stand {property.StandNumber}",
-                }, ct).ConfigureAwait(false);
-                if (invoiced.IsFailure)
-                {
-                    return Result.Failure(invoiced.Error);
-                }
+                CompanyId = companyId, CustomerId = ratepayer.Id, DocumentNumber = feeInvoice, DocumentDate = date, Currency = ratepayer.Currency,
+                NetAmount = fee.Amount, SalesAccountCode = fee.RevenueAccountCode,
+                Narrative = $"{(order.Kind == ServiceOrderKind.Disconnect ? "Disconnection" : "Reconnection")} fee, stand {property.StandNumber}",
+            }, ct).ConfigureAwait(false);
+            if (invoiced.IsFailure)
+            {
+                return Result.Failure(invoiced.Error);
             }
         }
 

@@ -43,11 +43,19 @@ public interface IServiceOrderService
     /// <returns>The order number, or why it was refused.</returns>
     Task<Result<string>> RaiseAsync(long companyId, long propertyId, ServiceType serviceType, ServiceOrderKind kind, DateOnly date, decimal threshold, CancellationToken ct = default);
 
-    /// <summary>Carries out an open order; a reconnection invoices its fee, in one unit.</summary>
+    /// <summary>Authorises an open disconnection: by a user other than whoever raised it, before it can be carried out.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="orderNumber">The order.</param>
+    /// <param name="userId">The authorising user.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> AuthoriseAsync(long companyId, string orderNumber, long userId, CancellationToken ct = default);
+
+    /// <summary>Carries out an open order (a disconnection once authorised); its fee - disconnection or reconnection - is invoiced, in one unit.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="orderNumber">The order.</param>
     /// <param name="date">When it was carried out.</param>
-    /// <param name="fee">The reconnection fee, for a reconnection.</param>
+    /// <param name="fee">The disconnection or reconnection fee, if one is charged.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>
     Task<Result> ExecuteAsync(long companyId, string orderNumber, DateOnly date, ReconnectionFee? fee, CancellationToken ct = default);

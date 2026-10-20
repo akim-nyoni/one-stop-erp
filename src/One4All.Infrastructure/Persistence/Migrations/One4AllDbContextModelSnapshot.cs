@@ -18745,6 +18745,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("arrears");
 
+                    b.Property<long?>("AuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("authorised_by_user_id");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");

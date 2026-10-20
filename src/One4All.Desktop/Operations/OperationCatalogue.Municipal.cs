@@ -682,10 +682,10 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Disconnections and reconnections",
-            Description = "Lists stands whose arrears for a service pass a threshold, raises a disconnection (or reconnection) order for one, executes it (a reconnection with its fee) or "
-                + "cancels it.",
-            Fields = [Pick("Step", "Step", ["Candidates", "Raise", "Execute", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()), Num("Threshold", "Arrears threshold", "0"),
-                Opt("Stand", "Stand number (raise)"), Pick("Kind", "Order", Enum.GetNames<ServiceOrderKind>()), Opt("Order", "Order number"), Num("Fee", "Reconnection fee", "0"), Opt("Account", "Fee revenue account"), Today()],
+            Description = "Lists stands whose arrears for a service pass a threshold, raises a disconnection (or reconnection) order for one, authorises a disconnection (someone "
+                + "other than whoever raised it), executes it (with its disconnection or reconnection fee) or cancels it.",
+            Fields = [Pick("Step", "Step", ["Candidates", "Raise", "Authorise", "Execute", "Cancel"]), Pick("Service", "Service", Enum.GetNames<ServiceType>()), Num("Threshold", "Arrears threshold", "0"),
+                Opt("Stand", "Stand number (raise)"), Pick("Kind", "Order", Enum.GetNames<ServiceOrderKind>()), Opt("Order", "Order number"), Num("Fee", "Disconnection / reconnection fee", "0"), Opt("Account", "Fee revenue account"), Today()],
             Run = async (c, i) =>
             {
                 IServiceOrderService orders = c.Get<IServiceOrderService>();
@@ -698,6 +698,8 @@ public static partial class OperationCatalogue
                     case "Raise":
                         return $"Order {Check(await orders.RaiseAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), service, Enum.Parse<ServiceOrderKind>(i.Text("Kind")),
                             i.Date("Date"), i.Number("Threshold")).ConfigureAwait(true))} raised.";
+                    case "Authorise":
+                        return Check(await orders.AuthoriseAsync(c.CompanyId, i.Optional("Order") ?? string.Empty, c.UserId).ConfigureAwait(true), "Disconnection authorised.");
                     case "Execute":
                         ReconnectionFee? fee = i.Number("Fee") > 0m ? new ReconnectionFee(i.Number("Fee"), i.Optional("Account") ?? string.Empty) : null;
                         return Check(await orders.ExecuteAsync(c.CompanyId, i.Optional("Order") ?? string.Empty, i.Date("Date"), fee).ConfigureAwait(true), "Order executed.");

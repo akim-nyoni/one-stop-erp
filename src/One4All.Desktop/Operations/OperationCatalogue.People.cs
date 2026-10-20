@@ -996,13 +996,15 @@ public static partial class OperationCatalogue
             Module = module, Title = "Set payroll approval",
             Description = "Whether payroll needs a second user: regular runs then go calculate, approve (by someone else), commit, and supplementary and backpay runs name "
                 + "their approver. Nobody ever approves a run that pays themselves.",
-            Fields = [Tick("Required", "Payroll needs approval by a second user")],
+            Fields = [Tick("Required", "Payroll needs approval by a second user"), Tick("Remit", "Invoice the third parties (tax, funds, court orders) with every committed run")],
             Run = async (c, i) =>
             {
                 Company company = await c.Db.Companies.FirstAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
                 company.PayrollApprovalRequired = i.Flag("Required");
+                company.RaisePayrollRemittances = i.Flag("Remit");
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                return company.PayrollApprovalRequired ? "Payroll now needs approval by a second user." : "Payroll may be run and committed in one step.";
+                return (company.PayrollApprovalRequired ? "Payroll now needs approval by a second user." : "Payroll may be run and committed in one step.")
+                    + (company.RaisePayrollRemittances ? " Third-party remittances are raised with each run." : " Remittances are raised on request.");
             },
         };
         yield return new Operation

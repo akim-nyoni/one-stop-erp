@@ -100,4 +100,11 @@ public sealed class ServiceOrder : AuditableEntity, ICompanyScoped
 
     /// <summary>Cancels an open order.</summary>
     public void Cancel() => Status = ServiceOrderStatus.Cancelled;
+
+    /// <summary>Who authorised a disconnection (someone other than whoever raised it).</summary>
+    public long? AuthorisedByUserId { get; private set; }
+
+    /// <summary>Records the authorisation to disconnect.</summary>
+    /// <param name="userId">The authorising user.</param>
+    public void Authorise(long userId) => AuthorisedByUserId = userId;
 }
