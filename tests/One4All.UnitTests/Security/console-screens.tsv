@@ -279,6 +279,7 @@ Point of Sale	Expire loyalty points	False
 Point of Sale	Gift cards: balance, top up, block, replace, breakage	False	
 Point of Sale	Loyalty: enrol, earn, redeem, statement	False	
 Point of Sale	Price a basket with promotions	False	
+Point of Sale	Promotion results	False	
 Point of Sale	Promotional codes	False	
 Point of Sale	Receipt layout	False	
 Point of Sale	Record a till event	False	
@@ -362,6 +363,7 @@ Stock	Dispatch a transfer	False
 Stock	Find an item	False	
 Stock	Future prices	False	
 Stock	Item picture, description and dimensions	False	
+Stock	Item variants	False	
 Stock	Landed costs on a receipt	False	
 Stock	Post a stocktake	False	
 Stock	Price a list from cost	False	

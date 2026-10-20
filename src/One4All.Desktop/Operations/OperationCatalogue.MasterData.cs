@@ -810,7 +810,7 @@ public static partial class OperationCatalogue
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return "Customer added.";
             },
-            List = async c => Table(await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value), ("Credit limit", x => M(x.CreditLimit)),
                 ("Analysis", x => string.Join(" / ", new[] { x.AnalysisCode1, x.AnalysisCode2, x.AnalysisCode3 }.Where(a => !string.IsNullOrEmpty(a))))),
         };
@@ -838,7 +838,7 @@ public static partial class OperationCatalogue
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return "Supplier added.";
             },
-            List = async c => Table(await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+            List = async c => Table(await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.Currency.Value),
                 ("Analysis", x => string.Join(" / ", new[] { x.AnalysisCode1, x.AnalysisCode2, x.AnalysisCode3 }.Where(a => !string.IsNullOrEmpty(a))))),
         };

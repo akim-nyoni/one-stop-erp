@@ -111,7 +111,7 @@ public static class NavigationMap
         new("Stock & Products", "\U0001F4E6", "#6D4C41", "Products and services, warehouses, stock movements, counts and production.", ["Stock"],
         [
             G("Products",
-                O("System Manager: Add an item", "Add a product or service"), O("Stock: Find an item", "Find a product"),
+                O("System Manager: Add an item", "Add a product or service"), O("Stock: Find an item", "Find a product"), O("Stock: Item variants", "Sizes and colours"),
                 O("Stock: Item picture, description and dimensions", "Product picture, description and size"),
                 O("Stock: Add a barcode, synonym, pack or supplier to an item", "Product barcodes, packs and suppliers"), O("Stock: Set item sale limits", "Product sale limits"),
                 O("Stock: Set an item as catch-weight", "Sell a product by weight"), O("Documents: Shelf labels", "Print shelf labels")),
@@ -143,7 +143,7 @@ public static class NavigationMap
                 O("Point of Sale: Refund sale lines", "Refund a sale"), O("Point of Sale: Refund without a receipt"), O("Point of Sale: Exchange goods"),
                 O("Point of Sale: Refund window", "How long refunds are allowed")),
             G("Promotions and loyalty",
-                O("Point of Sale: Save a promotion", "Promotions"), O("Point of Sale: Promotional codes"), O("Point of Sale: Price a basket with promotions"),
+                O("Point of Sale: Save a promotion", "Promotions"), O("Point of Sale: Promotion results"), O("Point of Sale: Promotional codes"), O("Point of Sale: Price a basket with promotions"),
                 O("Point of Sale: Loyalty: enrol, earn, redeem, statement", "Loyalty"), O("Point of Sale: Expire loyalty points")),
             G("Gift cards",
                 O("Point of Sale: Create gift card stock"), O("Point of Sale: Activate a gift card"), O("Point of Sale: Gift cards: balance, top up, block, replace, breakage", "Gift card balance and changes")),

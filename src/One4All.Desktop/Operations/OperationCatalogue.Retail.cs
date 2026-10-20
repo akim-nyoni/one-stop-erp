@@ -195,6 +195,19 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Promotion results", ListTitle = "Promotions this month",
+            Description = "What each promotion did over a period at the tills: the lines and quantity sold under it, the sales they made and the discount it gave away (voided sales left out).",
+            Fields = [Today("From", "From"), Today("To", "To")],
+            Run = async (c, i) =>
+            {
+                System.Data.DataTable table = await PromotionResultsAsync(c, i.Date("From"), i.Date("To")).ConfigureAwait(true);
+                return table.Rows.Count == 0 ? "No sales under a promotion in the period."
+                    : string.Join(Environment.NewLine, table.Rows.Cast<System.Data.DataRow>().Select(r => $"{r[0],-16} {r[1],6} lines  qty {r[2],10}  sales {r[3],14}  discount {r[4],12}"));
+            },
+            List = c => PromotionResultsAsync(c, new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1), DateOnly.FromDateTime(DateTime.Today)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Save a promotion", ListTitle = "Promotions",
             Description = "NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','.",
             Fields = [Req("Code", "Code"), Req("Name", "Name on receipts"), Pick("Kind", "Kind", Enum.GetNames<PromotionKind>()), Req("Account", "Discount account"), Num("Quantity", "N / X", "0"),
@@ -425,9 +438,78 @@ public static partial class OperationCatalogue
             ("When", e => e.OccurredOnUtc.LocalDateTime.ToString("yyyy-MM-dd HH:mm", System.Globalization.CultureInfo.InvariantCulture)), ("Event", e => e.Kind), ("Sale", e => e.SaleNumber),
             ("Description", e => e.Description), ("Amount", e => M(e.Amount)), ("Reason", e => e.Reason), ("Reference", e => e.Reference));
 
+    // What each promotion did over a period: lines and quantity sold under it, the sales, and the discount it gave (voided sales left out).
+    private static async Task<System.Data.DataTable> PromotionResultsAsync(OperationContext c, DateOnly start, DateOnly end)
+    {
+        var rows = await (from l in c.Db.Set<Core.Pos.SaleLine>().AsNoTracking()
+                          join s in c.Db.Set<Core.Pos.Sale>().AsNoTracking() on l.SaleId equals s.Id
+                          where s.CompanyId == c.CompanyId && s.Status == Core.Pos.SaleStatus.Completed && s.SaleDate >= start && s.SaleDate <= end && l.PromotionCode != null
+                          group l by l.PromotionCode into g
+                          select new { Promotion = g.Key, Lines = g.Count(), Quantity = g.Sum(x => x.Quantity), Sales = g.Sum(x => x.LineNet), Discount = g.Sum(x => x.PromotionDiscount) })
+            .ToListAsync().ConfigureAwait(true);
+        return Table(rows.OrderByDescending(r => r.Discount), ("Promotion", r => r.Promotion), ("Lines", r => r.Lines), ("Quantity", r => Q(r.Quantity)), ("Sales", r => M(r.Sales)),
+            ("Discount given", r => M(r.Discount)));
+    }
+
     private static IEnumerable<Operation> Stock()
     {
         const string module = "Stock";
+        yield return new Operation
+        {
+            Module = module, Title = "Item variants", ListTitle = "Variants",
+            Description = "Sizes and colours of one product: a variant is its own stock item (own code, barcode, stock and price), made from the base item - its unit, tax code, category, "
+                + "accounts, tracking and brand copied - and kept under it so the variants list and report together.",
+            Fields = [Pick("Step", "Step", ["Add", "List"]), Req("Item", "Base item code"), Opt("Variant", "Variant item code (add)"), Opt("Size", "Size"), Opt("Colour", "Colour")],
+            Run = async (c, i) =>
+            {
+                long baseId = await ItemAsync(c, i.Text("Item")).ConfigureAwait(true);
+                Core.Inventory.Item parent = await c.Db.Items.AsNoTracking().FirstAsync(x => x.Id == baseId).ConfigureAwait(true);
+                if (parent.ParentItemId is not null)
+                {
+                    throw new OperationException($"{parent.Code} is itself a variant; add variants to its base item.");
+                }
+
+                if (i.Text("Step") == "List")
+                {
+                    List<Core.Inventory.Item> variants = await c.Db.Items.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.ParentItemId == baseId).OrderBy(x => x.Code).ToListAsync()
+                        .ConfigureAwait(true);
+                    return variants.Count == 0 ? $"{parent.Code} has no variants."
+                        : string.Join(Environment.NewLine, variants.Select(v => $"{v.Code,-20} {v.Size ?? "-",-8} {v.Colour ?? "-",-12} {v.Description}"));
+                }
+
+                string code = (i.Optional("Variant") ?? throw new OperationException("Give the variant's item code.")).Trim().ToUpperInvariant();
+                string? size = i.Optional("Size")?.Trim(), colour = i.Optional("Colour")?.Trim();
+                if (size is null && colour is null)
+                {
+                    throw new OperationException("A variant needs a size, a colour or both.");
+                }
+
+                if (await c.Db.Items.AnyAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Item {code} already exists.");
+                }
+
+                if (await c.Db.Items.AnyAsync(x => x.CompanyId == c.CompanyId && x.ParentItemId == baseId && x.Size == size && x.Colour == colour).ConfigureAwait(true))
+                {
+                    throw new OperationException($"{parent.Code} already has a {string.Join(" ", new[] { size, colour }.OfType<string>())} variant.");
+                }
+
+                c.Db.Items.Add(new Core.Inventory.Item(c.CompanyId, code, $"{parent.Description} {string.Join(" ", new[] { size, colour }.OfType<string>())}", parent.ItemType, parent.CostingMethod)
+                {
+                    ParentItemId = baseId, Size = size, Colour = colour, UnitOfMeasure = parent.UnitOfMeasure, TaxCode = parent.TaxCode, Category = parent.Category,
+                    CostOfSalesAccountCode = parent.CostOfSalesAccountCode, RevenueAccountCode = parent.RevenueAccountCode, Tracking = parent.Tracking, Brand = parent.Brand,
+                    ShortDescription = parent.ShortDescription, MinimumAge = parent.MinimumAge, RequiresPrescription = parent.RequiresPrescription,
+                });
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Variant {code} ({string.Join(", ", new[] { size, colour }.OfType<string>())}) added under {parent.Code}.";
+            },
+            List = async c => Table(await (from v in c.Db.Items.AsNoTracking()
+                                           join b in c.Db.Items.AsNoTracking() on v.ParentItemId equals b.Id
+                                           where v.CompanyId == c.CompanyId
+                                           orderby b.Code, v.Code
+                                           select new { Base = b.Code, v.Code, v.Size, v.Colour, v.Description }).Page(c, 1000).ToListAsync().ConfigureAwait(true),
+                ("Base item", v => v.Base), ("Variant", v => v.Code), ("Size", v => v.Size), ("Colour", v => v.Colour), ("Description", v => v.Description)),
+        };
         yield return new Operation
         {
             Module = module, Title = "Item picture, description and dimensions", ListTitle = "Items",
