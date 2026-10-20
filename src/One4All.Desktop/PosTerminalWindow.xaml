@@ -351,7 +351,9 @@
                                     <UniformGrid Columns="4">
                                         <StackPanel Margin="2"><TextBlock Text="Supervisor" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding SupervisorName}" /></StackPanel>
                                         <StackPanel Margin="2"><TextBlock Text="Supervisor PIN" Style="{StaticResource FieldLabel}" /><PasswordBox x:Name="SupervisorPinBox" PasswordChanged="SupervisorPin_Changed" /></StackPanel>
-                                        <StackPanel Margin="2"><TextBlock Text="Loyalty member" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding LoyaltyMember}" /></StackPanel>
+                                        <StackPanel Margin="2"><TextBlock Text="Loyalty member (number, name or phone)" Style="{StaticResource FieldLabel}" />
+                                            <DockPanel><Button DockPanel.Dock="Right" Content="Find" Padding="8,0" Margin="2,0,0,0" Command="{Binding FindMemberCommand}" ToolTip="Finds the member by number, name or the linked customer's mobile number" />
+                                                <TextBox Text="{Binding LoyaltyMember, UpdateSourceTrigger=PropertyChanged}" /></DockPanel></StackPanel>
                                         <StackPanel Margin="2"><TextBlock Text="Customer account (On account)" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding AccountCustomer, UpdateSourceTrigger=PropertyChanged}" /></StackPanel>
                                         <StackPanel Margin="2"><TextBlock Text="Sales rep (commission)" Style="{StaticResource FieldLabel}" /><TextBox Text="{Binding SalesRep, UpdateSourceTrigger=PropertyChanged}" /></StackPanel>
                                     </UniformGrid>

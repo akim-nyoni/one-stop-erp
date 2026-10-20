@@ -428,6 +428,44 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [ObservableProperty]
     private string _loyaltyMember = string.Empty;
 
+    /// <summary>
+    /// Finds the loyalty member typed in the member box by member number, name or the linked customer's mobile number: one match fills in the
+    /// member number, several are listed so the cashier can narrow the search.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [RelayCommand]
+    private async Task FindMemberAsync()
+    {
+        if (NullIfBlank(LoyaltyMember) is not string typed)
+        {
+            StatusMessage = "Type a member number, a name or a phone number in the loyalty member box, then Find.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        string text = typed.Trim(), upper = text.ToUpperInvariant();
+        string digits = new([.. text.Where(char.IsDigit)]);
+        var found = await (from m in db.LoyaltyMembers.AsNoTracking()
+                           join cu in db.Customers.AsNoTracking() on m.CustomerId equals cu.Id into linked
+                           from cu in linked.DefaultIfEmpty()
+                           where m.CompanyId == _companyId
+                               && (m.MemberNumber.ToUpper() == upper || m.Name.ToUpper().Contains(upper)
+                                   || (digits.Length >= 6 && cu != null && cu.MobileNumber != null && cu.MobileNumber.Contains(digits)))
+                           orderby m.MemberNumber
+                           select new { m.MemberNumber, m.Name }).Take(6).ToListAsync().ConfigureAwait(true);
+        if (found.Count == 1)
+        {
+            LoyaltyMember = found[0].MemberNumber;
+            StatusMessage = $"Loyalty member {found[0].MemberNumber} {found[0].Name}.";
+        }
+        else
+        {
+            StatusMessage = found.Count == 0 ? $"No loyalty member matches \"{text}\"."
+                : $"Several members match: {string.Join(", ", found.Take(5).Select(f => $"{f.MemberNumber} {f.Name}"))}{(found.Count > 5 ? ", ..." : string.Empty)}. Type more of the name or the number.";
+        }
+    }
+
     /// <summary>The name a parked sale is filed under.</summary>
     [ObservableProperty]
     private string _parkTag = string.Empty;
