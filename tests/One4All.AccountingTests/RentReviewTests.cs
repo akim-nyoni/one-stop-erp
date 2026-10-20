@@ -35,7 +35,8 @@ public sealed class RentReviewTests
         db.Accounts.Add(new LedgerAccount(companyId, "4975", "Rental Income", AccountType.Income));
         Customer flatTenant = new(companyId, "RR-FLAT", "Flat Tenant", Scenario.Usd);
         Customer houseTenant = new(companyId, "RR-HSE", "House Tenant", Scenario.Usd);
-        db.Customers.AddRange(flatTenant, houseTenant);
+        Customer newcomer = new(companyId, "RR-NEW", "Later Tenant", Scenario.Usd);
+        db.Customers.AddRange(flatTenant, houseTenant, newcomer);
         await db.SaveChangesAsync();
 
         IRentalHousingService rentals = scope.ServiceProvider.GetRequiredService<IRentalHousingService>();
@@ -54,7 +55,7 @@ public sealed class RentReviewTests
         (await db.OpenItems.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.DocumentNumber == $"{flat}-202606")).OriginalBase.Should().Be(330m);
         (await db.OpenItems.AsNoTracking().SingleAsync(i => i.CompanyId == companyId && i.DocumentNumber == $"{house}-202606")).OriginalBase.Should().Be(500m);
 
-        string later = (await rentals.LetAsync(new LetUnitRequest { CompanyId = companyId, UnitCode = "RR-F2", TenantCustomerId = houseTenant.Id, StartDate = new DateOnly(2026, 7, 1) })).Value;
+        string later = (await rentals.LetAsync(new LetUnitRequest { CompanyId = companyId, UnitCode = "RR-F2", TenantCustomerId = newcomer.Id, StartDate = new DateOnly(2026, 7, 1) })).Value;
         (await db.Set<Tenancy>().AsNoTracking().SingleAsync(t => t.CompanyId == companyId && t.TenancyNumber == later)).MonthlyRent.Should().Be(330m);
     }
 }
