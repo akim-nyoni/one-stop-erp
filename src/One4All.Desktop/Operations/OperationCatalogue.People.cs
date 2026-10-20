@@ -619,7 +619,7 @@ public static partial class OperationCatalogue
             Description = "After commit: Pay posts the run's net pay from the account for each pay method (bank transfers, cash, mobile money, cheques) - earnings paid in another "
                 + "currency go out of that currency's account at the pay date's rate - and clears the net pay control; "
                 + "Close closes the run once its net pay control is clear; Stage shows where a run stands.",
-            Fields = [Pick("Step", "Step", ["Pay", "Close", "Stage"]), Req("Run", "Run document number"), Opt("Bank", "Bank account for transfers", "1100"), Opt("Cash", "Cash account"),
+            Fields = [Pick("Step", "Step", ["Pay", "Close", "Stage"]), CommittedRun("Run", "Payroll run"), Opt("Bank", "Bank account for transfers", "1100"), Opt("Cash", "Cash account"),
                 Opt("Mobile", "Mobile-money float account"), Opt("Cheque", "Bank account cheques are drawn on"), Opt("Foreign", "Foreign-currency accounts (EUR:1120; ZAR:1130)"), Today()],
             Run = async (c, i) =>
             {
@@ -849,7 +849,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Reverse a payroll run", ListTitle = "Payroll runs", Description = "A formally approved reversal: reversing journal and negative payslips. The approver cannot be whoever ran the payroll.",
-            Fields = [Req("Run", "Run document or journal number"), Today(), Req("Reason", "Reason"), Req("Approver", "Approved by (user name)")],
+            Fields = [CommittedRun("Run", "Payroll run"), Today(), Req("Reason", "Reason"), Req("Approver", "Approved by (user name)")],
             Run = async (c, i) =>
             {
                 PayrollRunResult run = Check(await c.Get<IPayrollAdjustmentService>().ReverseRunAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), i.Text("Reason"),
@@ -890,11 +890,11 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Run payroll", ListTitle = "Payroll runs",
             Description = "Calculates and commits a pay group's payroll for the period (blank group = the default payroll): payslips and one balanced journal. A period is paid once per group.",
-            Fields = [Opt("Group", "Pay group (blank = default)"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Today(), Req("Document", "Run document number"),
+            Fields = [Opt("Group", "Pay group (blank = default)"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Today(), Opt("Document", "Run number (blank: next in sequence)"),
                 Req("NetPay", "Net pay control account", "2420")],
             Run = async (c, i) =>
             {
-                PayrollRunResult run = Check(await c.Get<IPayrollService>().RunGroupAsync(c.CompanyId, i.Optional("Group"), i.Text("Period"), i.Date("Date"), i.Text("NetPay"), i.Text("Document")).ConfigureAwait(true));
+                PayrollRunResult run = Check(await c.Get<IPayrollService>().RunGroupAsync(c.CompanyId, i.Optional("Group"), i.Text("Period"), i.Date("Date"), i.Text("NetPay"), await RunNumberAsync(c, i).ConfigureAwait(true)).ConfigureAwait(true));
                 return $"{run.PayslipCount} payslip(s): gross {M(run.TotalGross)}, deductions {M(run.TotalDeductions)}, net {M(run.TotalNet)}; journal {run.JournalNumber}.";
             },
             List = PayrollRunsAsync,
@@ -928,31 +928,36 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Calculate payroll for approval", ListTitle = "Payroll drafts",
-            Description = "Calculates a pay group's payroll without posting it, for someone else to approve. Recalculating replaces the earlier draft.",
-            Fields = [Opt("Group", "Pay group (blank = default)"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Today(), Req("Document", "Run document number"),
-                Req("NetPay", "Net pay control account", "2420")],
+            Description = "Step 1 of the payroll: calculates a pay group's payroll without posting it, for someone else to approve. The run number given here (the next in sequence when "
+                + "left blank) is the one picked to approve, commit and pay it. Recalculating the same run replaces the earlier draft.",
+            Fields = [Opt("Group", "Pay group (blank = default)"), Req("Period", "Period", DateTime.Today.ToString("yyyy-MM", CultureInfo.InvariantCulture)), Today(),
+                Opt("Document", "Run number (blank: next in sequence)"), Req("NetPay", "Net pay control account", "2420")],
             Run = async (c, i) => DescribeDraft(Check(await c.Get<IPayrollApprovalService>().CalculateRunAsync(new PayrollDraftRequest
             {
-                CompanyId = c.CompanyId, PayGroup = i.Optional("Group"), PeriodLabel = i.Text("Period"), PayDate = i.Date("Date"), NetPayAccountCode = i.Text("NetPay"), DocumentNumber = i.Text("Document"),
-                UserId = c.UserId,
+                CompanyId = c.CompanyId, PayGroup = i.Optional("Group"), PeriodLabel = i.Text("Period"), PayDate = i.Date("Date"), NetPayAccountCode = i.Text("NetPay"),
+                DocumentNumber = await RunNumberAsync(c, i).ConfigureAwait(true), UserId = c.UserId,
             }).ConfigureAwait(true))),
             List = PayrollDraftsAsync,
         };
         yield return new Operation
         {
-            Module = module, Title = "Approve payroll", ListTitle = "Payroll drafts", Description = "Approves a calculated payroll (not your own; a large movement needs two different approvers).",
-            Fields = [Num("Draft", "Draft id (from the list)")],
-            Run = async (c, i) => DescribeDraft(Check(await c.Get<IPayrollApprovalService>().ApproveRunAsync(c.CompanyId, (long)i.Number("Draft"), c.UserId).ConfigureAwait(true))),
+            Module = module, Title = "Approve payroll", ListTitle = "Payroll drafts",
+            Description = "Step 2: approves a calculated payroll run, picked by its run number (not your own; a large movement needs two different approvers).",
+            Fields = [DraftRun("Run", "Payroll run to approve", PayrollDraftStatus.Calculated)],
+            Run = async (c, i) => DescribeDraft(Check(await c.Get<IPayrollApprovalService>().ApproveRunAsync(c.CompanyId, await DraftIdAsync(c, i.Text("Run")).ConfigureAwait(true), c.UserId)
+                .ConfigureAwait(true))),
             List = PayrollDraftsAsync,
         };
         yield return new Operation
         {
-            Module = module, Title = "Commit approved payroll", ListTitle = "Payroll drafts", Description = "Saves the payslips and posts the journal - refused if anything changed since approval.",
-            Fields = [Num("Draft", "Draft id (from the list)")],
+            Module = module, Title = "Commit approved payroll", ListTitle = "Payroll drafts",
+            Description = "Step 3: saves the approved run's payslips and posts its journal - refused if anything changed since approval. Then pay it under step 4 with the same run number.",
+            Fields = [DraftRun("Run", "Approved payroll run to commit", PayrollDraftStatus.Approved)],
             Run = async (c, i) =>
             {
-                PayrollRunResult run = Check(await c.Get<IPayrollApprovalService>().CommitRunAsync(c.CompanyId, (long)i.Number("Draft"), c.UserId).ConfigureAwait(true));
-                return $"Committed {run.PayslipCount} payslip(s), net {M(run.TotalNet)}, journal {run.JournalNumber}.";
+                PayrollRunResult run = Check(await c.Get<IPayrollApprovalService>().CommitRunAsync(c.CompanyId, await DraftIdAsync(c, i.Text("Run")).ConfigureAwait(true), c.UserId)
+                    .ConfigureAwait(true));
+                return $"Run {i.Text("Run")} committed: {run.PayslipCount} payslip(s), net {M(run.TotalNet)}, journal {run.JournalNumber}. Pay it under step 4.";
             },
             List = PayrollDraftsAsync,
         };
@@ -960,7 +965,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Raise third-party invoices", ListTitle = "Payroll runs",
             Description = "Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier - clearing the payroll liabilities into payables.",
-            Fields = [Req("Run", "Run document or journal number")],
+            Fields = [CommittedRun("Run", "Payroll run")],
             Run = async (c, i) =>
             {
                 IReadOnlyList<RemittanceRaised> raised = Check(await c.Get<IPayrollRemittanceService>().RaiseRemittancesAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true));
@@ -1121,10 +1126,32 @@ public static partial class OperationCatalogue
         Dictionary<long, string> users = await c.Db.Users.AsNoTracking().ToDictionaryAsync(u => u.Id, u => u.Username).ConfigureAwait(true);
         string User(long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : string.Empty;
         return Table(await c.Db.PayrollDrafts.AsNoTracking().Where(d => d.CompanyId == c.CompanyId).OrderByDescending(d => d.Id).Take(30).ToListAsync().ConfigureAwait(true),
-            ("Draft", d => d.Id), ("Group", d => d.PayGroup.Length == 0 ? "Default" : d.PayGroup), ("Period", d => d.PeriodLabel), ("Status", d => d.Status), ("Net", d => M(d.Net)),
+            ("Run", d => d.DocumentNumber), ("Group", d => d.PayGroup.Length == 0 ? "Default" : d.PayGroup), ("Period", d => d.PeriodLabel), ("Status", d => d.Status), ("Net", d => M(d.Net)),
             ("Calculated by", d => User(d.CalculatedByUserId)), ("Approved by", d => string.Join(" + ", new[] { User(d.FirstApproverUserId), User(d.SecondApproverUserId) }.Where(x => x.Length > 0))),
             ("Journal", d => d.JournalNumber ?? string.Empty));
     }
+
+    // A payroll run still in approval, picked by its run number (with its period, group and net), for the step that comes next.
+    private static OperationField DraftRun(string name, string label, PayrollDraftStatus status) => Lookup(name, label, true, async c =>
+        (await c.Db.Set<PayrollDraft>().AsNoTracking().Where(d => d.CompanyId == c.CompanyId && d.Status == status).OrderByDescending(d => d.Id).Take(200).ToListAsync().ConfigureAwait(true))
+        .Select(d => (d.DocumentNumber, $"{d.PeriodLabel} {(d.PayGroup.Length == 0 ? "default" : d.PayGroup)} net {M(d.Net)}")).ToList());
+
+    // A committed payroll run, picked by its run number.
+    private static OperationField CommittedRun(string name, string label) => Lookup(name, label, true, async c =>
+        (await c.Db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(200).ToListAsync().ConfigureAwait(true))
+        .Select(r => (r.DocumentNumber.Length > 0 ? r.DocumentNumber : r.JournalNumber, $"{r.PeriodLabel} {(r.PayGroup.Length == 0 ? "default" : r.PayGroup)} {r.Kind} net {M(r.Net)}")).ToList());
+
+    // The draft behind a run number (the latest calculation of it that is not superseded).
+    private static async Task<long> DraftIdAsync(OperationContext c, string run)
+    {
+        string key = run.Trim();
+        return await c.Db.Set<PayrollDraft>().AsNoTracking().Where(d => d.CompanyId == c.CompanyId && d.DocumentNumber == key && d.Status != PayrollDraftStatus.Superseded)
+            .OrderByDescending(d => d.Id).Select(d => (long?)d.Id).FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"No payroll run {key} in approval.");
+    }
+
+    // The run number typed, or the next in the payroll run sequence.
+    private static async Task<string> RunNumberAsync(OperationContext c, OperationInput i) => i.Optional("Document")
+        ?? Check(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().AllocateAsync(c.CompanyId, "PAYRUN", i.Date("Date")).ConfigureAwait(true));
 
     private static async Task<DataTable> PayrollRunsAsync(OperationContext c)
         => Table(await c.Db.Set<PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderByDescending(r => r.Id).Take(50).ToListAsync().ConfigureAwait(true),
