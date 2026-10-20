@@ -87,6 +87,54 @@
                                             <ComboBox ItemsSource="{Binding Choices}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,0"
                                                       IsEditable="{Binding IsLookup}" IsTextSearchEnabled="True" StaysOpenOnEdit="True" MaxDropDownHeight="360"
                                                       Visibility="{Binding ShowsList, Converter={StaticResource Visible}}" />
+                                            <!-- A journal's lines: account, debit, credit, cost centre, tax code and narrative on a grid, with its running totals -->
+                                            <StackPanel Visibility="{Binding IsJournal, Converter={StaticResource Visible}}" Margin="0,4,0,0">
+                                                <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" MaxHeight="260"
+                                                          RowHeight="26" GridLinesVisibility="Horizontal" FontSize="12">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTemplateColumn Header="Account" Width="200">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <ComboBox ItemsSource="{Binding DataContext.ItemChoices, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              Text="{Binding Item, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                                                              MaxDropDownHeight="300" BorderThickness="0" />
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                        <DataGridTextColumn Header="Debit" Binding="{Binding Debit, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                                        <DataGridTextColumn Header="Credit" Binding="{Binding Credit, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                                        <DataGridTemplateColumn Header="Cost centre" Width="100">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <ComboBox ItemsSource="{Binding DataContext.CostCentreChoices, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              Text="{Binding CostCentre, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" IsTextSearchEnabled="True" BorderThickness="0" />
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                        <DataGridTemplateColumn Header="Tax code" Width="90">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <ComboBox ItemsSource="{Binding DataContext.TaxChoices, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              Text="{Binding Extra, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" IsTextSearchEnabled="True" BorderThickness="0" />
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                        <DataGridTextColumn Header="Line narrative" Binding="{Binding Memo, UpdateSourceTrigger=PropertyChanged}" Width="*" />
+                                                        <DataGridTemplateColumn Width="34">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <Button Content="✕" Padding="4,0" BorderThickness="0" Background="Transparent" Foreground="#C0392B" ToolTip="Remove the line"
+                                                                            Command="{Binding DataContext.RemoveLineCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" />
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                                <DockPanel Margin="0,4,0,0">
+                                                    <Button Content="+ Line" DockPanel.Dock="Left" Padding="10,2" Command="{Binding AddLineCommand}" />
+                                                    <TextBlock Text="{Binding JournalTotals}" HorizontalAlignment="Right" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#1E3A2E" />
+                                                </DockPanel>
+                                            </StackPanel>
                                             <!-- A document's lines: picked on a grid (it takes the place of the text above when filled) -->
                                             <StackPanel Visibility="{Binding IsLines, Converter={StaticResource Visible}}" Margin="0,4,0,0">
                                                 <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" MaxHeight="220"

@@ -28,8 +28,30 @@ public sealed partial class OperationLineVm : ObservableObject
     [ObservableProperty]
     private string? _extra;
 
-    /// <summary>Gets whether anything is on the row.</summary>
-    public bool IsFilled => !string.IsNullOrWhiteSpace(Item) && !string.IsNullOrWhiteSpace(Quantity);
+    /// <summary>A journal line's debit.</summary>
+    [ObservableProperty]
+    private string? _debit;
+
+    /// <summary>A journal line's credit.</summary>
+    [ObservableProperty]
+    private string? _credit;
+
+    /// <summary>A journal line's cost centre.</summary>
+    [ObservableProperty]
+    private string? _costCentre;
+
+    /// <summary>A journal line's narrative.</summary>
+    [ObservableProperty]
+    private string? _memo;
+
+    /// <summary>Gets whether anything is on the row (an item and its quantity, or an account and an amount).</summary>
+    public bool IsFilled => !string.IsNullOrWhiteSpace(Item) && (!string.IsNullOrWhiteSpace(Quantity) || Amount(Debit) != 0m || Amount(Credit) != 0m);
+
+    /// <summary>Reads an amount typed in a cell (blank or unreadable is nil).</summary>
+    /// <param name="text">The cell.</param>
+    /// <returns>The amount.</returns>
+    public static decimal Amount(string? text) => decimal.TryParse((text ?? string.Empty).Replace(",", string.Empty, StringComparison.Ordinal), System.Globalization.NumberStyles.Number,
+        System.Globalization.CultureInfo.InvariantCulture, out decimal value) ? value : 0m;
 }
 
 /// <summary>One field on the operation form, bound two-way.</summary>
@@ -43,6 +65,12 @@ public sealed partial class OperationFieldVm : ObservableObject
         _value = field.Default;
         _dateValue = field.Kind == FieldKind.Date && DateTime.TryParse(field.Default, System.Globalization.CultureInfo.InvariantCulture, out DateTime d) ? d : null;
         _isTicked = field.Default == "True";
+        Lines.CollectionChanged += WatchJournal;
+        foreach (OperationLineVm line in Lines)
+        {
+            line.PropertyChanged += (_, _) => OnPropertyChanged(nameof(JournalTotals));
+        }
+
         foreach (string choice in field.Choices ?? [])
         {
             Choices.Add(choice);
@@ -173,6 +201,7 @@ public sealed partial class OperationFieldVm : ObservableObject
         _ when IsDateText => DateValue is DateTime picked ? Ops.D(DateOnly.FromDateTime(picked)) : Value,
         _ when AutoLookup is not null => Ops.CodeOf(Value),
         _ when IsLines && Lines.Any(l => l.IsFilled) => LinesText(),
+        _ when IsJournal && Lines.Any(l => l.IsFilled) => JournalText(),
         _ => Value,
     };
 
@@ -180,7 +209,49 @@ public sealed partial class OperationFieldVm : ObservableObject
     public bool IsLines => Field.Kind == FieldKind.Text && Field.Name == "Lines" && Field.Label.Contains("ITEM:", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Gets the width the field takes on the form (a line grid is wider).</summary>
-    public double Width => IsLines ? 560 : 250;
+    public double Width => IsLines ? 560 : IsJournal ? 700 : 250;
+
+    /// <summary>Gets whether the field is a journal's lines (its label starts "Journal lines"): entered on a grid of account, debit, credit, cost centre, tax code and narrative.</summary>
+    public bool IsJournal => Field.Kind == FieldKind.Text && Field.Name == "Lines" && Field.Label.StartsWith("Journal lines", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Gets the journal grid's totals: debits, credits and the difference still to balance.</summary>
+    public string JournalTotals
+    {
+        get
+        {
+            decimal debit = Lines.Sum(l => OperationLineVm.Amount(l.Debit)), credit = Lines.Sum(l => OperationLineVm.Amount(l.Credit));
+            string state = debit == credit ? "balanced" : $"out by {Math.Abs(debit - credit):N2}";
+            return $"Dr {debit:N2}   Cr {credit:N2}   {state}";
+        }
+    }
+
+    // The journal grid written as the journal's text: "ACCOUNT Dr|Cr AMOUNT cc=.. tax=.. # narrative; ...".
+    private string JournalText() => string.Join("; ", Lines.Where(l => l.IsFilled).Select(l =>
+    {
+        decimal debit = OperationLineVm.Amount(l.Debit), credit = OperationLineVm.Amount(l.Credit);
+        string side = debit != 0m ? $"Dr {debit.ToString(System.Globalization.CultureInfo.InvariantCulture)}" : $"Cr {credit.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
+        string text = $"{Ops.CodeOf(l.Item)!.Trim()} {side}";
+        text += string.IsNullOrWhiteSpace(l.CostCentre) ? string.Empty : $" cc={Ops.CodeOf(l.CostCentre)!.Trim()}";
+        text += string.IsNullOrWhiteSpace(l.Extra) ? string.Empty : $" tax={Ops.CodeOf(l.Extra)!.Trim()}";
+        return string.IsNullOrWhiteSpace(l.Memo) ? text : $"{text} # {l.Memo.Trim().Replace(";", ",", StringComparison.Ordinal)}";
+    }));
+
+    // Keeps the totals current as lines are added, removed and typed into.
+    private void WatchJournal(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        foreach (OperationLineVm line in e.NewItems?.OfType<OperationLineVm>() ?? [])
+        {
+            line.PropertyChanged += (_, _) => OnPropertyChanged(nameof(JournalTotals));
+        }
+
+        OnPropertyChanged(nameof(JournalTotals));
+    }
+
+    /// <summary>Gets the cost centres a journal line can name.</summary>
+    public ObservableCollection<string> CostCentreChoices { get; } = [];
+
+    /// <summary>Gets the tax codes a journal line can name.</summary>
+    public ObservableCollection<string> TaxChoices { get; } = [];
 
     /// <summary>Gets the line grid's rows.</summary>
     public ObservableCollection<OperationLineVm> Lines { get; } = [new()];
@@ -571,6 +642,33 @@ public sealed partial class OperationsViewModel : ObservableObject
             catch (InvalidOperationException)
             {
                 // No company yet: the fields are typed into instead.
+            }
+        }
+
+        // A journal grid picks accounts, cost centres and tax codes from the company's own.
+        foreach (OperationFieldVm journal in Fields.Where(f => f.IsJournal).ToList())
+        {
+            try
+            {
+                (List<string> accounts, List<string> centres, List<string> taxes) = await InScopeAsync(async c => (
+                    await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.AccountCode).Select(x => x.AccountCode + " - " + x.Name)
+                        .ToListAsync().ConfigureAwait(true),
+                    await c.Db.CostCentres.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.Code).Select(x => x.Code + " - " + x.Name)
+                        .ToListAsync().ConfigureAwait(true),
+                    await c.Db.TaxCodes.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.Code).Select(x => x.Code + " - " + x.Name)
+                        .ToListAsync().ConfigureAwait(true))).ConfigureAwait(true);
+                foreach ((ObservableCollection<string> target, List<string> rows) in new[] { (journal.ItemChoices, accounts), (journal.CostCentreChoices, centres), (journal.TaxChoices, taxes) })
+                {
+                    target.Clear();
+                    foreach (string row in rows)
+                    {
+                        target.Add(row);
+                    }
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // No company yet: the journal is typed instead.
             }
         }
 

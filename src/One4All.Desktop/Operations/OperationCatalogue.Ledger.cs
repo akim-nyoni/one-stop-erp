@@ -83,10 +83,11 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Submit a manual journal", ListTitle = "Journals awaiting approval",
-            Description = "Lines separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch=, tax= (tax code, for the VAT return), cur= and rate= "
+            Description = "Enter the lines on the grid (account, debit or credit, cost centre, tax code for the VAT return, line narrative); the totals show when it balances. "
+                + "Or type them separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch=, tax=, cur= and rate= "
                 + "(a line in another currency at its rate) and a narrative after '#'; e.g. \"6100 Dr 500 project=P-DAM fund=WATER # Contractor; 2410 Cr 500 fund=WATER\". "
                 + "It is validated and numbered now, and posts once someone else approves it; an accrual names the date it reverses on.",
-            Fields = [Today("Date", "Posting date"), Req("Narrative", "Narrative"), Opt("Reference", "Reference"), Req("Lines", "Lines"), Opt("Currency", "Currency (blank: base)"),
+            Fields = [Today("Date", "Posting date"), Req("Narrative", "Narrative"), Opt("Reference", "Reference"), Req("Lines", "Journal lines"), Opt("Currency", "Currency (blank: base)"),
                 OptDate("ReverseOn", "Reverse on (blank: not reversed)")],
             Run = async (c, i) =>
             {
@@ -436,7 +437,7 @@ public static partial class OperationCatalogue
             Description = "Create: a journal posted again on a schedule (\"6100 Dr 500 cc=ADM; 2100 Cr 500\"): monthly, quarterly, half-yearly or yearly, from a start month to an end date or for "
                 + "a number of times, in a currency, and reversed on the first of the next month when it is an accrual. Schedule: change those on one. Post: one of them on a date. Post all: every one "
                 + "due. Stop / restart one. Create with an existing code changes its schedule (its lines stay); Delete stops it.",
-            Fields = [Pick("Step", "Step", ["Create", "Schedule", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Lines (create)"),
+            Fields = [Pick("Step", "Step", ["Create", "Schedule", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Journal lines (create)"),
                 Opt("Narrative", "Narrative"), Pick("Frequency", "Frequency", ["Monthly", "Quarterly", "Half-yearly", "Yearly"]), Opt("Start", "Start month (yyyy-MM, blank: any)"),
                 OptDate("End", "End date (blank: none)"), OptNum("Times", "Post at most this many times (blank: no limit)"), Tick("Reverse", "Auto-reverse next month", false),
                 Opt("Currency", "Currency (blank: base)"), Opt("Document", "Document number (post)"), Today()],
@@ -768,8 +769,14 @@ public static partial class OperationCatalogue
                 throw new OperationException($"\"{part}\" should be ACCOUNT Dr|Cr AMOUNT [cc= dept= project= fund= branch= tax= cur= rate=] [# narrative].");
             }
 
-            Dictionary<string, string> tags = words.Skip(3).Select(w => w.Split('=', 2)).Where(kv => kv.Length == 2)
-                .ToDictionary(kv => kv[0].ToLowerInvariant(), kv => kv[1], StringComparer.OrdinalIgnoreCase);
+            // Every word after the amount is a known tag=value: a typo ("cc:ADM", "proj=X") is refused rather than dropped without a word.
+            string[] known = ["cc", "dept", "project", "fund", "branch", "tax", "cur", "rate"];
+            if (words.Skip(3).FirstOrDefault(w => w.Split('=', 2) is not [string key, string value] || value.Length == 0 || !known.Contains(key, StringComparer.OrdinalIgnoreCase)) is string unknown)
+            {
+                throw new OperationException($"\"{unknown}\" in \"{part}\" is not understood: use cc=, dept=, project=, fund=, branch=, tax=, cur= or rate= (a narrative goes after '#').");
+            }
+
+            Dictionary<string, string> tags = words.Skip(3).Select(w => w.Split('=', 2)).ToDictionary(kv => kv[0].ToLowerInvariant(), kv => kv[1], StringComparer.OrdinalIgnoreCase);
             lines.Add(new JournalLineRequest
             {
                 AccountCode = words[0], Side = words[1].Equals("dr", StringComparison.OrdinalIgnoreCase) ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = amount,
