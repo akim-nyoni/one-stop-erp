@@ -227,7 +227,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "VAT return by tax point basis", ListTitle = "Journals awaiting approval",
+            Module = module, Title = "VAT return by tax point basis", ListTitle = "VAT returns filed",
             Description = "The VAT due for a period on the company's basis - invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it "
                 + "is paid) - with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.",
             Fields = [OptDate("From", "From"), Today("To", "To"), Pick("Basis", "Basis", Enum.GetNames<TaxPointBasis>()), Tick("Adopt", "Make it the company's basis")],
@@ -248,8 +248,7 @@ public static partial class OperationCatalogue
                     .Append($"Output tax {M(vat.OutputTax)} − input tax {M(vat.InputTax)} = {(vat.NetPayable >= 0 ? "payable" : "refundable")} {M(Math.Abs(vat.NetPayable))}"
                         + (i.Flag("Adopt") ? $" ({basis} is now the company's basis)" : string.Empty)));
             },
-            List = async c => Table(await c.Get<IJournalApprovalService>().AwaitingApprovalAsync(c.CompanyId).ConfigureAwait(true), ("Journal", j => j.JournalNumber), ("Date", j => D(j.PostingDate)),
-                ("Narrative", j => j.Narrative), ("Value", j => M(j.TotalBaseDebit))),
+            List = VatFilingsAsync,
         };
         yield return new Operation
         {
@@ -313,20 +312,29 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Settle VAT for a period",
+            Module = module, Title = "Settle VAT for a period", ListTitle = "VAT returns filed",
             Description = "Clears the period's output and input VAT accounts into the VAT payable (or refundable) account and shows output, input and the net. On cash "
                 + "accounting or the tax point, VAT the ledger holds that is not yet due goes to the not-yet-due account (and comes back out when it falls due). The period "
-                + "is then filed: it cannot be settled again and no VAT posts on its days.",
-            Fields = [Today("From", "From"), Today("To", "To"), Req("Payable", "VAT payable account"), Req("Document", "Document number"), Opt("NotYetDue", "VAT not yet due account (cash / tax point)")],
+                + "is then filed: it cannot be settled again and no VAT posts on its days. Left blank, the period runs from the day after the last return filed (or the start "
+                + "of last month) to the end of that month, and the document number is VAT-yyyyMM.",
+            Fields = [OptDate("From", "From (blank: day after the last return)"), OptDate("To", "To (blank: end of that month)"), Req("Payable", "VAT payable account"),
+                Opt("Document", "Document number (blank: VAT-yyyyMM)"), Opt("NotYetDue", "VAT not yet due account (cash / tax point)")],
             Run = async (c, i) =>
             {
+                // The next open VAT period follows the last return filed; with none filed it is last month.
+                DateOnly? lastFiled = await c.Db.VatReturnFilings.AsNoTracking().Where(f => f.CompanyId == c.CompanyId).OrderByDescending(f => f.ToDate).Select(f => (DateOnly?)f.ToDate)
+                    .FirstOrDefaultAsync().ConfigureAwait(true);
+                DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+                DateOnly from = i.Optional("From") is string given ? Day(given) : lastFiled?.AddDays(1) ?? new DateOnly(today.Year, today.Month, 1).AddMonths(-1);
+                DateOnly to = i.Optional("To") is string until ? Day(until) : new DateOnly(from.Year, from.Month, 1).AddMonths(1).AddDays(-1);
                 VatSettlementResult vat = Check(await c.Get<IVatReturnService>().SettleAsync(new SettleVatRequest
                 {
-                    CompanyId = c.CompanyId, FromDate = i.Date("From"), ToDate = i.Date("To"), VatPayableAccountCode = i.Text("Payable"), DocumentNumber = i.Text("Document"),
-                    VatNotYetDueAccountCode = i.Optional("NotYetDue"), FiledByUserId = c.UserId,
+                    CompanyId = c.CompanyId, FromDate = from, ToDate = to, VatPayableAccountCode = i.Text("Payable"),
+                    DocumentNumber = i.Optional("Document") ?? $"VAT-{to:yyyyMM}", VatNotYetDueAccountCode = i.Optional("NotYetDue"), FiledByUserId = c.UserId,
                 }).ConfigureAwait(true));
-                return $"Output {M(vat.OutputTax)} − input {M(vat.InputTax)} = {(vat.NetPayable >= 0m ? "payable" : "refundable")} {M(Math.Abs(vat.NetPayable))}{(vat.JournalNumber is null ? string.Empty : $" ({vat.JournalNumber})")}.";
+                return $"{D(from)} to {D(to)} filed. Output {M(vat.OutputTax)} − input {M(vat.InputTax)} = {(vat.NetPayable >= 0m ? "payable" : "refundable")} {M(Math.Abs(vat.NetPayable))}{(vat.JournalNumber is null ? string.Empty : $" ({vat.JournalNumber})")}.";
             },
+            List = VatFilingsAsync,
         };
         yield return new Operation
         {
@@ -348,7 +356,7 @@ public static partial class OperationCatalogue
             Description = "An accrual (an expense incurred, not yet invoiced) or a prepayment (paid ahead), posted on the date and reversed automatically on the reversal date. "
                 + "A prepayment schedule releases a prepayment to expense over the months it covers (from the month of the date, the document number as its reference); "
                 + "Release prepayments charges every month ended by the date (the scheduled task gl.prepayment-release does it daily).",
-            Fields = [Pick("Kind", "Kind", ["Accrual", "Prepayment", "Prepayment schedule", "Release prepayments"]), Today("Date", "Date"), Today("Reversal", "Reverses on"), Req("Expense", "Expense account"),
+            Fields = [Pick("Kind", "Kind", ["Accrual", "Prepayment", "Prepayment schedule", "Release prepayments"]), Today("Date", "Date"), OptDate("Reversal", "Reverses on (blank: 1st of next month)"), Req("Expense", "Expense account"),
                 Req("Balance", "Accrual / prepayment account"), Num("Amount", "Amount"), Req("Document", "Document number"), Req("Narrative", "Narrative"), Num("Months", "Months covered (schedule)", "12")],
             Run = async (c, i) =>
             {
@@ -366,9 +374,11 @@ public static partial class OperationCatalogue
                     return $"{release.Months} month(s) released from {release.Schedules} schedule(s): {M(release.Amount)} charged to expense.";
                 }
 
+                // An accrual or prepayment reverses on the first of the next month unless another date is given.
+                DateOnly reverses = i.Optional("Reversal") is string on ? Day(on) : new DateOnly(i.Date("Date").Year, i.Date("Date").Month, 1).AddMonths(1);
                 ReversingJournalResult posted = i.Text("Kind") == "Accrual"
-                    ? Check(await accruals.PostAccrualAsync(c.CompanyId, i.Date("Date"), i.Date("Reversal"), i.Text("Expense"), i.Text("Balance"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true))
-                    : Check(await accruals.PostPrepaymentAsync(c.CompanyId, i.Date("Date"), i.Date("Reversal"), i.Text("Balance"), i.Text("Expense"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true));
+                    ? Check(await accruals.PostAccrualAsync(c.CompanyId, i.Date("Date"), reverses, i.Text("Expense"), i.Text("Balance"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true))
+                    : Check(await accruals.PostPrepaymentAsync(c.CompanyId, i.Date("Date"), reverses, i.Text("Balance"), i.Text("Expense"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true));
                 return $"Posted {posted.PostingJournalNumber}; reverses as {posted.ReversalJournalNumber}.";
             },
         };
@@ -694,4 +704,10 @@ public static partial class OperationCatalogue
 
         return lines.Count >= 2 ? lines : throw new OperationException("A journal needs at least two lines.");
     }
+
+    // The VAT returns filed, latest first: the periods that are closed to VAT.
+    private static async Task<System.Data.DataTable> VatFilingsAsync(OperationContext c) => Table(await c.Db.VatReturnFilings.AsNoTracking().Where(f => f.CompanyId == c.CompanyId)
+            .OrderByDescending(f => f.ToDate).Page(c, 200).ToListAsync().ConfigureAwait(true),
+        ("From", f => D(f.FromDate)), ("To", f => D(f.ToDate)), ("Basis", f => f.Basis), ("Document", f => f.DocumentNumber), ("Output", f => M(f.OutputTax)), ("Input", f => M(f.InputTax)),
+        ("Net", f => M(f.OutputTax - f.InputTax)), ("Not yet due", f => M(f.Deferred)), ("Journal", f => f.JournalNumber), ("Status", _ => "Filed"));
 }
