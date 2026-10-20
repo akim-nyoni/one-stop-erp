@@ -55,6 +55,12 @@ public sealed class LeavePolicy : AuditableEntity, ICompanyScoped
     /// <summary>How far below nil leave may be taken in advance (0: not at all).</summary>
     public decimal NegativeBalanceDays { get; set; }
 
+    /// <summary>
+    /// A rolling sick-leave cycle in months (36 for a three-year cycle): the sick days already taken are counted over that many months back from the
+    /// period, not from the start of the leave year; null: the leave year.
+    /// </summary>
+    public int? SickCycleMonths { get; set; }
+
     /// <summary>Sick pay tiers: from the nth day taken in the leave year, the share of pay (days before the first tier are on full pay).</summary>
     public IReadOnlyList<LeaveSickTier> SickTiers => _sickTiers.OrderBy(t => t.FromDay).ToList();
 

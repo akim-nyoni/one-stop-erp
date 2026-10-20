@@ -72,6 +72,7 @@ public sealed class LeavePolicyService : ILeavePolicyService
         policy.SetSickTiers(tiers);
         policy.GradeDays = string.IsNullOrWhiteSpace(request.GradeDays) ? null : request.GradeDays.Trim();
         policy.MaxAwayPerDepartment = request.MaxAwayPerDepartment;
+        policy.SickCycleMonths = request.SickCycleMonths is > 0 ? request.SickCycleMonths : null;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
@@ -229,8 +230,10 @@ public sealed class LeavePolicyService : ILeavePolicyService
                 return Error.Rule("Pay.NoSickTiers", $"Leave type {type} has no sick pay tiers.");
             }
 
-            // The leave year the period starts in.
-            DateOnly yearStart = new(fromDate.Month >= policy.LeaveYearStartMonth ? fromDate.Year : fromDate.Year - 1, policy.LeaveYearStartMonth, 1);
+            // The sick days already taken count from the start of the leave year the period starts in, or over a rolling cycle back from the period.
+            DateOnly yearStart = policy.SickCycleMonths is int cycle
+                ? fromDate.AddMonths(-cycle)
+                : new(fromDate.Month >= policy.LeaveYearStartMonth ? fromDate.Year : fromDate.Year - 1, policy.LeaveYearStartMonth, 1);
             var records = await _db.LeaveRecords.AsNoTracking()
                 .Where(l => l.CompanyId == companyId && l.Kind == LeaveRecordKind.Taken && l.LeaveType.ToUpper() == type && l.FromDate >= yearStart && l.FromDate <= toDate)
                 .OrderBy(l => l.FromDate).ThenBy(l => l.Id).Select(l => new { l.EmployeeId, l.FromDate, l.Days }).ToListAsync(ct).ConfigureAwait(false);

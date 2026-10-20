@@ -20,6 +20,9 @@ public sealed record LeavePolicyRequest(long CompanyId, string LeaveType, decima
 
     /// <summary>Gets the most people of one department who may be away at once.</summary>
     public int? MaxAwayPerDepartment { get; init; }
+
+    /// <summary>Gets the rolling sick-leave cycle in months (null: the leave year).</summary>
+    public int? SickCycleMonths { get; init; }
 }
 
 /// <summary>One employee's sick pay for a period under the tiers.</summary>

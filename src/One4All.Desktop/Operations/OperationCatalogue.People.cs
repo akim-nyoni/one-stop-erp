@@ -456,7 +456,7 @@ public static partial class OperationCatalogue
                 OptNum("Ceiling", "Balance ceiling (days, blank: none)"), OptNum("Lapse", "Carried days lapse after (months, blank: never)"), Num("Advance", "May go negative by (days)", "0"),
                 Opt("Tiers", "Sick tiers (from day:pay %;...)"), Today("Month", "Month to run"), Opt("Period", "Pay period (sick pay)"), Opt("Element", "Deduction element (sick pay)"),
                 Num("WorkDays", "Working days a month (sick pay)", "21.67"), Opt("Recovery", "Recovery period (advance)"), Opt("GradeDays", "Days by grade GRADE=days; … (policy)"),
-                OptNum("MaxAway", "Most of a department away at once (policy)"), Opt("Employee", "Employee number (time off in lieu)"), OptNum("Hours", "Overtime hours (time off in lieu)"),
+                OptNum("MaxAway", "Most of a department away at once (policy)"), OptNum("SickCycle", "Rolling sick cycle in months (policy; blank: the leave year)"), Opt("Employee", "Employee number (time off in lieu)"), OptNum("Hours", "Overtime hours (time off in lieu)"),
                 Num("HoursPerDay", "Hours in a working day", "8"), Num("Ratio", "Hours off per hour worked", "1")],
             Run = async (c, i) =>
             {
@@ -519,6 +519,7 @@ public static partial class OperationCatalogue
                     i.Flag("ProRata"), bands, i.OptionalNumber("Ceiling"), i.OptionalNumber("Lapse") is decimal lapse ? (int)lapse : null, i.Number("Advance"), tiers)
                 {
                     GradeDays = i.Optional("GradeDays"), MaxAwayPerDepartment = i.OptionalNumber("MaxAway") is decimal away ? (int)away : null,
+                    SickCycleMonths = i.OptionalNumber("SickCycle") is decimal cycle ? (int)cycle : null,
                 }).ConfigureAwait(true),
                     "Leave policy saved.");
             },

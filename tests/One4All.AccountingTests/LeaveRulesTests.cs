@@ -73,6 +73,13 @@ public sealed class LeaveRulesTests
         (await db.PayrollVariables.AsNoTracking().Where(v => v.EmployeeId == clerk.Id && v.ElementCode == "SICKDED" && v.PeriodLabel == "2026-10").Select(v => v.Amount).SingleAsync())
             .Should().Be(450m);
 
+        // A rolling three-year sick cycle: January's 3 days follow the 12 already taken (not the first of a new leave year), so all 3 are unpaid.
+        (await policies.SavePolicyAsync(new LeavePolicyRequest(companyId, "SICK", 0m, true, 1, null, true, [], SickTiers: [(6, 50m), (11, 0m)]) { SickCycleMonths = 36 }))
+            .IsSuccess.Should().BeTrue();
+        (await attendance.TakeLeaveAsync(companyId, clerk.Id, "SICK", new DateOnly(2027, 1, 11), new DateOnly(2027, 1, 13), 3m)).IsSuccess.Should().BeTrue();
+        (await policies.ApplySickPayAsync(companyId, "SICK", "2027-01", new DateOnly(2027, 1, 1), new DateOnly(2027, 1, 31), "SICKDED", 21.7m)).Value.Single()
+            .Should().Be(new SickPayLine(clerk.Id, 3m, 3m, 300m));
+
         // Leave pay in advance: 5 annual days from 2 November at 2,170 ÷ 21.7 = 500, paid in October and recovered in November.
         db.PayElements.AddRange(
             new PayElement(companyId, "LEAVEPAY", "Leave pay", PayElementType.Earning, CalculationBasis.FixedAmount, 15, "6100"),

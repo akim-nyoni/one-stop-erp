@@ -21290,6 +21290,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("row_version");
 
+                    b.Property<int?>("SickCycleMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("sick_cycle_months");
+
                     b.HasKey("Id")
                         .HasName("pk_leave_policy");
 
