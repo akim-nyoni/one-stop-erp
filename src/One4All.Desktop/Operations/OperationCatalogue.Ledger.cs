@@ -404,9 +404,11 @@ public static partial class OperationCatalogue
             Module = module, Title = "Accruals and prepayments",
             Description = "An accrual (an expense incurred, not yet invoiced) or a prepayment (paid ahead), posted on the date and reversed automatically on the reversal date. "
                 + "A prepayment schedule releases a prepayment to expense over the months it covers (from the month of the date, the document number as its reference); "
-                + "Release prepayments charges every month ended by the date (the scheduled task gl.prepayment-release does it daily).",
+                + "Release prepayments charges every month ended by the date (the scheduled task gl.prepayment-release does it daily). Tick Send for approval to hold an "
+                + "accrual or prepayment for someone else to approve (Accounting > Journals > Journals awaiting approval); it posts, and its reversal is booked, when approved.",
             Fields = [Pick("Kind", "Kind", ["Accrual", "Prepayment", "Prepayment schedule", "Release prepayments"]), Today("Date", "Date"), OptDate("Reversal", "Reverses on (blank: 1st of next month)"), Req("Expense", "Expense account"),
-                Req("Balance", "Accrual / prepayment account"), Num("Amount", "Amount"), Req("Document", "Document number"), Req("Narrative", "Narrative"), Num("Months", "Months covered (schedule)", "12")],
+                Req("Balance", "Accrual / prepayment account"), Num("Amount", "Amount"), Req("Document", "Document number"), Req("Narrative", "Narrative"), Num("Months", "Months covered (schedule)", "12"),
+                Tick("Approval", "Send for approval (accrual / prepayment)", false)],
             Run = async (c, i) =>
             {
                 IAccrualService accruals = c.Get<IAccrualService>();
@@ -425,6 +427,25 @@ public static partial class OperationCatalogue
 
                 // An accrual or prepayment reverses on the first of the next month unless another date is given.
                 DateOnly reverses = i.Optional("Reversal") is string on ? Day(on) : new DateOnly(i.Date("Date").Year, i.Date("Date").Month, 1).AddMonths(1);
+                if (i.Flag("Approval"))
+                {
+                    // Held for a second user: an accrual is Dr expense / Cr accrual, a prepayment Dr prepayment / Cr expense; approving posts it and books its reversal.
+                    bool accrual = i.Text("Kind") == "Accrual";
+                    string debit = accrual ? i.Text("Expense") : i.Text("Balance"), credit = accrual ? i.Text("Balance") : i.Text("Expense");
+                    CurrencyCode baseCurrency = await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).SingleAsync().ConfigureAwait(true);
+                    PostingReceipt held = Check(await c.Get<IJournalApprovalService>().SubmitAsync(new JournalRequest
+                    {
+                        CompanyId = c.CompanyId, SourceModule = "GL", PostingDate = i.Date("Date"), TransactionCurrency = baseCurrency, Narrative = i.Text("Narrative"), Reference = i.Text("Document"),
+                        DocumentType = accrual ? "Accrual" : "Prepayment", ReverseOn = reverses,
+                        Lines =
+                        [
+                            new JournalLineRequest { AccountCode = debit, Side = JournalSide.Debit, TransactionAmount = i.Number("Amount"), Narrative = i.Text("Narrative") },
+                            new JournalLineRequest { AccountCode = credit, Side = JournalSide.Credit, TransactionAmount = i.Number("Amount"), Narrative = i.Text("Narrative") },
+                        ],
+                    }, c.UserId).ConfigureAwait(true));
+                    return $"{i.Text("Kind")} {held.JournalNumber} sent for approval ({M(held.TotalBase)}); it posts, and reverses on {D(reverses)}, once someone else approves it.";
+                }
+
                 ReversingJournalResult posted = i.Text("Kind") == "Accrual"
                     ? Check(await accruals.PostAccrualAsync(c.CompanyId, i.Date("Date"), reverses, i.Text("Expense"), i.Text("Balance"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true))
                     : Check(await accruals.PostPrepaymentAsync(c.CompanyId, i.Date("Date"), reverses, i.Text("Balance"), i.Text("Expense"), i.Number("Amount"), i.Text("Document"), i.Text("Narrative")).ConfigureAwait(true));
