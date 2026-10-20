@@ -19,11 +19,15 @@ public sealed class IntercompanyService : IIntercompanyService
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">The central posting engine.</param>
-    public IntercompanyService(One4AllDbContext db, IPostingEngine postingEngine)
+    /// <param name="scopes">The users' data scopes: whoever posts must reach both companies.</param>
+    public IntercompanyService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Security.IDataScopeService? scopes = null)
     {
         _db = db;
         _postingEngine = postingEngine;
+        _scopes = scopes;
     }
+
+    private readonly Application.Abstractions.Security.IDataScopeService? _scopes;
 
     /// <inheritdoc />
     public async Task<Result<IntercompanyPostingResult>> PostAsync(IntercompanyJournalRequest request, CancellationToken ct = default)
@@ -59,16 +63,21 @@ public sealed class IntercompanyService : IIntercompanyService
             return Error.NotFound("Interco.CompanyNotFound", "One of the companies does not exist.");
         }
 
-        if (from.BaseCurrency != to.BaseCurrency)
+        // The user posts into the other company's books too, so they must be allowed into both.
+        if (request.PostedByUserId > 0 && _scopes is not null
+            && (!await _scopes.AllowsAsync(request.PostedByUserId, Core.Security.ScopeDimension.Company, from.Id, ct).ConfigureAwait(false)
+                || !await _scopes.AllowsAsync(request.PostedByUserId, Core.Security.ScopeDimension.Company, to.Id, ct).ConfigureAwait(false)))
         {
-            return Error.Rule("Interco.MixedCurrency", $"{from.Code} ({from.BaseCurrency}) and {to.Code} ({to.BaseCurrency}) do not share a base currency.");
+            return Error.Rule("Interco.NoAccess", $"You are not allowed to post in both {from.Code} and {to.Code}.");
         }
 
+        // One charge in one currency: each side converts it to its own base currency (companies need not share one).
+        CurrencyCode currency = request.Currency ?? from.BaseCurrency;
         string narrative = request.Narrative ?? $"Intercompany {from.Code} → {to.Code} {request.DocumentNumber}";
 
         // Both journals or neither: the engine only calls SaveChanges, so one transaction on the context covers both.
 
-        Result<PostingReceipt> fromPosting = await _postingEngine.PostAsync(Journal(from, request.Date, request.DocumentNumber, narrative,
+        Result<PostingReceipt> fromPosting = await _postingEngine.PostAsync(Journal(from, currency, request.Date, request.DocumentNumber, narrative,
             (request.FromIntercompanyAccountCode, JournalSide.Debit),
             (request.FromAccountCode, JournalSide.Credit),
             request.Amount), ct).ConfigureAwait(false);
@@ -77,7 +86,7 @@ public sealed class IntercompanyService : IIntercompanyService
             return fromPosting.Error;
         }
 
-        Result<PostingReceipt> toPosting = await _postingEngine.PostAsync(Journal(to, request.Date, request.DocumentNumber, narrative,
+        Result<PostingReceipt> toPosting = await _postingEngine.PostAsync(Journal(to, currency, request.Date, request.DocumentNumber, narrative,
             (request.ToAccountCode, JournalSide.Debit),
             (request.ToIntercompanyAccountCode, JournalSide.Credit),
             request.Amount), ct).ConfigureAwait(false);
@@ -88,12 +97,13 @@ public sealed class IntercompanyService : IIntercompanyService
         return new IntercompanyPostingResult(fromPosting.Value.JournalNumber, toPosting.Value.JournalNumber);
     }
 
-    private static JournalRequest Journal(Company company, DateOnly date, string documentNumber, string narrative, (string Account, JournalSide Side) first, (string Account, JournalSide Side) second, decimal amount) => new()
+    private static JournalRequest Journal(Company company, CurrencyCode currency, DateOnly date, string documentNumber, string narrative, (string Account, JournalSide Side) first,
+        (string Account, JournalSide Side) second, decimal amount) => new()
     {
         CompanyId = company.Id,
         SourceModule = "GL",
         PostingDate = date,
-        TransactionCurrency = company.BaseCurrency,
+        TransactionCurrency = currency,
         EnforceManualJournalRules = false,
         DocumentType = "Intercompany",
         DocumentNumber = documentNumber,

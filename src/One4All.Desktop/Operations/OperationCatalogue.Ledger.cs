@@ -580,8 +580,9 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Intercompany journal",
-            Description = "Posts both sides of an intercompany charge at once: in this company against its intercompany account, and in the other company against its own.",
-            Fields = [Req("ToCompany", "Other company code"), Num("Amount", "Amount"), Req("Document", "Document number"), Opt("Narrative", "Narrative"), Req("FromAccount", "This company's account"),
+            Description = "Posts both sides of an intercompany charge at once: in this company against its intercompany account, and in the other company against its own (each in its "
+                + "own base currency, at the day's rate, when the charge is in another currency). You must be allowed into both companies.",
+            Fields = [Req("ToCompany", "Other company code"), Num("Amount", "Amount"), Opt("Currency", "Currency (blank: this company's base)"), Req("Document", "Document number"), Opt("Narrative", "Narrative"), Req("FromAccount", "This company's account"),
                 Req("FromIc", "This company's intercompany account"), Req("ToAccount", "Other company's account"), Req("ToIc", "Other company's intercompany account"), Today()],
             Run = async (c, i) =>
             {
@@ -590,6 +591,7 @@ public static partial class OperationCatalogue
                 {
                     FromCompanyId = c.CompanyId, ToCompanyId = other, Amount = i.Number("Amount"), Date = i.Date("Date"), DocumentNumber = i.Text("Document"), Narrative = i.Optional("Narrative"),
                     FromAccountCode = i.Text("FromAccount"), FromIntercompanyAccountCode = i.Text("FromIc"), ToAccountCode = i.Text("ToAccount"), ToIntercompanyAccountCode = i.Text("ToIc"),
+                    Currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code.ToUpperInvariant()) : null, PostedByUserId = c.UserId,
                 }).ConfigureAwait(true));
                 return $"Posted {posted.FromJournalNumber} here and {posted.ToJournalNumber} in {i.Text("ToCompany").ToUpperInvariant()}.";
             },

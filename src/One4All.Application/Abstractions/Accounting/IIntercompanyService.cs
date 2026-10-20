@@ -37,6 +37,12 @@ public sealed record IntercompanyJournalRequest
 
     /// <summary>In the to-company: the intercompany payable "due to" account (credited).</summary>
     public string ToIntercompanyAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The currency of the charge (blank: the source company's base); each company's journal converts it to its own base at the day's rate.</summary>
+    public Core.Accounting.CurrencyCode? Currency { get; init; }
+
+    /// <summary>Who posts it: they must be allowed into both companies (0: a system posting).</summary>
+    public long PostedByUserId { get; init; }
 }
 
 /// <summary>The two journals an intercompany posting produced.</summary>
