@@ -18,6 +18,9 @@ namespace One4All.Desktop.ViewModels;
 /// <param name="Value">Its value.</param>
 /// <param name="PreparedBy">Who prepared it.</param>
 /// <param name="IsOwn">Whether the signed-in user prepared it, and so cannot approve it.</param>
+/// <summary>One line of the journal being looked at: what the approver signs off.</summary>
+public sealed record JournalApprovalLineVm(string Account, string Debit, string Credit, string CostCentre, string TaxCode, string Narrative);
+
 public sealed record JournalApprovalRowVm(long JournalId, string Number, string Date, string Narrative, string Value, string PreparedBy, bool IsOwn);
 
 /// <summary>
@@ -49,6 +52,47 @@ public sealed partial class JournalApprovalsViewModel : ObservableObject
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ApproveCommand), nameof(RejectCommand))]
     private JournalApprovalRowVm? _selectedItem;
+
+    /// <summary>The selected journal's lines, so the approver sees what posts before approving.</summary>
+    public ObservableCollection<JournalApprovalLineVm> Lines { get; } = [];
+
+    /// <summary>The selected journal's reference, currency and reversal date, if any.</summary>
+    [ObservableProperty]
+    private string _details = "Choose a journal to see its lines.";
+
+    partial void OnSelectedItemChanged(JournalApprovalRowVm? value) => _ = LoadLinesAsync(value);
+
+    // Reads the chosen journal's lines and header details.
+    private async Task LoadLinesAsync(JournalApprovalRowVm? row)
+    {
+        Lines.Clear();
+        if (row is null)
+        {
+            Details = "Choose a journal to see its lines.";
+            return;
+        }
+
+        await using AsyncServiceScope scope = _services.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        Core.Accounting.JournalEntry? journal = await db.Journals.AsNoTracking().Include(j => j.Lines).FirstOrDefaultAsync(j => j.Id == row.JournalId).ConfigureAwait(true);
+        if (journal is null || !ReferenceEquals(row, SelectedItem))
+        {
+            return;
+        }
+
+        Dictionary<string, string> names = await db.Accounts.AsNoTracking().Where(a => a.CompanyId == journal.CompanyId).ToDictionaryAsync(a => a.AccountCode, a => a.Name).ConfigureAwait(true);
+        static string Money(decimal value) => value == 0m ? string.Empty : value.ToString("N2", CultureInfo.CurrentCulture);
+        foreach (Core.Accounting.JournalLine line in journal.Lines)
+        {
+            Lines.Add(new JournalApprovalLineVm($"{line.AccountCode} {names.GetValueOrDefault(line.AccountCode, string.Empty)}".Trim(), Money(line.TransactionDebit),
+                Money(line.TransactionCredit), line.CostCentre, line.TaxCode ?? string.Empty, line.Narrative ?? string.Empty));
+        }
+
+        Details = $"Currency {journal.TransactionCurrency.Value}"
+            + (string.IsNullOrWhiteSpace(journal.Reference) ? string.Empty : $"   Reference {journal.Reference}")
+            + (journal.ReverseOn is DateOnly on ? $"   Reverses on {on:yyyy-MM-dd}" : "   Not reversed")
+            + $"   Dr {Money(journal.Lines.Sum(l => l.TransactionDebit))}   Cr {Money(journal.Lines.Sum(l => l.TransactionCredit))}";
+    }
 
     /// <summary>Why the journal is rejected; required to reject.</summary>
     [ObservableProperty]

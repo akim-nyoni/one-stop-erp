@@ -1,7 +1,7 @@
 <Window x:Class="One4All.Desktop.JournalApprovalsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Journals Awaiting Approval" Height="560" Width="900"
+        Title="Journals Awaiting Approval" Height="720" Width="1000"
         WindowStartupLocation="CenterOwner" Background="#F4F6F4" FontFamily="Segoe UI">
     <Window.Resources>
         <Style x:Key="ActionButton" TargetType="Button">
@@ -38,6 +38,25 @@
                     <TextBlock Text="Reason (required to reject)" Foreground="#667" FontSize="12" />
                     <TextBox Text="{Binding Reason, UpdateSourceTrigger=PropertyChanged}" Margin="0,4,0,0" Padding="6,4" />
                 </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <!-- The chosen journal's lines: what the approver signs off -->
+        <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="6" Margin="6,6,6,0" Height="230">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="{Binding Details}" FontWeight="SemiBold" Foreground="#1E3A2E" Margin="4,0,0,4" />
+                <ListView ItemsSource="{Binding Lines}" BorderThickness="0">
+                    <ListView.View>
+                        <GridView>
+                            <GridViewColumn Header="Account" Width="280" DisplayMemberBinding="{Binding Account}" />
+                            <GridViewColumn Header="Debit" Width="100" DisplayMemberBinding="{Binding Debit}" />
+                            <GridViewColumn Header="Credit" Width="100" DisplayMemberBinding="{Binding Credit}" />
+                            <GridViewColumn Header="Cost centre" Width="90" DisplayMemberBinding="{Binding CostCentre}" />
+                            <GridViewColumn Header="Tax code" Width="80" DisplayMemberBinding="{Binding TaxCode}" />
+                            <GridViewColumn Header="Line narrative" Width="260" DisplayMemberBinding="{Binding Narrative}" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
             </DockPanel>
         </Border>
 
