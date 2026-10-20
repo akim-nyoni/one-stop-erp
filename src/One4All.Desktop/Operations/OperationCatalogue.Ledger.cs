@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
+using One4All.Application.Abstractions.Reporting;
 using One4All.Application.Abstractions.Budgeting;
 using One4All.Application.Abstractions.MasterData;
 using One4All.Core.Accounting;
@@ -575,6 +576,50 @@ public static partial class OperationCatalogue
                 Company company = await c.Db.Companies.AsNoTracking().SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
                 int queued = await c.Db.Journals.AsNoTracking().CountAsync(j => j.CompanyId == c.CompanyId && j.Status == JournalStatus.Deferred).ConfigureAwait(true);
                 return Table(new[] { (Modules: company.DeferredPostingModules ?? "(none: everything posts at once)", Queued: queued) }, ("Queued modules", r => r.Modules), ("Deferred journals waiting", r => r.Queued));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Group statements",
+            Description = "The group's consolidated profit or loss and financial position at a date: the companies added up, intercompany balances and intercompany sales and "
+                + "purchases eliminated, the parent's investment set against the subsidiaries' share capital (goodwill for any excess), and the non-controlling interest's share "
+                + "of each partly owned subsidiary (Ownership: COMPANY:percent; ...).",
+            Fields = [Req("Companies", "Group companies (codes, comma separated; the parent first)"), Today("Date", "As at"), Opt("Balances", "Intercompany balance accounts (comma separated)"),
+                Opt("Sales", "Intercompany sales accounts"), Opt("Purchases", "Intercompany purchase accounts"), Opt("Investment", "Parent's investment account"),
+                Opt("Capital", "Subsidiaries' share capital accounts"), Opt("Ownership", "Ownership: COMPANY:percent; ...")],
+            Run = async (c, i) =>
+            {
+                static string[] List(string? text) => (text ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(s => s.ToUpperInvariant()).ToArray();
+                List<long> ids = [];
+                foreach (string code in List(i.Text("Companies")))
+                {
+                    ids.Add(await FindAsync(c.Db.Companies, x => x.Code == code, x => x.Id, "company", code).ConfigureAwait(true));
+                }
+
+                Dictionary<long, decimal> ownership = [];
+                foreach (string part in (i.Optional("Ownership") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+                    string code = bits[0].ToUpperInvariant();
+                    ownership[await FindAsync(c.Db.Companies, x => x.Code == code, x => x.Id, "company", code).ConfigureAwait(true)] = bits.Length == 2 && decimal.TryParse(bits[1], NumberStyles.Number,
+                        CultureInfo.InvariantCulture, out decimal percent) ? percent : throw new OperationException($"Write each holding as COMPANY:percent (\"{part}\").");
+                }
+
+                GroupStatements g = Check(await c.Get<IConsolidationService>().GroupStatementsAsync(new GroupStatementsRequest
+                {
+                    CompanyIds = ids, ParentCompanyId = ids.FirstOrDefault(), AsAtDate = i.Date("Date"), IntercompanyBalanceAccounts = List(i.Optional("Balances")),
+                    IntercompanyRevenueAccounts = List(i.Optional("Sales")), IntercompanyExpenseAccounts = List(i.Optional("Purchases")), InvestmentAccountCode = i.Optional("Investment")?.ToUpperInvariant(),
+                    SubsidiaryShareCapitalAccounts = List(i.Optional("Capital")), Ownership = ownership,
+                }).ConfigureAwait(true));
+                IEnumerable<string> Section(string title, IReadOnlyList<GroupStatementLine> lines) =>
+                    [title, .. lines.Select(l => $"  {l.AccountCode,-10} {l.AccountName,-36} {M(l.Amount),14}"), $"  {"Total",-47} {M(lines.Sum(l => l.Amount)),14}"];
+                return string.Join(Environment.NewLine, [
+                    .. Section("INCOME", g.Income), .. Section("EXPENSES", g.Expenses),
+                    $"PROFIT {M(g.Profit)}: to owners {M(g.ProfitToOwners)}, to non-controlling interest {M(g.NciShareOfProfit)}", string.Empty,
+                    .. Section("ASSETS", g.Assets), .. Section("LIABILITIES", g.Liabilities), .. Section("EQUITY (owners)", g.Equity),
+                    $"Owners' equity {M(g.OwnersEquity)}; non-controlling interest {M(g.NonControllingInterest)}; goodwill {M(g.Goodwill)}.",
+                    $"Eliminated: intercompany trading {M(g.IntercompanyTradingEliminated)}, balances {M(g.IntercompanyBalancesEliminated)}. "
+                        + (g.Balances ? "The statement of financial position balances." : "The statement of financial position does NOT balance - check the elimination accounts.")]);
             },
         };
         yield return new Operation

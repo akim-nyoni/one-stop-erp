@@ -13,7 +13,7 @@ namespace One4All.Infrastructure.Accounting;
 /// translates each company into a presentation currency first (IAS 21 current-rate method) and carries the
 /// difference as a translation reserve. Either way the result balances because each company's own postings do.
 /// </summary>
-public sealed class ConsolidationService : IConsolidationService
+public sealed partial class ConsolidationService : IConsolidationService
 {
     private readonly One4AllDbContext _db;
 

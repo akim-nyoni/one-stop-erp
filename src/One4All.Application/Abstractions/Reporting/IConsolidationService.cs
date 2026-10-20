@@ -59,6 +59,78 @@ public sealed record TranslatedTrialBalance(DateOnly AsAtDate, string Presentati
     public bool IsBalanced => TotalDebit == TotalCredit;
 }
 
+/// <summary>What a set of group statements eliminates.</summary>
+public sealed class GroupStatementsRequest
+{
+    /// <summary>Gets the member companies (the parent among them), sharing a base currency.</summary>
+    public IReadOnlyList<long> CompanyIds { get; init; } = [];
+
+    /// <summary>Gets the parent.</summary>
+    public long ParentCompanyId { get; init; }
+
+    /// <summary>Gets the statement date.</summary>
+    public DateOnly AsAtDate { get; init; }
+
+    /// <summary>Gets the due-from / due-to accounts eliminated against each other.</summary>
+    public IReadOnlyCollection<string> IntercompanyBalanceAccounts { get; init; } = [];
+
+    /// <summary>Gets the accounts intercompany sales are made on.</summary>
+    public IReadOnlyCollection<string> IntercompanyRevenueAccounts { get; init; } = [];
+
+    /// <summary>Gets the accounts intercompany purchases are charged to.</summary>
+    public IReadOnlyCollection<string> IntercompanyExpenseAccounts { get; init; } = [];
+
+    /// <summary>Gets the parent's investment-in-subsidiaries account.</summary>
+    public string? InvestmentAccountCode { get; init; }
+
+    /// <summary>Gets the subsidiaries' share capital accounts, eliminated against the investment.</summary>
+    public IReadOnlyCollection<string> SubsidiaryShareCapitalAccounts { get; init; } = [];
+
+    /// <summary>Gets the percentage of each subsidiary the group owns (100 when not given).</summary>
+    public IReadOnlyDictionary<long, decimal> Ownership { get; init; } = new Dictionary<long, decimal>();
+}
+
+/// <summary>A line of the group statements.</summary>
+/// <param name="AccountCode">The account.</param>
+/// <param name="AccountName">Its name.</param>
+/// <param name="Amount">The amount (positive in the section's natural direction).</param>
+public sealed record GroupStatementLine(string AccountCode, string AccountName, decimal Amount);
+
+/// <summary>The group's consolidated statement of profit or loss and statement of financial position.</summary>
+/// <param name="AsAtDate">The date.</param>
+/// <param name="Income">Income, after eliminations.</param>
+/// <param name="Expenses">Expenses, after eliminations.</param>
+/// <param name="Assets">Assets, goodwill among them.</param>
+/// <param name="Liabilities">Liabilities.</param>
+/// <param name="Equity">Equity attributable to the parent's owners (share capital and reserves).</param>
+/// <param name="Goodwill">Goodwill on the subsidiaries (the investment over the share of their capital).</param>
+/// <param name="NonControllingInterest">The outside shareholders' share of the subsidiaries' net assets.</param>
+/// <param name="NciShareOfProfit">The outside shareholders' share of the subsidiaries' profit.</param>
+/// <param name="IntercompanyTradingEliminated">Intercompany sales and purchases eliminated.</param>
+/// <param name="IntercompanyBalancesEliminated">Intercompany balances eliminated.</param>
+public sealed record GroupStatements(DateOnly AsAtDate, IReadOnlyList<GroupStatementLine> Income, IReadOnlyList<GroupStatementLine> Expenses, IReadOnlyList<GroupStatementLine> Assets,
+    IReadOnlyList<GroupStatementLine> Liabilities, IReadOnlyList<GroupStatementLine> Equity, decimal Goodwill, decimal NonControllingInterest, decimal NciShareOfProfit,
+    decimal IntercompanyTradingEliminated, decimal IntercompanyBalancesEliminated)
+{
+    /// <summary>The group's profit.</summary>
+    public decimal Profit => Income.Sum(l => l.Amount) - Expenses.Sum(l => l.Amount);
+
+    /// <summary>The profit attributable to the parent's owners.</summary>
+    public decimal ProfitToOwners => Profit - NciShareOfProfit;
+
+    /// <summary>Total assets.</summary>
+    public decimal TotalAssets => Assets.Sum(l => l.Amount);
+
+    /// <summary>Total liabilities.</summary>
+    public decimal TotalLiabilities => Liabilities.Sum(l => l.Amount);
+
+    /// <summary>Equity attributable to the owners, the profit to them included.</summary>
+    public decimal OwnersEquity => Equity.Sum(l => l.Amount) + ProfitToOwners;
+
+    /// <summary>Whether the statement of financial position balances: assets = liabilities + owners' equity + non-controlling interest.</summary>
+    public bool Balances => Math.Abs(TotalAssets - TotalLiabilities - OwnersEquity - NonControllingInterest) < 0.01m;
+}
+
 /// <summary>
 /// Consolidates the ledgers of several companies (brief §2, the CONSOLIDATION feature): sums each account
 /// across the group into a single trial balance. The plain consolidation requires a shared base currency; the
@@ -100,4 +172,14 @@ public interface IConsolidationService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The translated trial balance, or an error (e.g. <c>Consolidation.NoRate</c> when a rate is missing).</returns>
     Task<Result<TranslatedTrialBalance>> TranslatedTrialBalanceAsync(IReadOnlyList<long> companyIds, CurrencyCode presentationCurrency, DateOnly asAtDate, IReadOnlyCollection<string>? intercompanyAccountCodes = null, CancellationToken ct = default);
+
+    /// <summary>
+    /// The group's consolidated statements (IFRS 10): the members' books added up, intercompany balances and intercompany sales and purchases
+    /// eliminated, the parent's investment eliminated against the subsidiaries' share capital (any excess is goodwill), and the non-controlling
+    /// interest's share of each partly owned subsidiary's net assets and profit shown apart.
+    /// </summary>
+    /// <param name="request">The group and its elimination accounts.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The statements, or why not.</returns>
+    Task<Result<GroupStatements>> GroupStatementsAsync(GroupStatementsRequest request, CancellationToken ct = default);
 }

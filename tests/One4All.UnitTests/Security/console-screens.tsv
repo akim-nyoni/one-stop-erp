@@ -130,6 +130,7 @@ General Ledger	Close or reopen a period	False
 General Ledger	Deferred posting	False	
 General Ledger	Exchange-rate policy	False	
 General Ledger	Funds, projects and fund accounting	False	
+General Ledger	Group statements	False	
 General Ledger	Hyperinflation (IAS 29)	False	
 General Ledger	Import journals from a file	False	
 General Ledger	Intercompany journal	False	
