@@ -28,6 +28,8 @@ comments, docs, commit messages): use a plain hyphen. a search for U+2014 across
 - Builds can hang MSBuild. The working pattern: run `dotnet build One4All.slnx -c Debug --nologo -v q -nodeReuse:false -p:UseSharedCompilation=false`
   in the background, record the start time, and check DLL timestamps against it. If the build hangs after writing the DLLs, stop it, run
   `taskkill //F //IM dotnet.exe`, then use `--no-build` for `dotnet ef` and `dotnet test`.
+- Verify while coding: `powershell -File tools/dev/verify-snapshot.ps1 > verify.out 2>&1` runs the same verify on a worktree (..\ERP-verify) at the latest
+  commit, so editing can go on meanwhile (commit first; do not run the accounting suite in the main tree at the same time, it shares the dev database).
 - Full verify: `powershell -File tools/dev/verify.ps1 > verify.out 2>&1` (keep verify.out outside the repo or delete it; Debug build, Release build, then all three suites
   with `--no-build`). It takes 20 to 30 minutes. Do not edit source while its builds run: a Debug build that started before a new file
   existed, or a Release build that compiles a half-applied change, fails the run. Edit only after `=== RELEASE OK ===` appears, and never
