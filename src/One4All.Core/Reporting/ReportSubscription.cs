@@ -74,6 +74,20 @@ public sealed class ReportSubscription : AuditableEntity, ICompanyScoped
     /// <summary>Starts or stops it.</summary>
     /// <param name="active">Whether it runs.</param>
     public void SetActive(bool active) => IsActive = active;
+
+    /// <summary>Changes what it runs and who receives it (the code stays); a stopped subscription runs again.</summary>
+    /// <param name="reportCode">The report.</param>
+    /// <param name="format">The output format.</param>
+    /// <param name="parametersJson">The stored parameters, as a JSON object of strings.</param>
+    /// <param name="recipients">The distribution list.</param>
+    public void Reconfigure(string reportCode, int format, string parametersJson, List<string> recipients)
+    {
+        ReportCode = reportCode;
+        Format = format;
+        ParametersJson = parametersJson;
+        Recipients = recipients;
+        IsActive = true;
+    }
 }
 
 /// <summary>One delivery of a subscription's report (<c>rpt.report_delivery</c>) - the delivery log.</summary>

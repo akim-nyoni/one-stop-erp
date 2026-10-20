@@ -54,7 +54,7 @@ public sealed record DeliveryLogEntry(DateTimeOffset RunAt, string Recipient, st
 /// </summary>
 public interface IReportSubscriptionService
 {
-    /// <summary>Sets up a subscription.</summary>
+    /// <summary>Sets up a subscription, or changes the one with the same code (and starts it again if it was stopped).</summary>
     /// <param name="request">The subscription.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>

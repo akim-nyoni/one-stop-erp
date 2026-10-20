@@ -112,6 +112,10 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
         }
     }
 
+    /// <summary>Changes the account's type; only for an account nothing has been posted to yet (the caller checks).</summary>
+    /// <param name="type">The new type.</param>
+    public void ChangeType(AccountType type) => Type = type;
+
     /// <summary>Sets the account's cash-flow classification for the Statement of Cash Flows.</summary>
     /// <param name="category">The activity the account's movement represents.</param>
     public void SetCashFlowCategory(CashFlowCategory category) => CashFlowCategory = category;

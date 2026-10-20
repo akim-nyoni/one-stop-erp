@@ -81,9 +81,18 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         }
 
         string code = request.Code.Trim().ToUpperInvariant();
-        if (await _db.Set<ReportSubscription>().AnyAsync(s => s.CompanyId == request.CompanyId && s.Code == code, ct).ConfigureAwait(false))
+
+        // An existing code changes that subscription (what it runs, its format, parameters and delivery) and starts it again if it was stopped.
+        if (await _db.Set<ReportSubscription>().FirstOrDefaultAsync(s => s.CompanyId == request.CompanyId && s.Code == code, ct).ConfigureAwait(false) is { } existing)
         {
-            return Result.Failure(Error.Conflict("Rpt.SubscriptionExists", $"Subscription {code} already exists."));
+            existing.Reconfigure(reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients);
+            existing.BurstKeyField = bursting ? request.BurstKeyField!.Trim() : null;
+            existing.BurstRecipientField = bursting ? request.BurstRecipientField?.Trim() : null;
+            existing.BurstLedger = bursting ? (int?)request.BurstLedger : null;
+            existing.DeliveryFolder = folder;
+            existing.DeliveryPrinter = printer;
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return Result.Success();
         }
 
         _db.Set<ReportSubscription>().Add(new ReportSubscription(request.CompanyId, code, reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients)

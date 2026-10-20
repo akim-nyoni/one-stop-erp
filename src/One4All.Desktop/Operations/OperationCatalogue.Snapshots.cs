@@ -24,7 +24,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Language and terminology", ListTitle = "The company's terms",
             Description = "The company's locale (screen language where translated, and the date and number formats of its reports - e.g. en-ZW, pt-MZ) and its own words for standard terms "
-                + "(Stand → Erf) on screens and report labels. Sign in again to see the screens change.",
+                + "(Stand → Erf) on screens and report labels. Sign in again to see the screens change. A term already replaced is changed by saving it again; Delete puts "
+                + "the standard word back.",
             Fields = [Opt("Locale", "Locale (blank: keep; '-' for English / invariant)"), Opt("Term", "Standard word"), Opt("Replacement", "The company's word (blank removes it)")],
             Run = async (c, i) =>
             {
@@ -46,7 +47,15 @@ public static partial class OperationCatalogue
                 return string.Join(" ", done.DefaultIfEmpty("Nothing changed.")) + $" Screen translations shipped: en, {string.Join(", ", cultures)}.";
             },
             List = async c => Table((await c.Get<One4All.Application.Abstractions.System.ILocalizationService>().TermsAsync(c.CompanyId).ConfigureAwait(true)).ToList(),
-                ("Standard word", t => t.Key), ("Company's word", t => t.Value)),
+                ("Term", t => t.Key), ("Replacement", t => t.Value)),
+            KeyColumn = "Term",
+
+            // Deleting a term puts the standard word back (the same as saving it with a blank replacement).
+            Delete = async (c, term) =>
+            {
+                _ = Check(await c.Get<One4All.Application.Abstractions.System.ILocalizationService>().SetTermAsync(c.CompanyId, term, null).ConfigureAwait(true), string.Empty);
+                return $"'{term}' is back to standard.";
+            },
         };
         yield return new Operation
         {

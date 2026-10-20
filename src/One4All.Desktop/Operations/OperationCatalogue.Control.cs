@@ -355,7 +355,8 @@ public static partial class OperationCatalogue
                 + "or a network receipt printer by its IP address and port (usually 9100). Set makes it the purpose's only printer; Add another prints to it as well (a "
                 + "customer and a shop copy, a second counter); Remove one takes a printer away by name; Test prints a test slip. Workstation * is the default for "
                 + "every computer without its own; this computer's name is filled in. Tills print receipts on their workstation's receipt printers (copies from the "
-                + "receipt layout); the report viewer's print dialog opens on the chosen printer.",
+                + "receipt layout); the report viewer's print dialog opens on the chosen printer. Edit opens a printer in the form (Set or Add another saves the change); "
+                + "Delete on the list removes that one printer.",
             Fields = [Pick("Step", "Step", ["Set", "Add another", "Remove one", "Remove all", "Test"]), Req("Workstation", "Workstation (computer name, or *)", Environment.MachineName),
                 Pick("Purpose", "Purpose", Enum.GetNames<Core.System.PrintPurpose>()), Pick("Connection", "Connection", ["Windows printer", "Network (IP address)"]),
                 new OperationField("Printer", "Printer (Windows name, or a name for a network printer)", FieldKind.Choice, Required: false, Choices: [],
@@ -380,7 +381,23 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Get<Application.Abstractions.System.IWorkstationPrinterService>().ListAsync(c.CompanyId).ConfigureAwait(true),
                 ("Workstation", p => p.Workstation), ("Purpose", p => p.Purpose), ("Printer", p => p.PrinterName),
-                ("Connection", p => p.Connection == Core.System.PrinterConnection.Network ? $"Network {p.Host}:{p.Port}" : "Windows"), ("Tray", p => p.Tray ?? "default"), ("Copies", p => p.Copies)),
+                ("Connection", p => p.Connection == Core.System.PrinterConnection.Network ? "Network (IP address)" : "Windows printer"),
+                ("Host", p => p.Connection == Core.System.PrinterConnection.Network ? p.Host : null), ("Port", p => p.Port), ("Tray", p => p.Tray), ("Copies", p => p.Copies),
+                ("Setting", p => $"{p.Workstation} / {p.Purpose} / {p.PrinterName}")),
+
+            // A printer setting is identified by its workstation, purpose and printer together ("TILL1 / Receipt / EPSON").
+            KeyColumn = "Setting",
+            Delete = async (c, setting) =>
+            {
+                string[] parts = setting.Split(" / ", 3);
+                if (parts.Length != 3 || !Enum.TryParse(parts[1], out Core.System.PrintPurpose purpose))
+                {
+                    throw new OperationException($"No printer setting {setting}.");
+                }
+
+                return Check(await c.Get<Application.Abstractions.System.IWorkstationPrinterService>().RemovePrinterAsync(c.CompanyId, parts[0], purpose, parts[2]).ConfigureAwait(true),
+                    $"{parts[2]} no longer prints {purpose} on {parts[0]}.");
+            },
         };
         yield return new Operation
         {
@@ -400,7 +417,8 @@ public static partial class OperationCatalogue
         {
             Module = people, Title = "Benefits in kind", ListTitle = "Benefits",
             Description = "Taxable benefits (a company car valued from the vehicle scale by engine size or cost, housing, school fees, medical): taxed each pay period they "
-                + "apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate.",
+                + "apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate. "
+                + "Add benefit with a benefit id changes that benefit's engine size, cost and monthly value; Delete on the list ends a benefit today (it stays in history).",
             Fields = [Pick("Step", "Step", ["Add benefit", "End benefit", "Vehicle scale band", "Deemed loan rate", "Loan interest rate", "Suspend loan deductions", "Resume loan deductions",
                     "Loan interest income account"]), EmployeePick("Employee", "Employee", required: false), Opt("Account", "Interest income account"),
                 Pick("Kind", "Benefit", Enum.GetNames<Core.Payroll.BenefitKind>()), Opt("Description", "What it is (registration, property)"), OptNum("Engine", "Engine capacity (cc)"),
@@ -411,6 +429,15 @@ public static partial class OperationCatalogue
             {
                 switch (i.Text("Step"))
                 {
+                    case "Add benefit" when i.OptionalNumber("Benefit") is decimal changing:
+                        // A benefit id given changes that benefit's values (engine size, cost, monthly value); what it is and when it started stay.
+                        Core.Payroll.EmployeeBenefit changed = await c.Db.EmployeeBenefits.FirstOrDefaultAsync(b => b.CompanyId == c.CompanyId && b.Id == (long)changing).ConfigureAwait(true)
+                            ?? throw new OperationException($"No benefit {changing}.");
+                        changed.EngineCapacityCc = i.OptionalNumber("Engine") is decimal engine ? (int)engine : null;
+                        changed.Cost = i.OptionalNumber("Cost");
+                        changed.MonthlyValue = i.OptionalNumber("Monthly");
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Benefit {changed.Id} changed.";
                     case "Add benefit":
                         long employee = await EmployeeAsync(c, i.Optional("Employee") ?? string.Empty).ConfigureAwait(true);
                         Core.Payroll.EmployeeBenefit benefit = new(c.CompanyId, employee, Enum.Parse<Core.Payroll.BenefitKind>(i.Text("Kind")), i.Optional("Description") ?? string.Empty, i.Date("Date"))
@@ -460,9 +487,27 @@ public static partial class OperationCatalogue
                         return $"Loan {loan.Reference} charges {loan.InterestRatePercent}% a year.";
                 }
             },
-            List = async c => Table(await c.Db.EmployeeBenefits.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderBy(b => b.EmployeeId).ToListAsync().ConfigureAwait(true),
-                ("Id", b => b.Id), ("Employee", b => b.EmployeeId), ("Benefit", b => b.Kind), ("What", b => b.Description), ("Engine cc", b => b.EngineCapacityCc?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty),
-                ("Monthly", b => b.MonthlyValue is decimal m ? M(m) : "scale"), ("From", b => D(b.From)), ("To", b => b.To is DateOnly t ? D(t) : string.Empty)),
+            List = async c =>
+            {
+                Dictionary<long, string> numbers = await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).ToDictionaryAsync(e => e.Id, e => e.EmployeeNumber).ConfigureAwait(true);
+                return Table(await c.Db.EmployeeBenefits.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderBy(b => b.EmployeeId).ToListAsync().ConfigureAwait(true),
+                    ("Benefit", b => b.Id), ("Employee", b => numbers.GetValueOrDefault(b.EmployeeId, b.EmployeeId.ToString(System.Globalization.CultureInfo.InvariantCulture))), ("Kind", b => b.Kind),
+                    ("Description", b => b.Description), ("Engine", b => b.EngineCapacityCc), ("Cost", b => b.Cost), ("Monthly", b => b.MonthlyValue),
+                    ("Starts", b => D(b.From)), ("Ends", b => b.To is DateOnly t ? D(t) : string.Empty));
+            },
+
+            // A benefit is ended, never removed: deleting it ends it today (or, not yet started, before it starts), and the pay periods it was taxed in keep it.
+            KeyColumn = "Benefit",
+            Delete = async (c, key) =>
+            {
+                long id = long.TryParse(key, out long parsed) ? parsed : throw new OperationException($"No benefit {key}.");
+                Core.Payroll.EmployeeBenefit benefit = await c.Db.EmployeeBenefits.FirstOrDefaultAsync(b => b.CompanyId == c.CompanyId && b.Id == id).ConfigureAwait(true)
+                    ?? throw new OperationException($"No benefit {key}.");
+                DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+                benefit.To = today < benefit.From ? benefit.From.AddDays(-1) : today;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Benefit {id} ended on {D(benefit.To.Value)} (kept in history).";
+            },
         };
     }
 

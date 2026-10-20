@@ -49,6 +49,17 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.ExchangeRatePolicies.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.DocumentType).ToListAsync().ConfigureAwait(true),
                 ("Document", p => p.DocumentType), ("Rate type", p => p.RateType)),
+            KeyColumn = "Document",
+
+            // Deleting a policy is the same as ticking Remove: the document type goes back to the default rate (the policy is a setting, not history).
+            Delete = async (c, document) =>
+            {
+                ExchangeRatePolicy policy = await c.Db.ExchangeRatePolicies.FirstOrDefaultAsync(p => p.CompanyId == c.CompanyId && p.DocumentType == document).ConfigureAwait(true)
+                    ?? throw new OperationException($"No rate policy for {document}.");
+                c.Db.ExchangeRatePolicies.Remove(policy);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{document} uses the default rate again.";
+            },
         };
         yield return new Operation
         {
@@ -105,7 +116,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Funds, projects and fund accounting", ListTitle = "Funds and projects",
             Description = "Add or change a fund (vote) or a project (closing a project stops postings to it), or turn fund accounting on or off: then every journal line names a fund - the default "
-                + "fund fills sub-ledger postings - and each fund must balance within each journal.",
+                + "fund fills sub-ledger postings - and each fund must balance within each journal. An existing code changes that fund or project; Delete closes it (postings "
+                + "to it are kept).",
             Fields = [Pick("What", "What", ["Fund", "Project", "Fund accounting on", "Fund accounting off"]), Opt("Code", "Code (default fund for 'on')"), Opt("Name", "Name"),
                 Tick("Restricted", "Restricted fund"), Opt("Fund", "Project's fund"), Tick("Closed", "Inactive / closed")],
             Run = async (c, i) =>
@@ -136,18 +148,41 @@ public static partial class OperationCatalogue
             },
             List = async c =>
             {
-                var funds = await c.Db.Funds.AsNoTracking().Where(f => f.CompanyId == c.CompanyId).Select(f => new { Kind = "Fund", f.Code, f.Name, Detail = f.IsRestricted ? "restricted" : string.Empty, f.IsActive })
-                    .ToListAsync().ConfigureAwait(true);
-                var projects = await c.Db.Projects.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).Select(p => new { Kind = "Project", p.Code, p.Name, Detail = p.FundCode ?? string.Empty, p.IsActive })
-                    .ToListAsync().ConfigureAwait(true);
-                return Table([.. funds, .. projects], ("Kind", r => r.Kind), ("Code", r => r.Code), ("Name", r => r.Name), ("Restricted / fund", r => r.Detail), ("Active", r => r.IsActive));
+                var funds = await c.Db.Funds.AsNoTracking().Where(f => f.CompanyId == c.CompanyId)
+                    .Select(f => new { Kind = "Fund", f.Code, f.Name, Restricted = f.IsRestricted, Fund = (string?)null, f.IsActive }).ToListAsync().ConfigureAwait(true);
+                var projects = await c.Db.Projects.AsNoTracking().Where(p => p.CompanyId == c.CompanyId)
+                    .Select(p => new { Kind = "Project", p.Code, p.Name, Restricted = false, Fund = p.FundCode, p.IsActive }).ToListAsync().ConfigureAwait(true);
+                return Table([.. funds, .. projects], ("What", r => r.Kind), ("Code", r => r.Code), ("Name", r => r.Name), ("Restricted", r => r.Restricted), ("Fund", r => r.Fund),
+                    ("Closed", r => !r.IsActive), ("Record", r => $"{r.Kind} {r.Code}"));
+            },
+
+            // A fund and a project may share a code, so a row is identified by its kind and code ("Fund WATER").
+            KeyColumn = "Record",
+            Delete = async (c, row) =>
+            {
+                if (row.StartsWith("Fund ", StringComparison.Ordinal))
+                {
+                    string code = row["Fund ".Length..];
+                    Company company = await c.Db.Companies.AsNoTracking().SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                    if (company.FundAccounting && string.Equals(company.DefaultFund, code, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new OperationException($"Fund {code} is the default fund of fund accounting; name another default fund first.");
+                    }
+
+                    return await Retire<Fund>(x => x.Code, x => x.IsActive = false, "fund")(c, code).ConfigureAwait(true);
+                }
+
+                return row.StartsWith("Project ", StringComparison.Ordinal)
+                    ? await Retire<Project>(x => x.Code, x => x.IsActive = false, "project")(c, row["Project ".Length..]).ConfigureAwait(true)
+                    : throw new OperationException($"No fund or project {row}.");
             },
         };
         yield return new Operation
         {
             Module = module, Title = "Reporting trees", ListTitle = "Reporting trees",
             Description = "Statement layouts independent of account codes (statutory, management, consolidation): create a tree (optionally started from the chart's types and categories), "
-                + "add headings under parents, map account ranges, check every account is mapped once, and show the rolled-up statement (Statement by Reporting Tree, GL-TREE, prints it).",
+                + "add headings under parents, map account ranges, check every account is mapped once, and show the rolled-up statement (Statement by Reporting Tree, GL-TREE, prints it). "
+                + "Create with an existing tree code renames it and changes its purpose; a heading saved again with its code is changed.",
             Fields = [Pick("Step", "Step", ["Create", "Create from chart", "Heading", "Map accounts", "Check", "Show statement"]), Req("Tree", "Tree code"), Opt("Name", "Tree / heading name"),
                 Pick("Purpose", "Purpose", Enum.GetNames<ReportingTreePurpose>()), Opt("Node", "Heading code"), Opt("Parent", "Parent heading"), Num("Order", "Order", "10"),
                 Tick("Credit", "Show credit-positive"), Opt("From", "From account"), Opt("To", "To account"), OptDate("Start", "From date (blank: balance)"), Today("End", "To date")],
@@ -155,8 +190,15 @@ public static partial class OperationCatalogue
             {
                 IReportingTreeService trees = c.Get<IReportingTreeService>();
                 string tree = i.Text("Tree");
+                ReportingTree? existingTree = i.Text("Step") == "Create" ? await ExistingAsync<ReportingTree>(c, tree, t => t.Code).ConfigureAwait(true) : null;
                 switch (i.Text("Step"))
                 {
+                    case "Create" when existingTree is not null:
+                        // An existing code renames the tree and changes its purpose; its headings and mappings stay.
+                        existingTree.Name = i.Optional("Name") ?? existingTree.Name;
+                        existingTree.Purpose = Enum.Parse<ReportingTreePurpose>(i.Text("Purpose"));
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Tree {existingTree.Code} changed.";
                     case "Create":
                     case "Create from chart":
                         _ = Check(await trees.CreateTreeAsync(c.CompanyId, tree, i.Optional("Name") ?? tree, Enum.Parse<ReportingTreePurpose>(i.Text("Purpose"))).ConfigureAwait(true));
@@ -183,12 +225,16 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.ReportingTrees.AsNoTracking().Include(t => t.Nodes).Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
                 ("Tree", t => t.Code), ("Name", t => t.Name), ("Purpose", t => t.Purpose), ("Headings", t => t.Nodes.Count)),
+
+            // A tree has no retired state, so it is renamed or reshaped rather than deleted.
+            Editable = true,
         };
         yield return new Operation
         {
             Module = module, Title = "Tax exemption certificates", ListTitle = "Certificates expiring within 30 days (or lately expired)",
             Description = "Record a customer's or supplier's exemption certificate (while valid no tax is charged either way; an exempt tax code needs one), or a supplier's tax clearance "
-                + "(while valid no withholding is deducted from payments), or withdraw one by its id.",
+                + "(while valid no withholding is deducted from payments), or withdraw one by its id (Delete on the list withdraws it from today). A renewed certificate is "
+                + "recorded as a new one, so the history of each stays.",
             Fields = [Pick("Step", "Step", ["Record", "Withdraw", "Set default withholding"]), Pick("Ledger", "Who", ["Customer", "Supplier"]), Pick("Purpose", "For", ["Tax exemption", "Tax clearance (supplier)"]),
                 Opt("Trader", "Customer / supplier code"), Opt("Number", "Certificate number"),
                 Today("From", "Valid from"), OptDate("To", "Valid to"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)"),
@@ -221,9 +267,18 @@ public static partial class OperationCatalogue
                 return $"Certificate {id} recorded.";
             },
             List = async c => Table(await c.Get<ITaxComplianceService>().ExpiringAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true),
-                ("Id", e => e.CertificateId), ("Who", e => e.Ledger == Core.Trading.TradingLedger.AccountsReceivable ? "Customer" : "Supplier"), ("For", e => e.Purpose == CertificatePurpose.TaxClearance ? "Clearance" : "Exemption"),
-                ("Code", e => e.TraderCode), ("Name", e => e.TraderName),
-                ("Certificate", e => e.CertificateNumber), ("Valid to", e => D(e.ValidTo)), ("Days left", e => e.DaysLeft)),
+                ("Id", e => e.CertificateId), ("Who", e => e.Ledger == Core.Trading.TradingLedger.AccountsReceivable ? "Customer" : "Supplier"),
+                ("For", e => e.Purpose == CertificatePurpose.TaxClearance ? "Tax clearance (supplier)" : "Tax exemption"), ("Trader", e => e.TraderCode), ("Name", e => e.TraderName),
+                ("Number", e => e.CertificateNumber), ("Valid to", e => D(e.ValidTo)), ("Days left", e => e.DaysLeft)),
+            KeyColumn = "Id",
+
+            // A certificate is never removed: deleting it withdraws it from today, and the record stays for the tax history.
+            Delete = async (c, id) =>
+            {
+                long certificate = long.TryParse(id, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsed) ? parsed : throw new OperationException($"No certificate {id}.");
+                _ = Check(await c.Get<ITaxComplianceService>().RevokeCertificateAsync(c.CompanyId, certificate, DateOnly.FromDateTime(DateTime.Today)).ConfigureAwait(true), string.Empty);
+                return $"Certificate {id} withdrawn from today (kept in history).";
+            },
         };
         yield return new Operation
         {
@@ -387,7 +442,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Recurring journals", ListTitle = "Recurring journals",
             Description = "Create: a journal posted again on a schedule (\"6100 Dr 500 cc=ADM; 2100 Cr 500\"): monthly, quarterly, half-yearly or yearly, from a start month to an end date or for "
                 + "a number of times, in a currency, and reversed on the first of the next month when it is an accrual. Schedule: change those on one. Post: one of them on a date. Post all: every one "
-                + "due. Stop / restart one.",
+                + "due. Stop / restart one. Create with an existing code changes its schedule (its lines stay); Delete stops it.",
             Fields = [Pick("Step", "Step", ["Create", "Schedule", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Lines (create)"),
                 Opt("Narrative", "Narrative"), Pick("Frequency", "Frequency", ["Monthly", "Quarterly", "Half-yearly", "Yearly"]), Opt("Start", "Start month (yyyy-MM, blank: any)"),
                 OptDate("End", "End date (blank: none)"), OptNum("Times", "Post at most this many times (blank: no limit)"), Tick("Reverse", "Auto-reverse next month", false),
@@ -405,8 +460,14 @@ public static partial class OperationCatalogue
                     return new RecurringSchedule(interval, start, end, i.OptionalNumber("Times") is decimal n ? (int)n : null, i.Flag("Reverse"), i.Optional("Currency") is string cur ? CurrencyCode.Parse(cur) : null);
                 }
 
+                string wanted = (i.Optional("Code") ?? string.Empty).ToUpperInvariant();
+                bool exists = i.Text("Step") == "Create" && await c.Db.Set<Core.Accounting.RecurringJournal>().AnyAsync(r => r.CompanyId == c.CompanyId && r.Code == wanted).ConfigureAwait(true);
                 switch (i.Text("Step"))
                 {
+                    case "Create" when exists:
+                        // An existing code changes its schedule; its lines stay as posted before (stop it and create a new one to change them).
+                        _ = Check(await recurring.SetScheduleAsync(c.CompanyId, await Id().ConfigureAwait(true), Schedule()).ConfigureAwait(true), string.Empty);
+                        return $"Recurring journal {(i.Optional("Code") ?? string.Empty).ToUpperInvariant()} changed: new schedule saved (its lines stay; stop it and create another to change them).";
                     case "Create":
                         List<RecurringJournalLineInput> lines = [.. JournalLines(i.Optional("Lines") ?? string.Empty)
                             .Select(l => new RecurringJournalLineInput(l.AccountCode, l.Side == JournalSide.Debit, l.TransactionAmount, l.CostCentre, l.Department))];
@@ -426,9 +487,18 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.Set<Core.Accounting.RecurringJournal>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", r => r.Code), ("Description", r => r.Description), ("Active", r => r.IsActive), ("Every", r => $"{r.IntervalMonths} month(s)"), ("Start", r => r.StartDate is DateOnly s ? D(s) : string.Empty),
-                ("End", r => r.EndDate is DateOnly e ? D(e) : string.Empty), ("Times", r => r.MaxOccurrences is int m ? $"{r.Occurrences} of {m}" : r.Occurrences.ToString(System.Globalization.CultureInfo.InvariantCulture)),
-                ("Reverses", r => r.AutoReverse), ("Currency", r => r.Currency?.Value ?? "base")),
+                ("Code", r => r.Code), ("Description", r => r.Description), ("Active", r => r.IsActive),
+                ("Frequency", r => r.IntervalMonths switch { 3 => "Quarterly", 6 => "Half-yearly", 12 => "Yearly", 1 => "Monthly", _ => $"Every {r.IntervalMonths} months" }),
+                ("Start", r => r.StartDate is DateOnly s ? s.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture) : string.Empty),
+                ("End", r => r.EndDate is DateOnly e ? D(e) : string.Empty), ("Times", r => r.MaxOccurrences), ("Posted", r => r.Occurrences),
+                ("Reverse", r => r.AutoReverse), ("Currency", r => r.Currency?.Value)),
+
+            // Deleting a recurring journal stops it (the Stop step): nothing more posts, and what it posted stays.
+            Delete = async (c, code) =>
+            {
+                long id = await FindAsync(c.Db.Set<Core.Accounting.RecurringJournal>(), r => r.CompanyId == c.CompanyId && r.Code == code.ToUpper(), r => r.Id, "recurring journal", code).ConfigureAwait(true);
+                return Check(await c.Get<IRecurringJournalService>().SetActiveAsync(c.CompanyId, id, false).ConfigureAwait(true), $"Recurring journal {code} stopped (kept in history).");
+            },
         };
         yield return new Operation
         {
@@ -521,7 +591,8 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Overhead allocation", ListTitle = "Allocation rules",
             Description = "Rules that recharge a cost centre's overheads to others by fixed %, headcount, floor area or a usage driver (targets \"CC1:60; CC2:40\", optionally CC:driver:dept). "
-                + "Drivers updates a rule's targets; Preview shows the period's recharge; Run posts it.",
+                + "Drivers updates a rule's targets; Preview shows the period's recharge; Run posts it. Create rule with an existing code changes its name, order and targets "
+                + "(the basis and source stay); Delete takes a rule out of use.",
             Fields = [Pick("Step", "Step", ["Create rule", "Drivers", "Preview", "Run"]), Opt("Code", "Rule code"), Opt("Name", "Name"), Num("Sequence", "Order", "1"),
                 Pick("Basis", "Basis", Enum.GetNames<Core.Accounting.AllocationBasis>()), Opt("Source", "Source account"), Opt("SourceCc", "Source cost centre"), Opt("Target", "Target account (blank: same)"),
                 Opt("Targets", "Targets: CC:driver[:dept]; …"), Today("Date", "Period (any day in it)")],
@@ -544,8 +615,23 @@ public static partial class OperationCatalogue
                 static string Show(AllocationRunResult run) => run.Rules.Count == 0 ? "No rules." : string.Join(Environment.NewLine, run.Rules.Select(r =>
                     $"{r.RuleCode} {r.RuleName} ({r.Basis}): pool {M(r.Pool)}{(r.JournalNumber is null ? string.Empty : $" → {r.JournalNumber}")}" + Environment.NewLine
                     + string.Join(Environment.NewLine, r.Shares.Select(x => $"    {x.CostCentre,-8} {x.Department,-6} driver {Q(x.Driver),10}  {M(x.Amount),12}"))));
+                Core.Accounting.AllocationRule? existing = i.Text("Step") == "Create rule" && i.Optional("Code") is string ruleCode
+                    ? await ExistingAsync<Core.Accounting.AllocationRule>(c, ruleCode, r => r.Code).ConfigureAwait(true)
+                    : null;
                 switch (i.Text("Step"))
                 {
+                    case "Create rule" when existing is not null:
+                        // An existing code changes the rule's name, order and (when given) its targets, and puts it back in use; its basis and source stay.
+                        existing.Name = i.Optional("Name") ?? existing.Name;
+                        existing.Sequence = i.Whole("Sequence");
+                        existing.IsActive = true;
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        if (i.Optional("Targets") is not null)
+                        {
+                            _ = Check(await allocation.SetDriversAsync(c.CompanyId, existing.Id, Targets()).ConfigureAwait(true), string.Empty);
+                        }
+
+                        return $"Rule {existing.Code} changed.";
                     case "Create rule":
                         return Check(await allocation.CreateRuleAsync(new AllocationRuleRequest
                         {
@@ -564,7 +650,9 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.Set<Core.Accounting.AllocationRule>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Sequence).ToListAsync().ConfigureAwait(true),
-                ("Code", r => r.Code), ("Name", r => r.Name), ("Order", r => r.Sequence), ("Basis", r => r.Basis), ("Source", r => r.SourceAccountCode), ("Cost centre", r => r.SourceCostCentre)),
+                ("Code", r => r.Code), ("Name", r => r.Name), ("Order", r => r.Sequence), ("Basis", r => r.Basis), ("Source", r => r.SourceAccountCode),
+                ("Source cost centre", r => r.SourceCostCentre), ("Target", r => r.TargetAccountCode), ("Active", r => r.IsActive)),
+            Delete = Retire<Core.Accounting.AllocationRule>(r => r.Code, r => r.IsActive = false, "allocation rule"),
         };
         yield return new Operation
         {

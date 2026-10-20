@@ -189,8 +189,9 @@ public static partial class OperationCatalogue
             Module = module, Title = "Message templates", ListTitle = "Message templates",
             Description = "The email, SMS and WhatsApp templates bulk sends use (statements STATEMENT, fee statements FEES, reminders REMINDER, bills BILL), with {{Field}} merge fields. "
                 + "Save: creates or rewords a template (\\n in the body starts a new line). Preview: renders it with sample values \"Name=Thandi;Account=C001\" and lists fields still blank. "
-                + "Seed standard: adds the standard templates this company is missing without touching reworded ones.",
-            Fields = [Pick("Step", "Step", ["List", "Save", "Preview", "Seed standard"]), Opt("Code", "Template code"), Pick("Channel", "Channel", ["Email", "Sms", "WhatsApp", "InApp"]), Opt("Language", "Language", "en"),
+                + "Seed standard: adds the standard templates this company is missing without touching reworded ones. An existing code, channel and language rewords that template; "
+                + "templates are kept rather than deleted (sent messages name them).",
+            Fields = [Pick("Step", "Step", ["Save", "Preview", "Seed standard", "List"]), Opt("Code", "Template code"), Pick("Channel", "Channel", ["Email", "Sms", "WhatsApp", "InApp"]), Opt("Language", "Language", "en"),
                 Opt("DocumentType", "Document type (save)"), Opt("Subject", "Subject (email)"), Opt("Body", "Body (save; \\n for a new line)"), Opt("Values", "Sample values (preview), Field=value; …")],
             Run = async (c, i) =>
             {
@@ -220,7 +221,11 @@ public static partial class OperationCatalogue
                 }
             },
             List = async c => Table(await c.Db.Set<Core.Communications.MessageTemplate>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ThenBy(x => x.Channel).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Channel", x => x.Channel), ("Language", x => x.Language), ("Document", x => x.DocumentType), ("Subject", x => x.Subject)),
+                ("Code", x => x.Code), ("Channel", x => x.Channel), ("Language", x => x.Language), ("Document type", x => x.DocumentType), ("Subject", x => x.Subject),
+                ("Body", x => x.Body.Replace("\r\n", "\\n", StringComparison.Ordinal).Replace("\n", "\\n", StringComparison.Ordinal))),
+
+            // A template has no retired state and sent messages name it, so it is reworded rather than removed (no Delete).
+            Editable = true,
         };
         yield return new Operation
         {
@@ -423,20 +428,67 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Create a company", ListTitle = "Companies", Description = "A new company with a head-office branch, held to the licence's company limit.",
+            Module = module, Title = "Create a company", ListTitle = "Companies",
+            Description = "A new company with a head-office branch, held to the licence's company limit. An existing code changes that company's name and time zone (its base currency "
+                + "stays: its books are kept in it). Companies are kept rather than deleted.",
             Fields = [Req("Code", "Company code"), Req("Name", "Name"), Req("Currency", "Base currency", "USD"), Req("TimeZone", "Time zone", "UTC")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateCompanyAsync(i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Text("TimeZone"))
-                .ConfigureAwait(true), id => $"Company {id} created."),
+            Run = async (c, i) =>
+            {
+                string code = i.Text("Code").Trim().ToUpperInvariant();
+                if (await c.Db.Companies.FirstOrDefaultAsync(x => x.Code == code).ConfigureAwait(true) is { } existing)
+                {
+                    if (!string.Equals(existing.BaseCurrency.Value, i.Text("Currency").Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new OperationException($"Company {existing.Code} keeps its books in {existing.BaseCurrency.Value}; its base currency cannot change.");
+                    }
+
+                    existing.Name = i.Text("Name");
+                    existing.TimeZoneId = i.Text("TimeZone");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Company {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateCompanyAsync(i.Text("Code"), i.Text("Name"), CurrencyCode.Parse(i.Text("Currency")), i.Text("TimeZone"))
+                    .ConfigureAwait(true), id => $"Company {id} created.");
+            },
             List = async c => Table(await c.Db.Companies.AsNoTracking().OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Id", x => x.Id), ("Code", x => x.Code), ("Name", x => x.Name), ("Base currency", x => x.BaseCurrency.Value), ("Time zone", x => x.TimeZoneId)),
+                ("Id", x => x.Id), ("Code", x => x.Code), ("Name", x => x.Name), ("Currency", x => x.BaseCurrency.Value), ("Time zone", x => x.TimeZoneId)),
+
+            // A company holds its own books, users' access and licence count: it is changed, never removed from here.
+            Editable = true,
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a branch", ListTitle = "Branches", Description = "A branch or site of the current company.",
+            Module = module, Title = "Add a branch", ListTitle = "Branches",
+            Description = "A branch or site of the current company. An existing code changes that branch's name (a deleted branch with the code is brought back). The head office cannot be deleted.",
             Fields = [Req("Code", "Code"), Req("Name", "Name")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateBranchAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true), id => "Branch added."),
+            Run = async (c, i) =>
+            {
+                string code = i.Text("Code").Trim();
+                List<Core.System.Branch> all = await c.Db.Branches.IgnoreQueryFilters([Infrastructure.Persistence.One4AllDbContext.SoftDeleteFilter]).Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true);
+                if (all.FirstOrDefault(x => string.Equals(x.Code, code, StringComparison.OrdinalIgnoreCase)) is { } existing)
+                {
+                    bool restored = existing.IsDeleted;
+                    existing.Name = i.Text("Name");
+                    BringBackDeleted(existing);
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return restored ? $"Branch {existing.Code} brought back into use." : $"Branch {existing.Code} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateBranchAsync(c.CompanyId, code, i.Text("Name")).ConfigureAwait(true), id => "Branch added.");
+            },
             List = async c => Table(await c.Db.Branches.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", x => x.Code), ("Name", x => x.Name), ("Head office", x => x.IsHeadOffice)),
+            Delete = async (c, code) =>
+            {
+                Core.System.Branch branch = await ExistingAsync<Core.System.Branch>(c, code, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No branch {code}.");
+                if (branch.IsHeadOffice)
+                {
+                    throw new OperationException($"Branch {branch.Code} is the head office and stays; make another branch the head office first.");
+                }
+
+                return await SoftDelete<Core.System.Branch>(x => x.Code, "branch")(c, code).ConfigureAwait(true);
+            },
         };
         yield return new Operation
         {
@@ -477,9 +529,10 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Report subscription", ListTitle = "Report subscriptions",
             Description = "A report emailed every time the report-subscriptions job runs: to a list of addresses, or burst by a field to each customer's or supplier's contacts (or the address in "
-                + "a field); and/or saved to a folder or printed on a printer. Parameters may use date tokens (@Today, @MonthStart, @PrevMonthEnd ...).",
+                + "a field); and/or saved to a folder or printed on a printer. Parameters may use date tokens (@Today, @MonthStart, @PrevMonthEnd ...). An existing code changes that "
+                + "subscription (and starts it again if it was stopped); Delete stops it, keeping its delivery log.",
             Fields = [Req("Code", "Subscription code"), Req("Report", "Report code"), Pick("Format", "Format", ["Pdf", "Xlsx", "Csv", "Html"]), Opt("Recipients", "Email addresses (; separated)"),
-                Opt("Key", "Burst by field (optional)"), Opt("EmailField", "Field holding the email (burst)"), Pick("Ledger", "Or burst to the contacts of", ["(email field)", "Customers", "Suppliers"]),
+                Opt("Key", "Burst by field"), Opt("EmailField", "Field holding the email (burst)"), Pick("Ledger", "Or burst to the contacts of", ["(email field)", "Customers", "Suppliers"]),
                 Opt("Parameters", "Parameters (Name=value; ...)"), Opt("Folder", "Also save to this folder (inside the delivery root)"), Opt("Printer", "Also print on this printer")],
             Run = async (c, i) =>
             {
@@ -497,10 +550,14 @@ public static partial class OperationCatalogue
                     BurstKeyField = i.Optional("Key"), BurstRecipientField = i.Optional("EmailField"), DeliveryFolder = i.Optional("Folder"), DeliveryPrinter = i.Optional("Printer"),
                     BurstLedger = i.Text("Ledger") switch { "Customers" => Core.Trading.TradingLedger.AccountsReceivable, "Suppliers" => Core.Trading.TradingLedger.AccountsPayable, _ => null },
                 }).ConfigureAwait(true), string.Empty);
-                return $"Subscription {i.Text("Code").ToUpperInvariant()} created.";
+                return $"Subscription {i.Text("Code").ToUpperInvariant()} saved.";
             },
             List = async c => Table(await c.Db.Set<Core.Reporting.ReportSubscription>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Burst by", x => x.BurstKeyField ?? "-"), ("Active", x => x.IsActive)),
+                ("Code", x => x.Code), ("Report", x => x.ReportCode), ("Format", x => ((Application.Abstractions.Reporting.ReportFormat)x.Format).ToString()),
+                ("Recipients", x => string.Join("; ", x.Recipients)), ("Burst by field", x => x.BurstKeyField), ("Email field", x => x.BurstRecipientField),
+                ("Ledger", x => x.BurstLedger switch { 1 => "Customers", 2 => "Suppliers", _ => "(email field)" }),
+                ("Parameters", x => SubscriptionParameters(x.ParametersJson)), ("Folder", x => x.DeliveryFolder), ("Printer", x => x.DeliveryPrinter), ("Active", x => x.IsActive)),
+            Delete = Retire<Core.Reporting.ReportSubscription>(x => x.Code, x => x.SetActive(false), "report subscription"),
         };
         yield return new Operation
         {
@@ -527,7 +584,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Number sequences", ListTitle = "Number sequences",
             Description = "How each document type is numbered (brief §2.4): the prefix, the digits the number is padded to, whether the counter restarts every year (the year goes into "
                 + "the number, INV-2026-000001), whether it must be gapless, and per branch when a branch numbers its own. A sequence not set up here is created on first use as "
-                + "'<type>-' padded to 5 digits. A starting number moves the counter forward, never back.",
+                + "'<type>-' padded to 5 digits. A starting number moves the counter forward, never back. An existing type (and branch) changes that sequence; sequences are "
+                + "kept rather than deleted, since documents carry their numbers.",
             Fields = [Req("Type", "Document type (e.g. AR.Invoice, PO, AC, ALR)"), Opt("Branch", "Branch code (blank: company-wide)"), Req("Prefix", "Prefix"), Num("Padding", "Padding (digits)", "5"),
                 Tick("Yearly", "Restart each year"), Tick("Gapless", "Gapless", true), OptNum("StartAt", "Next number (move forward)")],
             Run = async (c, i) =>
@@ -543,15 +601,25 @@ public static partial class OperationCatalogue
                     new Application.Abstractions.Numbering.NumberSequenceSetup(i.Text("Prefix"), i.Whole("Padding"), i.Flag("Yearly"), i.Flag("Gapless"), (long?)i.OptionalNumber("StartAt"))).ConfigureAwait(true));
                 return $"{row.DocumentType}: next number {row.Prefix}{(row.ResetYearly ? "<year>-" : string.Empty)}{row.NextValue.ToString(CultureInfo.InvariantCulture).PadLeft(row.Padding, '0')}{(row.Gapless ? " (gapless)" : string.Empty)}.";
             },
-            List = async c => Table(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().ListAsync(c.CompanyId).ConfigureAwait(true),
-                ("Type", s => s.DocumentType), ("Branch", s => s.BranchId?.ToString(CultureInfo.InvariantCulture) ?? "all"), ("Prefix", s => s.Prefix), ("Padding", s => s.Padding),
-                ("Yearly", s => s.ResetYearly ? "yes" : string.Empty), ("Gapless", s => s.Gapless ? "yes" : string.Empty), ("Next", s => s.NextValue), ("Year", s => s.CurrentYear == 0 ? string.Empty : s.CurrentYear.ToString(CultureInfo.InvariantCulture))),
+            List = async c =>
+            {
+                // The branch is shown by its code (blank: company-wide), so Edit fills the form's branch code.
+                Dictionary<long, string> branches = await c.Db.Branches.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).ToDictionaryAsync(b => b.Id, b => b.Code).ConfigureAwait(true);
+                return Table(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().ListAsync(c.CompanyId).ConfigureAwait(true),
+                    ("Type", s => s.DocumentType), ("Branch", s => s.BranchId is long b ? branches.GetValueOrDefault(b, b.ToString(CultureInfo.InvariantCulture)) : string.Empty), ("Prefix", s => s.Prefix),
+                    ("Padding", s => s.Padding), ("Yearly", s => s.ResetYearly), ("Gapless", s => s.Gapless), ("Next", s => s.NextValue),
+                    ("Year", s => s.CurrentYear == 0 ? string.Empty : s.CurrentYear.ToString(CultureInfo.InvariantCulture)));
+            },
+            KeyColumn = "Type",
+
+            // Issued documents carry the sequence's numbers, so a sequence is changed, never removed (no Delete).
+            Editable = true,
         };
         yield return new Operation
         {
             Module = module, Title = "Document layouts", ListTitle = "Document layouts",
             Description = "Which report lays out each business document. Copy the document's designable report (DOC01–DOC50, listed here) in the report designer, lay it out as your own, "
-                + "and name your copy's code here; a document with no layout prints as the standard text document. A blank code clears the layout.",
+                + "and name your copy's code here; a document with no layout prints as the standard text document. A blank code clears the layout; so does Delete (the report itself is kept).",
             Fields = [Pick("Document", "Document", [.. Application.Documents.DocumentKinds.All.Select(k => k.Name)]), Opt("Layout", "Layout report code (blank: standard text document)")],
             Run = async (c, i) =>
             {
@@ -573,8 +641,20 @@ public static partial class OperationCatalogue
             {
                 string? json = await c.Db.Companies.Where(x => x.Id == c.CompanyId).Select(x => x.DocumentLayoutsJson).FirstOrDefaultAsync().ConfigureAwait(true);
                 Application.Documents.DocumentLayoutSettings settings = Application.Documents.DocumentLayoutSettings.Parse(json);
-                return Table(Application.Documents.DocumentKinds.All, ("Document", k => k.Name), ("Layout", k => settings.LayoutFor(k.Kind) ?? "(standard text)"),
-                    ("Start from", k => k.DesignableReportCode), ("Identified by", k => k.NumberLabel));
+                return Table(Application.Documents.DocumentKinds.All, ("Document", k => k.Name), ("Layout", k => settings.LayoutFor(k.Kind)),
+                    ("Prints as", k => settings.LayoutFor(k.Kind) is null ? "standard text document" : "its layout report"), ("Start from", k => k.DesignableReportCode), ("Identified by", k => k.NumberLabel));
+            },
+            KeyColumn = "Document",
+            Delete = async (c, name) =>
+            {
+                // Deleting a document's layout returns it to the standard text document; the layout report stays in the report designer.
+                Application.Documents.DocumentKind kind = Application.Documents.DocumentKinds.Find(name) ?? throw new OperationException($"No document {name}.");
+                Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                Application.Documents.DocumentLayoutSettings settings = Application.Documents.DocumentLayoutSettings.Parse(company.DocumentLayoutsJson);
+                settings.Set(kind.Kind, null);
+                company.DocumentLayoutsJson = settings.ToJson();
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"{kind.Name}: layout cleared; it prints as the standard text document.";
             },
         };
         yield return new Operation
@@ -709,40 +789,204 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a ledger account", ListTitle = "Chart of accounts", Description = "A ledger account; a control account is posted only by its own ledger.",
+            Module = module, Title = "Add a ledger account", ListTitle = "Chart of accounts",
+            Description = "A ledger account; a control account is posted only by its own ledger. An existing code changes that account (and puts it back in use); its type and control "
+                + "account change only while nothing has been posted to it. Delete takes an account out of use when it has no balance and is not a control account.",
             Fields = [Req("Code", "Account code (up to 8)"), Req("Name", "Name"), Pick("Type", "Type", Enum.GetNames<AccountType>()),
                 Pick("Control", "Control account", [NoControl, .. Enum.GetNames<ControlAccountType>()]), Opt("Category", "Report category"), Opt("TaxCode", "Default tax code"),
                 Tick("Manual", "Manual journals allowed (untick for an account the system alone posts)", true), Tick("Monetary", "Monetary item (revalued at closing rates when currency-restricted)", true),
                 Tick("Oci", "Equity reserve whose movement is other comprehensive income")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateAccountAsync(new NewAccount(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<AccountType>(i.Text("Type")),
-                i.Text("Control") == NoControl ? null : Enum.Parse<ControlAccountType>(i.Text("Control")), i.Optional("Category"), DefaultTaxCode: i.Optional("TaxCode"), AllowManualJournal: i.Flag("Manual"), IsMonetary: i.Flag("Monetary"),
-                IsOtherComprehensiveIncome: i.Flag("Oci"))).ConfigureAwait(true), id => "Account added."),
+            Run = async (c, i) =>
+            {
+                if (await ExistingAsync<LedgerAccount>(c, i.Text("Code"), x => x.AccountCode).ConfigureAwait(true) is { } existing)
+                {
+                    AccountType type = Enum.Parse<AccountType>(i.Text("Type"));
+                    ControlAccountType control = i.Text("Control") == NoControl ? ControlAccountType.None : Enum.Parse<ControlAccountType>(i.Text("Control"));
+                    if (type != existing.Type || control != existing.ControlAccountType)
+                    {
+                        // Posted history was classified by the type and control account it was posted under, so these are fixed once there are postings.
+                        if (await AccountHasPostingsAsync(c, existing.AccountCode).ConfigureAwait(true))
+                        {
+                            throw new OperationException($"Account {existing.AccountCode} has postings, so its type and control account cannot change. Open a new account and move the balance by journal.");
+                        }
+
+                        existing.ChangeType(type);
+                        existing.MakeControlAccount(control);
+                    }
+
+                    existing.Name = i.Text("Name");
+                    existing.ReportCategory = i.Optional("Category") ?? existing.ReportCategory;
+                    existing.DefaultTaxCode = i.Optional("TaxCode")?.Trim().ToUpperInvariant();
+                    existing.AllowManualJournal = !existing.IsControlAccount && i.Flag("Manual");
+                    existing.IsMonetary = i.Flag("Monetary");
+                    existing.IsOtherComprehensiveIncome = i.Flag("Oci") && existing.Type == AccountType.Equity;
+                    existing.IsActive = true;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Account {existing.AccountCode} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateAccountAsync(new NewAccount(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<AccountType>(i.Text("Type")),
+                    i.Text("Control") == NoControl ? null : Enum.Parse<ControlAccountType>(i.Text("Control")), i.Optional("Category"), DefaultTaxCode: i.Optional("TaxCode"), AllowManualJournal: i.Flag("Manual"), IsMonetary: i.Flag("Monetary"),
+                    IsOtherComprehensiveIncome: i.Flag("Oci"))).ConfigureAwait(true), id => "Account added.");
+            },
             List = async c => Table(await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.AccountCode).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.ControlAccountType), ("Manual", x => x.AllowManualJournal ? "yes" : "no"), ("Active", x => x.IsActive)),
+                ("Code", x => x.AccountCode), ("Name", x => x.Name), ("Type", x => x.Type), ("Control", x => x.IsControlAccount ? x.ControlAccountType.ToString() : NoControl),
+                ("Category", x => x.ReportCategory), ("Tax code", x => x.DefaultTaxCode), ("Manual", x => x.AllowManualJournal), ("Monetary", x => x.IsMonetary), ("OCI", x => x.IsOtherComprehensiveIncome),
+                ("Active", x => x.IsActive)),
+            Delete = async (c, code) =>
+            {
+                LedgerAccount account = await ExistingAsync<LedgerAccount>(c, code, x => x.AccountCode).ConfigureAwait(true) ?? throw new OperationException($"No account {code}.");
+                if (account.IsControlAccount)
+                {
+                    throw new OperationException($"Account {account.AccountCode} is the {account.ControlAccountType} control account; its ledger posts to it, so it stays in use.");
+                }
+
+                decimal balance = await c.Db.Set<Core.Accounting.JournalLine>().Where(l => l.CompanyId == c.CompanyId && l.AccountCode == account.AccountCode)
+                    .SumAsync(l => l.BaseDebit - l.BaseCredit).ConfigureAwait(true);
+                if (balance != 0m)
+                {
+                    throw new OperationException($"Account {account.AccountCode} has a balance of {M(balance)}; move it to another account by journal before taking the account out of use.");
+                }
+
+                account.IsActive = false;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Account {account.AccountCode} taken out of use (kept in history).";
+            },
         };
         yield return new Operation
         {
             Module = module, Title = "Add a tax code", ListTitle = "Tax codes",
             Description = "A tax code with its first rate and the accounts it posts to; what it applies to (a goods-only code is refused on a service line and the other way round), "
-                + "its jurisdiction and the tax-return box it reports in (TX226 VAT return by box).",
+                + "its jurisdiction and the tax-return box it reports in (TX226 VAT return by box). An existing code changes that tax code (and puts it back in use): a different "
+                + "rate is added from the date given, so earlier documents keep the rate they were taxed at; the type stays. Delete takes a code out of use.",
             Fields = [Req("Code", "Code"), Req("Name", "Name"), Pick("Type", "Type", Enum.GetNames<TaxType>()), Num("Rate", "Rate %"), Today("From", "Rate from"),
                 Opt("Output", "Output / payable account"), Opt("Input", "Input account"), Pick("AppliesTo", "Applies to", Enum.GetNames<TaxAppliesTo>()), Opt("Jurisdiction", "Jurisdiction"),
                 Opt("ReturnBox", "Return box")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateTaxCodeAsync(new NewTaxCode(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<TaxType>(i.Text("Type")),
-                i.Number("Rate"), i.Date("From"), i.Optional("Output"), i.Optional("Input"), Enum.Parse<TaxAppliesTo>(i.Text("AppliesTo")), i.Optional("Jurisdiction"), i.Optional("ReturnBox")))
-                .ConfigureAwait(true), id => "Tax code added."),
-            List = async c => Table(await c.Db.TaxCodes.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
-                ("Code", x => x.Code), ("Name", x => x.Name), ("Type", x => x.Type), ("Output", x => x.OutputAccountCode), ("Input", x => x.InputAccountCode), ("Applies to", x => x.AppliesTo),
+            Run = async (c, i) =>
+            {
+                string code = i.Text("Code").Trim().ToUpperInvariant();
+                if (await c.Db.TaxCodes.Include(x => x.Rates).FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Code == code).ConfigureAwait(true) is { } existing)
+                {
+                    if (Enum.Parse<TaxType>(i.Text("Type")) != existing.Type)
+                    {
+                        throw new OperationException($"Tax code {existing.Code} is {existing.Type}; its type cannot change. Add a new tax code for the other type.");
+                    }
+
+                    foreach (string? account in new[] { i.Optional("Output"), i.Optional("Input") })
+                    {
+                        string? key = account?.Trim().ToUpperInvariant();
+                        if (key is not null && !await c.Db.Accounts.AnyAsync(a => a.CompanyId == c.CompanyId && a.AccountCode == key).ConfigureAwait(true))
+                        {
+                            throw new OperationException($"No account {key}.");
+                        }
+                    }
+
+                    decimal rate = i.Number("Rate");
+                    DateOnly from = i.Date("From");
+                    decimal current = existing.Rates.Where(r => r.EffectiveFrom <= from).OrderByDescending(r => r.EffectiveFrom).Select(r => r.RatePercent).FirstOrDefault();
+                    string rateNote = string.Empty;
+                    if (rate != current)
+                    {
+                        if (rate is < 0m or > 100m)
+                        {
+                            throw new OperationException("A rate is between 0 and 100%.");
+                        }
+
+                        if (existing.Rates.Any(r => r.EffectiveFrom == from))
+                        {
+                            throw new OperationException($"Tax code {existing.Code} already has a rate from {D(from)}; give the new rate a later date.");
+                        }
+
+                        existing.AddRate(from, rate);
+                        rateNote = $" Rate {rate:0.####}% applies from {D(from)}.";
+                    }
+
+                    existing.Name = i.Text("Name");
+                    existing.OutputAccountCode = i.Optional("Output")?.Trim().ToUpperInvariant();
+                    existing.InputAccountCode = i.Optional("Input")?.Trim().ToUpperInvariant();
+                    existing.AppliesTo = Enum.Parse<TaxAppliesTo>(i.Text("AppliesTo"));
+                    existing.Jurisdiction = i.Optional("Jurisdiction")?.Trim().ToUpperInvariant();
+                    existing.ReturnBox = i.Optional("ReturnBox")?.Trim();
+                    existing.IsActive = true;
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Tax code {existing.Code} changed.{rateNote}";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateTaxCodeAsync(new NewTaxCode(c.CompanyId, i.Text("Code"), i.Text("Name"), Enum.Parse<TaxType>(i.Text("Type")),
+                    i.Number("Rate"), i.Date("From"), i.Optional("Output"), i.Optional("Input"), Enum.Parse<TaxAppliesTo>(i.Text("AppliesTo")), i.Optional("Jurisdiction"), i.Optional("ReturnBox")))
+                    .ConfigureAwait(true), id => "Tax code added.");
+            },
+            List = async c => Table(await c.Db.TaxCodes.AsNoTracking().Include(x => x.Rates).Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).ToListAsync().ConfigureAwait(true),
+                ("Code", x => x.Code), ("Name", x => x.Name), ("Type", x => x.Type),
+                ("Rate", x => x.Rates.Where(r => r.EffectiveFrom <= DateOnly.FromDateTime(DateTime.Today)).OrderByDescending(r => r.EffectiveFrom).Select(r => (decimal?)r.RatePercent).FirstOrDefault()?.ToString("0.####", CultureInfo.InvariantCulture)),
+                ("Output", x => x.OutputAccountCode), ("Input", x => x.InputAccountCode), ("Applies to", x => x.AppliesTo),
                 ("Jurisdiction", x => x.Jurisdiction), ("Return box", x => x.ReturnBox), ("Active", x => x.IsActive)),
+            Delete = Retire<TaxCode>(x => x.Code, x => x.IsActive = false, "tax code"),
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a currency", ListTitle = "Currencies", Description = "An ISO currency the system may trade or hold balances in.",
+            Module = module, Title = "Add a currency", ListTitle = "Currencies",
+            Description = "An ISO currency the system may trade or hold balances in. An existing code changes its name and symbol (its decimal places only while nothing has been "
+                + "posted in it); a deleted currency with the code is brought back. Delete is refused for a company's base or reporting currency and for one in use.",
             Fields = [Req("Code", "ISO code"), Req("Name", "Name"), Opt("Symbol", "Symbol"), Num("Places", "Decimal places", "2")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().CreateCurrencyAsync(CurrencyCode.Parse(i.Text("Code")), i.Text("Name"), i.Optional("Symbol") ?? string.Empty, i.Whole("Places"))
-                .ConfigureAwait(true), "Currency added."),
+            Run = async (c, i) =>
+            {
+                CurrencyCode code = CurrencyCode.Parse(i.Text("Code").Trim().ToUpperInvariant());
+                if (await c.Db.Currencies.IgnoreQueryFilters([Infrastructure.Persistence.One4AllDbContext.SoftDeleteFilter]).FirstOrDefaultAsync(x => x.Code == code).ConfigureAwait(true) is { } existing)
+                {
+                    int places = i.Whole("Places");
+                    if (places != existing.DecimalPlaces)
+                    {
+                        if (places is < 0 or > 4)
+                        {
+                            throw new OperationException("A currency has 0 to 4 decimal places.");
+                        }
+
+                        if (await c.Db.Journals.IgnoreQueryFilters([Infrastructure.Persistence.One4AllDbContext.CompanyFilter]).AnyAsync(j => j.TransactionCurrency == code).ConfigureAwait(true))
+                        {
+                            throw new OperationException($"Amounts have been posted in {code.Value}, so its decimal places stay {existing.DecimalPlaces}.");
+                        }
+
+                        existing.DecimalPlaces = places;
+                        existing.RoundingIncrement = places == 0 ? 1m : 1m / (decimal)Math.Pow(10, places);
+                    }
+
+                    bool restored = existing.IsDeleted;
+                    existing.Name = i.Text("Name");
+                    existing.Symbol = i.Optional("Symbol") ?? existing.Symbol;
+                    BringBackDeleted(existing);
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return restored ? $"Currency {code.Value} brought back into use." : $"Currency {code.Value} changed.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().CreateCurrencyAsync(code, i.Text("Name"), i.Optional("Symbol") ?? string.Empty, i.Whole("Places")).ConfigureAwait(true), "Currency added.");
+            },
             List = async c => Table(await c.Db.Currencies.AsNoTracking().ToListAsync().ConfigureAwait(true), ("Code", x => x.Code.Value), ("Name", x => x.Name), ("Symbol", x => x.Symbol),
                 ("Places", x => x.DecimalPlaces)),
+            Delete = async (c, text) =>
+            {
+                CurrencyCode code = CurrencyCode.Parse(text.Trim().ToUpperInvariant());
+                Currency currency = await c.Db.Currencies.FirstOrDefaultAsync(x => x.Code == code).ConfigureAwait(true) ?? throw new OperationException($"No currency {text}.");
+                string? company = await c.Db.Companies.Where(x => x.BaseCurrency == code || x.ReportingCurrency == code).Select(x => x.Code).FirstOrDefaultAsync().ConfigureAwait(true);
+                if (company is not null)
+                {
+                    throw new OperationException($"{code.Value} is company {company}'s base or reporting currency, so it stays.");
+                }
+
+                bool inUse = await c.Db.Customers.IgnoreQueryFilters().AnyAsync(x => x.Currency == code).ConfigureAwait(true)
+                    || await c.Db.Suppliers.IgnoreQueryFilters().AnyAsync(x => x.Currency == code).ConfigureAwait(true)
+                    || await c.Db.Journals.IgnoreQueryFilters([Infrastructure.Persistence.One4AllDbContext.CompanyFilter]).AnyAsync(j => j.TransactionCurrency == code).ConfigureAwait(true);
+                if (inUse)
+                {
+                    throw new OperationException($"{code.Value} is in use (customer or supplier accounts, or postings), so it stays; it is kept for their history.");
+                }
+
+                currency.IsDeleted = true;
+                currency.DeletedOnUtc = DateTimeOffset.UtcNow;
+                currency.DeletedByUserId = c.UserId;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Currency {code.Value} deleted (kept in history).";
+            },
         };
         yield return new Operation
         {
@@ -774,16 +1018,52 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Add a cost centre or department", ListTitle = "Cost centres and departments", Description = "GL analysis codes of up to three characters.",
+            Module = module, Title = "Add a cost centre or department", ListTitle = "Cost centres and departments",
+            Description = "GL analysis codes of up to three characters. An existing code of the kind changes its name (and puts it back in use); Delete takes one out of use, "
+                + "keeping what was posted to it.",
             Fields = [Pick("Kind", "Kind", ["Cost centre", "Department"]), Req("Code", "Code (up to 3)"), Req("Name", "Name")],
-            Run = async (c, i) => Check(i.Text("Kind") == "Department"
-                ? await c.Get<IMasterDataService>().CreateDepartmentAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true)
-                : await c.Get<IMasterDataService>().CreateCostCentreAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true), id => $"{i.Text("Kind")} added."),
+            Run = async (c, i) =>
+            {
+                bool department = i.Text("Kind") == "Department";
+                Core.Common.ICompanyScoped? found = department
+                    ? (Core.Common.ICompanyScoped?)await ExistingAsync<Department>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true)
+                    : (Core.Common.ICompanyScoped?)await ExistingAsync<CostCentre>(c, i.Text("Code"), x => x.Code).ConfigureAwait(true);
+                switch (found)
+                {
+                    case Department d:
+                        (d.Name, d.IsActive) = (i.Text("Name"), true);
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Department {d.Code} changed.";
+                    case CostCentre cc:
+                        (cc.Name, cc.IsActive) = (i.Text("Name"), true);
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        return $"Cost centre {cc.Code} changed.";
+                }
+
+                return Check(department
+                    ? await c.Get<IMasterDataService>().CreateDepartmentAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true)
+                    : await c.Get<IMasterDataService>().CreateCostCentreAsync(c.CompanyId, i.Text("Code"), i.Text("Name")).ConfigureAwait(true), id => $"{i.Text("Kind")} added.");
+            },
             List = async c =>
             {
-                var centres = (await c.Db.CostCentres.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).Select(x => (Kind: "Cost centre", x.Code, x.Name));
-                var departments = (await c.Db.Departments.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).Select(x => (Kind: "Department", x.Code, x.Name));
-                return Table(centres.Concat(departments).OrderBy(x => x.Kind).ThenBy(x => x.Code), ("Kind", x => x.Kind), ("Code", x => x.Code), ("Name", x => x.Name));
+                var centres = (await c.Db.CostCentres.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).Select(x => (Kind: "Cost centre", x.Code, x.Name, x.IsActive));
+                var departments = (await c.Db.Departments.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).ToListAsync().ConfigureAwait(true)).Select(x => (Kind: "Department", x.Code, x.Name, x.IsActive));
+                return Table(centres.Concat(departments).OrderBy(x => x.Kind).ThenBy(x => x.Code), ("Kind", x => x.Kind), ("Code", x => x.Code), ("Name", x => x.Name), ("Active", x => x.IsActive),
+                    ("Record", x => $"{x.Kind} {x.Code}"));
+            },
+
+            // A cost centre and a department may share a code, so a row is identified by its kind and code ("Department FIN").
+            KeyColumn = "Record",
+            Delete = async (c, row) =>
+            {
+                if (row.StartsWith("Department ", StringComparison.Ordinal))
+                {
+                    return await Retire<Department>(x => x.Code, x => x.IsActive = false, "department")(c, row["Department ".Length..]).ConfigureAwait(true);
+                }
+
+                return row.StartsWith("Cost centre ", StringComparison.Ordinal)
+                    ? await Retire<CostCentre>(x => x.Code, x => x.IsActive = false, "cost centre")(c, row["Cost centre ".Length..]).ConfigureAwait(true)
+                    : throw new OperationException($"No cost centre or department {row}.");
             },
         };
         yield return new Operation
@@ -881,17 +1161,48 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Create a user", ListTitle = "Users and their roles",
-            Description = "A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name).",
-            Fields = [Req("Username", "Login name"), Req("Name", "Display name"), Opt("Email", "E-mail"), Req("Password", "Initial password")],
-            Run = async (c, i) => Check(await c.Get<IUserAdminService>().CreateUserAsync(i.Text("Username"), i.Text("Name"), i.Optional("Email"), i.Text("Password")).ConfigureAwait(true),
-                id => $"User {i.Text("Username")} created."),
+            Description = "A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name). An existing login name changes "
+                + "that user's display name and e-mail (a password given is set as a new one they must change). Delete deactivates the user: they can no longer sign in, and "
+                + "their history stays; the last system administrator stays active.",
+            Fields = [Req("Username", "Login name"), Req("Name", "Display name"), Opt("Email", "E-mail"), Opt("Password", "Initial password (blank when changing a user)")],
+            Run = async (c, i) =>
+            {
+                string normalized = i.Text("Username").Trim().ToUpperInvariant();
+                if (await c.Db.Users.FirstOrDefaultAsync(u => u.NormalizedUsername == normalized).ConfigureAwait(true) is { } existing)
+                {
+                    existing.DisplayName = i.Text("Name");
+                    existing.Email = i.Optional("Email");
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    if (i.Optional("Password") is string password)
+                    {
+                        _ = Check(await c.Get<IUserAdminService>().ResetPasswordAsync(existing.Id, password).ConfigureAwait(true), string.Empty);
+                        return $"User {existing.Username} changed; the new password must be changed at next sign-in.";
+                    }
+
+                    return $"User {existing.Username} changed.";
+                }
+
+                return Check(await c.Get<IUserAdminService>().CreateUserAsync(i.Text("Username"), i.Text("Name"), i.Optional("Email"), i.Text("Password")).ConfigureAwait(true),
+                    id => $"User {i.Text("Username")} created.");
+            },
             List = UsersAsync,
+            KeyColumn = "Username",
+            Delete = async (c, username) =>
+            {
+                long user = await UserAsync(c, username).ConfigureAwait(true);
+                if (user == c.UserId)
+                {
+                    throw new OperationException("You cannot deactivate yourself; ask another administrator.");
+                }
+
+                return Check(await c.Get<IUserAdminService>().SetActiveAsync(user, false).ConfigureAwait(true), $"User {username} deactivated: they can no longer sign in (kept in history).");
+            },
         };
         yield return new Operation
         {
             Module = module, Title = "API keys for integrations", ListTitle = "API clients",
             Description = "An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). "
-                + "The key is shown once - copy it then; rotating issues a new one and the old stops working; revoking stops the client.",
+                + "The key is shown once - copy it then; rotating issues a new one and the old stops working; revoking (or Delete on the list) stops the client.",
             Fields = [Pick("Step", "Step", ["Create", "Rotate", "Revoke"]), Opt("Name", "Client name (create)"), Opt("User", "Service user it acts as (create)"),
                 new("Expires", "Expires on (create)", FieldKind.Date, Required: false), OptNum("Rate", "Requests per minute (create; blank: the server's)"), Opt("Client", "Client id (rotate / revoke)")],
             Run = async (c, i) =>
@@ -909,6 +1220,10 @@ public static partial class OperationCatalogue
             List = async c => Table(await c.Get<IApiClientService>().ListAsync().ConfigureAwait(true), ("Client", r => r.ClientId), ("Name", r => r.Name), ("Acts as", r => r.ActsAs),
                 ("Active", r => r.IsActive), ("Expires", r => r.ExpiresOn is DateOnly d ? D(d) : "-"), ("Rate/min", r => r.RequestsPerMinute?.ToString(CultureInfo.CurrentCulture) ?? "server"),
                 ("Last used", r => r.LastUsedOnUtc?.ToLocalTime().ToString("g", CultureInfo.CurrentCulture) ?? "never")),
+            KeyColumn = "Client",
+
+            // Deleting an API client revokes it: its key stops working and the client stays listed.
+            Delete = async (c, client) => Check(await c.Get<IApiClientService>().RevokeAsync(client).ConfigureAwait(true), $"Client {client} revoked (kept in history)."),
         };
         yield return new Operation
         {
@@ -926,12 +1241,49 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Create a role", ListTitle = "Roles", Description = "A role, optionally starting from a copy of another role's permissions (edit grants in the permission grid).",
+            Module = module, Title = "Create a role", ListTitle = "Roles",
+            Description = "A role, optionally starting from a copy of another role's permissions (edit grants in the permission grid). An existing role name changes its description "
+                + "(a deleted role with the name is brought back). Delete is refused for a system role and for a role users or groups still hold.",
             Fields = [Req("Name", "Role name"), Opt("Description", "Description"), Opt("Copy", "Copy permissions from role")],
-            Run = async (c, i) => Check(await c.Get<IUserAdminService>().CreateRoleAsync(i.Text("Name"), i.Optional("Description"),
-                i.Optional("Copy") is string copy ? await RoleAsync(c, copy).ConfigureAwait(true) : null).ConfigureAwait(true), id => $"Role {i.Text("Name")} created."),
+            Run = async (c, i) =>
+            {
+                string normalized = i.Text("Name").Trim().ToUpperInvariant();
+                if (await c.Db.Roles.IgnoreQueryFilters([Infrastructure.Persistence.One4AllDbContext.SoftDeleteFilter]).FirstOrDefaultAsync(r => r.NormalizedName == normalized).ConfigureAwait(true) is { } existing)
+                {
+                    bool restored = existing.IsDeleted;
+                    existing.Description = i.Optional("Description");
+                    BringBackDeleted(existing);
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return restored ? $"Role {existing.Name} brought back into use." : $"Role {existing.Name} changed.";
+                }
+
+                return Check(await c.Get<IUserAdminService>().CreateRoleAsync(i.Text("Name"), i.Optional("Description"),
+                    i.Optional("Copy") is string copy ? await RoleAsync(c, copy).ConfigureAwait(true) : null).ConfigureAwait(true), id => $"Role {i.Text("Name")} created.");
+            },
             List = async c => Table(await c.Db.Roles.AsNoTracking().Include(r => r.Permissions).OrderBy(r => r.Name).ToListAsync().ConfigureAwait(true),
-                ("Role", r => r.Name), ("Description", r => r.Description), ("Permissions", r => r.Permissions.Count)),
+                ("Role name", r => r.Name), ("Description", r => r.Description), ("System", r => r.IsSystemRole), ("Permissions", r => r.Permissions.Count)),
+            KeyColumn = "Role name",
+            Delete = async (c, name) =>
+            {
+                string normalized = name.Trim().ToUpperInvariant();
+                Role role = await c.Db.Roles.FirstOrDefaultAsync(r => r.NormalizedName == normalized).ConfigureAwait(true) ?? throw new OperationException($"No role {name}.");
+                if (role.IsSystemRole)
+                {
+                    throw new OperationException($"{role.Name} is a system role and stays.");
+                }
+
+                if (await c.Db.Users.AnyAsync(u => u.Roles.Any(r => r.RoleId == role.Id)).ConfigureAwait(true)
+                    || await c.Db.Groups.AnyAsync(g => g.Roles.Any(r => r.RoleId == role.Id)).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Role {role.Name} is still held by users or groups; take it away from them first (Assign a role, Remove).");
+                }
+
+                role.IsDeleted = true;
+                role.DeletedOnUtc = DateTimeOffset.UtcNow;
+                role.DeletedByUserId = c.UserId;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Role {role.Name} deleted (kept in history).";
+            },
         };
         yield return new Operation
         {
@@ -1062,6 +1414,32 @@ public static partial class OperationCatalogue
         };
     }
 
+    // Brings a soft-deleted record back into use (adding its code again restores it rather than clashing with it).
+    private static void BringBackDeleted(Core.Common.SoftDeletableEntity record)
+    {
+        record.IsDeleted = false;
+        record.DeletedOnUtc = null;
+        record.DeletedByUserId = null;
+    }
+
+    // Whether anything has been posted to a ledger account of the company.
+    private static Task<bool> AccountHasPostingsAsync(OperationContext c, string accountCode)
+        => c.Db.Set<Core.Accounting.JournalLine>().AnyAsync(l => l.CompanyId == c.CompanyId && l.AccountCode == accountCode);
+
+    // A subscription's stored parameters as the form writes them (Name=value; ...).
+    private static string SubscriptionParameters(string json)
+    {
+        try
+        {
+            Dictionary<string, string>? values = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+            return values is null ? string.Empty : string.Join("; ", values.Select(p => $"{p.Key}={p.Value}"));
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return string.Empty;
+        }
+    }
+
     private static Task<long> RoleAsync(OperationContext c, string name)
     {
         string normalized = name.Trim().ToUpperInvariant();
@@ -1072,7 +1450,7 @@ public static partial class OperationCatalogue
     {
         Dictionary<long, string> roles = await c.Db.Roles.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.Name).ConfigureAwait(true);
         return Table(await c.Db.Users.AsNoTracking().Include(u => u.Roles).ThenInclude(r => r.Scopes).OrderBy(u => u.Username).ToListAsync().ConfigureAwait(true),
-            ("User", u => u.Username), ("Name", u => u.DisplayName), ("Active", u => u.IsActive), ("Administrator", u => u.IsSystemAdministrator),
+            ("Username", u => u.Username), ("Name", u => u.DisplayName), ("Email", u => u.Email), ("Active", u => u.IsActive), ("Administrator", u => u.IsSystemAdministrator),
             ("Roles", u => string.Join("; ", u.Roles.Select(r => roles.GetValueOrDefault(r.RoleId) + (r.Scopes.Count == 0 ? string.Empty
                 : " (" + string.Join(", ", r.Scopes.Select(s => $"{s.Dimension}: {string.Join("/", s.Values)}")) + ")")))));
     }
