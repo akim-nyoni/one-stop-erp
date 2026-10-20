@@ -113,7 +113,7 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Receive goods", ListTitle = "Purchase orders",
             Description = "Books a goods received note into a warehouse (stock in, goods-received-not-invoiced accrued). Pick the order and leave Lines blank to receive everything "
-                + "still outstanding, or give ITEM:quantity; ITEM:quantity. Goods that came without an order: leave the order blank, give the supplier and the lines as "
+                + "still outstanding, or give ITEM:quantity; ITEM:quantity (or ITEM:2 BOX in a unit the item is bought in). Goods that came without an order: leave the order blank, give the supplier and the lines as "
                 + "ITEM:quantity@price - an order is raised for them and received at once. The GRN number is given the next in sequence when left blank.",
             Fields = [Lookup("Order", "Order (blank: goods without an order)", false, async c => (await c.Db.PurchaseOrders.AsNoTracking()
                     .Where(o => o.CompanyId == c.CompanyId && (o.Status == PurchaseOrderStatus.Open || o.Status == PurchaseOrderStatus.PartReceived))
@@ -524,13 +524,30 @@ public static partial class OperationCatalogue
         List<(long, decimal)> lines = [];
         foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            // ITEM:quantity in the item's own unit, or ITEM:quantity UNIT (2 BOX) in a unit the item is bought in, turned into its own unit.
             string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
-            if (bits.Length != 2 || !decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity))
+            string[] amount = bits.Length == 2 ? bits[1].Split(' ', StringSplitOptions.RemoveEmptyEntries) : [];
+            if (amount.Length is < 1 or > 2 || !decimal.TryParse(amount[0], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity))
             {
-                throw new OperationException($"\"{part}\" should be ITEM:quantity.");
+                throw new OperationException($"\"{part}\" should be ITEM:quantity or ITEM:quantity UNIT (2 BOX).");
             }
 
-            lines.Add((await ItemAsync(c, bits[0]).ConfigureAwait(true), quantity));
+            long item = await ItemAsync(c, bits[0]).ConfigureAwait(true);
+            decimal factor = 1m;
+            if (amount.Length == 2)
+            {
+                string unit = amount[1].ToUpperInvariant();
+                string own = await c.Db.Items.AsNoTracking().Where(x => x.Id == item).Select(x => x.UnitOfMeasure).SingleAsync().ConfigureAwait(true);
+                if (!string.Equals(own, unit, StringComparison.OrdinalIgnoreCase))
+                {
+                    factor = await c.Db.Set<Core.Inventory.ItemUnit>().AsNoTracking().Where(u => u.CompanyId == c.CompanyId && u.ItemId == item && u.UnitCode.ToUpper() == unit)
+                        .Select(u => (decimal?)u.Factor).FirstOrDefaultAsync().ConfigureAwait(true) is decimal f && f > 0m
+                        ? f
+                        : throw new OperationException($"{bits[0].ToUpperInvariant()} is not bought in {unit}; add the unit and how many {own} it holds.");
+                }
+            }
+
+            lines.Add((item, quantity * factor));
         }
 
         return lines;
