@@ -87,6 +87,33 @@ public sealed class RentalHousingService : IRentalHousingService
             return Error.NotFound("Hse.TenantNotFound", $"Customer {request.TenantCustomerId} not found.");
         }
 
+        // Lettings from the rental waiting list: an active applicant on the rental list, where the council lets only from it.
+        HousingApplicant? applicant = null;
+        if (!string.IsNullOrWhiteSpace(request.WaitingListNumber))
+        {
+            string listNumber = request.WaitingListNumber.Trim().ToUpperInvariant();
+            applicant = await _db.HousingApplicants.FirstOrDefaultAsync(a => a.CompanyId == request.CompanyId && a.WaitingListNumber == listNumber, ct).ConfigureAwait(false);
+            if (applicant is null || applicant.Category != HousingCategory.Rental || applicant.Status != ApplicantStatus.Active)
+            {
+                return Error.Rule("Hse.ApplicantNotEligible", $"{listNumber} is not an active applicant on the rental waiting list.");
+            }
+        }
+        else if (await _db.Set<WaitingListPolicy>().AnyAsync(p => p.CompanyId == request.CompanyId && p.RentalFromWaitingList, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Hse.LetFromWaitingList", "Council rental units are let only to applicants on the rental waiting list; give the applicant's waiting-list number.");
+        }
+
+        // One tenancy per household: the tenant, anyone with the tenant's ID number, or the applicant's spouse may not already rent a council unit.
+        List<string> household = [.. new[] { tenant.NationalIdNumber, applicant?.IdNumber, applicant?.SpouseIdNumber }.OfType<string>().Where(n => n.Length > 0)];
+        if (await (from t in _db.Set<Tenancy>()
+                   join c in _db.Customers on t.TenantCustomerId equals c.Id
+                   where t.CompanyId == request.CompanyId && t.Status == TenancyStatus.Active
+                         && (c.Id == tenant.Id || (c.NationalIdNumber != null && household.Contains(c.NationalIdNumber)))
+                   select t.Id).AnyAsync(ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Hse.HouseholdTenancy", $"{tenant.Name}'s household already rents a council unit.");
+        }
+
         Result<string> number = await _numbers.AllocateAsync(request.CompanyId, "TN", request.StartDate, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
@@ -106,6 +133,7 @@ public sealed class RentalHousingService : IRentalHousingService
         _db.Set<Tenancy>().Add(new Tenancy(request.CompanyId, number.Value, unit.Id, tenant.Id, request.StartDate, unit.MonthlyRent, request.Deposit,
             string.IsNullOrWhiteSpace(request.DepositAccountCode) ? string.Empty : request.DepositAccountCode.Trim()));
         unit.Let(request.StartDate);
+        applicant?.SetStatus(ApplicantStatus.Allocated);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return number.Value;
     }

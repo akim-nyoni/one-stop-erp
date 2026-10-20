@@ -203,6 +203,7 @@ public sealed class WaitingListService : IWaitingListService
         policy.FirstTimeBuyersOnly = rules.FirstTimeBuyersOnly;
         policy.RefuseForfeited = rules.RefuseForfeited;
         policy.RequireRatesClearance = rules.RequireRatesClearance;
+        policy.RentalFromWaitingList = rules.RentalFromWaitingList;
         List<WaitingListIncomeCeiling> ceilings = await _db.Set<WaitingListIncomeCeiling>().Where(c => c.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
         _db.Set<WaitingListIncomeCeiling>().RemoveRange(ceilings.Where(c => !rules.CategoryIncomeCeilings.ContainsKey(c.Category)));
         foreach ((HousingCategory category, decimal ceiling) in rules.CategoryIncomeCeilings)
@@ -225,12 +226,13 @@ public sealed class WaitingListService : IWaitingListService
     public async Task<QualificationRules> QualificationRulesAsync(long companyId, CancellationToken ct = default)
     {
         var policy = await _db.Set<WaitingListPolicy>().AsNoTracking().Where(p => p.CompanyId == companyId)
-            .Select(p => new { p.FirstTimeBuyersOnly, p.RefuseForfeited, p.RequireRatesClearance }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            .Select(p => new { p.FirstTimeBuyersOnly, p.RefuseForfeited, p.RequireRatesClearance, p.RentalFromWaitingList }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         Dictionary<HousingCategory, decimal> ceilings = await _db.Set<WaitingListIncomeCeiling>().AsNoTracking().Where(c => c.CompanyId == companyId)
             .ToDictionaryAsync(c => c.Category, c => c.MaximumMonthlyIncome, ct).ConfigureAwait(false);
         return policy is null && ceilings.Count == 0
             ? QualificationRules.None
-            : new QualificationRules(policy?.FirstTimeBuyersOnly ?? false, policy?.RefuseForfeited ?? false, policy?.RequireRatesClearance ?? false, ceilings);
+            : new QualificationRules(policy?.FirstTimeBuyersOnly ?? false, policy?.RefuseForfeited ?? false, policy?.RequireRatesClearance ?? false, ceilings,
+                policy?.RentalFromWaitingList ?? false);
     }
 
     // Whether any of the household's accounts has ever held a council stand or owned property on the municipal register.

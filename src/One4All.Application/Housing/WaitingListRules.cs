@@ -17,7 +17,9 @@ public sealed record ApplicantFacts(DateOnly DateOfBirth, DateOnly ResidentSince
 /// <param name="RefuseForfeited">Those whose earlier stand was repossessed or agreement cancelled do not qualify.</param>
 /// <param name="RequireRatesClearance">Applicants must be clear of overdue rates and charges.</param>
 /// <param name="CategoryIncomeCeilings">The income ceiling per category.</param>
-public sealed record QualificationRules(bool FirstTimeBuyersOnly, bool RefuseForfeited, bool RequireRatesClearance, IReadOnlyDictionary<HousingCategory, decimal> CategoryIncomeCeilings)
+/// <param name="RentalFromWaitingList">Council rental units are let only to applicants on the rental waiting list.</param>
+public sealed record QualificationRules(bool FirstTimeBuyersOnly, bool RefuseForfeited, bool RequireRatesClearance, IReadOnlyDictionary<HousingCategory, decimal> CategoryIncomeCeilings,
+    bool RentalFromWaitingList = false)
 {
     /// <summary>No further rules.</summary>
     public static QualificationRules None { get; } = new(false, false, false, new Dictionary<HousingCategory, decimal>());

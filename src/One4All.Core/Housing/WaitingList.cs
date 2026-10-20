@@ -109,6 +109,9 @@ public sealed class WaitingListPolicy : AuditableEntity, ICompanyScoped
 
     /// <summary>Applicants must be clear of overdue rates and charges.</summary>
     public bool RequireRatesClearance { get; set; }
+
+    /// <summary>Council rental units are let only to applicants on the rental waiting list.</summary>
+    public bool RentalFromWaitingList { get; set; }
 }
 
 /// <summary>

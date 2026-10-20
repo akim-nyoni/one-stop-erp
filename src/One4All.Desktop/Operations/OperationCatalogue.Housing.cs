@@ -22,7 +22,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Policy", "Qualification rules"]), Num("MinAge", "Minimum age", "18"), Num("Years", "Minimum years resident", "0"),
                 OptNum("Income", "Overall income ceiling (blank: none)"), Num("PerYearOnList", "Points per year on the list", "10"), Num("PerYearResident", "Points per year resident", "2"),
                 Num("PerDependant", "Points per dependant", "5"), Num("Disability", "Points for a disability", "15"), Num("Homeless", "Points if homeless", "20"),
-                Num("Lodger", "Points if lodging", "8"), Tick("FirstTime", "First-time buyers only"), Tick("Forfeited", "Refuse earlier forfeiture"), Tick("Clearance", "Require rates clearance"),
+                Num("Lodger", "Points if lodging", "8"), Tick("FirstTime", "First-time buyers only"), Tick("Forfeited", "Refuse earlier forfeiture"), Tick("Clearance", "Require rates clearance"), Tick("RentalList", "Let rental units only from the rental waiting list"),
                 Pick("Category", "Category for the ceiling", Enum.GetNames<HousingCategory>()), OptNum("Ceiling", "Its income ceiling (blank: none)")],
             Run = async (c, i) =>
             {
@@ -45,7 +45,7 @@ public static partial class OperationCatalogue
                     ceilings.Remove(category);
                 }
 
-                return Check(await list.SetQualificationRulesAsync(c.CompanyId, new QualificationRules(i.Flag("FirstTime"), i.Flag("Forfeited"), i.Flag("Clearance"), ceilings))
+                return Check(await list.SetQualificationRulesAsync(c.CompanyId, new QualificationRules(i.Flag("FirstTime"), i.Flag("Forfeited"), i.Flag("Clearance"), ceilings, i.Flag("RentalList")))
                     .ConfigureAwait(true), "Qualification rules saved.");
             },
             List = async c =>
@@ -314,7 +314,7 @@ public static partial class OperationCatalogue
                 + "for a month (lodger fees included). End: final rent, the deposit applied to arrears and the rest refunded. Occupancy limit: the most people a unit may house.",
             Fields = [Pick("Step", "Step", ["Add unit", "Let", "Rent run", "End tenancy", "Occupancy limit"]), Opt("Unit", "Unit code"), Opt("Description", "Description (add unit)"),
                 Pick("Type", "Unit type", Enum.GetNames<RentalUnitType>()), Num("Rooms", "Rooms", "1"), Num("Rent", "Monthly rent", "0"), Opt("RentAccount", "Rent income account (add unit)"),
-                Opt("Tenant", "Tenant customer code (let)"), Opt("Tenancy", "Tenancy number (end)"), Num("Deposit", "Deposit (let)", "0"), Opt("Bank", "Bank account (deposit / refund)"),
+                Opt("Tenant", "Tenant customer code (let)"), Opt("Applicant", "Rental waiting-list number (let)"), Opt("Tenancy", "Tenancy number (end)"), Num("Deposit", "Deposit (let)", "0"), Opt("Bank", "Bank account (deposit / refund)"),
                 Opt("DepositAccount", "Deposit liability account (let)"), OptNum("Limit", "Most people (blank: no limit)"), Today()],
             Run = async (c, i) =>
             {
@@ -329,6 +329,7 @@ public static partial class OperationCatalogue
                         {
                             CompanyId = c.CompanyId, UnitCode = i.Text("Unit"), TenantCustomerId = await CustomerAsync(c, i.Text("Tenant")).ConfigureAwait(true), StartDate = i.Date("Date"),
                             Deposit = i.Number("Deposit"), BankAccountCode = i.Optional("Bank") ?? string.Empty, DepositAccountCode = i.Optional("DepositAccount") ?? string.Empty,
+                            WaitingListNumber = i.Optional("Applicant"),
                         }).ConfigureAwait(true));
                         return $"Let as tenancy {tenancy}.";
                     case "Rent run":

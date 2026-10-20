@@ -13149,6 +13149,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("refuse_forfeited");
 
+                    b.Property<bool>("RentalFromWaitingList")
+                        .HasColumnType("boolean")
+                        .HasColumnName("rental_from_waiting_list");
+
                     b.Property<bool>("RequireRatesClearance")
                         .HasColumnType("boolean")
                         .HasColumnName("require_rates_clearance");

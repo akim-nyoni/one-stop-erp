@@ -27,6 +27,9 @@ public sealed class LetUnitRequest
 
     /// <summary>The liability account the deposit is held on.</summary>
     public string DepositAccountCode { get; init; } = string.Empty;
+
+    /// <summary>The rental waiting-list applicant housed (required where the council lets only from the list).</summary>
+    public string? WaitingListNumber { get; init; }
 }
 
 /// <summary>A rent run's result.</summary>
