@@ -37204,6 +37204,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(120)")
                         .HasColumnName("name");
 
+                    b.Property<string>("ParallelGroups")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("parallel_groups");
+
                     b.Property<int>("Quorum")
                         .HasColumnType("integer")
                         .HasColumnName("quorum");

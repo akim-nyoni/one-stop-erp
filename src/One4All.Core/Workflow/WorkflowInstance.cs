@@ -81,7 +81,9 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
     /// <param name="nowUtc">The current time.</param>
     /// <returns>The updated status, or a rule error.</returns>
     /// <param name="onBehalfOfUserId">The approver a delegate acts for, if any.</param>
-    public Result<WorkflowStatus> Act(IReadOnlyList<WorkflowStage> applicableStages, long userId, WorkflowActionType action, string? comment, DateTimeOffset nowUtc, long? onBehalfOfUserId = null)
+    /// <param name="branchesMet">For a stage with parallel branches: whether the approvals given (the approving principals) cover every branch.</param>
+    public Result<WorkflowStatus> Act(IReadOnlyList<WorkflowStage> applicableStages, long userId, WorkflowActionType action, string? comment, DateTimeOffset nowUtc, long? onBehalfOfUserId = null,
+        Func<IReadOnlyCollection<long>, bool>? branchesMet = null)
     {
         if (Status != WorkflowStatus.InProgress)
         {
@@ -112,8 +114,9 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
                 break;
 
             case WorkflowActionType.Approve:
-                int approvalsAtStage = _approvals.Count(a => a.StageSequence == CurrentStageSequence && a.Action == WorkflowActionType.Approve);
-                if (approvalsAtStage >= currentStage.Quorum)
+                List<WorkflowApproval> atStage = [.. _approvals.Where(a => a.StageSequence == CurrentStageSequence && a.Action == WorkflowActionType.Approve)];
+                bool branchesCovered = branchesMet is null || branchesMet([.. atStage.Select(a => a.OnBehalfOfUserId ?? a.UserId)]);
+                if (atStage.Count >= currentStage.Quorum && branchesCovered)
                 {
                     WorkflowStage? next = applicableStages.FirstOrDefault(s => s.Sequence > CurrentStageSequence);
                     if (next is null)

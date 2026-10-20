@@ -26,6 +26,8 @@ internal sealed class WorkflowStageConfiguration : IEntityTypeConfiguration<Work
     {
         b.ToTable("stage", Schemas.Workflow);
         b.HasKey(x => x.Id);
+        b.Property(x => x.ParallelGroups).HasMaxLength(500);
+        b.Ignore(x => x.Branches);
         b.Property(x => x.Condition).HasMaxLength(500);
         b.Property(x => x.DynamicApprover).HasConversion<int>();
         b.Property(x => x.Name).HasMaxLength(120);

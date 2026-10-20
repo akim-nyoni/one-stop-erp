@@ -117,7 +117,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Define a workflow", ListTitle = "Workflow definitions",
             Description = "The approval route for a document type (brief §7): stages in order, each with its quorum, the value from which it applies, a condition on the document "
                 + "(e.g. Department = IT and Value > 5000), an approving role, named approvers, the requester's manager, and escalation after so many hours to someone. "
-                + "Stages are written one per line as sequence | name | quorum | from value | condition | role | approvers (comma-separated user names) | Manager or None | escalate hours | escalate to | group. "
+                + "Stages are written one per line as sequence | name | quorum | from value | condition | role | approvers (comma-separated user names) | Manager or None | escalate hours | escalate to | group | parallel groups (comma-separated: one approval from each). "
                 + "Saving replaces the active definition for that document type (documents already in flight finish on the old one). Switch off/on by id with the Enable step.",
             Fields = [Pick("Step", "Step", ["Define", "Enable", "Disable"]), Opt("DocumentType", "Document type (" + string.Join(", ", typeof(WorkflowDocumentTypes).GetFields(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static).Where(f => f.IsLiteral).Select(f => (string)f.GetRawConstantValue()!)) + ", or your own)"), Opt("Name", "Workflow name"),
                 Opt("Stages", "Stages (one per line; see above)"), OptNum("Definition", "Definition id (enable / disable)")],
@@ -144,7 +144,8 @@ public static partial class OperationCatalogue
                         At(3).Length == 0 ? null : decimal.Parse(At(3), System.Globalization.CultureInfo.InvariantCulture), At(4).Length == 0 ? null : At(4), At(5).Length == 0 ? null : At(5),
                         At(6).Length == 0 ? null : [.. At(6).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)],
                         At(7).Equals("Manager", StringComparison.OrdinalIgnoreCase) || At(7).Equals("RequesterManager", StringComparison.OrdinalIgnoreCase) ? Core.Workflow.DynamicApprover.RequesterManager : Core.Workflow.DynamicApprover.None,
-                        At(8).Length == 0 ? null : int.Parse(At(8), System.Globalization.CultureInfo.InvariantCulture), At(9).Length == 0 ? null : At(9), At(10).Length == 0 ? null : At(10)));
+                        At(8).Length == 0 ? null : int.Parse(At(8), System.Globalization.CultureInfo.InvariantCulture), At(9).Length == 0 ? null : At(9), At(10).Length == 0 ? null : At(10),
+                        At(11).Length == 0 ? null : At(11)));
                 }
 
                 long created = Check(await workflow.DefineAsync(c.CompanyId, new WorkflowDefinitionInput(i.Optional("DocumentType") ?? string.Empty, i.Optional("Name") ?? string.Empty, stages)).ConfigureAwait(true));

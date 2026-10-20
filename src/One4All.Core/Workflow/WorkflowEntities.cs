@@ -133,6 +133,16 @@ public sealed class WorkflowStage : Entity
     /// <summary>A user group whose members may approve (brief §7 approvers by group), or null.</summary>
     public string? RequiredGroupName { get; set; }
 
+    /// <summary>
+    /// Parallel branches (comma-separated group names, "Finance, Legal"): the stage needs an approval from a member of every one of these groups, in
+    /// any order, besides its quorum; members of any of them may approve it.
+    /// </summary>
+    public string? ParallelGroups { get; set; }
+
+    /// <summary>Gets the parallel branches' group names.</summary>
+    public IReadOnlyList<string> Branches => [.. (ParallelGroups ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(g => g.ToUpperInvariant()).Distinct()];
+
     /// <summary>Gets or sets the condition (over the document's value and attributes) for the stage to apply; null: always (value bands aside).</summary>
     public string? Condition { get; set; }
 

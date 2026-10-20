@@ -211,7 +211,8 @@ public interface IWorkflowService
 /// <param name="EscalateTo">The user name escalated to, or null.</param>
 /// <param name="GroupName">A user group whose members may approve, or null.</param>
 public sealed record WorkflowStageInput(int Sequence, string Name, int Quorum = 1, decimal? MinValue = null, string? Condition = null, string? RoleName = null, IReadOnlyList<string>? Approvers = null,
-    One4All.Core.Workflow.DynamicApprover DynamicApprover = One4All.Core.Workflow.DynamicApprover.None, int? EscalateAfterHours = null, string? EscalateTo = null, string? GroupName = null);
+    One4All.Core.Workflow.DynamicApprover DynamicApprover = One4All.Core.Workflow.DynamicApprover.None, int? EscalateAfterHours = null, string? EscalateTo = null, string? GroupName = null,
+    string? ParallelGroups = null);
 
 /// <summary>A workflow definition being saved.</summary>
 /// <param name="DocumentType">The document type it routes (<see cref="WorkflowDocumentTypes"/>, or a custom one).</param>

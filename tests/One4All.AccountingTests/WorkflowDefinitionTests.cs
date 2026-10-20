@@ -84,6 +84,22 @@ public sealed class WorkflowDefinitionTests
         (await workflow.PendingForUserAsync(companyId, member.Id)).Should().ContainSingle(p => p.DocumentReference == "STK-1");
         (await workflow.ActAsync(count.Value.InstanceId, member.Id, WorkflowActionType.Approve, "counted")).Value.Should().Be(WorkflowStatus.Approved);
 
+        // Parallel branches: finance and legal must each sign the one stage, in either order.
+        Group finance = new($"wf-fin-{suffix}", "Finance"), legal = new($"wf-legal-{suffix}", "Legal");
+        db.Groups.AddRange(finance, legal);
+        User accountant = new($"wf-acc-{suffix}", "Accountant"), lawyer = new($"wf-law-{suffix}", "Lawyer");
+        db.Users.AddRange(accountant, lawyer);
+        await db.SaveChangesAsync();
+        accountant.JoinGroup(finance.Id);
+        lawyer.JoinGroup(legal.Id);
+        await db.SaveChangesAsync();
+        (await workflow.DefineAsync(companyId, new WorkflowDefinitionInput(WorkflowDocumentTypes.Stocktake, "Counts v2", [new WorkflowStageInput(1, "Sign-off", ParallelGroups: $"{finance.Name}, {legal.Name}")])))
+            .IsSuccess.Should().BeTrue();
+        var signed = await workflow.StartAsync(companyId, WorkflowDocumentTypes.Stocktake, "STK-2", 0m, initiatedByUserId: 1);
+        (await workflow.ActAsync(signed.Value.InstanceId, accountant.Id, WorkflowActionType.Approve, "figures agree")).Value.Should().Be(WorkflowStatus.InProgress, "legal has not signed");
+        (await workflow.ActAsync(signed.Value.InstanceId, member.Id, WorkflowActionType.Approve, "me too")).Error.Code.Should().Be("Workflow.NotEligible");
+        (await workflow.ActAsync(signed.Value.InstanceId, lawyer.Id, WorkflowActionType.Approve, "in order")).Value.Should().Be(WorkflowStatus.Approved);
+
         (await workflow.SetDefinitionActiveAsync(companyId, second.Value, false)).IsSuccess.Should().BeTrue();
         (await workflow.StartAsync(companyId, WorkflowDocumentTypes.PurchaseRequisition, "REQ-X", 5m, 1)).Error.Code.Should().Be("Workflow.NoDefinition");
         (await workflow.SetDefinitionActiveAsync(companyId, first.Value, true)).IsSuccess.Should().BeTrue();

@@ -162,7 +162,15 @@ public sealed class WorkflowService : IWorkflowService
             }
         }
 
-        Result<WorkflowStatus> result = instance.Act(applicable, userId, action, comment, _clock.UtcNow, onBehalfOf);
+        // Parallel branches: the stage completes once every listed group has an approval from one of its members.
+        Func<IReadOnlyCollection<long>, bool>? branchesMet = null;
+        if (currentStage is { Branches.Count: > 0 })
+        {
+            Dictionary<string, HashSet<long>> members = await BranchMembersAsync(currentStage, ct).ConfigureAwait(false);
+            branchesMet = approvers => currentStage.Branches.All(b => members.TryGetValue(b, out HashSet<long>? group) && approvers.Any(group.Contains));
+        }
+
+        Result<WorkflowStatus> result = instance.Act(applicable, userId, action, comment, _clock.UtcNow, onBehalfOf, branchesMet);
         if (result.IsSuccess && instance.Approvals.Count > 0)
         {
             // The document as it stood at this decision.
@@ -408,9 +416,23 @@ public sealed class WorkflowService : IWorkflowService
     }
 
     // Who holds the stage's role (directly, or through a group that carries it) and who belongs to the stage's group.
+    // The members of each parallel branch's group.
+    private async Task<Dictionary<string, HashSet<long>>> BranchMembersAsync(WorkflowStage stage, CancellationToken ct)
+    {
+        List<string> branches = [.. stage.Branches];
+        var rows = await (from m in _db.Set<Core.Security.UserGroupMember>() join g in _db.Groups on m.GroupId equals g.Id where branches.Contains(g.NormalizedName) select new { g.NormalizedName, m.UserId })
+            .ToListAsync(ct).ConfigureAwait(false);
+        return rows.GroupBy(r => r.NormalizedName).ToDictionary(g => g.Key, g => g.Select(r => r.UserId).ToHashSet(), StringComparer.Ordinal);
+    }
+
     private async Task<List<long>> RoleAndGroupHoldersAsync(WorkflowStage stage, CancellationToken ct)
     {
         List<long> users = [];
+        if (stage.Branches.Count > 0)
+        {
+            users.AddRange((await BranchMembersAsync(stage, ct).ConfigureAwait(false)).Values.SelectMany(v => v));
+        }
+
         if (!string.IsNullOrWhiteSpace(stage.RequiredRoleName))
         {
             string role = stage.RequiredRoleName.Trim().ToUpperInvariant();
@@ -504,7 +526,8 @@ public sealed class WorkflowService : IWorkflowService
             dynamicOnly = true;
         }
 
-        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0 && string.IsNullOrWhiteSpace(stage.RequiredRoleName) && string.IsNullOrWhiteSpace(stage.RequiredGroupName) && !dynamicOnly;
+        bool open = stage.EligibleUserIds.Count == 0 && extra.Count == 0 && string.IsNullOrWhiteSpace(stage.RequiredRoleName) && string.IsNullOrWhiteSpace(stage.RequiredGroupName)
+            && stage.Branches.Count == 0 && !dynamicOnly;
         bool Direct(long user) => open || stage.EligibleUserIds.Contains(user) || extra.Contains(user);
         if (Direct(userId))
         {
@@ -552,13 +575,22 @@ public sealed class WorkflowService : IWorkflowService
             return Error.Validation("Workflow.DefinitionInvalid", "Each stage needs its own sequence (1, 2, …), a name, a quorum of at least 1, a value band not below zero and, if it escalates, hours above zero.");
         }
 
-        if (definition.Stages.Any(s => s.RoleName is null && s.GroupName is null && (s.Approvers is null || s.Approvers.Count == 0) && s.DynamicApprover == DynamicApprover.None))
+        if (definition.Stages.Any(s => s.RoleName is null && s.GroupName is null && s.ParallelGroups is null && (s.Approvers is null || s.Approvers.Count == 0) && s.DynamicApprover == DynamicApprover.None))
         {
             return Error.Validation("Workflow.DefinitionInvalid", "Each stage needs an approver: a role, named users, or the requester's manager.");
         }
 
         foreach (WorkflowStageInput stage in definition.Stages)
         {
+            foreach (string branch in (stage.ParallelGroups ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string normalised = branch.ToUpperInvariant();
+                if (!await _db.Groups.AnyAsync(g => g.NormalizedName == normalised, ct).ConfigureAwait(false))
+                {
+                    return Error.NotFound("Workflow.GroupNotFound", $"Group {branch} not found.");
+                }
+            }
+
             if (Application.Workflow.WorkflowCondition.Problem(stage.Condition) is string problem)
             {
                 return Error.Validation("Workflow.ConditionInvalid", $"Stage {stage.Sequence}: {problem}");
@@ -601,6 +633,7 @@ public sealed class WorkflowService : IWorkflowService
                 stage.Condition = string.IsNullOrWhiteSpace(input.Condition) ? null : input.Condition.Trim();
                 stage.RequiredRoleName = string.IsNullOrWhiteSpace(input.RoleName) ? null : input.RoleName.Trim();
                 stage.RequiredGroupName = string.IsNullOrWhiteSpace(input.GroupName) ? null : input.GroupName.Trim();
+                stage.ParallelGroups = string.IsNullOrWhiteSpace(input.ParallelGroups) ? null : input.ParallelGroups.Trim();
                 stage.DynamicApprover = input.DynamicApprover;
                 stage.EscalateAfterHours = input.EscalateAfterHours;
                 stage.EscalateToUserId = string.IsNullOrWhiteSpace(input.EscalateTo) ? null : users[input.EscalateTo.Trim().ToUpperInvariant()];
