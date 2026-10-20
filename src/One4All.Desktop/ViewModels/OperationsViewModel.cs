@@ -9,6 +9,29 @@ using One4All.Infrastructure.Persistence;
 
 namespace One4All.Desktop.ViewModels;
 
+/// <summary>One row of a document's line grid: the item (picked from the list or typed), the quantity, the price and one more value.</summary>
+public sealed partial class OperationLineVm : ObservableObject
+{
+    /// <summary>The item (CODE or "CODE - description").</summary>
+    [ObservableProperty]
+    private string? _item;
+
+    /// <summary>The quantity (with its unit after it, "2 BOX", where the document allows).</summary>
+    [ObservableProperty]
+    private string? _quantity;
+
+    /// <summary>The price (blank: the price list's).</summary>
+    [ObservableProperty]
+    private string? _price;
+
+    /// <summary>The one further value the document takes (a tax code, say).</summary>
+    [ObservableProperty]
+    private string? _extra;
+
+    /// <summary>Gets whether anything is on the row.</summary>
+    public bool IsFilled => !string.IsNullOrWhiteSpace(Item) && !string.IsNullOrWhiteSpace(Quantity);
+}
+
 /// <summary>One field on the operation form, bound two-way.</summary>
 public sealed partial class OperationFieldVm : ObservableObject
 {
@@ -66,8 +89,49 @@ public sealed partial class OperationFieldVm : ObservableObject
         FieldKind.Date => DateValue is DateTime d ? Ops.D(DateOnly.FromDateTime(d)) : null,
         FieldKind.Flag => IsTicked ? "True" : "False",
         FieldKind.Choice => Ops.CodeOf(Value),
+        _ when IsLines && Lines.Any(l => l.IsFilled) => LinesText(),
         _ => Value,
     };
+
+    /// <summary>Gets whether the field is a document's lines (ITEM:qty...), entered on a line grid as well as typed.</summary>
+    public bool IsLines => Field.Kind == FieldKind.Text && Field.Name == "Lines" && Field.Label.Contains("ITEM:", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Gets the width the field takes on the form (a line grid is wider).</summary>
+    public double Width => IsLines ? 560 : 250;
+
+    /// <summary>Gets the line grid's rows.</summary>
+    public ObservableCollection<OperationLineVm> Lines { get; } = [new()];
+
+    /// <summary>Gets the items to pick on the line grid.</summary>
+    public ObservableCollection<string> ItemChoices { get; } = [];
+
+    /// <summary>Adds a row to the line grid.</summary>
+    [RelayCommand]
+    private void AddLine() => Lines.Add(new OperationLineVm());
+
+    /// <summary>Removes a row from the line grid.</summary>
+    /// <param name="line">The row.</param>
+    [RelayCommand]
+    private void RemoveLine(OperationLineVm? line)
+    {
+        if (line is not null && Lines.Count > 1)
+        {
+            Lines.Remove(line);
+        }
+    }
+
+    // The grid written the way the document's text takes it: ITEM:qty@price where the label says so, else ITEM:qty[:price[:extra]].
+    private string LinesText()
+    {
+        bool at = Field.Label.Contains("@price", StringComparison.OrdinalIgnoreCase);
+        return string.Join("; ", Lines.Where(l => l.IsFilled).Select(l =>
+        {
+            string head = $"{Ops.CodeOf(l.Item)!.Trim()}:{l.Quantity!.Trim()}";
+            string? price = string.IsNullOrWhiteSpace(l.Price) ? null : l.Price.Trim();
+            string? extra = string.IsNullOrWhiteSpace(l.Extra) ? null : l.Extra.Trim();
+            return at ? $"{head}@{price ?? "0"}" : extra is not null ? $"{head}:{price}:{extra}" : price is not null ? $"{head}:{price}" : head;
+        }));
+    }
 
     /// <summary>Gets a value indicating whether the choices are the company's records (typed codes are accepted too).</summary>
     public bool IsLookup => Field.ChoicesFrom is not null;
@@ -294,6 +358,25 @@ public sealed partial class OperationsViewModel : ObservableObject
     // Choices that come from the database (the company's currencies…) are read when the form opens; the first is taken unless one is set.
     private async Task LoadChoicesAsync()
     {
+        // A line grid picks from the company's active items.
+        foreach (OperationFieldVm lines in Fields.Where(f => f.IsLines).ToList())
+        {
+            try
+            {
+                List<string> items = await InScopeAsync(async c => await c.Db.Items.AsNoTracking().Where(i => i.CompanyId == c.CompanyId && i.IsActive).OrderBy(i => i.Code)
+                    .Select(i => i.Code + " - " + i.Description).Take(5000).ToListAsync().ConfigureAwait(true)).ConfigureAwait(true);
+                lines.ItemChoices.Clear();
+                foreach (string item in items)
+                {
+                    lines.ItemChoices.Add(item);
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // No company yet: the grid is typed into instead.
+            }
+        }
+
         foreach (OperationFieldVm field in Fields.Where(f => f.Field.ChoicesFrom is not null).ToList())
         {
             try

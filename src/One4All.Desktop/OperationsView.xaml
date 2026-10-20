@@ -76,7 +76,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Width="250" Margin="0,0,12,8">
+                                        <StackPanel Width="{Binding Width}" Margin="0,0,12,8">
                                             <TextBlock Text="{Binding Label, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                                             <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,3,0,0"
                                                      Visibility="{Binding IsText, Converter={StaticResource Visible}}" />
@@ -87,6 +87,35 @@
                                             <ComboBox ItemsSource="{Binding Choices}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,0"
                                                       IsEditable="{Binding IsLookup}" IsTextSearchEnabled="True" StaysOpenOnEdit="True" MaxDropDownHeight="360"
                                                       Visibility="{Binding IsChoice, Converter={StaticResource Visible}}" />
+                                            <!-- A document's lines: picked on a grid (it takes the place of the text above when filled) -->
+                                            <StackPanel Visibility="{Binding IsLines, Converter={StaticResource Visible}}" Margin="0,4,0,0">
+                                                <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" MaxHeight="220"
+                                                          RowHeight="26" GridLinesVisibility="Horizontal" FontSize="12">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTemplateColumn Header="Item" Width="230">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <ComboBox ItemsSource="{Binding DataContext.ItemChoices, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                                              Text="{Binding Item, UpdateSourceTrigger=PropertyChanged}" IsEditable="True" IsTextSearchEnabled="True" StaysOpenOnEdit="True"
+                                                                              MaxDropDownHeight="300" BorderThickness="0" />
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                        <DataGridTextColumn Header="Quantity" Binding="{Binding Quantity, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                                        <DataGridTextColumn Header="Price" Binding="{Binding Price, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                                        <DataGridTextColumn Header="Tax / other" Binding="{Binding Extra, UpdateSourceTrigger=PropertyChanged}" Width="80" />
+                                                        <DataGridTemplateColumn Width="40">
+                                                            <DataGridTemplateColumn.CellTemplate>
+                                                                <DataTemplate>
+                                                                    <Button Content="✕" Padding="4,0" BorderThickness="0" Background="Transparent" Foreground="#C0392B" ToolTip="Remove the line"
+                                                                            Command="{Binding DataContext.RemoveLineCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" CommandParameter="{Binding}" />
+                                                                </DataTemplate>
+                                                            </DataGridTemplateColumn.CellTemplate>
+                                                        </DataGridTemplateColumn>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                                <Button Content="+ Line" HorizontalAlignment="Left" Padding="10,2" Margin="0,4,0,0" Command="{Binding AddLineCommand}" />
+                                            </StackPanel>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
