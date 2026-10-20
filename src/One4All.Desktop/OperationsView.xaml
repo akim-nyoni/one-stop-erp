@@ -76,7 +76,7 @@
                                 </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <StackPanel Width="{Binding Width}" Margin="0,0,12,8">
+                                        <StackPanel Width="{Binding Width}" Margin="0,0,12,8" Visibility="{Binding IsShown, Converter={StaticResource Visible}}">
                                             <TextBlock Text="{Binding Label, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                                             <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,3,0,0"
                                                      Visibility="{Binding IsText, Converter={StaticResource Visible}}" />
@@ -86,7 +86,7 @@
                                                       Visibility="{Binding IsFlag, Converter={StaticResource Visible}}" />
                                             <ComboBox ItemsSource="{Binding Choices}" Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Margin="0,3,0,0"
                                                       IsEditable="{Binding IsLookup}" IsTextSearchEnabled="True" StaysOpenOnEdit="True" MaxDropDownHeight="360"
-                                                      Visibility="{Binding IsChoice, Converter={StaticResource Visible}}" />
+                                                      Visibility="{Binding ShowsList, Converter={StaticResource Visible}}" />
                                             <!-- A document's lines: picked on a grid (it takes the place of the text above when filled) -->
                                             <StackPanel Visibility="{Binding IsLines, Converter={StaticResource Visible}}" Margin="0,4,0,0">
                                                 <DataGrid ItemsSource="{Binding Lines}" AutoGenerateColumns="False" CanUserAddRows="False" HeadersVisibility="Column" MaxHeight="220"

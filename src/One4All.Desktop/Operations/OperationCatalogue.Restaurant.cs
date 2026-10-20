@@ -339,7 +339,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Reservations", ListTitle = "Upcoming reservations",
             Description = "Books a table for a guest at a time (yyyy-mm-dd hh:mm), seats the guest when they arrive (opening the order), cancels a booking or marks a no-show.",
             Fields = [Pick("Step", "Step", ["Reserve", "Seat", "Cancel", "No-show"]), Opt("Table", "Table number (reserve)"), Opt("Guest", "Guest name"), Num("Party", "Party size", "2"),
-                Opt("When", "When: yyyy-mm-dd hh:mm (reserve)"), Opt("Phone", "Phone"), Opt("Notes", "Notes"), OptNum("Reservation", "Reservation id"), Opt("Order", "Order number (seat)"),
+                OptDate("When", "Date (reserve)"), Opt("WhenTime", "Time hh:mm (reserve)"), Opt("Phone", "Phone"), Opt("Notes", "Notes"), OptNum("Reservation", "Reservation id"), Opt("Order", "Order number (seat)"),
                 Opt("Waiter", "Waiter user name (blank: me)"), Opt("Reason", "Reason (cancel)"), Today()],
             Run = async (c, i) =>
             {
@@ -348,8 +348,8 @@ public static partial class OperationCatalogue
                 switch (i.Text("Step"))
                 {
                     case "Reserve":
-                        DateTime when = DateTime.TryParse(i.Optional("When"), CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime parsed)
-                            ? parsed.ToUniversalTime() : throw new OperationException("Write when as yyyy-mm-dd hh:mm.");
+                        DateTime when = DateTime.TryParse($"{i.Optional("When")} {i.Optional("WhenTime") ?? "19:00"}", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out DateTime parsed)
+                            ? parsed.ToUniversalTime() : throw new OperationException("Pick the date and give the time as hh:mm.");
                         return Check(await restaurant.ReserveTableAsync(c.CompanyId, await TableAsync(c, i.Optional("Table") ?? string.Empty).ConfigureAwait(true), i.Optional("Guest") ?? string.Empty,
                             i.Whole("Party"), when, i.Optional("Phone"), i.Optional("Notes")).ConfigureAwait(true), id => $"Reservation {id} booked.");
                     case "Seat":

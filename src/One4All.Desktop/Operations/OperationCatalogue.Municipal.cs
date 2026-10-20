@@ -514,7 +514,7 @@ public static partial class OperationCatalogue
                 + "cemetery's plots.",
             Fields = [Pick("Step", "Step", ["Add plots", "Sell plot", "Interment", "Plots"]), Opt("Cemetery", "Cemetery"), Opt("Section", "Section"), Opt("Plots", "Plot numbers, comma-separated"),
                 Num("Price", "Price / interment fee", "0"), Num("Capacity", "Capacity (graves per plot)", "1"), Opt("Plot", "Plot reference (sell / interment)"), Opt("Holder", "Holder customer code"),
-                Opt("Deceased", "Deceased name"), Opt("Died", "Date of death (yyyy-MM-dd)"), Opt("Account", "Revenue / fee account"), Today()],
+                Opt("Deceased", "Deceased name"), OptDate("Died", "Date of death"), Opt("Account", "Revenue / fee account"), Today()],
             Run = async (c, i) =>
             {
                 ICemeteryService cemetery = c.Get<ICemeteryService>();

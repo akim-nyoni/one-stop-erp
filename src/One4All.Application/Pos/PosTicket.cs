@@ -622,7 +622,7 @@ public sealed class PosTicket
             }
             else if (string.IsNullOrWhiteSpace(account))
             {
-                return Error.Validation("Pos.TenderAccount", $"No GL account is configured for {tender.Type} tenders.");
+                return Error.Validation("Pos.TenderAccount", $"The till has no account set for {tender.Type} payments (More > Account codes); ask your accountant to set it.");
             }
 
             tenders.Add(tender.Currency is CurrencyCode foreign && foreign != context.Currency

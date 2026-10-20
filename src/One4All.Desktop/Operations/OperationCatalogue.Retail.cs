@@ -79,7 +79,7 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Point of Sale", Title = "Activate a gift card", ListTitle = "Gift card stock", Description = "Loads a card of printed stock with its value when sold (Dr cash, Cr gift card liability).",
-            Fields = [Req("Card", "Card number"), Num("Value", "Value"), Today(), Opt("Expiry", "Expires (yyyy-MM-dd, optional)"), Req("Cash", "Cash account", "1000"), Req("Liability", "Gift card liability account")],
+            Fields = [Req("Card", "Card number"), Num("Value", "Value"), Today(), OptDate("Expiry", "Expires (optional)"), Req("Cash", "Cash account", "1000"), Req("Liability", "Gift card liability account")],
             Run = async (c, i) =>
             {
                 Application.Abstractions.Vouchers.GiftCardResult card = Check(await c.Get<Application.Abstractions.Vouchers.IGiftCardServicing>().ActivateAsync(c.CompanyId, i.Text("Card"), i.Number("Value"),

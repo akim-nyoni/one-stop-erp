@@ -303,7 +303,7 @@ public static partial class OperationCatalogue
             Module = "Customers", Title = "Customer statement", ListTitle = "Open customer items",
             Description = "The customer's statement as at a date, ready to print or send: open-item, or balance-forward (brought forward, the period's documents with a running "
                 + "balance, carried forward) for customers set to that style or when a period start is given. Style sets the customer's statement style.",
-            Fields = [CustomerPick("Customer", "Customer"), Today("AsAt", "As at"), Opt("From", "Balance-forward period from (yyyy-MM-dd; blank: the customer's style)"),
+            Fields = [CustomerPick("Customer", "Customer"), Today("AsAt", "As at"), OptDate("From", "Balance-forward period from (blank: the customer's style)"),
                 Pick("Style", "Set the customer's style", ["(leave)", .. Enum.GetNames<Core.Trading.StatementType>()])],
             Run = async (c, i) =>
             {
@@ -584,7 +584,7 @@ public static partial class OperationCatalogue
             Description = "Hands a customer's overdue debt to a collector or lawyer (a case), records the summons, asks for the case to be written off (approved by another user), "
                 + "and closes it as settled or withdrawn.",
             Fields = [Pick("Step", "Step", ["Hand over", "Summons", "Request write-off", "Approve write-off", "Close"]), Opt("Customer", "Customer code (hand over)"), Opt("Case", "Case number"),
-                Opt("Party", "Handed over to / court"), Opt("Summons", "Summons number"), Opt("Hearing", "Hearing date (yyyy-MM-dd)"), Opt("Reason", "Reason (write-off)"),
+                Opt("Party", "Handed over to / court"), Opt("Summons", "Summons number"), OptDate("Hearing", "Hearing date"), Opt("Reason", "Reason (write-off)"),
                 Opt("BadDebt", "Bad debt account"), Pick("Outcome", "Outcome (close)", [nameof(Core.Trading.DebtCaseStage.Settled), nameof(Core.Trading.DebtCaseStage.Withdrawn)]), Today()],
             Run = async (c, i) =>
             {

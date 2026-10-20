@@ -422,6 +422,12 @@ public static class Ops
     /// <returns>The field.</returns>
     public static OperationField Tick(string name, string label, bool ticked = false) => new(name, label, FieldKind.Flag, ticked ? "True" : "False", Required: false);
 
+    /// <summary>An optional date, picked on a calendar (blank when none is picked); the operation reads it as yyyy-MM-dd.</summary>
+    /// <param name="name">The field name.</param>
+    /// <param name="label">The label.</param>
+    /// <returns>The field.</returns>
+    public static OperationField OptDate(string name, string label) => new(name, label, FieldKind.Date, Required: false);
+
     /// <summary>A choice field.</summary>
     /// <param name="name">The key.</param>
     /// <param name="label">The label.</param>

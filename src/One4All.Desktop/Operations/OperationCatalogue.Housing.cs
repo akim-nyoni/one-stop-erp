@@ -170,7 +170,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands", "Approve swap", "Reject swap", "Expired offers", "Lapse offer",
                 "Extend offer"]), Opt("Stands", "Only these stands (substitution run; ',')"), OptNum("Swap", "Swap document id (approve / reject swap)"),
                 OptNum("Line", "Pairing sequence (reject / substitute)"), Opt("LineReason", "Reason (reject / substitute)"), Opt("Resolution", "Committee resolution (approve)"),
-                Opt("Meeting", "Meeting date yyyy-MM-dd (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap / lapse / extend)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
+                OptDate("Meeting", "Meeting date (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap / lapse / extend)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
                 Opt("Reason", "Reason (swap / lapse / extend)"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
                 Pick("Method", "Method", Enum.GetNames<AllocationMethod>()), OptNum("Seed", "Ballot seed (blank: random)"), Opt("Run", "Run number"), Today("Date", "Date"), Num("OfferDays", "Days to accept an offer", "30")],
             Run = async (c, i) =>
@@ -923,7 +923,7 @@ public static partial class OperationCatalogue
                 Opt("Ward", "Ward"), Opt("Suburb", "Suburb / locality"), Opt("Zone", "Zone"), Opt("Use", "Intended use / land use"), Opt("Zoning", "Zoning"), Opt("Phase", "Servicing phase"),
                 Tick("Water", "Water"), Tick("Sewer", "Sewer"), Tick("Road", "Road"), Tick("Power", "Electricity"), Tick("Storm", "Storm water"), Opt("Remark", "Remark / improvements"),
                 Pick("Tenure", "Parcel tenure", ["", .. Enum.GetNames<ParcelTenure>()]), Pick("Occupation", "Parcel occupation", ["", .. Enum.GetNames<ParcelOccupation>()]),
-                Pick("Funding", "Scheme funding", ["", .. Enum.GetNames<SchemeFunding>()]), Opt("Start", "Scheme start (yyyy-MM-dd)"), Opt("End", "Scheme completion (yyyy-MM-dd)"),
+                Pick("Funding", "Scheme funding", ["", .. Enum.GetNames<SchemeFunding>()]), OptDate("Start", "Scheme start"), OptDate("End", "Scheme completion"),
                 OptNum("Deposit", "Scheme deposit before acceptance")],
             Run = async (c, i) =>
             {
@@ -993,7 +993,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Register", "Add member", "Remove member", "Allocate stands", "Sub-allocate", "Stands", "Account", "Charge", "Contribution", "Statement"]),
                 Req("Cooperative", "Cooperative code"), Opt("Name", "Name / member name"), Opt("Registration", "Registration number"), Opt("IdNumber", "Member national ID"),
                 Opt("Stands", "Stand number(s), comma-separated"), Opt("Customer", "Account customer code"), Num("Amount", "Amount", "0"), Opt("Account", "Income account (charge) / bank (contribution)"),
-                Opt("Reference", "Document / receipt number"), Opt("Since", "Statement from (yyyy-MM-dd)"), Opt("Approver", "Approving user name (allocate stands)"), Today()],
+                Opt("Reference", "Document / receipt number"), OptDate("Since", "Statement from"), Opt("Approver", "Approving user name (allocate stands)"), Today()],
             Run = async (c, i) =>
             {
                 ICooperativeService cooperatives = c.Get<ICooperativeService>();
@@ -1411,8 +1411,8 @@ public static partial class OperationCatalogue
                 + "closes it, then turns an eligible household into a waiting-list registration or regularises it on a stand; Summary shows where the settlement stands.",
             Fields = [Pick("Step", "Step", ["Register", "Approve plan", "Start enumeration", "Enumerate household", "Close enumeration", "To waiting list", "Regularise", "Summary"]),
                 Opt("Settlement", "Settlement code"), Opt("Name", "Name / plan / enumeration reference"), Opt("Ward", "Ward (register)"), Today("CutOff", "Cut-off date (register)"),
-                Opt("Household", "Household number"), Opt("IdNumber", "Head's national ID"), Opt("Head", "Head's name"), Opt("Born", "Head's date of birth (yyyy-MM-dd)"), Num("Size", "Household size", "1"),
-                Num("Income", "Monthly income", "0"), Opt("Since", "Occupied since (yyyy-MM-dd)"), Pick("Structure", "Structure", Enum.GetNames<StructureType>()), Opt("StructureRef", "Structure reference"),
+                Opt("Household", "Household number"), Opt("IdNumber", "Head's national ID"), Opt("Head", "Head's name"), OptDate("Born", "Head's date of birth"), Num("Size", "Household size", "1"),
+                Num("Income", "Monthly income", "0"), OptDate("Since", "Occupied since"), Pick("Structure", "Structure", Enum.GetNames<StructureType>()), Opt("StructureRef", "Structure reference"),
                 Pick("Category", "Waiting-list category", Enum.GetNames<HousingCategory>()), Opt("Stand", "Stand number (regularise)"), Opt("Approver", "Approving user name (regularise)"),
                 Today()],
             Run = async (c, i) =>

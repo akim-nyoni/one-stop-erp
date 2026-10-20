@@ -1494,7 +1494,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         Item item = await db.Items.AsNoTracking().SingleAsync(i => i.Id == found.Value.ItemId).ConfigureAwait(true);
         if (string.IsNullOrWhiteSpace(item.RevenueAccountCode))
         {
-            StatusMessage = $"{item.Description} has no revenue account; it cannot be sold here.";
+            StatusMessage = $"{item.Description} cannot be sold yet: it has no sales (revenue) account. Set one on the product, or ask your accountant.";
             return;
         }
 
@@ -2305,7 +2305,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         {
             if (!context.TenderAccounts.TryGetValue(payments[p].TenderType, out string? account))
             {
-                StatusMessage = $"No GL account is configured for {payments[p].TenderType} tenders.";
+                StatusMessage = $"The till has no account set for {payments[p].TenderType} payments (More > Account codes); ask your accountant to set it.";
                 return;
             }
 
@@ -2813,10 +2813,21 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         await using AsyncServiceScope scope = _services.CreateAsyncScope();
         IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
 
-        // The count ("120" or "120; ZAR 500; EUR 20") is declared before anything expected is shown, which is what a blind till needs.
-        bool doCashUp = !string.IsNullOrWhiteSpace(CountedCash)
-            && !string.IsNullOrWhiteSpace(CashAccountCode)
-            && !string.IsNullOrWhiteSpace(OverShortAccountCode);
+        // The count ("120" or "120; ZAR 500; EUR 20") is declared before anything expected is shown, which is what a blind till needs. A till is never
+        // closed without its cash-up: the count and the two accounts the variance needs come first.
+        if (string.IsNullOrWhiteSpace(CountedCash))
+        {
+            StatusMessage = "Count the drawer first: type the cash counted in 'Counted cash' (under More), then press Z / Close till again.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CashAccountCode) || string.IsNullOrWhiteSpace(OverShortAccountCode))
+        {
+            StatusMessage = "The till's cash and over/short accounts are not set (More > Account codes); ask your accountant to set them before closing.";
+            return;
+        }
+
+        bool doCashUp = true;
 
         IReadOnlyList<CashCount> counts = [];
         if (doCashUp && !CashCounts.TryParse(CountedCash, _currency.Value, out counts))

@@ -49,6 +49,8 @@
                                             <TextBlock Text="{Binding Prompt}" FontSize="12" Foreground="#556" />
                                             <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="24" VerticalContentAlignment="Center" Padding="4,0"
                                                      Visibility="{Binding IsPlain, Converter={StaticResource BoolToVisibility}}" />
+                                            <DatePicker SelectedDate="{Binding DateValue}" SelectedDateFormat="Short" Height="26"
+                                                        Visibility="{Binding IsDate, Converter={StaticResource BoolToVisibility}}" />
                                             <ComboBox IsEditable="True" ItemsSource="{Binding Options}" DisplayMemberPath="Display" TextSearch.TextPath="Value"
                                                       Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Height="24"
                                                       Visibility="{Binding HasLookup, Converter={StaticResource BoolToVisibility}}" />

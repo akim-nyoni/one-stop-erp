@@ -21,7 +21,7 @@ public static partial class OperationCatalogue
             Description = "Raise a requisition (budget-checked), submit it, approve or reject it (someone else approves), and convert an approved one into a purchase order. " + LinesHelp,
             Fields = [Pick("Step", "Step", ["Create", "Submit", "Approve", "Reject", "Convert to order"]), Opt("Number", "Requisition number"), Opt("Supplier", "Supplier code (create)"),
                 Opt("Currency", "Currency", "USD"), Opt("Lines", "Lines (create)"), Opt("Order", "New order number (convert)"), Today("Date", "Date"),
-                Opt("Account", "Expense account the lines are budget-checked against (create)"), Opt("RequiredBy", "Required by yyyy-MM-dd (create)"), Opt("Justification", "Justification (create)"),
+                Opt("Account", "Expense account the lines are budget-checked against (create)"), OptDate("RequiredBy", "Required by (create)"), Opt("Justification", "Justification (create)"),
                 Opt("Department", "Department (create)"), Opt("CostCentre", "Cost centre (create)"), Opt("Project", "Project (create)")],
             Run = async (c, i) =>
             {
@@ -72,7 +72,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Purchase order", ListTitle = "Purchase orders",
             Description = "Raise an order directly (budget-checked; over-budget needs an approver), cancel one, or print it. " + LinesHelp,
             Fields = [Pick("Step", "Step", ["Create", "Print", "Cancel"]), Req("Number", "Order number"), Opt("Supplier", "Supplier code (create)"), Opt("Currency", "Currency", "USD"),
-                Opt("Lines", "Lines (create)"), Opt("RequiredBy", "Required by (yyyy-MM-dd)"), Opt("BudgetApprover", "Budget approver user (over budget)"), Opt("Reason", "Reason (cancel)"), Today("Date", "Order date"),
+                Opt("Lines", "Lines (create)"), OptDate("RequiredBy", "Required by"), Opt("BudgetApprover", "Budget approver user (over budget)"), Opt("Reason", "Reason (cancel)"), Today("Date", "Order date"),
                 Opt("Job", "For job (contract number): received straight to the job"), Opt("JobAccount", "Job WIP account"), Opt("JobHead", "Job cost head", "Materials")],
             Run = async (c, i) =>
             {

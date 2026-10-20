@@ -153,7 +153,7 @@ public static partial class OperationCatalogue
             Description = "An employee's medical records - fitness assessments, illness, injury, disability - seen and kept only by users with the Hr.Medical permission; "
                 + "notes are encrypted at rest.",
             Fields = [Pick("Step", "Step", ["Show", "Record"]), Req("Number", "Employee number"), Pick("Kind", "Record is", Enum.GetNames<MedicalRecordKind>()), Opt("Note", "Note"),
-                Pick("Fit", "Fit for work", ["Not assessed", "Fit", "Not fit"]), Opt("Review", "Review on (yyyy-MM-dd)"), Today()],
+                Pick("Fit", "Fit for work", ["Not assessed", "Fit", "Not fit"]), OptDate("Review", "Review on"), Today()],
             Run = async (c, i) =>
             {
                 IHrCasesService cases = c.Get<IHrCasesService>();
@@ -178,7 +178,7 @@ public static partial class OperationCatalogue
             Fields = [Pick("Step", "Step", ["Details", "Photo", "Add dependant", "Remove dependant"]), Opt("Number", "Employee number"), Opt("Physical", "Physical address"),
                 Opt("Postal", "Postal address"), Opt("Phone", "Phone"), Opt("JobTitle", "Job title / position"), OptNum("Notice", "Notice period (days)"), Opt("Wcif", "Workers' compensation class"),
                 Opt("PhotoFile", "Photograph file"), Pick("Kind", "Dependant is", Enum.GetNames<DependantKind>()), Opt("DependantName", "Dependant's name"), Opt("Relationship", "Relationship"),
-                Opt("Born", "Born (yyyy-MM-dd)"), Opt("IdNumber", "ID number"), OptNum("Share", "Beneficiary share %"), Opt("MedicalAid", "Medical-aid number"), OptNum("Dependant", "Dependant id")],
+                OptDate("Born", "Born"), Opt("IdNumber", "ID number"), OptNum("Share", "Beneficiary share %"), Opt("MedicalAid", "Medical-aid number"), OptNum("Dependant", "Dependant id")],
             Run = async (c, i) =>
             {
                 IEmployeeProfileService profile = c.Get<IEmployeeProfileService>();
@@ -227,7 +227,7 @@ public static partial class OperationCatalogue
                 + "and a second person's approval.",
             Fields = [Pick("Step", "Step", ["Engage", "Update"]), Req("Number", "Employee number"), Opt("Name", "Full name"), OptNum("Basic", "Basic salary"), Today("Engaged", "Engagement date"),
                 Pick("Type", "Employment", Enum.GetNames<EmploymentType>()), Opt("Department", "Department code (3)"), Opt("CostCentre", "Cost centre code (3)"), Opt("PayGroup", "Pay group"), Opt("Grade", "Grade"),
-                Opt("NationalId", "National ID"), Opt("TaxNumber", "Tax number"), Opt("ContractEnd", "Contract end (yyyy-MM-dd)"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()),
+                Opt("NationalId", "National ID"), Opt("TaxNumber", "Tax number"), OptDate("ContractEnd", "Contract end"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()),
                 Opt("Bank", "Bank (engage only)"), Opt("Branch", "Bank branch (engage only)"), Opt("Account", "Account number (engage only)"), Opt("Mobile", "Mobile money (engage only)"), Opt("Email", "Email"),
                 Pick("Frequency", "Paid", Enum.GetNames<PayFrequency>()), Opt("WorkBranch", "Works at branch (code)"), Opt("Project", "Charged to project"), Opt("Fund", "Charged to fund"),
                 Opt("ReportsTo", "Reports to (employee number)"), Pick("Marital", "Marital status", Enum.GetNames<MaritalStatus>()), Opt("Nationality", "Nationality"),
@@ -640,7 +640,7 @@ public static partial class OperationCatalogue
             Description = "Shows who is on leave between two dates (optionally one department); cancels leave not yet begun, or cuts it short when someone is recalled - the days "
                 + "not taken go back to the balance (pro rata unless given).",
             Fields = [Pick("Step", "Step", ["Calendar", "Cancel or recall"]), Today("From", "From"), Today("To", "To"), Opt("Department", "Department (calendar)"),
-                OptNum("Leave", "Leave record id (cancel)"), Opt("Returned", "Back at work on (yyyy-mm-dd; blank: cancel outright)"), OptNum("DaysBack", "Days given back (blank: pro rata)")],
+                OptNum("Leave", "Leave record id (cancel)"), OptDate("Returned", "Back at work on (blank: cancel outright)"), OptNum("DaysBack", "Days given back (blank: pro rata)")],
             Run = async (c, i) =>
             {
                 IAttendanceService attendance = c.Get<IAttendanceService>();
@@ -1138,7 +1138,7 @@ public static partial class OperationCatalogue
                 + "delivery plus terms, standing orders, payroll (repeating the last regular run) and flows keyed in by hand (once or monthly). Weeks where cash would fall "
                 + "below the minimum are marked. With a currency, the forecast is of the cash held in that currency, in it (its bank accounts, documents, orders and runs).",
             Fields = [Pick("Step", "Step", ["Forecast", "Add a flow", "Remove a flow"]), Opt("Currency", "Currency (blank: everything in base)"), Today("From", "From"), Num("Weeks", "Weeks", "13"), Num("Minimum", "Minimum cash to hold", "0"),
-                Tick("Detail", "Show every flow"), Num("Amount", "Flow amount (+ in, − out)", "0"), Opt("What", "Flow description"), Opt("Until", "Repeat monthly until (yyyy-mm-dd)"),
+                Tick("Detail", "Show every flow"), Num("Amount", "Flow amount (+ in, − out)", "0"), Opt("What", "Flow description"), OptDate("Until", "Repeat monthly until"),
                 OptNum("Entry", "Flow id (remove)")],
             Run = async (c, i) =>
             {
@@ -1207,7 +1207,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits",
             Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.",
             Fields = [Req("Reference", "Reference"), Req("Bank", "Bank account", "1100"), Num("Amount", "Amount"), Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()),
-                Today("Start", "First payment"), Opt("End", "Last date (yyyy-MM-dd, optional)"), SupplierPick("Supplier", "Supplier", required: false), Opt("Account", "GL account"), Opt("Narrative", "What it is for")],
+                Today("Start", "First payment"), OptDate("End", "Last date (optional)"), SupplierPick("Supplier", "Supplier", required: false), Opt("Account", "GL account"), Opt("Narrative", "What it is for")],
             Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateStandingOrderAsync(new StandingOrderRequest
             {
                 CompanyId = c.CompanyId, Reference = i.Text("Reference"), BankAccountCode = i.Text("Bank"), Amount = i.Number("Amount"), Frequency = Enum.Parse<RecurrenceFrequency>(i.Text("Frequency")),
@@ -1221,7 +1221,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "Set up a direct debit mandate", ListTitle = "Standing orders and direct debits",
             Description = "The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped).",
             Fields = [Req("Reference", "Mandate reference"), CustomerPick("Customer", "Customer"), Req("CustomerBank", "Customer's bank account"), Req("Bank", "Collect into bank account", "1100"),
-                Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()), Today("Start", "First collection"), Opt("End", "Last date (yyyy-MM-dd, optional)"),
+                Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()), Today("Start", "First collection"), OptDate("End", "Last date (optional)"),
                 OptNum("Fixed", "Fixed amount (blank: what is owed)"), OptNum("Max", "Most per collection")],
             Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateMandateAsync(new DirectDebitMandateRequest
             {
@@ -1406,8 +1406,8 @@ public static partial class OperationCatalogue
             Description = "Term dates (with pro rata, a joiner pays from the admission date and a leaver is credited the unused part of the term invoice); a student taking or "
                 + "dropping an optional item (lunches, clubs, trips - billed with the term, not discounted); a student's admission date; withdrawing a student.",
             Fields = [Pick("Step", "Step", ["Term dates", "Take option", "Drop option", "Admission date", "Withdraw"]), Opt("Structure", "Fee structure code"),
-                Opt("Student", "Admission number"), OptNum("Item", "Optional fee item id (from the list)"), Opt("Start", "Term start / admission date (yyyy-MM-dd)"),
-                Opt("End", "Term end (yyyy-MM-dd)"), Tick("ProRata", "Pro rata joiners and leavers", true), Opt("Prefix", "Term invoice prefix (withdraw)"), Today("Date", "Left on (withdraw)")],
+                Opt("Student", "Admission number"), OptNum("Item", "Optional fee item id (from the list)"), OptDate("Start", "Term start / admission date"),
+                OptDate("End", "Term end"), Tick("ProRata", "Pro rata joiners and leavers", true), Opt("Prefix", "Term invoice prefix (withdraw)"), Today("Date", "Left on (withdraw)")],
             Run = async (c, i) =>
             {
                 ISchoolBillingService billing = c.Get<ISchoolBillingService>();
@@ -1450,7 +1450,7 @@ public static partial class OperationCatalogue
                 + "or through the approval workflow when one is defined for bursaries. Decide approves or rejects a pending request by its reference. A bursary may expire: fees billed "
                 + "after its last day get no bursary. Expiring lists bursaries ending within the given days, for renewal.",
             Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Expiring"]), Opt("Student", "Admission number (request)"), Pick("Type", "Type", ["Percentage", "Value"]),
-                OptNum("Value", "Percentage or value (request)"), Opt("Reason", "Reason / decision note"), Opt("Reference", "Reference (decide)"), Opt("ValidUntil", "Last day it applies (yyyy-MM-dd)"),
+                OptNum("Value", "Percentage or value (request)"), Opt("Reason", "Reason / decision note"), Opt("Reference", "Reference (decide)"), OptDate("ValidUntil", "Last day it applies"),
                 Num("Within", "Expiring within (days)", "60"), Today()],
             Run = async (c, i) =>
             {

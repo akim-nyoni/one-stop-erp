@@ -57,8 +57,19 @@ public sealed partial class ReportParameterInput : ObservableObject
     /// <summary>Whether the parameter offers a list of choices.</summary>
     public bool HasLookup => !string.IsNullOrWhiteSpace(Definition.LookupQuery);
 
-    /// <summary>Whether the parameter is typed as text (no list).</summary>
-    public bool IsPlain => !HasLookup;
+    /// <summary>Whether the parameter is typed as text (no list, not a date).</summary>
+    public bool IsPlain => !HasLookup && !IsDate;
+
+    /// <summary>Whether the parameter is a single date, picked on a calendar.</summary>
+    public bool IsDate => Type == ParameterType.Date && !HasLookup && !Definition.MultiSelect;
+
+    /// <summary>The date picked (kept in step with <see cref="Value"/> as yyyy-MM-dd).</summary>
+    public DateTime? DateValue
+    {
+        get => DateTime.TryParseExact(Value, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime d) ? d
+            : DateTime.TryParse(Value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out DateTime any) ? any : null;
+        set => Value = value is DateTime d ? d.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) : string.Empty;
+    }
 
     /// <summary>The parameter name (key passed to the runner).</summary>
     public string Name { get; }
@@ -72,7 +83,7 @@ public sealed partial class ReportParameterInput : ObservableObject
     /// <summary>A hint describing the expected input.</summary>
     public string Hint => (Type switch
     {
-        ParameterType.Date => "yyyy-mm-dd",
+        ParameterType.Date => Definition.MultiSelect ? "dates as yyyy-mm-dd" : "pick a date",
         ParameterType.Integer => "whole number",
         ParameterType.Decimal => "number",
         ParameterType.Boolean => "true / false",
@@ -91,7 +102,11 @@ public sealed partial class ReportParameterInput : ObservableObject
     /// <summary>Raised when the value changes (a dependent list reloads).</summary>
     public event EventHandler? ValueChanged;
 
-    partial void OnValueChanged(string value) => ValueChanged?.Invoke(this, EventArgs.Empty);
+    partial void OnValueChanged(string value)
+    {
+        OnPropertyChanged(nameof(DateValue));
+        ValueChanged?.Invoke(this, EventArgs.Empty);
+    }
 }
 
 /// <summary>One choice in a parameter's list.</summary>

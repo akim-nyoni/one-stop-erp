@@ -83,7 +83,7 @@ public static partial class OperationCatalogue
                 + "(a line in another currency at its rate) and a narrative after '#'; e.g. \"6100 Dr 500 project=P-DAM fund=WATER # Contractor; 2410 Cr 500 fund=WATER\". "
                 + "It is validated and numbered now, and posts once someone else approves it; an accrual names the date it reverses on.",
             Fields = [Today("Date", "Posting date"), Req("Narrative", "Narrative"), Opt("Reference", "Reference"), Req("Lines", "Lines"), Opt("Currency", "Currency (blank: base)"),
-                Opt("ReverseOn", "Reverse on (yyyy-MM-dd; blank: not reversed)")],
+                OptDate("ReverseOn", "Reverse on (blank: not reversed)")],
             Run = async (c, i) =>
             {
                 CurrencyCode currency = i.Optional("Currency") is string code ? CurrencyCode.Parse(code)
@@ -150,7 +150,7 @@ public static partial class OperationCatalogue
                 + "add headings under parents, map account ranges, check every account is mapped once, and show the rolled-up statement (Statement by Reporting Tree, GL-TREE, prints it).",
             Fields = [Pick("Step", "Step", ["Create", "Create from chart", "Heading", "Map accounts", "Check", "Show statement"]), Req("Tree", "Tree code"), Opt("Name", "Tree / heading name"),
                 Pick("Purpose", "Purpose", Enum.GetNames<ReportingTreePurpose>()), Opt("Node", "Heading code"), Opt("Parent", "Parent heading"), Num("Order", "Order", "10"),
-                Tick("Credit", "Show credit-positive"), Opt("From", "From account"), Opt("To", "To account"), Opt("Start", "From date (blank: balance)"), Today("End", "To date")],
+                Tick("Credit", "Show credit-positive"), Opt("From", "From account"), Opt("To", "To account"), OptDate("Start", "From date (blank: balance)"), Today("End", "To date")],
             Run = async (c, i) =>
             {
                 IReportingTreeService trees = c.Get<IReportingTreeService>();
@@ -191,7 +191,7 @@ public static partial class OperationCatalogue
                 + "(while valid no withholding is deducted from payments), or withdraw one by its id.",
             Fields = [Pick("Step", "Step", ["Record", "Withdraw", "Set default withholding"]), Pick("Ledger", "Who", ["Customer", "Supplier"]), Pick("Purpose", "For", ["Tax exemption", "Tax clearance (supplier)"]),
                 Opt("Trader", "Customer / supplier code"), Opt("Number", "Certificate number"),
-                Today("From", "Valid from"), Opt("To", "Valid to (yyyy-MM-dd)"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)"),
+                Today("From", "Valid from"), OptDate("To", "Valid to"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)"),
                 Opt("Wht", "Withholding code for suppliers without clearance (blank: none)")],
             Run = async (c, i) =>
             {
@@ -230,7 +230,7 @@ public static partial class OperationCatalogue
             Module = module, Title = "VAT return by tax point basis", ListTitle = "Journals awaiting approval",
             Description = "The VAT due for a period on the company's basis - invoice date (the ledger), tax point (deliveries move invoices between periods), or cash accounting (invoice VAT due as it "
                 + "is paid) - with every adjustment off the ledger listed. Tick 'Make it the company's basis' to change the basis used from now on.",
-            Fields = [Opt("From", "From (yyyy-MM-dd)"), Today("To", "To"), Pick("Basis", "Basis", Enum.GetNames<TaxPointBasis>()), Tick("Adopt", "Make it the company's basis")],
+            Fields = [OptDate("From", "From"), Today("To", "To"), Pick("Basis", "Basis", Enum.GetNames<TaxPointBasis>()), Tick("Adopt", "Make it the company's basis")],
             Run = async (c, i) =>
             {
                 TaxPointBasis basis = Enum.Parse<TaxPointBasis>(i.Text("Basis"));
@@ -380,7 +380,7 @@ public static partial class OperationCatalogue
                 + "due. Stop / restart one.",
             Fields = [Pick("Step", "Step", ["Create", "Schedule", "Post", "Post all", "Stop", "Restart"]), Opt("Code", "Code"), Opt("Description", "Description"), Opt("Lines", "Lines (create)"),
                 Opt("Narrative", "Narrative"), Pick("Frequency", "Frequency", ["Monthly", "Quarterly", "Half-yearly", "Yearly"]), Opt("Start", "Start month (yyyy-MM, blank: any)"),
-                Opt("End", "End date (yyyy-MM-dd, blank: none)"), OptNum("Times", "Post at most this many times (blank: no limit)"), Tick("Reverse", "Auto-reverse next month", false),
+                OptDate("End", "End date (blank: none)"), OptNum("Times", "Post at most this many times (blank: no limit)"), Tick("Reverse", "Auto-reverse next month", false),
                 Opt("Currency", "Currency (blank: base)"), Opt("Document", "Document number (post)"), Today()],
             Run = async (c, i) =>
             {

@@ -22,7 +22,7 @@ public static partial class OperationCatalogue
                 + "or lost (with the reason); Forecast shows the weighted pipeline by stage; Timeline lists everything done on it; Convert raises the sales order from it "
                 + "(lines ITEM:qty[:price]; …).",
             Fields = [Pick("Step", "Step", ["Move", "Forecast", "Timeline", "Convert to order"]), OptNum("Opportunity", "Opportunity id"), Pick("Stage", "Stage", Enum.GetNames<OpportunityStage>()),
-                OptNum("Probability", "Probability % (blank: the stage's)"), Opt("ExpectedClose", "Expected close (yyyy-MM-dd)"), Opt("Reason", "Why lost"), Opt("Order", "Sales order number"),
+                OptNum("Probability", "Probability % (blank: the stage's)"), OptDate("ExpectedClose", "Expected close"), Opt("Reason", "Why lost"), Opt("Order", "Sales order number"),
                 Opt("Lines", "Lines ITEM:qty[:price]; …"), Today()],
             Run = async (c, i) =>
             {
@@ -98,11 +98,11 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Log an activity", ListTitle = "My agenda (due within a week)",
             Description = "A call, e-mail, meeting, task or note against a lead, opportunity or customer; give a due date for something still to do.",
-            Fields = [Pick("Type", "Type", Enum.GetNames<ActivityType>()), Req("Subject", "Subject"), Opt("Notes", "Notes"), Opt("Due", "Due (yyyy-MM-dd HH:mm)"), OptNum("Lead", "Lead id"),
+            Fields = [Pick("Type", "Type", Enum.GetNames<ActivityType>()), Req("Subject", "Subject"), Opt("Notes", "Notes"), OptDate("Due", "Due date"), Opt("DueTime", "Due time (HH:mm, blank: 09:00)"), OptNum("Lead", "Lead id"),
                 OptNum("Opportunity", "Opportunity id"), CustomerPick("Customer", "Customer", required: false)],
             Run = async (c, i) =>
             {
-                DateTimeOffset? due = i.Optional("Due") is string text ? DateTimeOffset.ParseExact(text, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal) : null;
+                DateTimeOffset? due = i.Optional("Due") is string text ? DateTimeOffset.ParseExact($"{text} {i.Optional("DueTime") ?? "09:00"}", "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal) : null;
                 long? customer = i.Optional("Customer") is string code ? await CustomerAsync(c, code).ConfigureAwait(true) : null;
                 return Check(await c.Get<ICrmService>().LogActivityAsync(new NewActivity(c.CompanyId, Enum.Parse<ActivityType>(i.Text("Type")), i.Text("Subject"), c.UserId, due, i.Optional("Notes"),
                     (long?)i.OptionalNumber("Lead"), (long?)i.OptionalNumber("Opportunity"), customer)).ConfigureAwait(true), id => $"Activity {id} logged.");

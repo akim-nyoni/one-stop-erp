@@ -56,10 +56,83 @@ public sealed partial class OperationFieldVm : ObservableObject
     public string Label => Field.Required && Field.Kind != FieldKind.Flag ? Field.Label + " *" : Field.Label;
 
     /// <summary>Gets a value indicating whether it is typed.</summary>
-    public bool IsText => Field.Kind is FieldKind.Text or FieldKind.Number;
+    public bool IsText => Field.Kind is FieldKind.Text or FieldKind.Number && !IsDateText && AutoLookup is null;
 
-    /// <summary>Gets a value indicating whether it is a date.</summary>
-    public bool IsDate => Field.Kind == FieldKind.Date;
+    /// <summary>Gets a value indicating whether it is a date (a date field, or a text field that asks for yyyy-MM-dd, picked on a calendar).</summary>
+    public bool IsDate => Field.Kind == FieldKind.Date || IsDateText;
+
+    /// <summary>Gets whether a typed field asks for a date (its label says yyyy-MM-dd): it is picked on a calendar instead.</summary>
+    public bool IsDateText => Field.Kind == FieldKind.Text && Field.Label.Contains("yyyy-MM-dd", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Gets what a typed field names, when the company's own records can be offered for it: a ledger account, a customer, a supplier or a user
+    /// (from its label); null for ordinary text. Such a field is picked from a list that can still be typed into.
+    /// </summary>
+    public string? AutoLookup
+    {
+        get
+        {
+            if (Field.Kind != FieldKind.Text || Field.Name == "Code" || IsDateText)
+            {
+                return null;
+            }
+
+            string label = Field.Label.ToLowerInvariant();
+            if (label.Contains("customer", StringComparison.Ordinal) && label.Contains("code", StringComparison.Ordinal))
+            {
+                return "Customers";
+            }
+
+            if (label.Contains("supplier", StringComparison.Ordinal) && label.Contains("code", StringComparison.Ordinal))
+            {
+                return "Suppliers";
+            }
+
+            if (label.Contains("user name", StringComparison.Ordinal))
+            {
+                return "Users";
+            }
+
+            return label.Contains("account", StringComparison.Ordinal) && !label.Contains("number", StringComparison.Ordinal) && !label.Contains("customer", StringComparison.Ordinal)
+                && !label.Contains("supplier", StringComparison.Ordinal) && !label.Contains("account code (up to", StringComparison.Ordinal) ? "Accounts" : null;
+        }
+    }
+
+    /// <summary>Gets whether the field shows a list to pick from (a choice, or a typed field offered the company's records).</summary>
+    public bool ShowsList => IsChoice || AutoLookup is not null;
+
+    /// <summary>Whether the field applies to the step chosen on the form (fields marked for other steps are hidden).</summary>
+    [ObservableProperty]
+    private bool _isShown = true;
+
+    /// <summary>
+    /// Shows the field only for the steps its label names in brackets ("Customer code (take)", "Amount (take) / NRV (cancel)"); a field whose
+    /// brackets name no step applies to every step.
+    /// </summary>
+    /// <param name="step">The step chosen.</param>
+    /// <param name="steps">The form's steps.</param>
+    public void ShowFor(string? step, IReadOnlyList<string> steps)
+    {
+        if (Field.Name == "Step" || string.IsNullOrWhiteSpace(step) || steps.Count == 0)
+        {
+            IsShown = true;
+            return;
+        }
+
+        List<string> named = [];
+        foreach (System.Text.RegularExpressions.Match hint in System.Text.RegularExpressions.Regex.Matches(Field.Label, @"\(([^()]*)\)"))
+        {
+            foreach (string token in hint.Groups[1].Value.Split(['/', ',', ';'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                string word = token.Split(':')[0].Trim();
+                named.AddRange(steps.Where(s => s.Equals(word, StringComparison.OrdinalIgnoreCase)
+                    || (word.Length >= 4 && s.StartsWith(word, StringComparison.OrdinalIgnoreCase))
+                    || (word.Length >= 4 && s.Split(' ')[0].Equals(word, StringComparison.OrdinalIgnoreCase))));
+            }
+        }
+
+        IsShown = named.Count == 0 || named.Contains(step, StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>Gets a value indicating whether it is a tick.</summary>
     public bool IsFlag => Field.Kind == FieldKind.Flag;
@@ -89,6 +162,8 @@ public sealed partial class OperationFieldVm : ObservableObject
         FieldKind.Date => DateValue is DateTime d ? Ops.D(DateOnly.FromDateTime(d)) : null,
         FieldKind.Flag => IsTicked ? "True" : "False",
         FieldKind.Choice => Ops.CodeOf(Value),
+        _ when IsDateText => DateValue is DateTime picked ? Ops.D(DateOnly.FromDateTime(picked)) : Value,
+        _ when AutoLookup is not null => Ops.CodeOf(Value),
         _ when IsLines && Lines.Any(l => l.IsFilled) => LinesText(),
         _ => Value,
     };
@@ -134,7 +209,7 @@ public sealed partial class OperationFieldVm : ObservableObject
     }
 
     /// <summary>Gets a value indicating whether the choices are the company's records (typed codes are accepted too).</summary>
-    public bool IsLookup => Field.ChoicesFrom is not null;
+    public bool IsLookup => Field.ChoicesFrom is not null || AutoLookup is not null;
 }
 
 /// <summary>
@@ -342,6 +417,28 @@ public sealed partial class OperationsViewModel : ObservableObject
             Fields.Add(new OperationFieldVm(field));
         }
 
+        // Fields marked for other steps are hidden as the step changes.
+        if (Fields.FirstOrDefault(f => f.Field.Name == "Step" && f.Field.Kind == FieldKind.Choice) is OperationFieldVm stepField)
+        {
+            void Apply()
+            {
+                List<string> steps = [.. stepField.Choices];
+                foreach (OperationFieldVm f in Fields)
+                {
+                    f.ShowFor(stepField.Value, steps);
+                }
+            }
+
+            stepField.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(OperationFieldVm.Value))
+                {
+                    Apply();
+                }
+            };
+            Apply();
+        }
+
         Result = string.Empty;
         Failed = false;
         List = null;
@@ -358,6 +455,39 @@ public sealed partial class OperationsViewModel : ObservableObject
     // Choices that come from the database (the company's currencies…) are read when the form opens; the first is taken unless one is set.
     private async Task LoadChoicesAsync()
     {
+        // Typed fields that name an account, customer, supplier or user offer the company's records (and can still be typed into).
+        foreach (IGrouping<string, OperationFieldVm> kind in Fields.Where(f => f.AutoLookup is not null).GroupBy(f => f.AutoLookup!).ToList())
+        {
+            try
+            {
+                List<string> rows = await InScopeAsync(async c => kind.Key switch
+                {
+                    "Customers" => await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.Code).Select(x => x.Code + " - " + x.Name).Take(5000)
+                        .ToListAsync().ConfigureAwait(true),
+                    "Suppliers" => await c.Db.Suppliers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.Code).Select(x => x.Code + " - " + x.Name).Take(5000)
+                        .ToListAsync().ConfigureAwait(true),
+                    "Users" => await c.Db.Users.AsNoTracking().OrderBy(x => x.Username).Select(x => x.Username + " - " + x.DisplayName).Take(2000).ToListAsync().ConfigureAwait(true),
+                    _ => await c.Db.Accounts.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.IsActive).OrderBy(x => x.AccountCode).Select(x => x.AccountCode + " - " + x.Name)
+                        .ToListAsync().ConfigureAwait(true),
+                }).ConfigureAwait(true);
+                foreach (OperationFieldVm field in kind)
+                {
+                    string? keep = field.Value;
+                    field.Choices.Clear();
+                    foreach (string row in rows)
+                    {
+                        field.Choices.Add(row);
+                    }
+
+                    field.Value = keep;
+                }
+            }
+            catch (InvalidOperationException)
+            {
+                // No company yet: the fields are typed into instead.
+            }
+        }
+
         // A line grid picks from the company's active items.
         foreach (OperationFieldVm lines in Fields.Where(f => f.IsLines).ToList())
         {

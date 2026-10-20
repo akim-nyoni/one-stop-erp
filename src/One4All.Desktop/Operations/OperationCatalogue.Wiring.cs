@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Accounting;
 using One4All.Application.Abstractions.Budgeting;
@@ -203,8 +203,8 @@ public static partial class OperationCatalogue
         {
             Module = "Fixed Assets", Title = "Asset insurance and warranty", ListTitle = "Insurance and warranty",
             Description = "Who insures an asset, the policy and the sum insured with its expiry, and when the manufacturer's warranty ends (report M213 and the expiry alerts read them).",
-            Fields = [Req("Asset", "Asset number"), Opt("Insurer", "Insurer"), Opt("Policy", "Policy number"), OptNum("Insured", "Sum insured"), Opt("InsuredTo", "Insurance expires (yyyy-MM-dd)"),
-                Opt("WarrantyTo", "Warranty ends (yyyy-MM-dd)")],
+            Fields = [Req("Asset", "Asset number"), Opt("Insurer", "Insurer"), Opt("Policy", "Policy number"), OptNum("Insured", "Sum insured"), OptDate("InsuredTo", "Insurance expires"),
+                OptDate("WarrantyTo", "Warranty ends")],
             Run = async (c, i) =>
             {
                 string number = i.Text("Asset").Trim().ToUpperInvariant();
