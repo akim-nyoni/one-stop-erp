@@ -65,6 +65,12 @@ public sealed class LedgerAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets whether the account is a monetary item (cash, receivables, payables, loans) revalued at closing rates when currency-restricted (IAS 21); stock, prepayments and fixed assets held in a currency are not.</summary>
     public bool IsMonetary { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets whether the account is an equity reserve whose movement is other comprehensive income (IAS 1.7: revaluation surplus, translation
+    /// reserve, cash-flow hedge reserve): the period's movement shows under the profit, making total comprehensive income.
+    /// </summary>
+    public bool IsOtherComprehensiveIncome { get; set; }
+
     /// <summary>Optional currency the account is restricted to (e.g. a foreign bank account).</summary>
     public CurrencyCode? CurrencyRestriction { get; set; }
 

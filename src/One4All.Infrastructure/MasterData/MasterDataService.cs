@@ -151,6 +151,7 @@ public sealed class MasterDataService : IMasterDataService
             DefaultTaxCode = string.IsNullOrWhiteSpace(account.DefaultTaxCode) ? null : account.DefaultTaxCode.Trim().ToUpperInvariant(),
             AllowManualJournal = account.AllowManualJournal,
             IsMonetary = account.IsMonetary,
+            IsOtherComprehensiveIncome = account.IsOtherComprehensiveIncome && account.Type == AccountType.Equity,
         };
         if (account.ControlType is ControlAccountType control)
         {

@@ -132,6 +132,18 @@ public sealed class GeneralLedgerReportDataProvider : IReportDataProvider
             ["Category"] = "Result", ["AccountCode"] = string.Empty, ["AccountName"] = "Net profit", ["Amount"] = report.NetProfit, ["PriorAmount"] = prior.NetProfit,
             ["Change"] = report.NetProfit - prior.NetProfit,
         }));
+
+        // IAS 1.81A: other comprehensive income below the profit, then total comprehensive income.
+        if (report.Oci.Count > 0 || prior.Oci.Count > 0)
+        {
+            rows.AddRange(Compared("Other comprehensive income", report.Oci.Select(l => (l.AccountCode, l.AccountName, l.Amount)), prior.Oci.Select(l => (l.AccountCode, l.AccountName, l.Amount))));
+            rows.Add(Row(new()
+            {
+                ["Category"] = "Result", ["AccountCode"] = string.Empty, ["AccountName"] = "Total comprehensive income", ["Amount"] = report.TotalComprehensiveIncome,
+                ["PriorAmount"] = prior.TotalComprehensiveIncome, ["Change"] = report.TotalComprehensiveIncome - prior.TotalComprehensiveIncome,
+            }));
+        }
+
         return rows;
     }
 

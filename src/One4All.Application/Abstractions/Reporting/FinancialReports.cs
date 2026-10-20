@@ -59,8 +59,17 @@ public sealed record StatementLine(string Category, string AccountCode, string A
 /// <param name="Expenses">Expense lines (positive = expense incurred).</param>
 public sealed record IncomeStatement(
     long CompanyId, DateOnly FromDate, DateOnly ToDate, string Currency,
-    IReadOnlyList<StatementLine> Income, IReadOnlyList<StatementLine> Expenses)
+    IReadOnlyList<StatementLine> Income, IReadOnlyList<StatementLine> Expenses, IReadOnlyList<StatementLine>? OtherComprehensiveIncome = null)
 {
+    /// <summary>Other comprehensive income: the period's movement on the reserves marked as such (a gain positive).</summary>
+    public IReadOnlyList<StatementLine> Oci => OtherComprehensiveIncome ?? [];
+
+    /// <summary>Total other comprehensive income.</summary>
+    public decimal TotalOtherComprehensiveIncome => Oci.Sum(l => l.Amount);
+
+    /// <summary>Total comprehensive income: the profit plus other comprehensive income.</summary>
+    public decimal TotalComprehensiveIncome => NetProfit + TotalOtherComprehensiveIncome;
+
     /// <summary>Total income.</summary>
     public decimal TotalIncome => Income.Sum(l => l.Amount);
 

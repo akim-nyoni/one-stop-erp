@@ -906,6 +906,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_monetary");
 
+                    b.Property<bool>("IsOtherComprehensiveIncome")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_other_comprehensive_income");
+
                     b.Property<long?>("ModifiedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("modified_by_user_id");

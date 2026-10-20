@@ -19,13 +19,13 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     /// <param name="db">The database context.</param>
     public GeneralLedgerReports(One4AllDbContext db) => _db = db;
 
-    private sealed record AccountMeta(string Name, AccountType Type, string ReportCategory, CashFlowCategory CashFlow);
+    private sealed record AccountMeta(string Name, AccountType Type, string ReportCategory, CashFlowCategory CashFlow, bool Oci = false);
 
     private async Task<Dictionary<string, AccountMeta>> LoadAccountsAsync(long companyId, CancellationToken ct)
     {
         return await _db.Accounts
             .Where(a => a.CompanyId == companyId)
-            .ToDictionaryAsync(a => a.AccountCode, a => new AccountMeta(a.Name, a.Type, a.ReportCategory, a.CashFlowCategory), ct)
+            .ToDictionaryAsync(a => a.AccountCode, a => new AccountMeta(a.Name, a.Type, a.ReportCategory, a.CashFlowCategory, a.IsOtherComprehensiveIncome), ct)
             .ConfigureAwait(false);
     }
 
@@ -97,10 +97,18 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
     {
         List<StatementLine> income = [];
         List<StatementLine> expenses = [];
+        List<StatementLine> oci = [];
         foreach ((string code, (decimal debit, decimal credit)) in sums)
         {
             if (!accounts.TryGetValue(code, out AccountMeta? meta))
             {
+                continue;
+            }
+
+            // A reserve's movement in the period is other comprehensive income (a credit is a gain).
+            if (meta.Type == AccountType.Equity && meta.Oci && credit - debit != 0m)
+            {
+                oci.Add(new StatementLine(meta.ReportCategory, code, meta.Name, credit - debit));
                 continue;
             }
 
@@ -124,7 +132,8 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
 
         return new IncomeStatement(companyId, from, to, currency,
             income.OrderBy(l => l.AccountCode, StringComparer.Ordinal).ToList(),
-            expenses.OrderBy(l => l.AccountCode, StringComparer.Ordinal).ToList());
+            expenses.OrderBy(l => l.AccountCode, StringComparer.Ordinal).ToList(),
+            oci.OrderBy(l => l.AccountCode, StringComparer.Ordinal).ToList());
     }
 
     /// <inheritdoc />
