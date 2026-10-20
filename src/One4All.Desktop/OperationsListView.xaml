@@ -19,13 +19,13 @@
                     <Button Content="{loc:T 'Next ▶'}" Padding="8,3" Command="{Binding NextPageCommand}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
-                    <Button Padding="8,3" Margin="0,0,6,0" Click="Add_Click" ToolTip="{Binding AddText, Mode=OneWay}">
+                    <Button Padding="8,3" Margin="0,0,6,0" Click="Add_Click" ToolTip="{Binding AddText, Mode=OneWay}" Visibility="{Binding UserCanAdd, Converter={StaticResource Visible}}">
                         <TextBlock><Run Text="➕ " Foreground="#27AE60" /><Run Text="Add" /></TextBlock>
                     </Button>
-                    <Button Padding="8,3" Margin="0,0,6,0" Click="Edit_Click" ToolTip="Opens the selected record in the form to change it" Visibility="{Binding Selected.CanEdit, Converter={StaticResource Visible}}">
+                    <Button Padding="8,3" Margin="0,0,6,0" Click="Edit_Click" ToolTip="Opens the selected record in the form to change it" Visibility="{Binding ShowEdit, Converter={StaticResource Visible}}">
                         <TextBlock><Run Text="✏ " Foreground="#2E86C1" /><Run Text="Edit" /></TextBlock>
                     </Button>
-                    <Button Padding="8,3" Margin="0,0,6,0" Click="Delete_Click" ToolTip="Removes the selected record from use (it is kept in history)" Visibility="{Binding Selected.Delete, Converter={StaticResource NotNull}}">
+                    <Button Padding="8,3" Margin="0,0,6,0" Click="Delete_Click" ToolTip="Removes the selected record from use (it is kept in history)" Visibility="{Binding ShowDelete, Converter={StaticResource Visible}}">
                         <TextBlock><Run Text="⛔ " Foreground="#C0392B" /><Run Text="Delete" /></TextBlock>
                     </Button>
                     <Button Padding="8,3" Margin="0,0,6,0" Command="{Binding RefreshCommand}">

@@ -21,21 +21,14 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Exchange-rate policy", ListTitle = "Rate policies",
             Description = "Which rate type a document type (SalesInvoice, Receipt, SalesCreditNote, PurchaseInvoice, PurchaseCreditNote, Payment) or a whole ledger (AR, AP) uses "
-                + "when no rate is keyed. A trader's own rate type still comes first; with no policy the daily rate is used.",
+                + "when no rate is keyed. A trader's own rate type still comes first; with no policy the daily rate is used. Delete on the list puts a document type back on the default rate.",
             Fields = [Pick("Document", "Document type or ledger", ["SalesInvoice", "Receipt", "SalesCreditNote", "PurchaseInvoice", "PurchaseCreditNote", "Payment", "AR", "AP"]),
-                Pick("RateType", "Rate type", Enum.GetNames<ExchangeRateType>()), Tick("Remove", "Remove the policy")],
+                Pick("RateType", "Rate type", Enum.GetNames<ExchangeRateType>())],
             Run = async (c, i) =>
             {
                 string document = i.Text("Document");
                 ExchangeRatePolicy? policy = await c.Db.ExchangeRatePolicies.FirstOrDefaultAsync(p => p.CompanyId == c.CompanyId && p.DocumentType == document).ConfigureAwait(true);
-                if (i.Flag("Remove"))
-                {
-                    if (policy is not null)
-                    {
-                        c.Db.ExchangeRatePolicies.Remove(policy);
-                    }
-                }
-                else if (policy is null)
+                if (policy is null)
                 {
                     c.Db.ExchangeRatePolicies.Add(new ExchangeRatePolicy(c.CompanyId, document, Enum.Parse<ExchangeRateType>(i.Text("RateType"))));
                 }
@@ -45,13 +38,13 @@ public static partial class OperationCatalogue
                 }
 
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                return i.Flag("Remove") ? $"{document} uses the default rate again." : $"{document} now uses the {i.Text("RateType")} rate.";
+                return $"{document} now uses the {i.Text("RateType")} rate.";
             },
             List = async c => Table(await c.Db.ExchangeRatePolicies.AsNoTracking().Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.DocumentType).ToListAsync().ConfigureAwait(true),
                 ("Document", p => p.DocumentType), ("Rate type", p => p.RateType)),
             KeyColumn = "Document",
 
-            // Deleting a policy is the same as ticking Remove: the document type goes back to the default rate (the policy is a setting, not history).
+            // Deleting a policy puts the document type back on the default rate (the policy is a setting, not history).
             Delete = async (c, document) =>
             {
                 ExchangeRatePolicy policy = await c.Db.ExchangeRatePolicies.FirstOrDefaultAsync(p => p.CompanyId == c.CompanyId && p.DocumentType == document).ConfigureAwait(true)

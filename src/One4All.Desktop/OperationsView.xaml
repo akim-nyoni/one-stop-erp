@@ -59,8 +59,8 @@
                             <TextBlock Text="{Binding Selected.Description, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                         </StackPanel>
                         <DockPanel DockPanel.Dock="Bottom" Margin="0,8,0,0" LastChildFill="False">
-                            <Button DockPanel.Dock="Right" Content="{Binding OkText}" Padding="22,7" MinWidth="100" Background="#DDEFE0" FontWeight="SemiBold" Click="Ok_Click" IsDefault="True"
-                                    ToolTip="Saves / runs, then closes when all is well" />
+                            <Button DockPanel.Dock="Right" Content="{Binding OkText}" Padding="22,7" MinWidth="100" Background="#DDEFE0" FontWeight="SemiBold" Click="Ok_Click" IsDefault="True" IsEnabled="{Binding CanSave}" ToolTipService.ShowOnDisabled="True"
+                                    ToolTip="Saves / runs, then closes when all is well (greyed out when your roles do not allow it)" />
                             <Button DockPanel.Dock="Right" Content="Cancel" Padding="18,7" MinWidth="90" Margin="0,0,8,0" Click="Cancel_Click" IsCancel="True" ToolTip="Closes without saving" />
                             <Button DockPanel.Dock="Left" Padding="14,7" Click="ShowList_Click" ToolTip="Opens the records in their own window"
                                     Visibility="{Binding Selected.HasList, Converter={StaticResource Visible}}">

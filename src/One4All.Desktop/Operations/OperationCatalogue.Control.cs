@@ -353,11 +353,11 @@ public static partial class OperationCatalogue
             Module = "System Manager", Title = "Printers per workstation", ListTitle = "Printers",
             Description = "The printers a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips): a Windows printer (USB or shared) "
                 + "or a network receipt printer by its IP address and port (usually 9100). Set makes it the purpose's only printer; Add another prints to it as well (a "
-                + "customer and a shop copy, a second counter); Remove one takes a printer away by name; Test prints a test slip. Workstation * is the default for "
+                + "customer and a shop copy, a second counter); Remove all takes every printer of the purpose away; Test prints a test slip. Workstation * is the default for "
                 + "every computer without its own; this computer's name is filled in. Tills print receipts on their workstation's receipt printers (copies from the "
                 + "receipt layout); the report viewer's print dialog opens on the chosen printer. Edit opens a printer in the form (Set or Add another saves the change); "
                 + "Delete on the list removes that one printer.",
-            Fields = [Pick("Step", "Step", ["Set", "Add another", "Remove one", "Remove all", "Test"]), Req("Workstation", "Workstation (computer name, or *)", Environment.MachineName),
+            Fields = [Pick("Step", "Step", ["Set", "Add another", "Remove all", "Test"]), Req("Workstation", "Workstation (computer name, or *)", Environment.MachineName),
                 Pick("Purpose", "Purpose", Enum.GetNames<Core.System.PrintPurpose>()), Pick("Connection", "Connection", ["Windows printer", "Network (IP address)"]),
                 new OperationField("Printer", "Printer (Windows name, or a name for a network printer)", FieldKind.Choice, Required: false, Choices: [],
                     ChoicesFrom: _ => Task.FromResult(Reporting.PrintPreferences.InstalledPrinters())),
@@ -374,7 +374,6 @@ public static partial class OperationCatalogue
                 {
                     "Set" => Check(await printers.SetAsync(c.CompanyId, setting).ConfigureAwait(true), $"{name} is the {purpose} printer."),
                     "Add another" => Check(await printers.AddAsync(c.CompanyId, setting).ConfigureAwait(true), $"{name} added: {purpose} now print there as well."),
-                    "Remove one" => Check(await printers.RemovePrinterAsync(c.CompanyId, i.Text("Workstation"), purpose, name).ConfigureAwait(true), $"{name} removed."),
                     "Test" => await c.Get<IReceiptPrintService>().TestAsync(setting).ConfigureAwait(true) is string failed ? $"Test not printed: {failed}" : $"Test slip sent to {name}.",
                     _ => Check(await printers.RemoveAsync(c.CompanyId, i.Text("Workstation"), purpose).ConfigureAwait(true), "Printers removed; the default applies."),
                 };

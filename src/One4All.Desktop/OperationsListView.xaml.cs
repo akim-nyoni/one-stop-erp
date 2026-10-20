@@ -76,6 +76,10 @@ public partial class OperationsListView : UserControl
         {
             model.Prefill(row);
         }
+        else if (!prefill)
+        {
+            model.IsEditing = false;
+        }
 
         if (_form is { IsLoaded: true })
         {
@@ -114,7 +118,7 @@ public partial class OperationsListView : UserControl
 
     private void ListGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
-        if (DataContext is OperationsViewModel { Selected.CanEdit: true } && ListGrid.SelectedItem is not null)
+        if (DataContext is OperationsViewModel { ShowEdit: true } && ListGrid.SelectedItem is not null)
         {
             OpenForm(prefill: true);
         }

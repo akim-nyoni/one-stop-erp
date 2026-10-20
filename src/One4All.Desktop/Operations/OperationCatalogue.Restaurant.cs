@@ -25,7 +25,7 @@ public static partial class OperationCatalogue
             Module = "Restaurant", Title = "Floor plan and tab warnings", ListTitle = "Floor plan",
             Description = "Place each table on the floor plan grid (across, down) with its shape; the plan shows every table, its open tab, the tab's total and how long it has "
                 + "been open. Tab warnings flag a tab open longer than so many minutes or running over a total (0 turns either off).",
-            Fields = [Pick("Step", "Step", ["Place table", "Tab warnings", "Warnings now"]), Opt("Table", "Table number"), Num("X", "Across (0–99)", "0"), Num("Y", "Down (0–99)", "0"),
+            Fields = [Pick("Step", "Step", ["Place table", "Tab warnings", "Warnings now"]), Opt("Table", "Table number"), Num("X", "Across (0 to 99)", "0"), Num("Y", "Down (0 to 99)", "0"),
                 Pick("Shape", "Shape", Enum.GetNames<TableShape>()), Num("Minutes", "Warn after (minutes)", "90"), Num("Amount", "Warn over (total)", "0")],
             Run = async (c, i) =>
             {
@@ -52,9 +52,9 @@ public static partial class OperationCatalogue
         {
             Module = "Restaurant", Title = "Kitchen station printers", ListTitle = "Station printers", KeyColumn = "Station",
             Description = "Which printer each preparation station's tickets print on (KITCHEN for dishes with no station): a Windows printer by name, or a network printer by host "
-                + "and port. A station with no printer works from its kitchen display. Setting a station that already has a printer changes it. Reprint sends a ticket (and its "
+                + "and port. A station with no printer works from its kitchen display. Setting a station that already has a printer changes it; Delete on the list takes its printer away. Reprint sends a ticket (and its "
                 + "per-station tickets) again, marked REPRINT.",
-            Fields = [Pick("Step", "Step", ["Set", "Remove", "Reprint"]), Opt("Station", "Station"), Opt("Printer", "Windows printer name"), Opt("Host", "Network printer host"),
+            Fields = [Pick("Step", "Step", ["Set", "Reprint"]), Opt("Station", "Station"), Opt("Printer", "Windows printer name"), Opt("Host", "Network printer host"),
                 Num("Port", "Port", "9100"), Num("Copies", "Copies", "1"), Opt("Ticket", "Ticket number (reprint)")],
             Run = async (c, i) =>
             {
@@ -62,7 +62,6 @@ public static partial class OperationCatalogue
                 StationPrinterSetting setting = new(i.Optional("Station") ?? string.Empty, i.Optional("Printer"), i.Optional("Host"), (int)i.Number("Port"), (int)i.Number("Copies"));
                 return i.Text("Step") switch
                 {
-                    "Remove" => Check(await kitchen.SetStationPrinterAsync(c.CompanyId, setting, remove: true).ConfigureAwait(true), "Station printer removed."),
                     "Reprint" => "Reprinted." + await KitchenPrintsAsync(c, i.Optional("Ticket") ?? string.Empty).ConfigureAwait(true),
                     _ => Check(await kitchen.SetStationPrinterAsync(c.CompanyId, setting).ConfigureAwait(true), "Station printer set."),
                 };

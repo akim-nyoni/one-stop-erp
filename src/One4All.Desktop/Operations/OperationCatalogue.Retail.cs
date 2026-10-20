@@ -44,8 +44,8 @@ public static partial class OperationCatalogue
                 : Check(await c.Get<IReceiptLayoutService>().RemoveAsync(c.CompanyId, terminal).ConfigureAwait(true), $"Till {terminal} prints the company's layout again."),
             Description = "How receipts print: 80mm (48 characters) or 58mm (32) paper, a logo picture printed at the top, the title, header and footer lines (separate lines with |), "
                 + "what is shown and how many copies. Blank till: the company's layout; a till code gives that till its own. Preview shows the receipt as it prints, inside the paper's edges, "
-                + "without saving; Save keeps it (a till or the company that already has a layout has it changed); Remove (or Delete in the list) takes a till's own layout away.",
-            Fields = [Pick("Step", "Step", ["Preview", "Save", "Show saved", "Set logo", "Remove logo", "Remove till layout"]), Opt("Terminal", "Till code (blank: every till)"), Pick("Paper", "Paper", ["80mm", "58mm"]),
+                + "without saving; Save keeps it (a till or the company that already has a layout has it changed); Delete in the list takes a till's own layout away.",
+            Fields = [Pick("Step", "Step", ["Preview", "Save", "Show saved", "Set logo", "Remove logo"]), Opt("Terminal", "Till code (blank: every till)"), Pick("Paper", "Paper", ["80mm", "58mm"]),
                 Opt("Logo", "Logo picture file (PNG, JPG, BMP; set logo)"),
                 Opt("Title", "Title", "SALES RECEIPT"), Opt("Header", "Header lines (address | phone | message)"), Opt("Footer", "Footer lines (blank: Thank you!)"),
                 Tick("Cashier", "Show the cashier", true), Tick("Till", "Show the till", true), Tick("UnitPrice", "Show quantity x unit price"), Tick("TaxSummary", "Show subtotal and tax", true),
@@ -68,8 +68,6 @@ public static partial class OperationCatalogue
                         return $"Logo set ({logo.WidthBytes * 8} x {logo.Height} dots)." + Environment.NewLine + Check(await layouts.PreviewAsync(c.CompanyId, null, i.Optional("Terminal")).ConfigureAwait(true));
                     case "Remove logo":
                         return Check(await layouts.SetLogoAsync(c.CompanyId, i.Optional("Terminal"), null).ConfigureAwait(true), "Logo removed.");
-                    case "Remove till layout":
-                        return Check(await layouts.RemoveAsync(c.CompanyId, i.Optional("Terminal") ?? string.Empty).ConfigureAwait(true), "The till prints the company's layout again.");
                     default:
                         return Check(await layouts.PreviewAsync(c.CompanyId, layout, i.Optional("Terminal")).ConfigureAwait(true));
                 }
@@ -109,11 +107,11 @@ public static partial class OperationCatalogue
                     .ConfigureAwait(true), $"Favourite {item} removed.");
             },
             Description = "Items pinned to the till's ★ Favourites tabs - for one terminal or every till, and optionally for one cashier (their own come first, then the till's, "
-                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name); an item already pinned there has its position, page and colour changed. "
+                + "then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name); an item already pinned there has its position, page and colour changed; Delete in the list unpins it. "
                 + "Profile: what kind of counter the terminal is. "
                 + "Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.",
             Fields = [Pick("Step", "Step", ["Favourite", "Profile", "Function keys"]), ItemPick("Item", "Product", required: false), Opt("Terminal", "Terminal code (blank: every till)"), Opt("Cashier", "Cashier user name (blank: anyone)"),
-                Num("Order", "Position", "10"), Num("Page", "Page", "1"), Opt("Colour", "Tile colour"), Tick("Remove", "Remove it"),
+                Num("Order", "Position", "10"), Num("Page", "Page", "1"), Opt("Colour", "Tile colour"),
                 Pick("Profile", "Terminal profile", Enum.GetNames<Core.Pos.TerminalProfile>()), Opt("Keys", "Function keys F2=TenderCash; … (blank: the profile's)")],
             Run = async (c, i) =>
             {
@@ -151,7 +149,7 @@ public static partial class OperationCatalogue
                 }
 
                 return Check(await c.Get<IPosCatalogueService>().SetFavouriteAsync(c.CompanyId, terminal, cashier, i.Optional("Item") ?? string.Empty, i.Whole("Order"), i.Whole("Page"),
-                    i.Optional("Colour"), i.Flag("Remove")).ConfigureAwait(true), i.Flag("Remove") ? "Favourite removed." : "Favourite saved.");
+                    i.Optional("Colour"), false).ConfigureAwait(true), "Favourite saved.");
             },
             List = async c => Table(await (from f in c.Db.PosFavourites.AsNoTracking()
                                            join it in c.Db.Items.AsNoTracking() on f.ItemId equals it.Id

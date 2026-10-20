@@ -372,10 +372,10 @@ public static partial class OperationCatalogue
             Module = module, Title = "Receipt matching rules", ListTitle = "Matching rules (tried first, lowest priority first)",
             Description = "Your own rules for matching imported payments: when the reference or the payer's name contains, starts with or equals the text (or fits a "
                 + "regular expression), the payment goes to the account. E.g. payer name contains \"MINISTRY OF HEALTH\" → the employer's account. Add with an existing rule id "
-                + "changes that rule (Edit fills it in); Delete or Remove takes a rule away (payments it matched stay where they went).",
+                + "changes that rule (Edit fills it in); Delete takes a rule away (payments it matched stay where they went).",
             KeyColumn = "Rule",
-            Fields = [Pick("Step", "Step", ["Add", "Remove"]), Pick("Field", "Look in", Enum.GetNames<ReceiptMatchField>()), Pick("Kind", "When it", Enum.GetNames<ReceiptMatchKind>()),
-                Opt("Pattern", "Text or pattern"), Opt("Customer", "Account (customer code)"), Num("Priority", "Priority (lowest first)", "100"), OptNum("Rule", "Rule id (change / remove)")],
+            Fields = [Pick("Field", "Look in", Enum.GetNames<ReceiptMatchField>()), Pick("Kind", "When it", Enum.GetNames<ReceiptMatchKind>()),
+                Opt("Pattern", "Text or pattern"), Opt("Customer", "Account (customer code)"), Num("Priority", "Priority (lowest first)", "100"), OptNum("Rule", "Rule id (blank: a new rule)")],
             Delete = async (c, key) =>
             {
                 long id = long.TryParse(key, NumberStyles.None, CultureInfo.InvariantCulture, out long parsed) ? parsed : throw new OperationException($"\"{key}\" is not a rule id.");
@@ -387,16 +387,6 @@ public static partial class OperationCatalogue
             },
             Run = async (c, i) =>
             {
-                if (i.Text("Step") == "Remove")
-                {
-                    long id = (long)(i.OptionalNumber("Rule") ?? throw new OperationException("Give the rule id to remove."));
-                    ReceiptMatchRule rule = await c.Db.Set<ReceiptMatchRule>().FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Id == id).ConfigureAwait(true)
-                        ?? throw new OperationException($"No rule {id}.");
-                    c.Db.Remove(rule);
-                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                    return $"Rule {id} removed.";
-                }
-
                 ReceiptMatchKind kind = Enum.Parse<ReceiptMatchKind>(i.Text("Kind"));
                 string pattern = i.Optional("Pattern") ?? string.Empty;
                 if (Application.Receipting.ReceiptMatcher.Problem(kind, pattern) is string problem)
@@ -426,7 +416,7 @@ public static partial class OperationCatalogue
             {
                 var rules = await c.Db.Set<ReceiptMatchRule>().AsNoTracking().Where(r => r.CompanyId == c.CompanyId).OrderBy(r => r.Priority).ThenBy(r => r.Id)
                     .Join(c.Db.Customers, r => r.CustomerId, x => x.Id, (r, x) => new { r.Id, r.Priority, r.Field, r.Kind, r.Pattern, Account = x.Code, x.Name }).ToListAsync().ConfigureAwait(true);
-                return Table(rules, ("Step", _ => "Add"), ("Rule", r => r.Id), ("Priority", r => r.Priority), ("Look in", r => r.Field), ("When it", r => r.Kind), ("Pattern", r => r.Pattern),
+                return Table(rules, ("Rule", r => r.Id), ("Priority", r => r.Priority), ("Look in", r => r.Field), ("When it", r => r.Kind), ("Pattern", r => r.Pattern),
                     ("Customer", r => r.Account), ("Name", r => r.Name));
             },
         };

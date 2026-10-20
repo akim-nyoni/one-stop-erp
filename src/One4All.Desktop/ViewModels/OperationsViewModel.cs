@@ -297,6 +297,7 @@ public sealed partial class OperationsViewModel : ObservableObject
     public void Prefill(System.Data.DataRowView row)
     {
         ArgumentNullException.ThrowIfNull(row);
+        IsEditing = true;
         static string Key(string text) => new([.. text.Where(char.IsLetterOrDigit)]);
         foreach (OperationFieldVm field in Fields)
         {
@@ -393,7 +394,63 @@ public sealed partial class OperationsViewModel : ObservableObject
     /// <summary>The chosen operation.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(RunCommand), nameof(RefreshCommand), nameof(PreviousPageCommand), nameof(NextPageCommand))]
+    [NotifyPropertyChangedFor(nameof(ShowEdit), nameof(ShowDelete))]
     private Operation? _selected;
+
+    /// <summary>Whether the signed-in user may add on (run) the chosen screen; the Add button shows only then.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _userCanAdd;
+
+    /// <summary>Whether the signed-in user may change records on the chosen screen.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowEdit), nameof(CanSave))]
+    private bool _userCanEdit;
+
+    /// <summary>Whether the signed-in user may delete records on the chosen screen.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowDelete))]
+    private bool _userCanDelete;
+
+    /// <summary>Whether the form was opened from a list row to change it (saving then needs the Edit right rather than the right to add).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    private bool _isEditing;
+
+    /// <summary>Gets whether the form's OK is enabled: the user may change the record being edited, or add on the screen.</summary>
+    public bool CanSave => IsEditing ? UserCanEdit : UserCanAdd;
+
+    /// <summary>Gets whether the Edit button shows: the screen changes records and the user may edit.</summary>
+    public bool ShowEdit => Selected?.CanEdit == true && UserCanEdit;
+
+    /// <summary>Gets whether the Delete button shows: the screen deletes records and the user may delete.</summary>
+    public bool ShowDelete => Selected?.Delete is not null && UserCanDelete;
+
+    // The user's rights on the screen, read once as it opens: the Add, Edit and Delete buttons show only for what the user's roles allow
+    // (the same checks are made again when the action runs).
+    private async Task LoadRightsAsync(Operation? operation)
+    {
+        (UserCanAdd, UserCanEdit, UserCanDelete) = (false, false, false);
+        if (operation is null)
+        {
+            return;
+        }
+
+        try
+        {
+            bool add = await RefusalAsync(operation, !operation.IsDocument, operation.Needs).ConfigureAwait(true) is null;
+            bool edit = operation.CanEdit && await RefusalAsync(operation, true, Core.Security.OperationFlags.Edit).ConfigureAwait(true) is null;
+            bool delete = operation.Delete is not null && await RefusalAsync(operation, true, Core.Security.OperationFlags.Delete).ConfigureAwait(true) is null;
+            if (ReferenceEquals(operation, Selected))
+            {
+                (UserCanAdd, UserCanEdit, UserCanDelete) = (add, edit, delete);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // No company or permissions yet: the buttons stay hidden.
+        }
+    }
 
     /// <summary>The outcome of the last run (or the printed document).</summary>
     [ObservableProperty]
@@ -426,6 +483,8 @@ public sealed partial class OperationsViewModel : ObservableObject
     partial void OnSelectedChanged(Operation? value)
     {
         _ = RecordUseAsync(value, "Open");
+        IsEditing = false;
+        _ = LoadRightsAsync(value);
         Fields.Clear();
         foreach (OperationField field in value?.Fields ?? [])
         {
@@ -635,7 +694,9 @@ public sealed partial class OperationsViewModel : ObservableObject
         IsBusy = true;
         try
         {
-            if (await RefusalAsync(operation, !operation.IsDocument, operation.Needs).ConfigureAwait(true) is string refused)
+            // A record opened from the list to change it needs the Edit right; anything else the right the screen asks for.
+            Core.Security.OperationFlags needs = IsEditing ? Core.Security.OperationFlags.Edit : operation.Needs;
+            if (await RefusalAsync(operation, IsEditing || !operation.IsDocument, needs).ConfigureAwait(true) is string refused)
             {
                 Result = refused;
                 Failed = true;

@@ -206,13 +206,13 @@ public static partial class OperationCatalogue
             {
                 Module = module, Title = "Addresses and contacts", ListTitle = "Directory", KeyColumn = "Ref",
                 Description = "Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who "
-                    + "receive statements, remittance advices and purchase orders by email. Remove takes an address or contact id. Add with an existing address or contact id "
+                    + "receive statements, remittance advices and purchase orders by email. Add with an existing address or contact id "
                     + "changes that address or contact (Edit fills it in); Delete removes an address or retires a contact.",
-                Fields = [Pick("Step", "Step", ["Add address", "Add contact", "Remove address", "Remove contact"]), Req("Code", module == "Customers" ? "Customer code" : "Supplier code"),
+                Fields = [Pick("Step", "Step", ["Add address", "Add contact"]), Req("Code", module == "Customers" ? "Customer code" : "Supplier code"),
                     Pick("Kind", "Address kind", Enum.GetNames<AddressKind>()), Opt("Line1", "Address line 1"), Opt("Line2", "Address line 2"), Opt("City", "Town / city"), Opt("Region", "Province"),
                     Opt("Postal", "Postal code"), Opt("Country", "Country"), Opt("Name", "Contact name"), Opt("Role", "Role"), Opt("Email", "Email"), Opt("Phone", "Phone"),
                     Tick("Primary", "Primary contact"), Tick("Statements", "Receives statements"), Tick("Remittances", "Receives remittances"), Tick("Orders", "Receives purchase orders"),
-                    OptNum("Id", "Address / contact id (change / remove)")],
+                    OptNum("Id", "Address / contact id (blank: a new one)")],
                 Run = async (c, i) =>
                 {
                     ITraderDirectoryService directory = c.Get<ITraderDirectoryService>();
@@ -259,12 +259,6 @@ public static partial class OperationCatalogue
                             long contact = Check(await directory.AddContactAsync(c.CompanyId, ledger, i.Text("Code"), new NewTraderContact(i.Optional("Name") ?? string.Empty, i.Optional("Role"),
                                 i.Optional("Email"), i.Optional("Phone"), i.Flag("Primary"), i.Flag("Statements"), i.Flag("Remittances"), i.Flag("Orders"))).ConfigureAwait(true));
                             return $"Contact {contact} added.";
-                        case "Remove address":
-                            _ = Check(await directory.RemoveAddressAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0)).ConfigureAwait(true), string.Empty);
-                            return "Address removed.";
-                        case "Remove contact":
-                            _ = Check(await directory.RemoveContactAsync(c.CompanyId, (long)(i.OptionalNumber("Id") ?? 0)).ConfigureAwait(true), string.Empty);
-                            return "Contact removed.";
                         default:
                             long address = Check(await directory.AddAddressAsync(c.CompanyId, ledger, i.Text("Code"), new NewTraderAddress(Enum.Parse<AddressKind>(i.Text("Kind")),
                                 i.Optional("Line1") ?? string.Empty, i.Optional("Line2"), i.Optional("City"), i.Optional("Region"), i.Optional("Postal"), i.Optional("Country"))).ConfigureAwait(true));
