@@ -41,6 +41,26 @@ public sealed class GeneralLedgerReports : IGeneralLedgerReports
         string? costCentre = string.IsNullOrWhiteSpace(options.CostCentre) ? null : options.CostCentre.Trim().ToUpperInvariant();
         string? department = string.IsNullOrWhiteSpace(options.Department) ? null : options.Department.Trim().ToUpperInvariant();
         string? branch = string.IsNullOrWhiteSpace(options.Branch) ? null : options.Branch.Trim().ToUpperInvariant();
+
+        // In the company's own reporting currency the statements add up the amounts stored on every line at its own day's rate (IAS 21.39 for
+        // income and expenses), not today's single rate applied to the base totals.
+        CurrencyCode? reporting = string.IsNullOrWhiteSpace(options.ReportingCurrency) ? null : CurrencyCode.Parse(options.ReportingCurrency.Trim().ToUpperInvariant());
+        if (reporting is CurrencyCode wanted
+            && await _db.Companies.AsNoTracking().AnyAsync(c => c.Id == companyId && c.ReportingCurrency == wanted, ct).ConfigureAwait(false))
+        {
+            var stored = await _db.Set<JournalLine>()
+                .Where(l => (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department) && (branch == null || l.Branch == branch))
+                .Where(l => _db.Journals.Any(j =>
+                    j.Id == l.JournalEntryId && j.CompanyId == companyId
+                    && (j.Status == JournalStatus.Posted || (unposted && (j.Status == JournalStatus.Draft || j.Status == JournalStatus.Deferred))) &&
+                    j.PostingDate <= to && (from == null || j.PostingDate >= from)))
+                .GroupBy(l => l.AccountCode)
+                .Select(g => new { Code = g.Key, Debit = g.Sum(x => x.ReportingDebit), Credit = g.Sum(x => x.ReportingCredit) })
+                .ToListAsync(ct)
+                .ConfigureAwait(false);
+            return stored.ToDictionary(t => t.Code, t => (decimal.Round(t.Debit, 2, MidpointRounding.AwayFromZero), decimal.Round(t.Credit, 2, MidpointRounding.AwayFromZero)));
+        }
+
         var totals = await _db.Set<JournalLine>()
             .Where(l => (costCentre == null || l.CostCentre == costCentre) && (department == null || l.Department == department) && (branch == null || l.Branch == branch))
             .Where(l => _db.Journals.Any(j =>

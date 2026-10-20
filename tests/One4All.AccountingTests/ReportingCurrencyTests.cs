@@ -81,6 +81,11 @@ public sealed class ReportingCurrencyTests
         string csv = Encoding.UTF8.GetString(report.Value.Content);
         csv.Should().Contain("1100,").And.Contain("11.00,ZWG,297").And.Contain("TOTAL,Difference (should be nil),0.00,ZWG,0");
 
+        // Statements in the reporting currency add the stored amounts (each at its own day's rate), whatever single rate is passed.
+        TrialBalanceReport inZwg = await scope.ServiceProvider.GetRequiredService<IGeneralLedgerReports>().TrialBalanceAsync(companyId, new DateOnly(2026, 3, 31),
+            new LedgerReportOptions(false, "ZWG", 99m));
+        inZwg.Rows.Where(r => r.AccountCode == "1100").Sum(r => r.Debit - r.Credit).Should().Be(297m);
+
         // No rate, no posting.
         company.SetReportingCurrency(CurrencyCode.Parse("JPY"));
         await db.SaveChangesAsync();
