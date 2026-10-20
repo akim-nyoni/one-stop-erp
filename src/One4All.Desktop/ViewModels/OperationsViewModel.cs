@@ -134,6 +134,15 @@ public sealed partial class OperationFieldVm : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Gets whether the field takes a file (its label speaks of a file or a path, not a file layout): a Browse button beside it picks the file.
+    /// </summary>
+    public bool IsFile => Field.Kind == FieldKind.Text && !Field.Label.Contains("layout", StringComparison.OrdinalIgnoreCase)
+        && (Field.Label.Contains("file", StringComparison.OrdinalIgnoreCase) || Field.Label.Contains("path", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Gets whether the file is written rather than read (the label says save or export), so Browse asks where to save it.</summary>
+    public bool IsSaveFile => IsFile && (Field.Label.Contains("save", StringComparison.OrdinalIgnoreCase) || Field.Label.Contains("export", StringComparison.OrdinalIgnoreCase));
+
     /// <summary>Gets whether the field shows a list to pick from (a choice, or a typed field offered the company's records).</summary>
     public bool ShowsList => IsChoice || AutoLookup is not null;
 

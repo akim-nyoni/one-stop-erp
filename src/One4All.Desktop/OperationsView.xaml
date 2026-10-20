@@ -80,6 +80,8 @@
                                             <TextBlock Text="{Binding Label, Converter={StaticResource Text}}" Foreground="#667" FontSize="12" TextWrapping="Wrap" />
                                             <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}" Padding="6,4" Margin="0,3,0,0"
                                                      Visibility="{Binding IsText, Converter={StaticResource Visible}}" />
+                                            <Button Content="Browse..." HorizontalAlignment="Left" Padding="10,2" Margin="0,3,0,0" Click="Browse_Click" ToolTip="Choose the file instead of typing its path"
+                                                    Visibility="{Binding IsFile, Converter={StaticResource Visible}}" />
                                             <DatePicker SelectedDate="{Binding DateValue}" Margin="0,3,0,0" SelectedDateFormat="Short"
                                                         Visibility="{Binding IsDate, Converter={StaticResource Visible}}" />
                                             <CheckBox IsChecked="{Binding IsTicked}" Content="{loc:T 'Yes'}" Margin="0,5,0,0"

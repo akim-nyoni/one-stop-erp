@@ -58,6 +58,30 @@ public partial class OperationsView : UserControl
         }
     }
 
+    // Browse... beside a file field: an open dialog for a file to read, a save dialog for one to write; the chosen path fills the field.
+    private void Browse_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not OperationFieldVm field)
+        {
+            return;
+        }
+
+        string label = field.Field.Label;
+        string filter = label.Contains("csv", StringComparison.OrdinalIgnoreCase) || label.Contains("xlsx", StringComparison.OrdinalIgnoreCase)
+            ? "CSV or Excel|*.csv;*.xlsx|All files|*.*"
+            : label.Contains("pdf", StringComparison.OrdinalIgnoreCase) ? "PDF|*.pdf|All files|*.*"
+            : label.Contains("picture", StringComparison.OrdinalIgnoreCase) || label.Contains("photo", StringComparison.OrdinalIgnoreCase) || label.Contains("logo", StringComparison.OrdinalIgnoreCase)
+                ? "Pictures|*.png;*.jpg;*.jpeg;*.bmp|All files|*.*"
+            : "All files|*.*";
+        Microsoft.Win32.FileDialog dialog = field.IsSaveFile
+            ? new Microsoft.Win32.SaveFileDialog { Filter = filter, FileName = field.Value ?? string.Empty }
+            : new Microsoft.Win32.OpenFileDialog { Filter = filter, CheckFileExists = true };
+        if (dialog.ShowDialog(Window.GetWindow(this)) == true)
+        {
+            field.Value = dialog.FileName;
+        }
+    }
+
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
         if (Window.GetWindow(this) is OperationsWindow host)
