@@ -267,9 +267,18 @@ public sealed class ReportingTreeReportDataProvider : Application.Abstractions.R
         DateOnly to = parameters.GetValueOrDefault("ToDate") is DateOnly t ? t : DateOnly.FromDateTime(DateTime.Today);
         DateOnly? from = parameters.GetValueOrDefault("FromDate") is DateOnly f ? f : null;
         Result<IReadOnlyList<ReportingTreeLine>> rolled = await _trees.RollupAsync(companyId, tree, from, to, ct).ConfigureAwait(false);
-        return rolled.IsFailure ? [] : [.. rolled.Value.Select(l => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        if (rolled.IsFailure)
         {
-            ["Code"] = l.Code, ["Heading"] = new string(' ', l.Level * 4) + l.Name, ["Amount"] = l.Amount, ["Level"] = l.Level, ["IsLeaf"] = l.IsLeaf,
+            return [];
+        }
+
+        // The same tree for the same period a year earlier, heading by heading, for the comparative column (IAS 1.38).
+        Result<IReadOnlyList<ReportingTreeLine>> prior = await _trees.RollupAsync(companyId, tree, from?.AddYears(-1), to.AddYears(-1), ct).ConfigureAwait(false);
+        Dictionary<string, decimal> before = prior.IsFailure ? [] : prior.Value.GroupBy(l => l.Code).ToDictionary(g => g.Key, g => g.First().Amount);
+        return [.. rolled.Value.Select(l => (IReadOnlyDictionary<string, object?>)new Dictionary<string, object?>
+        {
+            ["Code"] = l.Code, ["Heading"] = new string(' ', l.Level * 4) + l.Name, ["Amount"] = l.Amount, ["PriorAmount"] = before.GetValueOrDefault(l.Code),
+            ["Change"] = l.Amount - before.GetValueOrDefault(l.Code), ["Level"] = l.Level, ["IsLeaf"] = l.IsLeaf,
         })];
     }
 }

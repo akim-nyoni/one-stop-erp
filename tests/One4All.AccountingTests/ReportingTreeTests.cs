@@ -80,5 +80,11 @@ public sealed class ReportingTreeTests
             ReportFormat.Layout, ReportRunPurpose.View, null)).Value;
         RenderModel model = ReportLayout.Deserialize(report.Document.Content);
         model.Body.SelectMany(b => b.Cells).Should().Contain(c => c.Text == "Expenses" && c.Bold).And.Contain(c => c.Text == "500.00");
+
+        // With the prior year beside it (nothing posted in 2025, so the change is the whole amount).
+        IReportDataProvider rollup = scope.ServiceProvider.GetServices<IReportDataProvider>().Single(p => p.CanHandle("TreeRollup"));
+        IReadOnlyDictionary<string, object?> expenses = (await rollup.GetRowsAsync(companyId, "TreeRollup",
+            new Dictionary<string, object?> { ["TreeCode"] = "STAT", ["FromDate"] = new DateOnly(2026, 1, 1), ["ToDate"] = new DateOnly(2026, 12, 31) })).Single(r => (string?)r["Code"] == "EXPENSE");
+        (expenses["Amount"], expenses["PriorAmount"], expenses["Change"]).Should().Be(((object?)500m, (object?)0m, (object?)500m));
     }
 }

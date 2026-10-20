@@ -245,8 +245,9 @@ public static class SystemReports
     public static ReportDefinition TreeStatement()
     {
         ReportDefinition definition = Listing(TreeStatementCode, "Statement by Reporting Tree", "GeneralLedger",
-            "A financial statement laid out by a reporting tree (statutory, management or consolidation): each heading with everything mapped beneath it rolled up.", "TreeRollup",
-            [new Column("Code", "Code", 110), new Column("Heading", "Heading", 300), new Column("Amount", "Amount", 120, true)],
+            "A financial statement laid out by a reporting tree (statutory, management or consolidation): each heading with everything mapped beneath it rolled up, against the same period a year earlier.", "TreeRollup",
+            [new Column("Code", "Code", 110), new Column("Heading", "Heading", 280), new Column("Amount", "This year", 110, true), new Column("PriorAmount", "Prior year", 110, true),
+                new Column("Change", "Change", 100, true)],
             [("TreeCode", ParameterType.String), ("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date)]);
         ReportBand detail = definition.BandOfType(BandType.Detail)!;
         foreach (ReportElement element in detail.Elements)
