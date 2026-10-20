@@ -189,4 +189,17 @@ public sealed class MaintenancePlan : Entity, ICompanyScoped
         LastDone = date;
         NextDue = date.AddMonths(IntervalMonths);
     }
+
+    /// <summary>Changes the task, how often it recurs and when it is next due (the asset and when it was last done stay).</summary>
+    /// <param name="description">The task.</param>
+    /// <param name="intervalMonths">How often, in months (at least one).</param>
+    /// <param name="nextDue">When it is next due.</param>
+    public void Reschedule(string description, int intervalMonths, DateOnly nextDue)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(description);
+        ArgumentOutOfRangeException.ThrowIfLessThan(intervalMonths, 1);
+        Description = description.Trim();
+        IntervalMonths = intervalMonths;
+        NextDue = nextDue;
+    }
 }

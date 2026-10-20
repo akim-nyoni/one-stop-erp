@@ -126,6 +126,7 @@ public sealed class AcademicStructureService : IAcademicStructureService
         existing.Name = name.Trim();
         existing.Capacity = capacity;
         existing.NextGrade = next;
+        existing.IsActive = true;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

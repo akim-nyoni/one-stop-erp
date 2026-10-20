@@ -74,6 +74,7 @@ public sealed class LeavePolicyService : ILeavePolicyService
         policy.MaxAwayPerDepartment = request.MaxAwayPerDepartment;
         policy.SickCycleMonths = request.SickCycleMonths is > 0 ? request.SickCycleMonths : null;
         policy.IsUnpaid = request.IsUnpaid;
+        policy.IsActive = true;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

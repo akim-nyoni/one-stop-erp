@@ -43,15 +43,17 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Vehicle register", ListTitle = "Vehicles",
+            Module = module, Title = "Vehicle register", ListTitle = "Vehicles", KeyColumn = "Vehicle",
+            Delete = Retire<WeighbridgeVehicle>(x => x.Registration, x => x.IsActive = false, "vehicle"),
             Description = "The vehicles that use the weighbridge (brief §4.2): the haulier, the stored tare an outbound first weigh can take instead of weighing empty, the gross the vehicle may "
-                + "not exceed (an overload is flagged on the ticket), and whether it is barred from the bridge.",
+                + "not exceed (an overload is flagged on the ticket), and whether it is barred from the bridge. Saving an existing registration changes that vehicle; "
+                + "Delete bars it from the bridge (its tickets are kept).",
             Fields = [Req("Vehicle", "Registration"), Opt("Haulier", "Haulier"), OptNum("Tare", "Stored tare kg"), OptNum("MaxGross", "Permitted gross kg"), Tick("Active", "May use the bridge", true)],
             Run = async (c, i) => Check(await c.Get<Application.Abstractions.JobCosting.IWeighbridgeService>().SaveVehicleAsync(c.CompanyId, i.Text("Vehicle"), i.Optional("Haulier"), i.OptionalNumber("Tare"),
                 i.OptionalNumber("MaxGross"), i.Flag("Active")).ConfigureAwait(true), id => $"Vehicle {i.Text("Vehicle").ToUpperInvariant()} saved (id {id})."),
             List = async c => Table(await c.Db.WeighbridgeVehicles.AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderBy(v => v.Registration).ToListAsync().ConfigureAwait(true),
                 ("Vehicle", v => v.Registration), ("Haulier", v => v.Haulier ?? string.Empty), ("Stored tare kg", v => v.StoredTareKg?.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty),
-                ("Max gross kg", v => v.MaxGrossKg?.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty), ("Active", v => v.IsActive ? "yes" : "barred")),
+                ("Permitted gross kg", v => v.MaxGrossKg?.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty), ("Active", v => v.IsActive ? "Yes" : "barred")),
         };
         yield return new Operation
         {
@@ -217,7 +219,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Asset classes and impairment", ListTitle = "Asset classes",
+            Module = module, Title = "Asset classes and impairment", ListTitle = "Asset classes", Editable = true,
             Description = "Classes hold the defaults an asset registered in them takes (method, life, residual %, rate and accounts). An impairment test (IAS 36) books a "
                 + "recoverable amount below the carrying amount as a loss, or reverses an earlier loss when it recovers - never above what it would have been unimpaired.",
             Fields = [Pick("Step", "Step", ["Save class", "Impairment test"]), Opt("Class", "Class code"), Opt("Name", "Class name"),
@@ -319,10 +321,28 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Plan recurring maintenance", ListTitle = "Maintenance plans", Description = "A task repeated every N months for an asset.",
-            Fields = [Req("Asset", "Asset number"), Req("Task", "Task"), Num("Interval", "Every (months)", "6"), Today("FirstDue", "First due")],
+            Module = module, Title = "Plan recurring maintenance", ListTitle = "Maintenance plans", KeyColumn = "Plan",
+            Description = "A task repeated every N months for an asset. Giving an existing plan id changes its task, interval and next due date (the asset stays); "
+                + "Delete stops the plan (its maintenance log is kept).",
+            Fields = [OptNum("Plan", "Plan id (blank: a new plan)"), Req("Asset", "Asset number"), Req("Task", "Task"), Num("Interval", "Every (months)", "6"), Today("FirstDue", "Next due")],
+            Delete = Retire<MaintenancePlan>(x => x.Id.ToString(System.Globalization.CultureInfo.InvariantCulture), x => x.IsActive = false, "maintenance plan"),
             Run = async (c, i) =>
             {
+                if (i.OptionalNumber("Plan") is decimal planNumber)
+                {
+                    long planId = (long)planNumber;
+                    MaintenancePlan existing = await c.Db.MaintenancePlans.FirstOrDefaultAsync(p => p.CompanyId == c.CompanyId && p.Id == planId && p.IsActive).ConfigureAwait(true)
+                        ?? throw new OperationException($"No maintenance plan {planId} in use.");
+                    if (i.Whole("Interval") < 1)
+                    {
+                        throw new OperationException("A plan recurs at least every month.");
+                    }
+
+                    existing.Reschedule(i.Text("Task"), i.Whole("Interval"), i.Date("FirstDue"));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Plan {existing.Id} changed.";
+                }
+
                 long asset = await FindAsync(c.Db.FixedAssets, a => a.CompanyId == c.CompanyId && a.AssetNumber.ToUpper() == i.Text("Asset").ToUpper(), a => a.Id, "asset", i.Text("Asset")).ConfigureAwait(true);
                 long plan = Check(await c.Get<IAssetControlService>().PlanMaintenanceAsync(c.CompanyId, asset, i.Text("Task"), i.Whole("Interval"), i.Date("FirstDue")).ConfigureAwait(true));
                 return $"Plan {plan} created.";
@@ -383,7 +403,7 @@ public static partial class OperationCatalogue
     {
         Dictionary<long, string> assets = await c.Db.FixedAssets.Where(a => a.CompanyId == c.CompanyId).ToDictionaryAsync(a => a.Id, a => a.AssetNumber).ConfigureAwait(true);
         return Table(await c.Db.MaintenancePlans.AsNoTracking().Where(p => p.CompanyId == c.CompanyId && p.IsActive).OrderBy(p => p.NextDue).ToListAsync().ConfigureAwait(true),
-            ("Plan", p => p.Id), ("Asset", p => assets.GetValueOrDefault(p.AssetId)), ("Task", p => p.Description), ("Every", p => $"{p.IntervalMonths} months"),
+            ("Plan", p => p.Id), ("Asset", p => assets.GetValueOrDefault(p.AssetId)), ("Task", p => p.Description), ("Every (months)", p => p.IntervalMonths),
             ("Last done", p => p.LastDone is DateOnly d ? D(d) : "-"), ("Next due", p => D(p.NextDue)));
     }
 

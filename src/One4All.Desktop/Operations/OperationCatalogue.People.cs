@@ -222,9 +222,22 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Employee record", ListTitle = "Employees",
-            Description = "Engage an employee, or update one (blank fields stay as they are). Bank details are set at engagement; later changes go through 'Bank detail change' "
-                + "and a second person's approval.",
+            Module = module, Title = "Employee record", ListTitle = "Employees", KeyColumn = "Number",
+            Description = "Engage an employee, or update one (blank fields stay as they are); an existing employee number always updates that employee. Bank details are set at "
+                + "engagement; later changes go through 'Bank detail change' and a second person's approval. Delete removes only an employee never paid, with no loans or leave "
+                + "on record; anyone else leaves through 'Termination and final pay'.",
+            Delete = async (c, number) =>
+            {
+                Employee employee = await ExistingAsync<Employee>(c, number, x => x.EmployeeNumber).ConfigureAwait(true) ?? throw new OperationException($"No employee {number}.");
+                if (await c.Db.Payslips.AnyAsync(p => p.CompanyId == c.CompanyId && p.EmployeeId == employee.Id).ConfigureAwait(true)
+                    || await c.Db.EmployeeLoans.AnyAsync(l => l.CompanyId == c.CompanyId && l.EmployeeId == employee.Id).ConfigureAwait(true)
+                    || await c.Db.LeaveRecords.AnyAsync(l => l.CompanyId == c.CompanyId && l.EmployeeId == employee.Id).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Employee {employee.EmployeeNumber} has been paid or has loans or leave on record; end the employment under 'Termination and final pay' instead.");
+                }
+
+                return await SoftDelete<Employee>(x => x.EmployeeNumber, "employee")(c, employee.EmployeeNumber).ConfigureAwait(true);
+            },
             Fields = [Pick("Step", "Step", ["Engage", "Update"]), Req("Number", "Employee number"), Opt("Name", "Full name"), OptNum("Basic", "Basic salary"), Today("Engaged", "Engagement date"),
                 Pick("Type", "Employment", Enum.GetNames<EmploymentType>()), Opt("Department", "Department code (3)"), Opt("CostCentre", "Cost centre code (3)"), Opt("PayGroup", "Pay group"), Opt("Grade", "Grade"),
                 Opt("NationalId", "National ID"), Opt("TaxNumber", "Tax number"), OptDate("ContractEnd", "Contract end"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()),
@@ -239,7 +252,7 @@ public static partial class OperationCatalogue
                 DateOnly? contractEnd = i.Optional("ContractEnd") is string end ? DateOnly.ParseExact(end, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
                 EmploymentType type = Enum.Parse<EmploymentType>(i.Text("Type"));
                 PayMethod method = Enum.Parse<PayMethod>(i.Text("Method"));
-                if (i.Text("Step") == "Update")
+                if (i.Text("Step") == "Update" || await ExistingAsync<Employee>(c, i.Text("Number"), x => x.EmployeeNumber).ConfigureAwait(true) is not null)
                 {
                     _ = Check(await setup.UpdateEmployeeAsync(c.CompanyId, i.Text("Number"), new EmployeeUpdate
                     {
@@ -267,14 +280,31 @@ public static partial class OperationCatalogue
                 return $"Employee {i.Text("Number").ToUpperInvariant()} engaged (id {id}).";
             },
             List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.EmployeeNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
-                ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Department", e => e.Department ?? string.Empty), ("Grade", e => e.Grade ?? string.Empty),
-                ("Type", e => e.EmploymentType), ("Job title", e => e.JobTitle ?? string.Empty), ("Phone", e => e.Phone ?? string.Empty), ("Status", e => e.Status),
-                ("Engaged", e => D(e.EngagementDate))),
+                ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Department", e => e.Department ?? string.Empty), ("Cost centre", e => e.CostCentre ?? string.Empty),
+                ("Grade", e => e.Grade ?? string.Empty), ("Pay group", e => e.PayGroup ?? string.Empty), ("Type", e => e.EmploymentType), ("Paid by", e => e.PaymentMethod),
+                ("Paid", e => e.PayFrequency), ("Marital status", e => e.MaritalStatus), ("Job title", e => e.JobTitle ?? string.Empty), ("Phone", e => e.Phone ?? string.Empty),
+                ("Email", e => e.Email ?? string.Empty), ("Status", e => e.Status), ("Engaged", e => D(e.EngagementDate))),
         };
         yield return new Operation
         {
             Module = module, Title = "Pay elements and tax tables", ListTitle = "Pay elements",
-            Description = "Create a pay element or edit one (every field but its code and type, entered in full as for a new one), assign one to (or end one for) an employee, "
+            Delete = async (c, code) =>
+            {
+                Core.Payroll.PayElement element = await ExistingAsync<Core.Payroll.PayElement>(c, code, x => x.Code).ConfigureAwait(true) ?? throw new OperationException($"No pay element {code}.");
+                if (await c.Db.Employees.Where(e => e.CompanyId == c.CompanyId).SelectMany(e => e.PayElements).AnyAsync(p => p.PayElementId == element.Id && p.IsActive).ConfigureAwait(true))
+                {
+                    throw new OperationException($"Pay element {element.Code} is still assigned to employees; end it for them first ('End for employee').");
+                }
+
+                if (await c.Db.Set<TaxCredit>().AnyAsync(t => t.CompanyId == c.CompanyId && t.IsActive && t.ElementCode == element.Code).ConfigureAwait(true))
+                {
+                    throw new OperationException($"A tax credit is worked out on pay element {element.Code}; take that credit out of use first.");
+                }
+
+                return await SoftDelete<Core.Payroll.PayElement>(x => x.Code, "pay element")(c, element.Code).ConfigureAwait(true);
+            },
+            Description = "Create a pay element or edit one (every field but its code and type, entered in full as for a new one; creating an existing code edits it), "
+                + "assign one to (or end one for) an employee, delete one no employee is on (past payslips keep it), "
                 + "create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. "
                 + "'0-100:0; 100-300:20; 300-:30' - or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).",
             Fields = [Pick("Step", "Step", ["Create element", "Edit element", "Set element options", "Assign to employee", "End for employee", "Create tax table", "Add standard elements", "Preview formula"]),
@@ -348,16 +378,26 @@ public static partial class OperationCatalogue
                         _ = Check(await setup.EditPayElementAsync(c.CompanyId, ElementFrom(i)).ConfigureAwait(true), string.Empty);
                         return $"Pay element {i.Optional("Code")?.ToUpperInvariant()} changed.";
                     default:
+                        if (await ExistingAsync<Core.Payroll.PayElement>(c, i.Optional("Code") ?? string.Empty, x => x.Code).ConfigureAwait(true) is { } existing)
+                        {
+                            _ = Check(await setup.EditPayElementAsync(c.CompanyId, ElementFrom(i)).ConfigureAwait(true), string.Empty);
+                            return $"Pay element {existing.Code} changed.";
+                        }
+
                         long element = Check(await setup.CreatePayElementAsync(c.CompanyId, ElementFrom(i)).ConfigureAwait(true));
                         return $"Pay element created (id {element}).";
                 }
             },
             List = async c => Table(await c.Db.PayElements.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.Sequence).ThenBy(e => e.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", e => e.Code), ("Name", e => e.Name), ("Type", e => e.Type), ("Basis", e => e.Basis), ("Sequence", e => e.Sequence), ("Account", e => e.AccountCode),
-                ("Taxable", e => e.Taxable), ("Formula / table", e => e.Formula ?? e.TaxTableCode ?? string.Empty),
-                ("Options", e => string.Join(", ", new[] { e.Recovers == PayRecovery.None ? null : $"recovers {e.Recovers}", e.BenefitCategory is null ? null : $"benefit {e.BenefitCategory}",
-                    e.PaidInCurrency is null ? null : $"paid in {e.PaidInCurrency}", e.CumulativeTax ? "cumulative tax" : null, e.SplitCurrencyTax ? "tax per currency" : null, e.IsAnnualPayment ? "annual" : null }
-                    .Where(o => o is not null)))),
+                ("Amount", e => e.FixedAmount), ("Rate", e => e.Rate), ("Taxable", e => e.Taxable), ("Formula", e => e.Formula ?? string.Empty), ("Tax table", e => e.TaxTableCode ?? string.Empty),
+                ("Pensionable", e => e.Pensionable), ("Social security", e => e.SubjectToSocialSecurity), ("Overtime base", e => e.OvertimeBase), ("Leave base", e => e.LeavePayBase),
+                ("Pro rated", e => e.ProRated), ("No arrears", e => !e.ArrearsRecoverable), ("Terminal", e => e.TerminalBenefit), ("Union", e => e.UnionDues), ("Group", e => e.Group ?? string.Empty),
+                ("Basis group", e => e.BasisGroup ?? string.Empty), ("Floor", e => e.Floor), ("Ceiling", e => e.Ceiling), ("Round to", e => e.RoundTo), ("Rounding", e => e.Rounding),
+                ("Expense", e => e.ContributionExpenseAccountCode ?? string.Empty), ("Dept accounts", e => e.DepartmentAccounts ?? string.Empty),
+                ("Lookup variable", e => e.LookupVariable ?? string.Empty), ("Lookup bands", e => e.LookupBands ?? string.Empty), ("Recovers", e => e.Recovers),
+                ("Benefit category", e => e.BenefitCategory ?? string.Empty), ("Paid in", e => e.PaidInCurrency?.ToString() ?? string.Empty), ("Cumulative tax", e => e.CumulativeTax),
+                ("Split tax", e => e.SplitCurrencyTax), ("Annual", e => e.IsAnnualPayment)),
         };
         yield return new Operation
         {
@@ -444,8 +484,9 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Leave policies", ListTitle = "Leave policies",
-            Description = "Per leave type: yearly days (service bands \"5:24;10:30\" raise them after so many completed years), earned monthly or granted at the leave-year start, "
+            Module = module, Title = "Leave policies", ListTitle = "Leave policies", KeyColumn = "Type",
+            Delete = Retire<Core.Payroll.LeavePolicy>(x => x.LeaveType, x => x.IsActive = false, "leave policy"),
+            Description = "Saving an existing leave type changes its policy (and puts a retired one back in use); Delete stops it accruing. Per leave type: yearly days (service bands \"5:24;10:30\" raise them after so many completed years), earned monthly or granted at the leave-year start, "
                 + "joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). A balance ceiling stops accrual; carried days can lapse so many months "
                 + "into the year; leave can be taken in advance down to so many days; sick tiers \"11:50;21:0\" pay so much from the nth sick day of the year. "
                 + "Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions. Advance leave pay pays the "
@@ -524,9 +565,13 @@ public static partial class OperationCatalogue
                 }).ConfigureAwait(true),
                     "Leave policy saved.");
             },
-            List = async c => Table(await c.Db.Set<Core.Payroll.LeavePolicy>().AsNoTracking().Include(p => p.Bands).Where(p => p.CompanyId == c.CompanyId).OrderBy(p => p.LeaveType).ToListAsync().ConfigureAwait(true),
-                ("Type", p => p.LeaveType), ("Days", p => Q(p.AnnualDays)), ("Monthly", p => p.AccruesMonthly), ("Year starts", p => p.LeaveYearStartMonth), ("Cap", p => p.CarryOverCapDays),
-                ("Bands", p => string.Join("; ", p.Bands.Select(b => $"{b.FromYears}y:{Q(b.AnnualDays)}")))),
+            List = async c => Table(await c.Db.Set<Core.Payroll.LeavePolicy>().AsNoTracking().Include(p => p.Bands).Include(p => p.SickTiers).Where(p => p.CompanyId == c.CompanyId)
+                    .OrderBy(p => p.LeaveType).ToListAsync().ConfigureAwait(true),
+                ("Type", p => p.LeaveType), ("Days", p => Q(p.AnnualDays)), ("Monthly", p => p.AccruesMonthly), ("Start", p => p.LeaveYearStartMonth), ("Cap", p => p.CarryOverCapDays),
+                ("Pro rata", p => p.ProRataJoiners), ("Bands", p => string.Join("; ", p.Bands.Select(b => $"{b.FromYears}:{Q(b.AnnualDays)}"))), ("Ceiling", p => p.MaxAccumulationDays),
+                ("Lapse", p => p.CarryOverExpiryMonths), ("Advance", p => Q(p.NegativeBalanceDays)), ("Tiers", p => string.Join("; ", p.SickTiers.Select(t => $"{t.FromDay}:{Q(t.PayPercent)}"))),
+                ("Grade days", p => p.GradeDays ?? string.Empty), ("Max away", p => p.MaxAwayPerDepartment), ("Sick cycle", p => p.SickCycleMonths), ("Unpaid", p => p.IsUnpaid),
+                ("Active", p => p.IsActive)),
         };
         yield return new Operation
         {
@@ -538,8 +583,10 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Tax credits", ListTitle = "Tax credits",
+            Delete = Retire<TaxCredit>(x => x.Code, x => x.IsActive = false, "tax credit"),
             Description = "Credits taken off the tax the table works out, never below nil: a fixed amount a month (say an elderly credit from 65) or a percentage of a pay element "
-                + "(say half the medical-aid deduction), for everyone or only the employees given it.",
+                + "(say half the medical-aid deduction), for everyone or only the employees given it. Saving an existing code changes that credit (and puts it back in use); "
+                + "Delete stops it being given.",
             Fields = [Pick("Step", "Step", ["Save credit", "Give to employee", "Take from employee"]), Req("Code", "Credit code"), Opt("Name", "Name"),
                 Pick("Basis", "Basis", Enum.GetNames<TaxCreditBasis>()), Num("Amount", "Monthly amount (fixed)", "0"), Num("Percent", "Percent (of an element)", "0"), Opt("Element", "Pay element"),
                 OptNum("Age", "From age"), Tick("All", "Applies to every employee"), Opt("Employee", "Employee number (give / take)")],
@@ -556,7 +603,7 @@ public static partial class OperationCatalogue
             },
             List = async c => Table(await c.Db.Set<TaxCredit>().AsNoTracking().Where(t => t.CompanyId == c.CompanyId).OrderBy(t => t.Code).ToListAsync().ConfigureAwait(true),
                 ("Code", t => t.Code), ("Name", t => t.Name), ("Basis", t => t.Basis), ("Amount", t => M(t.Amount)), ("Percent", t => Q(t.Percent)), ("Element", t => t.ElementCode),
-                ("From age", t => t.MinimumAge), ("Everyone", t => t.AppliesToAll), ("Active", t => t.IsActive)),
+                ("From age", t => t.MinimumAge), ("Applies to every employee", t => t.AppliesToAll), ("Active", t => t.IsActive)),
         };
         yield return new Operation
         {
@@ -698,7 +745,7 @@ public static partial class OperationCatalogue
             Fields = [Req("Department", "Department"), Req("Grade", "Grade"), Num("Posts", "Approved posts"), Num("Cost", "Annual cost per post")],
             Run = async (c, i) => Check(await c.Get<IHrRecordsService>().SetEstablishmentAsync(c.CompanyId, i.Text("Department"), i.Text("Grade"), i.Whole("Posts"), i.Number("Cost")).ConfigureAwait(true), "Establishment saved."),
             List = async c => Table(await c.Get<IEstablishmentService>().VacanciesAsync(c.CompanyId).ConfigureAwait(true),
-                ("Department", v => v.Department), ("Grade", v => v.Grade), ("Approved", v => v.Approved), ("Filled", v => v.Filled), ("Vacant", v => v.Vacant)),
+                ("Department", v => v.Department), ("Grade", v => v.Grade), ("Approved posts", v => v.Approved), ("Filled", v => v.Filled), ("Vacant", v => v.Vacant)),
             ListTitle = "Posts filled and vacant",
         };
         yield return new Operation
@@ -709,7 +756,7 @@ public static partial class OperationCatalogue
             Run = async (c, i) => Check(await c.Get<IEstablishmentService>().SetScaleAsync(c.CompanyId, i.Text("Grade"), i.Whole("Notch"), i.Number("Amount"), i.Date("From")).ConfigureAwait(true),
                 "Scale notch saved."),
             List = async c => Table(await c.Db.SalaryScales.AsNoTracking().Where(s => s.CompanyId == c.CompanyId).OrderBy(s => s.Grade).ThenByDescending(s => s.EffectiveFrom).ThenBy(s => s.Notch)
-                .ToListAsync().ConfigureAwait(true), ("Grade", s => s.Grade), ("Notch", s => s.Notch), ("Monthly", s => M(s.MonthlyAmount)), ("From", s => D(s.EffectiveFrom))),
+                .ToListAsync().ConfigureAwait(true), ("Grade", s => s.Grade), ("Notch", s => s.Notch), ("Monthly salary", s => M(s.MonthlyAmount)), ("From", s => D(s.EffectiveFrom))),
         };
         yield return new Operation
         {
@@ -1204,8 +1251,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits",
-            Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.",
+            Module = module, Title = "Set up a standing order", ListTitle = "Standing orders and direct debits", KeyColumn = "Reference",
+            Delete = async (c, reference) => Check(await c.Get<IStandingOrderService>().CancelAsync(c.CompanyId, reference).ConfigureAwait(true), $"{reference} stopped (kept in history)."),
+            Description = "A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both. "
+                + "Its terms cannot change once set up: Delete stops it (it stays in the list), then set up a new one.",
             Fields = [Req("Reference", "Reference"), Req("Bank", "Bank account", "1100"), Num("Amount", "Amount"), Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()),
                 Today("Start", "First payment"), OptDate("End", "Last date (optional)"), SupplierPick("Supplier", "Supplier", required: false), Opt("Account", "GL account"), Opt("Narrative", "What it is for")],
             Run = async (c, i) => Check(await c.Get<IStandingOrderService>().CreateStandingOrderAsync(new StandingOrderRequest
@@ -1218,8 +1267,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Set up a direct debit mandate", ListTitle = "Standing orders and direct debits",
-            Description = "The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped).",
+            Module = module, Title = "Set up a direct debit mandate", ListTitle = "Standing orders and direct debits", KeyColumn = "Reference",
+            Delete = async (c, reference) => Check(await c.Get<IStandingOrderService>().CancelAsync(c.CompanyId, reference).ConfigureAwait(true), $"{reference} stopped (kept in history)."),
+            Description = "The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped). Its terms cannot change once set up: "
+                + "Delete stops it (it stays in the list), then set up a new one.",
             Fields = [Req("Reference", "Mandate reference"), CustomerPick("Customer", "Customer"), Req("CustomerBank", "Customer's bank account"), Req("Bank", "Collect into bank account", "1100"),
                 Pick("Frequency", "Frequency", Enum.GetNames<RecurrenceFrequency>()), Today("Start", "First collection"), OptDate("End", "Last date (optional)"),
                 OptNum("Fixed", "Fixed amount (blank: what is owed)"), OptNum("Max", "Most per collection")],
@@ -1292,7 +1343,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Save a bank file layout", ListTitle = "Bank file layouts",
+            Module = module, Title = "Save a bank file layout", ListTitle = "Bank file layouts", Editable = true,
             Description = "A bank's EFT format as templates: {Field[,width][:format]} - header/trailer: Date, Originator, Currency, Count, Total, Hash; detail: Seq, Date, Reference, Name, Bank, Branch, Account, Currency, Amount (format 'cents' for whole cents; width 010 zero-pads).",
             Fields = [Req("Code", "Layout code"), Req("Name", "Bank / format name"), Opt("Header", "Header template"), Req("Detail", "Detail template", "{Reference}|{Name}|{Bank}|{Account}|{Amount}"), Opt("Trailer", "Trailer template")],
             Run = async (c, i) => Check(await c.Get<IBankFileService>().SaveLayoutAsync(new BankFileLayoutRequest(c.CompanyId, i.Text("Code"), i.Text("Name"), i.Optional("Header"), i.Text("Detail"), i.Optional("Trailer")))
@@ -1337,9 +1388,11 @@ public static partial class OperationCatalogue
     {
         yield return new Operation
         {
-            Module = "Sales & Schools", Title = "Fee structures and term billing", ListTitle = "Fee structures",
+            Module = "Sales & Schools", Title = "Fee structures and term billing", ListTitle = "Fee structures", KeyColumn = "Structure",
+            Delete = SoftDelete<Core.Schools.FeeStructure>(x => x.Code, "fee structure"),
             Description = "A fee structure per grade and term with its items (compulsory ones billed to every student in the grade, optional ones only to those taking them); "
-                + "Bill term invoices every enrolled student of the grade under the prefix (a rerun skips those already billed); Bill student invoices one.",
+                + "Bill term invoices every enrolled student of the grade under the prefix (a rerun skips those already billed); Bill student invoices one. Saving an existing "
+                + "structure code changes its name (grade, term and account stay); Delete takes it out of use, leaving the invoices already raised.",
             Fields = [Pick("Step", "Step", ["Save structure", "Add item", "Bill term", "Bill student"]), Req("Structure", "Fee structure code"), Opt("Name", "Name / item description"),
                 Opt("Grade", "Grade"), Opt("Term", "Term (e.g. 2026-T1)"), Opt("Revenue", "Revenue account"), Num("Amount", "Item amount", "0"), Tick("Compulsory", "Compulsory item", true),
                 Opt("Prefix", "Invoice prefix (bill term) / number (bill student)"), Opt("Student", "Admission number (bill student)"), Today()],
@@ -1364,6 +1417,13 @@ public static partial class OperationCatalogue
                             .ConfigureAwait(true));
                         return $"Billed {M(bill.NetFees)} (gross {M(bill.GrossFees)}, discounts {M(bill.Discount + bill.SiblingDiscount)}).";
                     default:
+                        if (await ExistingAsync<Core.Schools.FeeStructure>(c, i.Text("Structure"), x => x.Code).ConfigureAwait(true) is not null)
+                        {
+                            _ = Check(await setup.SaveFeeStructureAsync(c.CompanyId, i.Text("Structure"), i.Optional("Name") ?? i.Text("Structure"), i.Optional("Grade") ?? string.Empty,
+                                i.Optional("Term") ?? string.Empty, i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true));
+                            return $"Fee structure {i.Text("Structure").ToUpperInvariant()} changed.";
+                        }
+
                         return $"Fee structure saved (id {Check(await setup.SaveFeeStructureAsync(c.CompanyId, i.Text("Structure"), i.Optional("Name") ?? i.Text("Structure"), i.Optional("Grade") ?? string.Empty,
                             i.Optional("Term") ?? string.Empty, i.Optional("Revenue") ?? string.Empty).ConfigureAwait(true))}).";
                 }
@@ -1373,9 +1433,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Sales & Schools", Title = "Students, hostels and routes", ListTitle = "Students",
+            Module = "Sales & Schools", Title = "Students, hostels and routes", ListTitle = "Students", Editable = true,
             Description = "Admit a student under their guardian's account (the customer billed); set up a hostel or transport route with its capacity and fee per term; place a "
-                + "student in a hostel and on a route (blank takes them out) within capacity.",
+                + "student in a hostel and on a route (blank takes them out) within capacity. Admitting an existing admission number changes that student's name and gender; "
+                + "saving an existing hostel or route code changes its capacity and fee.",
             Fields = [Pick("Step", "Step", ["Admit", "Hostel", "Route", "Place", "Sponsor"]), Opt("Student", "Admission number"), Opt("Name", "Name"), Opt("Grade", "Grade"), Opt("Guardian", "Guardian (customer code)"),
                 Opt("Sponsor", "Sponsor (customer code billed instead of the guardian; blank: none)"),
                 Pick("Gender", "Gender", Enum.GetNames<Core.Payroll.Gender>()), Opt("Code", "Hostel / route code"), Num("Capacity", "Capacity", "0"), Num("Fee", "Fee per term", "0"), Opt("Revenue", "Revenue account"), Opt("HostelCode", "Hostel (place)"),
@@ -1383,6 +1444,19 @@ public static partial class OperationCatalogue
             Run = async (c, i) =>
             {
                 ISchoolSetupService setup = c.Get<ISchoolSetupService>();
+                if (i.Text("Step") == "Admit" && i.Optional("Student") is string admission
+                    && await ExistingAsync<Core.Schools.Student>(c, admission, x => x.AdmissionNumber).ConfigureAwait(true) is { } admitted)
+                {
+                    admitted.FullName = i.Optional("Name")?.Trim() ?? admitted.FullName;
+                    if (Enum.TryParse(i.Optional("Gender"), out Core.Payroll.Gender changed) && changed != Core.Payroll.Gender.Unspecified)
+                    {
+                        admitted.Gender = changed;
+                    }
+
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Student {admitted.AdmissionNumber} changed.";
+                }
+
                 return i.Text("Step") switch
                 {
                     "Hostel" => $"Hostel saved (id {Check(await setup.SaveHostelAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, i.Optional("Name") ?? string.Empty, i.Whole("Capacity"), i.Number("Fee"),
@@ -1512,7 +1586,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Sales & Schools", Title = "Academic years and terms", ListTitle = "Terms",
+            Module = "Sales & Schools", Title = "Academic years and terms", ListTitle = "Terms", Editable = true,
             Description = "Years and their terms (no overlaps). A term's code is what fee structures name as their term: saving it gives them its dates for pro-rata billing and deferred income.",
             Fields = [Pick("Step", "Step", ["Save year", "Save term", "Which term is it?"]), Req("Year", "Year code"), Opt("Term", "Term code (e.g. 2026-T1)"), Opt("Name", "Term name"),
                 Num("Sequence", "Term number", "1"), Today("From", "First day"), Today("To", "Last day")],
@@ -1536,8 +1610,26 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Sales & Schools", Title = "Classes and streams", ListTitle = "Class rolls",
-            Description = "Classes by grade and stream with capacity and the grade they move up to (blank: final year). Place a student within capacity; at year end, promote the school once.",
+            Module = "Sales & Schools", Title = "Classes and streams", ListTitle = "Class rolls", KeyColumn = "Class code",
+            Description = "Classes by grade and stream with capacity and the grade they move up to (blank: final year). Place a student within capacity; at year end, promote the school once. "
+                + "Saving an existing grade and stream changes that class (and puts a closed one back in use); Delete closes a class nobody is enrolled in.",
+            Delete = async (c, key) =>
+            {
+                string[] parts = key.Split('/', 2, StringSplitOptions.TrimEntries);
+                string grade = parts[0].ToUpperInvariant();
+                string? stream = parts.Length > 1 && parts[1].Length > 0 ? parts[1].ToUpperInvariant() : null;
+                Core.Schools.SchoolClass schoolClass = await c.Db.SchoolClasses.FirstOrDefaultAsync(x => x.CompanyId == c.CompanyId && x.Grade == grade && x.Stream == stream && x.IsActive)
+                    .ConfigureAwait(true) ?? throw new OperationException($"No class {key}.");
+                ClassRoll? roll = (await c.Get<IAcademicStructureService>().ClassRollsAsync(c.CompanyId).ConfigureAwait(true)).FirstOrDefault(r => r.Grade == grade && r.Stream == stream);
+                if (roll is { Enrolled: > 0 })
+                {
+                    throw new OperationException($"Class {key} has {roll.Enrolled} enrolled student(s); place them in another class first.");
+                }
+
+                schoolClass.IsActive = false;
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                return $"Class {key} taken out of use (kept in history).";
+            },
             Fields = [Pick("Step", "Step", ["Save class", "Place a student", "Promote the year"]), Opt("Grade", "Grade / form"), Opt("Stream", "Stream"), Opt("Name", "Class name"),
                 OptNum("Capacity", "Capacity"), Opt("Next", "Next grade"), Opt("Student", "Admission number"), Opt("Year", "Year ending (promote)")],
             Run = async (c, i) =>
@@ -1554,8 +1646,9 @@ public static partial class OperationCatalogue
                 };
             },
             List = async c => Table(await c.Get<IAcademicStructureService>().ClassRollsAsync(c.CompanyId).ConfigureAwait(true),
-                ("Grade", r => r.Grade), ("Stream", r => r.Stream ?? "-"), ("Class", r => r.Name), ("Enrolled", r => r.Enrolled), ("Capacity", r => r.Capacity?.ToString(System.Globalization.CultureInfo.CurrentCulture) ?? "-"),
-                ("Moves to", r => r.NextGrade ?? "leaves")),
+                ("Class code", r => r.Stream is null ? r.Grade : $"{r.Grade}/{r.Stream}"), ("Grade", r => r.Grade), ("Stream", r => r.Stream ?? string.Empty), ("Class name", r => r.Name),
+                ("Enrolled", r => r.Enrolled), ("Capacity", r => r.Capacity?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty),
+                ("Next grade", r => r.NextGrade ?? string.Empty)),
         };
         yield return new Operation
         {
@@ -1925,7 +2018,7 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Sales & Schools", Title = "Save a delivery zone rate", ListTitle = "Delivery zone rates",
+            Module = "Sales & Schools", Title = "Save a delivery zone rate", ListTitle = "Delivery zone rates", Editable = true,
             Description = "A zone's charge per delivery plus per kg and per m³ of goods sent (from item weights and volumes), free above a goods value.",
             Fields = [Req("Zone", "Zone"), Num("Base", "Charge per delivery", "0"), Num("PerKg", "Per kg", "0"), Num("PerM3", "Per m³", "0"), OptNum("Free", "Free above goods value")],
             Run = async (c, i) => Check(await c.Get<IDeliveryChargeService>().SaveRateAsync(c.CompanyId, i.Text("Zone"), i.Number("Base"), i.Number("PerKg"), i.Number("PerM3"), i.OptionalNumber("Free"))
@@ -1935,10 +2028,12 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = "Sales & Schools", Title = "Delivery vehicles and loads", ListTitle = "Delivery vehicles",
-            Description = "Register a vehicle (capacity in kg, optional m³ and drops a day, usual driver); put a delivery on a vehicle's run for a day at a stop (refused when it would "
-                + "overload the vehicle by weight or exceed its drops); or show a vehicle's load for a day in run order.",
-            Fields = [Pick("Step", "Step", "Assign", "Load", "Register vehicle"), Req("Vehicle", "Vehicle registration"), Opt("Delivery", "Delivery reference (assign)"), Today("Date", "Day"),
+            Module = "Sales & Schools", Title = "Delivery vehicles and loads", ListTitle = "Delivery vehicles", KeyColumn = "Vehicle",
+            Delete = Retire<Core.SalesOrders.DeliveryVehicle>(x => x.Registration, x => x.IsActive = false, "delivery vehicle"),
+            Description = "Register a vehicle (capacity in kg, optional m³ and drops a day, usual driver; registering an existing one changes it and puts it back in use); "
+                + "put a delivery on a vehicle's run for a day at a stop (refused when it would overload the vehicle by weight or exceed its drops); or show a vehicle's load "
+                + "for a day in run order. Delete takes a vehicle off the runs.",
+            Fields = [Pick("Step", "Step", "Register vehicle", "Assign", "Load"), Req("Vehicle", "Vehicle registration"), Opt("Delivery", "Delivery reference (assign)"), Today("Date", "Day"),
                 Opt("Route", "Route"), Opt("Driver", "Driver"), OptNum("Stop", "Stop number (assign; blank: last)"), Opt("Description", "Description (register)"),
                 OptNum("CapacityKg", "Capacity kg (register)"), OptNum("CapacityM3", "Capacity m³ (register)"), OptNum("MaxStops", "Most drops a day (register)")],
             Run = async (c, i) =>
@@ -1959,8 +2054,9 @@ public static partial class OperationCatalogue
                     + string.Join(Environment.NewLine, load.Stops.Select(s => $"  {s.Stop}. {s.DeliveryReference} {s.Route ?? string.Empty} {Q(s.WeightKg)} kg"));
             },
             List = async c => Table(await c.Db.Set<Core.SalesOrders.DeliveryVehicle>().AsNoTracking().Where(v => v.CompanyId == c.CompanyId).OrderBy(v => v.Registration).ToListAsync().ConfigureAwait(true),
-                ("Vehicle", v => v.Registration), ("Description", v => v.Description), ("Capacity kg", v => Q(v.CapacityKg)), ("Drops", v => v.MaxStops?.ToString(CultureInfo.InvariantCulture) ?? "-"),
-                ("Driver", v => v.DefaultDriver ?? "-")),
+                ("Vehicle", v => v.Registration), ("Description", v => v.Description), ("Capacity kg", v => Q(v.CapacityKg)),
+                ("Capacity m3", v => v.CapacityM3 is decimal m3 ? Q(m3) : string.Empty), ("Max stops", v => v.MaxStops?.ToString(CultureInfo.InvariantCulture) ?? string.Empty),
+                ("Driver", v => v.DefaultDriver ?? string.Empty), ("Active", v => v.IsActive)),
         };
         yield return new Operation
         {
