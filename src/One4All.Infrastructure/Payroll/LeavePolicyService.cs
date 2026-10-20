@@ -73,6 +73,7 @@ public sealed class LeavePolicyService : ILeavePolicyService
         policy.GradeDays = string.IsNullOrWhiteSpace(request.GradeDays) ? null : request.GradeDays.Trim();
         policy.MaxAwayPerDepartment = request.MaxAwayPerDepartment;
         policy.SickCycleMonths = request.SickCycleMonths is > 0 ? request.SickCycleMonths : null;
+        policy.IsUnpaid = request.IsUnpaid;
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }

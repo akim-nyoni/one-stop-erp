@@ -112,9 +112,14 @@ public sealed partial class PayrollService
             .Where(l => l.CompanyId == companyId && ids.Contains(l.EmployeeId) && l.Outstanding > 0m && l.GrantedOn <= asAt)
             .Select(l => new { l.EmployeeId, l.Reference, l.Outstanding, l.InterestRatePercent }).ToListAsync(ct).ConfigureAwait(false);
 
-        // Loans repaid from pay this period (brief §4.15.5): active, deducted from pay, not suspended.
+        // Loans repaid from pay this period (brief §4.15.5): active, deducted from pay, not suspended - by hand, or while unpaid leave covers the pay date.
+        List<string> unpaidTypes = await _db.Set<LeavePolicy>().AsNoTracking().Where(p => p.CompanyId == companyId && p.IsUnpaid).Select(p => p.LeaveType).ToListAsync(ct).ConfigureAwait(false);
+        List<long> onUnpaidLeave = unpaidTypes.Count == 0 ? [] : await _db.LeaveRecords.AsNoTracking()
+            .Where(r => r.CompanyId == companyId && ids.Contains(r.EmployeeId) && r.Kind == LeaveRecordKind.Taken && unpaidTypes.Contains(r.LeaveType.ToUpper()) && r.FromDate <= asAt && r.ToDate >= asAt)
+            .Select(r => r.EmployeeId).Distinct().ToListAsync(ct).ConfigureAwait(false);
         var repaying = await _db.EmployeeLoans.AsNoTracking()
-            .Where(l => l.CompanyId == companyId && ids.Contains(l.EmployeeId) && l.Status == EmployeeLoanStatus.Active && l.DeductFromPay && !l.Suspended && l.Outstanding > 0m && l.GrantedOn <= asAt)
+            .Where(l => l.CompanyId == companyId && ids.Contains(l.EmployeeId) && l.Status == EmployeeLoanStatus.Active && l.DeductFromPay && !l.Suspended && l.Outstanding > 0m && l.GrantedOn <= asAt
+                && !onUnpaidLeave.Contains(l.EmployeeId))
             .OrderBy(l => l.GrantedOn).ThenBy(l => l.Id)
             .Select(l => new { l.Id, l.EmployeeId, l.Reference, l.Outstanding, l.Installment, l.InterestRatePercent }).ToListAsync(ct).ConfigureAwait(false);
 

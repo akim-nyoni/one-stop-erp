@@ -21293,6 +21293,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_active");
 
+                    b.Property<bool>("IsUnpaid")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_unpaid");
+
                     b.Property<string>("LeaveType")
                         .IsRequired()
                         .HasMaxLength(20)

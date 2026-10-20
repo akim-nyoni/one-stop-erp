@@ -61,6 +61,9 @@ public sealed class LeavePolicy : AuditableEntity, ICompanyScoped
     /// </summary>
     public int? SickCycleMonths { get; set; }
 
+    /// <summary>Whether the leave type is unpaid leave: staff loan instalments are held back for a pay date it covers (interest still accrues).</summary>
+    public bool IsUnpaid { get; set; }
+
     /// <summary>Sick pay tiers: from the nth day taken in the leave year, the share of pay (days before the first tier are on full pay).</summary>
     public IReadOnlyList<LeaveSickTier> SickTiers => _sickTiers.OrderBy(t => t.FromDay).ToList();
 

@@ -84,6 +84,16 @@ public sealed class LoanRepaymentFromPayTests
             restored[loan.Id].Should().Be(1200m);
             restored[tight.Id].Should().Be(900m);
         }
+
+        // Unpaid leave over February's pay date holds Lou's instalment back; Stan's is still deducted.
+        (await scope.ServiceProvider.GetRequiredService<ILeavePolicyService>().SavePolicyAsync(new LeavePolicyRequest(companyId, "UNPAID", 0m, false, 1, null, false, [], NegativeBalanceDays: 60m)
+            { IsUnpaid = true })).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IAttendanceService>().TakeLeaveAsync(companyId, borrower.Id, "UNPAID", new DateOnly(2026, 2, 16), new DateOnly(2026, 2, 27), 10m))
+            .IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-02", new DateOnly(2026, 2, 25), "2420", "LR-2026-02")).IsSuccess.Should().BeTrue();
+        List<Payslip> february = await db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId && p.RunReference == "LR-2026-02").ToListAsync();
+        february.Single(p => p.EmployeeId == borrower.Id).Lines.Should().NotContain(l => l.ElementCode == $"LOAN-{loan.Id}", "on unpaid leave over the pay date");
+        february.Single(p => p.EmployeeId == stretched.Id).Lines.Should().Contain(l => l.ElementCode == $"LOAN-{tight.Id}");
     }
 
     [Fact]

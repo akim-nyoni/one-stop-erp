@@ -23,6 +23,9 @@ public sealed record LeavePolicyRequest(long CompanyId, string LeaveType, decima
 
     /// <summary>Gets the rolling sick-leave cycle in months (null: the leave year).</summary>
     public int? SickCycleMonths { get; init; }
+
+    /// <summary>Gets whether the leave type is unpaid leave (loan instalments held back while it covers the pay date).</summary>
+    public bool IsUnpaid { get; init; }
 }
 
 /// <summary>One employee's sick pay for a period under the tiers.</summary>
