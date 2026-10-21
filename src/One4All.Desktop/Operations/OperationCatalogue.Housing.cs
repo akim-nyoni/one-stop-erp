@@ -145,16 +145,43 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Waiting list enquiry and ranking", ListTitle = "Applicants",
-            Description = "With a waiting-list number (or applicant id): the applicant's status, place by seniority and score. Without one: the ranking for a category, by seniority or score.",
-            Fields = [Opt("Number", "Waiting-list number (blank for the ranking)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
+            Description = "With a waiting-list number, national ID or name (or part of it): the applicant's status, place by seniority and score; when several names match they are "
+                + "listed to narrow down. Without one: the ranking for a category, by seniority or score.",
+            Fields = [Opt("Number", "Waiting-list number, national ID or name (blank for the ranking)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
                 Pick("Order", "Order", Enum.GetNames<WaitingListOrder>()), Today("AsAt", "As at")],
             Run = async (c, i) =>
             {
                 IWaitingListService list = c.Get<IWaitingListService>();
+                static string Show(WaitingListEnquiry e)
+                    => $"{e.WaitingListNumber} · {e.Category} · {e.Status} · place by seniority {(e.PositionBySeniority?.ToString(CultureInfo.InvariantCulture) ?? "-")} · score {e.Score.Total:0.##}";
                 if (i.Optional("Number") is string number)
                 {
-                    WaitingListEnquiry e = Check(await list.EnquireAsync(c.CompanyId, number, i.Date("AsAt")).ConfigureAwait(true));
-                    return $"{e.WaitingListNumber} · {e.Category} · {e.Status} · place by seniority {(e.PositionBySeniority?.ToString(CultureInfo.InvariantCulture) ?? "-")} · score {e.Score.Total:0.##}";
+                    Core.Common.Result<WaitingListEnquiry> exact = await list.EnquireAsync(c.CompanyId, number, i.Date("AsAt")).ConfigureAwait(true);
+                    if (exact.IsSuccess)
+                    {
+                        return Show(exact.Value);
+                    }
+
+                    // Not a waiting-list number: the national ID exactly, then the name containing what was typed.
+                    string key = number.ToUpperInvariant();
+                    IQueryable<HousingApplicant> listed = c.Db.HousingApplicants.AsNoTracking().Where(a => a.CompanyId == c.CompanyId && a.WaitingListNumber != null);
+                    var byId = await listed.Where(a => a.IdNumber.ToUpper() == key).OrderBy(a => a.FullName)
+                        .Select(a => new { a.WaitingListNumber, a.FullName, a.IdNumber, a.Status }).Take(11).ToListAsync().ConfigureAwait(true);
+                    var matches = byId.Count > 0 ? byId : await listed.Where(a => a.FullName.ToUpper().Contains(key)).OrderBy(a => a.FullName)
+                        .Select(a => new { a.WaitingListNumber, a.FullName, a.IdNumber, a.Status }).Take(11).ToListAsync().ConfigureAwait(true);
+                    if (matches.Count == 0)
+                    {
+                        throw new OperationException($"No applicant on the waiting list has the number, national ID or a name containing \"{number}\".");
+                    }
+
+                    if (matches.Count == 1)
+                    {
+                        return Show(Check(await list.EnquireAsync(c.CompanyId, matches[0].WaitingListNumber!, i.Date("AsAt")).ConfigureAwait(true)));
+                    }
+
+                    return $"{(matches.Count > 10 ? "More than 10" : matches.Count.ToString(CultureInfo.InvariantCulture))} applicants match \"{number}\"; type more of the name, "
+                        + "the national ID or the waiting-list number to narrow it down:" + Environment.NewLine
+                        + string.Join(Environment.NewLine, matches.Take(10).Select(m => $"  {m.WaitingListNumber,-12} {m.FullName,-30} {m.IdNumber,-16} {m.Status}"));
                 }
 
                 IReadOnlyList<WaitingListPlace> ranking = await list.RankingAsync(c.CompanyId, Enum.Parse<HousingCategory>(i.Text("Category")), Enum.Parse<WaitingListOrder>(i.Text("Order")), i.Date("AsAt"))
@@ -172,7 +199,7 @@ public static partial class OperationCatalogue
                 + "members are kept; approving needs the allocation-approval permission), cancel it, or verify a ballot's draw. Expired offers wait in a queue for an officer to lapse or "
                 + "extend them with a reason. A swap of two allottees' stands is asked for as a document and approved or rejected by another officer before the stands change hands.",
             Fields = [Pick("Step", "Step", ["Propose", "Reject line", "Substitute line", "Approve", "Cancel", "Verify draw", "Swap stands", "Approve swap", "Reject swap", "Expired offers", "Lapse offer",
-                "Extend offer"]), Opt("Stands", "Only these stands (substitution run; ',')"), OptNum("Swap", "Swap document id (approve / reject swap)"),
+                "Extend offer"]), Opt("Stands", "Only these stands (substitution run; ',')"), Lookup("Swap", "Swap document (approve / reject swap)", false, PendingSwapsAsync),
                 OptNum("Line", "Pairing sequence (reject / substitute)"), Opt("LineReason", "Reason (reject / substitute)"), Opt("Resolution", "Committee resolution (approve)"),
                 OptDate("Meeting", "Meeting date (approve)"), Opt("Members", "Committee members present (approve)"), Opt("Certificate", "Certificate (swap / lapse / extend)"), Opt("Other", "Other certificate (swap)"), Opt("Document", "Swap document"),
                 Opt("Reason", "Reason (swap / lapse / extend)"), Opt("Scheme", "Scheme code (propose)"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()),
@@ -228,7 +255,7 @@ public static partial class OperationCatalogue
                     case "Approve swap":
                     case "Reject swap":
                         bool approveSwap = i.Text("Step") == "Approve swap";
-                        return Check(await allocation.DecideSwapAsync(c.CompanyId, (long)(i.OptionalNumber("Swap") ?? 0), approveSwap, c.UserId, i.Date("Date"), i.Optional("Reason")).ConfigureAwait(true),
+                        return Check(await allocation.DecideSwapAsync(c.CompanyId, PickedId(i, "Swap"), approveSwap, c.UserId, i.Date("Date"), i.Optional("Reason")).ConfigureAwait(true),
                             approveSwap ? "Swap approved; the stands have changed hands." : "Swap rejected.");
                     case "Cancel":
                         _ = Check(await allocation.CancelAsync(c.CompanyId, i.Text("Run")).ConfigureAwait(true), string.Empty);
@@ -252,9 +279,12 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Accept or decline an offer", ListTitle = "Stands",
             Description = "Records the applicant's answer to an allocation offer by its certificate number; a decline needs the reason and frees the stand. "
-                + "Offer letter prints the offer (price, deposit, deadline) for the applicant; Allocation letter prints the confirmation once accepted.",
+                + "Offer letter prints the offer (price, deposit, deadline) for the applicant; Allocation letter prints the confirmation once accepted. "
+                + "When the scheme wants a deposit held before acceptance, it can be taken here with the acceptance: give its amount, receipt and accounts.",
             Fields = [Req("Certificate", "Certificate number"), Pick("Answer", "Answer", ["Accept", "Decline", "Offer letter", "Allocation letter"]), Opt("Reason", "Reason (decline)"),
-                Today("Date", "Date"), OptNum("Deposit", "Deposit % (letters)")],
+                Today("Date", "Date"), OptNum("Deposit", "Deposit % (letters)"), OptNum("DepositAmount", "Deposit taken now (accept; blank: none)"),
+                Opt("Receipt", "Deposit receipt reference (accept)"), Opt("Bank", "Bank / cash account the deposit is paid into (accept)"),
+                Opt("Liability", "Deposit liability account (accept)"), Opt("Customer", "Customer paying the deposit (accept; blank: the applicant's customer by national ID)")],
             Run = async (c, i) =>
             {
                 IAllocationService allocation = c.Get<IAllocationService>();
@@ -266,8 +296,42 @@ public static partial class OperationCatalogue
 
                 if (i.Text("Answer") == "Accept")
                 {
-                    _ = Check(await allocation.AcceptAsync(c.CompanyId, i.Text("Certificate"), i.Date("Date")).ConfigureAwait(true), string.Empty);
-                    return "Offer accepted.";
+                    // A deposit given here is taken first (it secures the open offer), then the offer is accepted.
+                    string certificate = i.Text("Certificate");
+                    string? journal = null;
+
+                    // The deposit and the acceptance are one unit: the services join this transaction, so an acceptance that fails takes the deposit back out.
+                    await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction unit = await c.Db.Database.BeginTransactionAsync().ConfigureAwait(true);
+                    if (i.OptionalNumber("DepositAmount") is decimal amount and > 0m)
+                    {
+                        long payer = i.Optional("Customer") is string customer ? await CustomerAsync(c, customer).ConfigureAwait(true)
+                            : await (from x in c.Db.Set<StandAllocation>().AsNoTracking()
+                                     where x.CompanyId == c.CompanyId && x.CertificateNumber == certificate
+                                     join a in c.Db.HousingApplicants.AsNoTracking() on x.ApplicantId equals a.Id
+                                     join k in c.Db.Customers.AsNoTracking() on a.IdNumber equals k.NationalIdNumber
+                                     where k.CompanyId == c.CompanyId
+                                     select (long?)k.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                                ?? throw new OperationException("No customer has the applicant's national ID; give the customer paying the deposit.");
+                        journal = Check(await c.Get<IHousingDepositService>().TakeDepositAsync(new StandDepositReceipt
+                        {
+                            CompanyId = c.CompanyId, CertificateNumber = certificate, CustomerId = payer, Amount = amount, Date = i.Date("Date"),
+                            ReceiptReference = i.Optional("Receipt") ?? string.Empty, BankAccountCode = i.Optional("Bank") ?? string.Empty, LiabilityAccountCode = i.Optional("Liability") ?? string.Empty,
+                        }).ConfigureAwait(true));
+                    }
+
+                    Core.Common.Result accepted = await allocation.AcceptAsync(c.CompanyId, certificate, i.Date("Date")).ConfigureAwait(true);
+                    if (accepted.IsFailure)
+                    {
+                        await unit.RollbackAsync().ConfigureAwait(true);
+                        string why = accepted.Error.Code == "Hse.DepositRequired"
+                            ? $"{accepted.Error.Message} Take the deposit first under Housing > Sales and instalments > Stand deposits and cancellations (Take deposit), "
+                                + "or give the deposit taken now, its receipt and accounts here."
+                            : accepted.Error.Message;
+                        throw new OperationException(journal is null ? why : $"The offer was not accepted, so the deposit was not taken either: {why}");
+                    }
+
+                    await unit.CommitAsync().ConfigureAwait(true);
+                    return journal is null ? "Offer accepted." : $"Deposit taken ({journal}); offer accepted.";
                 }
 
                 _ = Check(await allocation.DeclineAsync(c.CompanyId, i.Text("Certificate"), i.Date("Date"), i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), string.Empty);
@@ -373,7 +437,7 @@ public static partial class OperationCatalogue
             Description = "Add occupant / move out: the household living with the tenant, within the unit's occupancy limit. Permit: a lodger on a permit (the tenant keeps a room of their own; "
                 + "a monthly fee goes on the rent). Revoke: ends a permit. Who lives there: the household and lodgers on a date.",
             Fields = [Pick("Step", "Step", ["Who lives there", "Add occupant", "Move out", "Issue permit", "Revoke permit"]), Req("Tenancy", "Tenancy number (permit: to revoke, its number)"),
-                Opt("Name", "Name (occupant / lodger)"), Opt("IdNumber", "National ID"), Opt("Relationship", "Relationship to the tenant"), OptNum("Occupant", "Occupant id (move out)"),
+                Opt("Name", "Name (occupant / lodger)"), Opt("IdNumber", "National ID"), Opt("Relationship", "Relationship to the tenant"), Lookup("Occupant", "Occupant (move out)", false, CurrentOccupantsAsync),
                 Num("Rooms", "Rooms let to the lodger", "1"), Num("Fee", "Monthly lodger fee", "0"), Opt("FeeAccount", "Lodger fee income account"), Today("Date", "Date / from"),
                 Today("Expires", "Permit last day"), Opt("Reason", "Reason (revoke)")],
             Run = async (c, i) =>
@@ -385,7 +449,7 @@ public static partial class OperationCatalogue
                         return Check(await occupancy.AddOccupantAsync(c.CompanyId, i.Text("Tenancy"), i.Optional("Name") ?? string.Empty, i.Optional("IdNumber"), i.Optional("Relationship") ?? string.Empty,
                             i.Date("Date")).ConfigureAwait(true), id => $"Occupant {id} added.");
                     case "Move out":
-                        return Check(await occupancy.RemoveOccupantAsync(c.CompanyId, i.Text("Tenancy"), (long)(i.OptionalNumber("Occupant") ?? 0m), i.Date("Date")).ConfigureAwait(true), "Moved out.");
+                        return Check(await occupancy.RemoveOccupantAsync(c.CompanyId, i.Text("Tenancy"), PickedId(i, "Occupant"), i.Date("Date")).ConfigureAwait(true), "Moved out.");
                     case "Issue permit":
                         string permit = Check(await occupancy.IssueLodgerPermitAsync(new LodgerPermitRequest(c.CompanyId, i.Text("Tenancy"), i.Optional("Name") ?? string.Empty, i.Optional("IdNumber"),
                             i.Whole("Rooms"), i.Number("Fee"), i.Optional("FeeAccount"), i.Date("Date"), i.Date("Expires"))).ConfigureAwait(true));
@@ -805,10 +869,10 @@ public static partial class OperationCatalogue
                 + "which raises the repair that carries its cost.",
             Fields = [Pick("Step", "Step", ["Report repair", "Complete repair", "Inspection", "Close follow-up", "History", "Void details", "Plan task", "Planned due", "Planned done"]),
                 Opt("Unit", "Unit code"), Opt("Repair", "Repair number (complete)"), Opt("Reason", "Void reason"), Opt("Job", "Refurbishment job (contract) number"),
-                Num("Every", "Planned: every (months, 0 = once)", "12"), OptNum("Task", "Planned task id (as listed by Planned due)"),
+                Num("Every", "Planned: every (months, 0 = once)", "12"), Lookup("Task", "Planned task (Planned done)", false, PlannedTasksAsync),
                 Opt("Description", "Description / findings"), Num("Cost", "Cost", "0"), Opt("Expense", "Repairs expense account"), Opt("PaidFrom", "Paid from account"), Tick("TenantCaused", "Tenant caused it"),
                 Opt("Recharge", "Recharge income account"), Opt("Inspector", "Inspector"), Num("Grade", "Condition grade (1–5)", "3"), Tick("FollowUp", "Needs follow-up"),
-                OptNum("Inspection", "Inspection id (close)"), Today()],
+                Lookup("Inspection", "Inspection (close)", false, OpenFollowUpsAsync), Today()],
             Run = async (c, i) =>
             {
                 IRentalMaintenanceService maintenance = c.Get<IRentalMaintenanceService>();
@@ -828,7 +892,7 @@ public static partial class OperationCatalogue
                         return Check(await maintenance.RecordInspectionAsync(c.CompanyId, unit, i.Date("Date"), i.Optional("Inspector") ?? string.Empty, i.Whole("Grade"), i.Optional("Description") ?? string.Empty,
                             i.Flag("FollowUp")).ConfigureAwait(true), id => $"Inspection {id} recorded.");
                     case "Close follow-up":
-                        return Check(await maintenance.CloseFollowUpAsync(c.CompanyId, (long)(i.OptionalNumber("Inspection") ?? 0m), i.Date("Date")).ConfigureAwait(true), "Follow-up closed.");
+                        return Check(await maintenance.CloseFollowUpAsync(c.CompanyId, PickedId(i, "Inspection"), i.Date("Date")).ConfigureAwait(true), "Follow-up closed.");
                     case "Void details":
                         return Check(await maintenance.SetVoidDetailsAsync(c.CompanyId, unit, i.Optional("Reason"), i.Optional("Job")).ConfigureAwait(true), "Void details saved.");
                     case "Plan task":
@@ -837,7 +901,7 @@ public static partial class OperationCatalogue
                         IReadOnlyList<PlannedTaskDue> due = await maintenance.DueAsync(c.CompanyId, i.Date("Date")).ConfigureAwait(true);
                         return due.Count == 0 ? "Nothing planned is due." : string.Join(Environment.NewLine, due.Select(t => $"{t.Id,6} {D(t.Due)} {t.UnitCode,-10} {t.Description}"));
                     case "Planned done":
-                        return $"Done; repair {Check(await maintenance.MarkDoneAsync(c.CompanyId, (long)(i.OptionalNumber("Task") ?? 0m), i.Date("Date")).ConfigureAwait(true))} raised for its cost.";
+                        return $"Done; repair {Check(await maintenance.MarkDoneAsync(c.CompanyId, PickedId(i, "Task"), i.Date("Date")).ConfigureAwait(true))} raised for its cost.";
                     default:
                         UnitMaintenanceHistory history = Check(await maintenance.HistoryAsync(c.CompanyId, unit).ConfigureAwait(true));
                         return $"{history.UnitCode}: {history.RepairsOpen} repair(s) open, repairs cost {M(history.RepairCost)}, recharged {M(history.Recharged)}, "
@@ -1290,7 +1354,7 @@ public static partial class OperationCatalogue
             Description = "Request a change to an applicant's registration date (with the reason) and have another user decide it; confirm an applicant's continued interest; run "
                 + "renewals (suspending, then removing, applicants who have not renewed within the cycle and grace); see the notices sent to an applicant.",
             Fields = [Pick("Step", "Step", ["Request date change", "Decide date change", "Confirm interest", "Run renewals", "Notices"]), Opt("Applicant", "Waiting-list number"),
-                Opt("Reason", "Reason (date change)"), OptNum("Request", "Request id (decide)"), Tick("Approve", "Approve"), Num("Cycle", "Renewal cycle (months)", "12"), Num("Grace", "Grace (days)", "30"), Today()],
+                Opt("Reason", "Reason (date change)"), Lookup("Request", "Date change request (decide)", false, PendingDateChangesAsync), Tick("Approve", "Approve"), Num("Cycle", "Renewal cycle (months)", "12"), Num("Grace", "Grace (days)", "30"), Today()],
             Run = async (c, i) =>
             {
                 IWaitingListControlService control = c.Get<IWaitingListControlService>();
@@ -1301,7 +1365,7 @@ public static partial class OperationCatalogue
                         return Check(await control.RequestDateChangeAsync(c.CompanyId, applicant, i.Date("Date"), i.Optional("Reason") ?? string.Empty, c.UserId).ConfigureAwait(true),
                             id => $"Date change request {id} awaits another user's decision.");
                     case "Decide date change":
-                        return Check(await control.DecideDateChangeAsync(c.CompanyId, (long)(i.OptionalNumber("Request") ?? 0m), i.Flag("Approve"), c.UserId).ConfigureAwait(true), i.Flag("Approve") ? "Approved." : "Refused.");
+                        return Check(await control.DecideDateChangeAsync(c.CompanyId, PickedId(i, "Request"), i.Flag("Approve"), c.UserId).ConfigureAwait(true), i.Flag("Approve") ? "Approved." : "Refused.");
                     case "Confirm interest":
                         return Check(await control.ConfirmAsync(c.CompanyId, applicant, i.Date("Date")).ConfigureAwait(true), "Interest confirmed.");
                     case "Run renewals":
@@ -1693,7 +1757,7 @@ public static partial class OperationCatalogue
                 + "reported → investigation → negotiation → mediation → litigation → judgment → resolved; dispose of land by sale, exchange (receiving a parcel in return), donation or "
                 + "expropriation, with the cost out and the gain or loss.",
             Fields = [Pick("Step", "Step", ["Encumbrance", "Lift encumbrance", "Open dispute", "Advance dispute", "Dispose"]), Opt("Parcel", "Parcel number"), Pick("EncType", "Encumbrance type", Enum.GetNames<EncumbranceType>()),
-                OptNum("Encumbrance", "Encumbrance id (lift)"), Opt("Reference", "Reference / resolution"), Opt("Party", "In favour of / claimant / counterparty"), Opt("Text", "Description / particulars / note"),
+                Lookup("Encumbrance", "Encumbrance (lift)", false, EncumbrancesInForceAsync), Opt("Reference", "Reference / resolution"), Opt("Party", "In favour of / claimant / counterparty"), Opt("Text", "Description / particulars / note"),
                 Pick("DisputeType", "Dispute type", Enum.GetNames<LandDisputeType>()), Opt("Dispute", "Dispute number (advance)"), Pick("Stage", "Dispute stage", Enum.GetNames<LandDisputeStage>()),
                 Opt("Stand", "Stand number (dispute, optional)"), Pick("DisposalType", "Disposal", Enum.GetNames<LandDisposalType>()), Num("Area", "Area m² (disposal)", "0"), Num("Consideration", "Sale price", "0"),
                 Opt("LandAccount", "Land account"), Opt("Proceeds", "Proceeds account"), Opt("GainLoss", "Gain / loss account"), Opt("Exchange", "Parcel received in exchange: number"),
@@ -1712,7 +1776,7 @@ public static partial class OperationCatalogue
                             InFavourOf = i.Optional("Party") ?? string.Empty, Description = i.Optional("Text") ?? string.Empty, Date = date,
                         }).ConfigureAwait(true), id => $"Encumbrance {id} registered.");
                     case "Lift encumbrance":
-                        return Check(await register.LiftEncumbranceAsync(c.CompanyId, (long)(i.OptionalNumber("Encumbrance") ?? 0m), date, i.Optional("Reference") ?? string.Empty).ConfigureAwait(true), "Encumbrance lifted.");
+                        return Check(await register.LiftEncumbranceAsync(c.CompanyId, PickedId(i, "Encumbrance"), date, i.Optional("Reference") ?? string.Empty).ConfigureAwait(true), "Encumbrance lifted.");
                     case "Open dispute":
                         return $"Dispute {Check(await register.OpenDisputeAsync(new LandDisputeLodgement
                         {
@@ -1946,6 +2010,66 @@ public static partial class OperationCatalogue
         private static string Name(IReadOnlyDictionary<long, string> names, long? id)
             => id is long key ? names.GetValueOrDefault(key, key.ToString(CultureInfo.InvariantCulture)) : string.Empty;
     }
+
+    /// <summary>The record id picked from a lookup (0 when none is picked, which the service refuses as not found).</summary>
+    private static long PickedId(OperationInput i, string name)
+        => i.Optional(name) is not string text ? 0L
+            : long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) ? id : throw new OperationException($"Pick one from the list (\"{text}\" is not one).");
+
+    private static string Short(string text, int length = 40) => text.Length <= length ? text : text[..length].TrimEnd() + "...";
+
+    // Swap documents waiting for another officer's decision.
+    private static async Task<List<(string Code, string Name)>> PendingSwapsAsync(OperationContext c)
+        => (await c.Db.Set<StandSwap>().AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.Status == StandSwapStatus.Pending).OrderBy(x => x.Id)
+                .Select(x => new { x.Id, x.FirstCertificate, x.SecondCertificate, x.Reference, x.Date }).Take(500).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.Id.ToString(CultureInfo.InvariantCulture), $"{x.FirstCertificate} with {x.SecondCertificate} - document {x.Reference} - {D(x.Date)}")).ToList();
+
+    // Household members still living in a let unit.
+    private static async Task<List<(string Code, string Name)>> CurrentOccupantsAsync(OperationContext c)
+        => (await (from t in c.Db.Set<Tenancy>().AsNoTracking()
+                   where t.CompanyId == c.CompanyId
+                   from o in t.Occupants
+                   where o.MovedOutOn == null
+                   join u in c.Db.Set<RentalUnit>().AsNoTracking() on t.UnitId equals u.Id
+                   orderby t.TenancyNumber, o.FullName
+                   select new { o.Id, o.FullName, t.TenancyNumber, u.Code, o.MovedInOn }).Take(2000).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.Id.ToString(CultureInfo.InvariantCulture), $"{x.FullName} - tenancy {x.TenancyNumber} - unit {x.Code} - since {D(x.MovedInOn)}")).ToList();
+
+    // Inspections whose follow-up is still open.
+    private static async Task<List<(string Code, string Name)>> OpenFollowUpsAsync(OperationContext c)
+        => (await (from x in c.Db.Set<UnitInspection>().AsNoTracking()
+                   where x.CompanyId == c.CompanyId && x.FollowUpRequired && x.FollowUpDoneOn == null
+                   join u in c.Db.Set<RentalUnit>().AsNoTracking() on x.UnitId equals u.Id
+                   orderby x.InspectedOn
+                   select new { x.Id, u.Code, x.InspectedOn, x.ConditionGrade, x.Findings }).Take(1000).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.Id.ToString(CultureInfo.InvariantCulture), $"unit {x.Code} - inspected {D(x.InspectedOn)} - grade {x.ConditionGrade} - {Short(x.Findings)}")).ToList();
+
+    // Planned maintenance tasks still in the programme, soonest due first.
+    private static async Task<List<(string Code, string Name)>> PlannedTasksAsync(OperationContext c)
+        => (await (from x in c.Db.Set<PlannedMaintenance>().AsNoTracking()
+                   where x.CompanyId == c.CompanyId && x.IsActive
+                   join u in c.Db.Set<RentalUnit>().AsNoTracking() on x.UnitId equals u.Id
+                   orderby x.NextDue, u.Code
+                   select new { x.Id, u.Code, x.Description, x.NextDue }).Take(1000).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.Id.ToString(CultureInfo.InvariantCulture), $"unit {x.Code} - {Short(x.Description)} - due {D(x.NextDue)}")).ToList();
+
+    // Registration date changes waiting for another user's decision.
+    private static async Task<List<(string Code, string Name)>> PendingDateChangesAsync(OperationContext c)
+        => (await (from x in c.Db.Set<RegistrationDateChange>().AsNoTracking()
+                   where x.CompanyId == c.CompanyId && x.Status == ChangeRequestStatus.Pending
+                   join a in c.Db.HousingApplicants.AsNoTracking() on x.ApplicantId equals a.Id
+                   orderby x.Id
+                   select new { x.Id, a.FullName, a.WaitingListNumber, x.OldDate, x.NewDate, x.Reason }).Take(500).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.Id.ToString(CultureInfo.InvariantCulture), $"{x.FullName} {x.WaitingListNumber} - {D(x.OldDate)} to {D(x.NewDate)} - {Short(x.Reason)}")).ToList();
+
+    // Encumbrances still in force (not lifted).
+    private static async Task<List<(string Code, string Name)>> EncumbrancesInForceAsync(OperationContext c)
+        => (await (from x in c.Db.Set<LandEncumbrance>().AsNoTracking()
+                   where x.CompanyId == c.CompanyId && x.LiftedOn == null
+                   join p in c.Db.LandParcels.AsNoTracking() on x.LandParcelId equals p.Id
+                   orderby p.ParcelNumber, x.RegisteredOn
+                   select new { x.Id, p.ParcelNumber, x.Type, x.Reference, x.InFavourOf, x.RegisteredOn }).Take(1000).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.Id.ToString(CultureInfo.InvariantCulture), $"parcel {x.ParcelNumber} - {x.Type} {x.Reference} - in favour of {x.InFavourOf} - since {D(x.RegisteredOn)}")).ToList();
 
     private static DateOnly Day(string text)
         => DateOnly.TryParseExact(text.Trim(), "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateOnly day) ? day : throw new OperationException($"\"{text}\" is not a date (yyyy-MM-dd).");
