@@ -165,7 +165,7 @@ public static class NavigationMap
         new("Accounting", "\U0001F4D8", "#1565C0", "Journals, the chart of accounts, tax, currencies and closing the books.", ["General Ledger"],
         [
             G("Journals",
-                O("General Ledger: Submit a manual journal", "Enter a journal"),
+                O("General Ledger: Submit a manual journal", "Enter a journal"), O("General Ledger: Reverse a manual journal", "Reverse a journal"),
                 W("journal-approvals", "Journals awaiting approval", "Approve or reject journals others have entered.", MenuArea.Transactions, "General Ledger"),
                 O("General Ledger: Accounting vouchers"), O("General Ledger: Accruals and prepayments"), O("General Ledger: Recurring journals"),
                 O("General Ledger: Import journals from a file"), O("General Ledger: Group statements", "Consolidated statements"), O("General Ledger: Intercompany journal"), O("General Ledger: Deferred posting"), O("General Ledger: Petty cash"), O("General Ledger: Petty cash funds")),

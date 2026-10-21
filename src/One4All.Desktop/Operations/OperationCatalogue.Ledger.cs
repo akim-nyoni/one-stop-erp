@@ -82,6 +82,34 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
+            Module = module, Title = "Reverse a manual journal", ListTitle = "Manual journals posted",
+            Description = "Corrects a posted manual journal by posting its exact inverse on the date given, with the reason kept on it; the original stays as it was. "
+                + "Only general ledger journals are reversed here: an invoice, receipt or payment is reversed through its own document.",
+            Fields = [Lookup("Journal", "Posted manual journal", true, async c => (await c.Db.Journals.AsNoTracking()
+                    .Where(j => j.CompanyId == c.CompanyId && j.SourceModule == "GL" && j.Status == JournalStatus.Posted && !j.IsReversal
+                        && !c.Db.Journals.Any(r => r.CompanyId == c.CompanyId && r.ReversalOfJournalId == j.Id))
+                    .OrderByDescending(j => j.Id).Take(300).Select(j => new { j.JournalNumber, j.PostingDate, j.Narrative }).ToListAsync().ConfigureAwait(true))
+                    .Select(j => (j.JournalNumber, $"{D(j.PostingDate)} {j.Narrative}")).ToList()),
+                Today("Date", "Reversal date"), Req("Reason", "Reason")],
+            Run = async (c, i) =>
+            {
+                string number = i.Text("Journal").Trim();
+                JournalEntry journal = await c.Db.Journals.AsNoTracking().FirstOrDefaultAsync(j => j.CompanyId == c.CompanyId && j.JournalNumber == number).ConfigureAwait(true)
+                    ?? throw new OperationException($"No journal {number}.");
+                if (journal.SourceModule != "GL")
+                {
+                    throw new OperationException($"Journal {number} came from {journal.SourceModule}; reverse it through its own document.");
+                }
+
+                PostingReceipt reversed = Check(await c.Get<IPostingEngine>().ReverseAsync(c.CompanyId, journal.Id, i.Date("Date"), i.Text("Reason")).ConfigureAwait(true));
+                return $"Journal {number} reversed by {reversed.JournalNumber} on {D(reversed.PostingDate)}.";
+            },
+            List = async c => Table(await c.Db.Journals.AsNoTracking().Where(j => j.CompanyId == c.CompanyId && j.SourceModule == "GL" && j.Status == JournalStatus.Posted)
+                    .OrderByDescending(j => j.Id).Page(c, 200).Select(j => new { j.JournalNumber, j.PostingDate, j.Narrative, j.IsReversal, j.ReversalOfJournalId }).ToListAsync().ConfigureAwait(true),
+                ("Journal", j => j.JournalNumber), ("Date", j => D(j.PostingDate)), ("Narrative", j => j.Narrative), ("Reversal", j => j.IsReversal)),
+        };
+        yield return new Operation
+        {
             Module = module, Title = "Submit a manual journal", ListTitle = "Journals awaiting approval",
             Description = "Enter the lines on the grid (account, debit or credit, cost centre, tax code for the VAT return, line narrative); the totals show when it balances. "
                 + "Or type them separated by ';', each ACCOUNT Dr|Cr AMOUNT with optional cc=, dept=, project=, fund=, branch=, tax=, cur= and rate= "

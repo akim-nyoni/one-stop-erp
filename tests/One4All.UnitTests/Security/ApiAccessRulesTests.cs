@@ -60,6 +60,7 @@ public sealed partial class ApiAccessRulesTests
     [InlineData("PUT", "/api/master/items/5", "Inventory", true)]
     [InlineData("POST", "/api/pos/sales", "Pos", true)]
     [InlineData("GET", "/api/schools/students", "School", false)]
+    [InlineData("POST", "/api/gl/journals/J-100/reverse", "GeneralLedger", true)]
     public void Master_data_pos_and_schools_are_governed_by_their_own_module(string method, string path, string module, bool write)
     {
         ApiRequirement requirement = ApiAccessRules.Requirement(method, path)!;

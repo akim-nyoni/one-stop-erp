@@ -142,6 +142,7 @@ General Ledger	Recognise deferred income	False
 General Ledger	Recurring journals	False	
 General Ledger	Reporting trees	False	
 General Ledger	Revalue foreign currency balances	False	
+General Ledger	Reverse a manual journal	False	
 General Ledger	Settle VAT for a period	False	
 General Ledger	Submit a manual journal	False	
 General Ledger	Tax exemption certificates	False	

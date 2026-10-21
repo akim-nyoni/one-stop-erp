@@ -40,6 +40,27 @@ internal static class LedgerApiEndpoints
 
     private static void MapLedgers(RouteGroupBuilder api)
     {
+        // A posted manual (GL) journal reversed by its exact inverse; it needs the journal reverse right, and sub-ledger journals go through their documents.
+        api.MapPost("/api/gl/journals/{number}/reverse", async (string number, long companyId, long userId, DateOnly date, string reason, One4AllDbContext db,
+            IPermissionService permissions, Application.Abstractions.Accounting.IPostingEngine engine, CancellationToken ct) =>
+        {
+            if (!(await permissions.ResolveAsync(userId, ct).ConfigureAwait(false)).Has("GeneralLedger.Journal", OperationFlags.VoidReverse))
+            {
+                return Value(Result<bool>.Failure(Error.Forbidden("Api.JournalReverse", "Reversing a journal needs the journal reverse right (GeneralLedger.Journal).")));
+            }
+
+            string key = (number ?? string.Empty).Trim();
+            var journal = await db.Journals.AsNoTracking().Where(j => j.CompanyId == companyId && j.JournalNumber == key).Select(j => new { j.Id, j.SourceModule }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (journal is null)
+            {
+                return NotFound($"No journal {key}.");
+            }
+
+            return journal.SourceModule != "GL"
+                ? Value(Result<bool>.Failure(Error.Rule("Api.SubLedgerJournal", $"Journal {key} came from {journal.SourceModule}; reverse it through its own document.")))
+                : Value(await engine.ReverseAsync(companyId, journal.Id, date, reason, ct).ConfigureAwait(false));
+        }).RequireAuthorization().WithName("ApiReverseJournal");
+
         api.MapGet("/api/gl/trial-balance", async (long companyId, DateOnly? asAt, DateOnly? from, DateOnly? to, IGeneralLedgerReports reports, CancellationToken ct) =>
         {
             if (from is DateOnly start)
