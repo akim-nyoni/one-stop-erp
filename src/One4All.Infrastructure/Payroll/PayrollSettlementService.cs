@@ -116,18 +116,13 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
             }
 
             // A gain (the currency weakened) is credited to FX gain, a loss debited to FX loss.
-            string? exchangeAccount = null;
-            if (exchange != 0m)
+            Result<string?> fx = await PayrollCurrencies.ExchangeAccountAsync(_db, companyId, exchange, "Net pay", ct).ConfigureAwait(false);
+            if (fx.IsFailure)
             {
-                ControlAccountType fxType = exchange > 0m ? ControlAccountType.FxGain : ControlAccountType.FxLoss;
-                exchangeAccount = await _db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == fxType).OrderBy(a => a.AccountCode).Select(a => a.AccountCode)
-                    .FirstOrDefaultAsync(ct).ConfigureAwait(false);
-                if (exchangeAccount is null)
-                {
-                    return Error.Rule("Payroll.NoFxAccount", $"Net pay paid at a different rate from the pay date's gives an exchange {(exchange > 0m ? "gain" : "loss")} of {Math.Abs(exchange):N2}; "
-                        + $"set up an {fxType} control account first.");
-                }
+                return fx.Error;
             }
+
+            string? exchangeAccount = fx.Value;
 
             List<(PayMethod Method, string Account, decimal Amount)> byMethod = [];
             foreach (IGrouping<PayMethod, decimal> method in baseNet.Where(s => s.Net > 0m).GroupBy(s => s.Method, s => s.Net).OrderBy(g => g.Key))

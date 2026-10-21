@@ -137,4 +137,38 @@ public sealed class ApiAccessTests
         (await Ask("GET", "/api/gl/trial-balance")).StatusCode.Should().Be(403);
         (await Ask("GET", "/api/ap/aged-creditors")).StatusCode.Should().Be(403);
     }
+
+    [SkippableFact]
+    public async Task Employee_payroll_and_stand_history_routes_are_held_to_their_modules()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long home = await Scenario.SeedAsync(db);
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        Role officer = new($"HR officer {tag}");
+        officer.Grant("Payroll.Employee", OperationFlags.View);
+        db.Roles.Add(officer);
+        await db.SaveChangesAsync();
+        User user = new($"hr.{tag}", "HR officer");
+        user.SetPasswordHash("hash", mustChange: false);
+        user.AssignRole(officer.Id);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        IApiAccessService access = scope.ServiceProvider.GetRequiredService<IApiAccessService>();
+        Task<ApiAccessDecision> Ask(string method, string path)
+            => access.AuthoriseAsync(new ApiAccessRequest(user.Id, method, path, new Dictionary<string, string> { ["companyId"] = $"{home}" }));
+
+        // Employees and runs may be read (the payslip route then asks for the right to see salaries) but no employee engaged or changed; stands are out of reach.
+        (await Ask("GET", "/api/hr/employees/E-1")).Allowed.Should().BeTrue();
+        (await Ask("GET", "/api/payroll/runs")).Allowed.Should().BeTrue();
+        ApiAccessDecision payslip = await Ask("GET", "/api/payroll/payslips/E-1");
+        payslip.Allowed.Should().BeTrue();
+        payslip.MissingActorParameters.Should().Contain("userId");
+        (await Ask("POST", "/api/hr/employees")).StatusCode.Should().Be(403);
+        (await Ask("PUT", "/api/hr/employees/E-1")).StatusCode.Should().Be(403);
+        (await Ask("GET", "/api/housing/stands/ST-12/history")).StatusCode.Should().Be(403);
+    }
 }

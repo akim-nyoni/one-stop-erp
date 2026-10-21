@@ -249,10 +249,7 @@ public sealed class TerminationService : ITerminationService
 
         sb.AppendLine(rule);
         sb.AppendLine(Row($"NET PAY ({company.BaseCurrency.Value})", termination.NetPay));
-        DateOnly payDate = termination.JournalNumber is string accrued
-            ? await _db.Set<JournalEntry>().Where(j => j.CompanyId == companyId && j.JournalNumber == accrued).Select(j => (DateOnly?)j.PostingDate).FirstOrDefaultAsync(ct).ConfigureAwait(false)
-                ?? termination.LastDay
-            : termination.LastDay;
+        DateOnly payDate = await AccruedOnAsync(companyId, termination, ct).ConfigureAwait(false);
         foreach ((string currency, decimal amount, decimal baseAmount, decimal rate) in await NetByCurrencyAsync(companyId, termination, payDate, ct).ConfigureAwait(false))
         {
             sb.AppendLine(Row(rate == 1m ? $"  in {currency}" : $"  in {currency} at {rate.ToString("0.####", CultureInfo.InvariantCulture)} ({baseAmount.ToString("N2", CultureInfo.InvariantCulture)})", amount));
@@ -440,13 +437,21 @@ public sealed class TerminationService : ITerminationService
         return byCurrency;
     }
 
+    // The final pay's date: when its accrual journal posted (the pay date, else the last day).
+    private async Task<DateOnly> AccruedOnAsync(long companyId, Termination termination, CancellationToken ct)
+        => termination.JournalNumber is string accrued
+            ? await _db.Set<JournalEntry>().Where(j => j.CompanyId == companyId && j.JournalNumber == accrued).Select(j => (DateOnly?)j.PostingDate).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+                ?? termination.LastDay
+            : termination.LastDay;
+
     // The base-currency table of a code in force on a date (the latest effective by then).
     private async Task<TaxTable?> TableAsync(long companyId, string code, DateOnly date, CancellationToken ct)
         => (await _db.Set<TaxTable>().Include(t => t.Bands).Where(t => t.CompanyId == companyId && t.Code == code && t.Currency == null && t.EffectiveFrom <= date)
             .ToListAsync(ct).ConfigureAwait(false)).OrderBy(t => t.EffectiveFrom).LastOrDefault();
 
     /// <inheritdoc />
-    public Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default)
+    public Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode,
+        IReadOnlyDictionary<CurrencyCode, string>? currencyAccounts = null, CancellationToken ct = default)
         => _db.AtomicAsync(async () =>
         {
             Termination? termination = await LatestAsync(companyId, employeeNumber, ct).ConfigureAwait(false);
@@ -470,21 +475,72 @@ public sealed class TerminationService : ITerminationService
             string? journal = null;
             if (termination.NetPay > 0m)
             {
-                if (string.IsNullOrWhiteSpace(bankAccountCode) || string.IsNullOrWhiteSpace(termination.NetPayAccountCode))
+                if (string.IsNullOrWhiteSpace(termination.NetPayAccountCode))
+                {
+                    return Error.Validation("Payroll.FinalPayAccounts", "The final pay does not record the net pay account it was accrued to; pay it by journal.");
+                }
+
+                // Paid in the currencies the slip shows (as a run's net pay is): what is owed in each foreign currency is fixed at the final pay's date
+                // rate; paid at the payment date's rate it costs a different base amount, and the difference is a realised exchange gain or loss.
+                CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+                DateOnly payDate = await AccruedOnAsync(companyId, termination, ct).ConfigureAwait(false);
+                List<(CurrencyCode Currency, string Account, decimal Amount, decimal BaseAmount, decimal Rate)> foreign = [];
+                decimal inBase = termination.NetPay, exchange = 0m;
+                foreach ((string code, decimal owed, decimal baseAmount, _) in (await NetByCurrencyAsync(companyId, termination, payDate, ct).ConfigureAwait(false))
+                    .Where(r => r.Currency != baseCurrency.Value))
+                {
+                    CurrencyCode currency = CurrencyCode.Parse(code);
+                    if (currencyAccounts is null || !currencyAccounts.TryGetValue(currency, out string? account) || string.IsNullOrWhiteSpace(account))
+                    {
+                        return Error.Validation("Payroll.CurrencyAccount", $"Say which {currency} account pays the final pay in {currency} ({baseAmount:N2} in base).");
+                    }
+
+                    decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+                    if (rate is not > 0m)
+                    {
+                        return Error.Rule("Payroll.NoRate", $"There is no {currency} rate on {date:yyyy-MM-dd} to pay the {currency} final pay at.");
+                    }
+
+                    decimal paidBase = decimal.Round(owed * rate.Value, 2, MidpointRounding.AwayFromZero);
+                    exchange += baseAmount - paidBase;
+                    inBase -= baseAmount;
+                    foreign.Add((currency, account.Trim().ToUpperInvariant(), owed, paidBase, rate.Value));
+                }
+
+                if (inBase > 0m && string.IsNullOrWhiteSpace(bankAccountCode))
                 {
                     return Error.Validation("Payroll.FinalPayAccounts", "Give the bank account the final pay is paid from.");
                 }
 
+                Result<string?> exchangeAccount = await PayrollCurrencies.ExchangeAccountAsync(_db, companyId, exchange, "The final pay", ct).ConfigureAwait(false);
+                if (exchangeAccount.IsFailure)
+                {
+                    return exchangeAccount.Error;
+                }
+
                 Employee employee = await _db.Employees.AsNoTracking().SingleAsync(e => e.Id == termination.EmployeeId, ct).ConfigureAwait(false);
-                Core.System.Company company = await _db.Companies.SingleAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
                 Result<PostingReceipt> posted = await _engine.PostAsync(new JournalRequest
                 {
-                    CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "FinalPayment",
+                    CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = baseCurrency, DocumentType = "FinalPayment",
                     DocumentNumber = employee.EmployeeNumber, Narrative = $"Final pay released to {employee.EmployeeNumber} {employee.FullName}",
                     Lines =
                     [
                         new JournalLineRequest { AccountCode = termination.NetPayAccountCode, Side = JournalSide.Debit, TransactionAmount = termination.NetPay, Narrative = "Net final pay" },
-                        new JournalLineRequest { AccountCode = bankAccountCode.Trim(), Side = JournalSide.Credit, TransactionAmount = termination.NetPay, Narrative = "Final pay paid" },
+                        .. (inBase > 0m
+                            ? [new JournalLineRequest { AccountCode = bankAccountCode.Trim(), Side = JournalSide.Credit, TransactionAmount = inBase, Narrative = "Final pay paid" }]
+                            : Array.Empty<JournalLineRequest>()),
+                        .. foreign.Select(f => new JournalLineRequest
+                        {
+                            AccountCode = f.Account, Side = JournalSide.Credit, TransactionAmount = f.Amount, Currency = f.Currency, ExchangeRate = f.Rate, BaseAmount = f.BaseAmount,
+                            Narrative = $"Final pay paid in {f.Currency}",
+                        }),
+                        .. (exchangeAccount.Value is string fx
+                            ? [new JournalLineRequest
+                            {
+                                AccountCode = fx, Side = exchange > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(exchange),
+                                Narrative = "Exchange difference on final pay paid in another currency",
+                            }]
+                            : Array.Empty<JournalLineRequest>()),
                     ],
                 }, ct).ConfigureAwait(false);
                 if (posted.IsFailure)

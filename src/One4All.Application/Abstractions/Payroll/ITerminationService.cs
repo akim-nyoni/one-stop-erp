@@ -69,14 +69,18 @@ public interface ITerminationService
 
     /// <summary>
     /// Releases the net final pay to the leaver (Dr the net pay account it was accrued to, Cr the bank) - only once every clearance item is cleared (brief §4.15.8).
+    /// The final pay goes out in the currencies its slip shows: each foreign amount owed at the final pay's date rate, from that currency's account,
+    /// any difference at the payment date's rate to FX gain or loss; the rest in base from the bank account.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="employeeNumber">The leaver.</param>
     /// <param name="date">The payment date.</param>
-    /// <param name="bankAccountCode">The bank account paying.</param>
+    /// <param name="bankAccountCode">The bank account paying the base-currency part.</param>
+    /// <param name="currencyAccounts">The account paying each foreign currency the final pay goes out in.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The payment journal (null when nothing was due), or why it is held.</returns>
-    Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default);
+    Task<Result<string?>> ReleaseFinalPayAsync(long companyId, string employeeNumber, DateOnly date, string bankAccountCode,
+        IReadOnlyDictionary<One4All.Core.Accounting.CurrencyCode, string>? currencyAccounts = null, CancellationToken ct = default);
 
     /// <summary>The certificate of service (dates, position and reason - not pay).</summary>
     Task<Result<string>> CertificateOfServiceAsync(long companyId, string employeeNumber, CancellationToken ct = default);

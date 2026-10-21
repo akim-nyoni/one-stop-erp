@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Payroll;
 using One4All.Core.Accounting;
+using One4All.Core.Common;
 using One4All.Core.Payroll;
 using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
@@ -140,6 +141,60 @@ public sealed class TerminationTests
         Skip.IfNot(_fixture.Available, _fixture.SkipReason);
         await using ServiceProvider provider = _fixture.BuildServiceProvider();
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        (long companyId, ITerminationService terminations, FinalPayStatement statement) = await TwoCurrencyLeaverAsync(scope);
+
+        // A third of April's taxable pay was in shillings, so is a third of the final 483.87 (15 of May's 31 days): the base table's 56.77 on
+        // the whole falls two thirds on the dollars (37.85); the 161.29 in shillings is 16,129 KSh, nil on its own table. On the base table
+        // alone it would be 56.77.
+        (statement.ProRataSalary, statement.OrdinaryTax, statement.Net).Should().Be((483.87m, 37.85m, 446.02m));
+
+        // The slip's footer: the shillings' share (161.29, within the net) paid in shillings at the pay date's rate, the rest in dollars.
+        string slip = (await terminations.FinalPaySlipAsync(companyId, "TC-1")).Value;
+        slip.Should().Contain("in USD").And.Contain("284.73").And.Contain("in KES at 0.01 (161.29)").And.Contain("16,129.00");
+    }
+
+    [SkippableFact]
+    public async Task Final_pay_is_paid_in_the_currencies_its_slip_shows()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        (long companyId, ITerminationService terminations, _) = await TwoCurrencyLeaverAsync(scope);
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        CurrencyCode kes = CurrencyCode.Parse("KES");
+        DateOnly paidOn = new(2026, 6, 30);
+        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == kes && r.ToCurrency == Scenario.Usd && r.RateType == ExchangeRateType.Daily && r.EffectiveFrom == paidOn))
+        {
+            db.ExchangeRates.Add(new ExchangeRate(kes, Scenario.Usd, ExchangeRateType.Daily, paidOn, 0.0102m));
+        }
+
+        db.Accounts.Add(new LedgerAccount(companyId, "1160", "Bank KES", AccountType.Asset));
+        await db.SaveChangesAsync();
+        foreach (ClearanceItem item in (await terminations.ClearanceAsync(companyId, "TC-1")).Value.Where(i => !i.IsCleared))
+        {
+            (await terminations.ClearItemAsync(companyId, item.Id, 5, paidOn)).IsSuccess.Should().BeTrue();
+        }
+
+        // The shillings need an account to be paid from.
+        (await terminations.ReleaseFinalPayAsync(companyId, "TC-1", paidOn, "1000")).Error.Code.Should().Be("Payroll.CurrencyAccount");
+
+        // KSh 16,129 owed at the final pay's 0.01 (161.29 base) is paid on 30 June at 0.0102 for 164.52 base: a 3.23 exchange loss. The other
+        // 284.73 goes out in dollars from the bank, and the 446.02 accrued is cleared in full.
+        Result<string?> released = await terminations.ReleaseFinalPayAsync(companyId, "TC-1", paidOn, "1000", new Dictionary<CurrencyCode, string> { [kes] = "1160" });
+        released.IsSuccess.Should().BeTrue(released.IsFailure ? released.Error.ToString() : null);
+        JournalEntry journal = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.JournalNumber == released.Value);
+        journal.Lines.Single(l => l.AccountCode == "2420").BaseDebit.Should().Be(446.02m);
+        journal.Lines.Single(l => l.AccountCode == "1000").BaseCredit.Should().Be(284.73m);
+        JournalLine paidInShillings = journal.Lines.Single(l => l.AccountCode == "1160");
+        (paidInShillings.TransactionCurrency, paidInShillings.TransactionCredit, paidInShillings.BaseCredit).Should().Be((kes, 16_129m, 164.52m));
+        string fxLoss = await db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == ControlAccountType.FxLoss).Select(a => a.AccountCode).FirstAsync();
+        journal.Lines.Single(l => l.AccountCode == fxLoss).BaseDebit.Should().Be(3.23m);
+        (await terminations.FinalPaySlipAsync(companyId, "TC-1")).Value.Should().Contain($"Paid ({released.Value}).");
+    }
+
+    // A company whose leaver TC-1 was paid a third of April in shillings (KES at 0.01) under split-currency tax, then resigned on 15 May.
+    private static async Task<(long CompanyId, ITerminationService Terminations, FinalPayStatement Statement)> TwoCurrencyLeaverAsync(AsyncServiceScope scope)
+    {
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
         CurrencyCode kes = CurrencyCode.Parse("KES");
@@ -148,9 +203,10 @@ public sealed class TerminationTests
             db.Currencies.Add(new Currency(kes, "Kenyan Shilling", "KSh"));
         }
 
-        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == kes && r.ToCurrency == Scenario.Usd && r.RateType == ExchangeRateType.Daily))
+        DateOnly rateFrom = new(2026, 1, 1);
+        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == kes && r.ToCurrency == Scenario.Usd && r.RateType == ExchangeRateType.Daily && r.EffectiveFrom == rateFrom))
         {
-            db.ExchangeRates.Add(new ExchangeRate(kes, Scenario.Usd, ExchangeRateType.Daily, new DateOnly(2026, 1, 1), 0.01m));   // 100 a dollar
+            db.ExchangeRates.Add(new ExchangeRate(kes, Scenario.Usd, ExchangeRateType.Daily, rateFrom, 0.01m));   // 100 a dollar
         }
 
         TaxTable dollars = new(companyId, "PAYE", new DateOnly(2026, 1, 1));
@@ -174,19 +230,12 @@ public sealed class TerminationTests
         var run = await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-04", new DateOnly(2026, 4, 25), "2420", "TC-04");
         run.IsSuccess.Should().BeTrue(run.IsFailure ? run.Error.ToString() : null);
 
-        // A third of April's taxable pay was in shillings, so is a third of the final 483.87 (15 of May's 31 days): the base table's 56.77 on
-        // the whole falls two thirds on the dollars (37.85); the 161.29 in shillings is 16,129 KSh, nil on its own table. On the base table
-        // alone it would be 56.77.
         ITerminationService terminations = scope.ServiceProvider.GetRequiredService<ITerminationService>();
         var done = await terminations.TerminateAsync(new TerminationRequest(companyId, "TC-1", TerminationType.Resignation, new DateOnly(2026, 5, 15), "Moving on")
         {
             Policy = new TerminalPolicy(1m, 22m, 2m, 4m, 10m), SalaryExpenseAccount = "6100", TerminalBenefitsAccount = "6100", PayeLiabilityAccount = "2400", NetPayAccount = "2420", ApprovedByUserId = 5,
         });
         done.IsSuccess.Should().BeTrue(done.IsFailure ? done.Error.ToString() : null);
-        (done.Value.Statement.ProRataSalary, done.Value.Statement.OrdinaryTax, done.Value.Statement.Net).Should().Be((483.87m, 37.85m, 446.02m));
-
-        // The slip's footer: the shillings' share (161.29, within the net) paid in shillings at the pay date's rate, the rest in dollars.
-        string slip = (await terminations.FinalPaySlipAsync(companyId, "TC-1")).Value;
-        slip.Should().Contain("in USD").And.Contain("284.73").And.Contain("in KES at 0.01 (161.29)").And.Contain("16,129.00");
+        return (companyId, terminations, done.Value.Statement);
     }
 }

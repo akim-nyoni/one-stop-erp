@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using One4All.Application.Payroll;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
@@ -96,5 +97,32 @@ internal static class PayrollCurrencies
         }
 
         return foreign.Where(f => f.Value > 0m).ToDictionary(f => f.Key, f => f.Value);
+    }
+
+    /// <summary>
+    /// The account an exchange difference on pay paid in another currency goes to: a gain (the currency weakened) to the FX gain control account, a
+    /// loss to the FX loss one.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="exchange">The difference in base: positive a gain, negative a loss.</param>
+    /// <param name="what">What was paid, for the message ("Net pay").</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The account (null when there is no difference), or that the control account is missing.</returns>
+    public static async Task<Result<string?>> ExchangeAccountAsync(Persistence.One4AllDbContext db, long companyId, decimal exchange, string what, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(db);
+        if (exchange == 0m)
+        {
+            return Result<string?>.Success(null);
+        }
+
+        ControlAccountType fxType = exchange > 0m ? ControlAccountType.FxGain : ControlAccountType.FxLoss;
+        string? account = await db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == fxType).OrderBy(a => a.AccountCode).Select(a => a.AccountCode)
+            .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return account is null
+            ? Error.Rule("Payroll.NoFxAccount", $"{what} paid at a different rate from the pay date's gives an exchange {(exchange > 0m ? "gain" : "loss")} of {Math.Abs(exchange):N2}; "
+                + $"set up an {fxType} control account first.")
+            : Result<string?>.Success(account);
     }
 }

@@ -17,6 +17,19 @@ namespace One4All.Desktop.Operations;
 /// <content>HR and attendance, banking, sales and schools operations, and the document printer.</content>
 public static partial class OperationCatalogue
 {
+    // The accounts paying pay in other currencies, written "EUR:1120; ZAR:1130".
+    private static Dictionary<CurrencyCode, string> ForeignAccounts(string? text)
+    {
+        Dictionary<CurrencyCode, string> foreign = [];
+        foreach (string part in (text ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+            foreign[bits.Length == 2 ? CurrencyCode.Parse(bits[0]) : throw new OperationException($"Write each as CUR:account (\"{part}\").")] = bits[1];
+        }
+
+        return foreign;
+    }
+
     private static IEnumerable<Operation> People()
     {
         const string module = "HR & Attendance";
@@ -26,12 +39,13 @@ public static partial class OperationCatalogue
             Description = "Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay; on benefits above the tax-free "
                 + "amount, the terminal tax table's bands when one is given, else the terminal rate; loans "
                 + "recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are "
-                + "cleared, release the final pay from the bank; print the certificate.",
+                + "cleared, release the final pay from the bank (any part the slip shows in another "
+                + "currency from that currency's account, at the final pay's rate); print the certificate.",
             Fields = [Pick("Step", "Step", ["Preview", "Terminate", "Clear item", "Release final pay", "Final pay slip", "Certificate of service"]), Req("Number", "Employee number"), Pick("Type", "Type", Enum.GetNames<Application.Payroll.TerminationType>()),
                 Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
                 Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
                 Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id"),
-                Opt("Bank", "Bank account paying (release)"), OptNum("Bonus", "Year's bonus (paid pro rata)"), OptNum("Overpayment", "Overpayment to recover"),
+                Opt("Bank", "Bank account paying (release)"), Opt("Foreign", "Foreign-currency accounts paying (release; EUR:1120; ZAR:1130)"), OptNum("Bonus", "Year's bonus (paid pro rata)"), OptNum("Overpayment", "Overpayment to recover"),
                 Opt("Recoveries", "Recoveries account (property, overpayments)"), OptNum("TaxFree", "Tax-free terminal benefits"),
                 Opt("TerminalTable", "Terminal tax table (bands, instead of the rate)")],
             Run = async (c, i) =>
@@ -47,8 +61,8 @@ public static partial class OperationCatalogue
                     case "Final pay slip":
                         return Check(await terminations.FinalPaySlipAsync(c.CompanyId, i.Text("Number")).ConfigureAwait(true));
                     case "Release final pay":
-                        string? paid = Check(await terminations.ReleaseFinalPayAsync(c.CompanyId, i.Text("Number"), i.Date("LastDay"),
-                            i.Optional("Bank") ?? throw new OperationException("Give the bank account paying.")).ConfigureAwait(true));
+                        string? paid = Check(await terminations.ReleaseFinalPayAsync(c.CompanyId, i.Text("Number"), i.Date("LastDay"), i.Optional("Bank") ?? string.Empty,
+                            ForeignAccounts(i.Optional("Foreign"))).ConfigureAwait(true));
                         return paid is null ? "Released (nothing was due)." : $"Final pay released (journal {paid}).";
                 }
 
@@ -640,14 +654,7 @@ public static partial class OperationCatalogue
                         Use(Core.Payroll.PayMethod.Cash, "Cash");
                         Use(Core.Payroll.PayMethod.MobileMoney, "Mobile");
                         Use(Core.Payroll.PayMethod.Cheque, "Cheque");
-                        Dictionary<Core.Accounting.CurrencyCode, string> foreign = [];
-                        foreach (string part in (i.Optional("Foreign") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                        {
-                            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
-                            foreign[bits.Length == 2 ? Core.Accounting.CurrencyCode.Parse(bits[0]) : throw new OperationException($"Write each as CUR:account (\"{part}\").")] = bits[1];
-                        }
-
-                        PayrollPayment paid = Check(await settlement.PayAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), accounts, foreign).ConfigureAwait(true));
+                        PayrollPayment paid = Check(await settlement.PayAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), accounts, ForeignAccounts(i.Optional("Foreign"))).ConfigureAwait(true));
                         return $"Paid in journal {paid.JournalNumber}: " + string.Join("; ", paid.ByMethod.Select(m => $"{m.Method} {M(m.Amount)} from {m.FundingAccountCode}")
                             .Concat(paid.ByCurrency.Select(f => $"{f.Currency} {M(f.Amount)} ({M(f.BaseAmount)} base) from {f.FundingAccountCode}")));
                     case "Close":

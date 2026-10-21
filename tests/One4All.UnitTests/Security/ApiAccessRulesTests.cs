@@ -89,6 +89,20 @@ public sealed partial class ApiAccessRulesTests
         requirement.IsWrite.Should().Be(write);
     }
 
+    [Theory]
+    [InlineData("GET", "/api/hr/employees/E-1", "Payroll", false)]
+    [InlineData("POST", "/api/hr/employees", "Payroll", true)]
+    [InlineData("PUT", "/api/hr/employees/E-1", "Payroll", true)]
+    [InlineData("GET", "/api/payroll/runs", "Payroll", false)]
+    [InlineData("GET", "/api/payroll/payslips/E-1", "Payroll", false)]
+    [InlineData("GET", "/api/housing/stands/ST-12/history", "Housing", false)]
+    public void Employee_payroll_and_stand_history_routes_need_their_module_to_read_and_a_changing_grant_to_write(string method, string path, string module, bool write)
+    {
+        ApiRequirement requirement = ApiAccessRules.Requirement(method, path)!;
+        requirement.Modules.Should().Equal(module);
+        requirement.IsWrite.Should().Be(write);
+    }
+
     [Fact]
     public void Every_api_area_in_the_server_is_governed()
     {

@@ -2947,12 +2947,7 @@ api.MapPost("/api/payroll/variables/import", async (HttpRequest http, long compa
 .RequireAuthorization()
 .WithName("PayrollImportVariables");
 
-api.MapGet("/api/payroll/runs", async (long companyId, int? take, One4AllDbContext db, CancellationToken ct) =>
-    Results.Ok(await db.Set<One4All.Core.Payroll.PayrollRunRecord>().AsNoTracking().Where(r => r.CompanyId == companyId).OrderByDescending(r => r.Id).Take(Math.Clamp(take ?? 24, 1, 200))
-        .Select(r => new { r.PeriodLabel, r.PayDate, Kind = r.Kind.ToString(), r.Employees, r.Gross, r.Deductions, r.Net, r.JournalNumber }).ToListAsync(ct).ConfigureAwait(false)))
-.RequireAuthorization()
-.WithName("PayrollRuns");
-
+// The run list (GET /api/payroll/runs), employees one at a time and payslips are in PayrollApiEndpoints.
 api.MapPost("/api/payroll/runs", async (long companyId, string period, DateOnly payDate, string netPayAccount, string documentNumber, string? payGroup,
     One4All.Application.Abstractions.Payroll.IPayrollService payroll, CancellationToken ct) =>
     ValueResponse(await payroll.RunGroupAsync(companyId, payGroup, period, payDate, netPayAccount, documentNumber, ct).ConfigureAwait(false)))
@@ -2963,6 +2958,7 @@ One4All.Server.TradingApiEndpoints.Map(api);
 One4All.Server.SchoolsApiEndpoints.Map(api);
 One4All.Server.OrdersApiEndpoints.Map(api);
 One4All.Server.LedgerApiEndpoints.Map(api);
+One4All.Server.PayrollApiEndpoints.Map(api);
 
 app.Run();
 
