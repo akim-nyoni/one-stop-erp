@@ -103,6 +103,12 @@ public sealed class WorkflowService : IWorkflowService
                 continue;
             }
 
+            // Whoever raised the document does not approve it, so it never waits on them.
+            if (instance.InitiatedByUserId == userId)
+            {
+                continue;
+            }
+
             (bool eligible, long? onBehalfOf) = await EligibilityAsync(instance, stage, userId, ct).ConfigureAwait(false);
             if (!eligible || AlreadyApproved(instance, stage.Sequence, userId, onBehalfOf))
             {
@@ -146,6 +152,12 @@ public sealed class WorkflowService : IWorkflowService
 
         List<WorkflowStage> applicable = Applicable(definition, instance.Value, Attributes(instance));
         WorkflowStage? currentStage = applicable.FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
+
+        // Segregation of duties: the requester never approves their own document, whatever the stage (an open stage included).
+        if (action == WorkflowActionType.Approve && instance.InitiatedByUserId > 0 && instance.InitiatedByUserId == userId)
+        {
+            return Error.Forbidden("Workflow.OwnDocument", "Whoever raised a document cannot approve it; another approver must.");
+        }
 
         long? onBehalfOf = null;
         if (currentStage is not null)
@@ -332,11 +344,17 @@ public sealed class WorkflowService : IWorkflowService
     }
 
     /// <inheritdoc />
-    public async Task<Result<long>> DelegateAsync(long companyId, long fromUserId, long toUserId, DateOnly startsOn, DateOnly endsOn, string reason, CancellationToken ct = default)
+    public async Task<Result<long>> DelegateAsync(long companyId, long fromUserId, long toUserId, DateOnly startsOn, DateOnly endsOn, string reason, long actingUserId, CancellationToken ct = default)
     {
         if (fromUserId == toUserId || endsOn < startsOn || string.IsNullOrWhiteSpace(reason))
         {
             return Error.Validation("Workflow.DelegationInvalid", "A delegation is to someone else, for a period, with a reason.");
+        }
+
+        // Only an approver hands over their own approvals; a system administrator may record it for someone who is away.
+        if (actingUserId != fromUserId && !await IsSuperAdministratorAsync(actingUserId, ct).ConfigureAwait(false))
+        {
+            return Error.Forbidden("Workflow.DelegationNotOwn", "You can only delegate your own approvals.");
         }
 
         if (await _db.ApprovalDelegations.AnyAsync(d => d.CompanyId == companyId && d.FromUserId == fromUserId && !d.Withdrawn && d.StartsOn <= endsOn && d.EndsOn >= startsOn, ct).ConfigureAwait(false))
@@ -353,10 +371,32 @@ public sealed class WorkflowService : IWorkflowService
     /// <inheritdoc />
     public async Task<Result> AddApproverAsync(long instanceId, long userId, long addedByUserId, CancellationToken ct = default)
     {
-        WorkflowInstance? instance = await _db.WorkflowInstances.FirstOrDefaultAsync(i => i.Id == instanceId, ct).ConfigureAwait(false);
+        WorkflowInstance? instance = await _db.WorkflowInstances.Include(i => i.Approvals).FirstOrDefaultAsync(i => i.Id == instanceId, ct).ConfigureAwait(false);
         if (instance is null || instance.Status != WorkflowStatus.InProgress)
         {
             return Result.Failure(Error.Rule("Workflow.NotInProgress", "Approvers can only be added to a workflow in progress."));
+        }
+
+        if (userId == instance.InitiatedByUserId)
+        {
+            return Result.Failure(Error.Rule("Workflow.OwnDocument", "Whoever raised a document cannot be added as its approver."));
+        }
+
+        if (userId == addedByUserId)
+        {
+            return Result.Failure(Error.Rule("Workflow.AddSelf", "You cannot add yourself as an approver; ask an approver of the stage."));
+        }
+
+        // Only someone who may approve the stage (or a system administrator) widens it.
+        if (!await IsSuperAdministratorAsync(addedByUserId, ct).ConfigureAwait(false))
+        {
+            WorkflowDefinition? definition = await _db.WorkflowDefinitions.Include(d => d.Stages).FirstOrDefaultAsync(d => d.Id == instance.WorkflowDefinitionId, ct).ConfigureAwait(false);
+            WorkflowStage? stage = definition is null ? null
+                : Applicable(definition, instance.Value, Attributes(instance)).FirstOrDefault(s => s.Sequence == instance.CurrentStageSequence);
+            if (addedByUserId == instance.InitiatedByUserId || stage is null || !(await EligibilityAsync(instance, stage, addedByUserId, ct).ConfigureAwait(false)).Eligible)
+            {
+                return Result.Failure(Error.Forbidden("Workflow.NotEligible", $"User {addedByUserId} may not add approvers to this stage: only its approvers can."));
+            }
         }
 
         if (await _db.WorkflowInstanceApprovers.AnyAsync(a => a.WorkflowInstanceId == instanceId && a.StageSequence == instance.CurrentStageSequence && a.UserId == userId, ct).ConfigureAwait(false))
@@ -368,6 +408,10 @@ public sealed class WorkflowService : IWorkflowService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
     }
+
+    // The built-in system administrator (active), who may act for others on delegations and added approvers.
+    private Task<bool> IsSuperAdministratorAsync(long userId, CancellationToken ct)
+        => _db.Users.AnyAsync(u => u.Id == userId && u.IsActive && u.IsSystemAdministrator, ct);
 
     /// <inheritdoc />
     public async Task<int> EscalateOverdueAsync(long companyId, CancellationToken ct = default)
@@ -537,7 +581,8 @@ public sealed class WorkflowService : IWorkflowService
         DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
         List<ApprovalDelegation> covering = await _db.ApprovalDelegations.Where(d => d.CompanyId == instance.CompanyId && d.ToUserId == userId && !d.Withdrawn && d.StartsOn <= today && d.EndsOn >= today)
             .ToListAsync(ct).ConfigureAwait(false);
-        ApprovalDelegation? delegation = covering.FirstOrDefault(d => Direct(d.FromUserId) && !AlreadyApproved(instance, stage.Sequence, d.FromUserId, null));
+        // A delegate never stands in for the requester: the requester may not approve their own document, so neither may their delegate.
+        ApprovalDelegation? delegation = covering.FirstOrDefault(d => d.FromUserId != instance.InitiatedByUserId && Direct(d.FromUserId) && !AlreadyApproved(instance, stage.Sequence, d.FromUserId, null));
         return delegation is null ? (false, null) : (true, delegation.FromUserId);
     }
 

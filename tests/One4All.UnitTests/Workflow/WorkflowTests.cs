@@ -106,4 +106,20 @@ public class WorkflowTests
 
         instance.Act(applicable, 11, WorkflowActionType.Approve, null, DateTimeOffset.UtcNow).Error.Code.Should().Be("Workflow.NotInProgress");
     }
+
+    [Fact]
+    public void The_initiator_cannot_approve_their_own_document_in_person_or_as_a_delegate()
+    {
+        WorkflowDefinition def = new(1, "Requisition", "Standard");
+        def.AddStage(1, "Manager");
+        (WorkflowInstance instance, IReadOnlyList<WorkflowStage> applicable) = Start(def, 500m);
+
+        instance.Act(applicable, 1, WorkflowActionType.Approve, null, DateTimeOffset.UtcNow).Error.Code.Should().Be("Workflow.OwnDocument");
+        instance.Act(applicable, 10, WorkflowActionType.Approve, null, DateTimeOffset.UtcNow, onBehalfOfUserId: 1).Error.Code.Should().Be("Workflow.OwnDocument");
+        instance.Approvals.Should().BeEmpty();
+        instance.Status.Should().Be(WorkflowStatus.InProgress);
+
+        // Rejecting their own document stays open to them.
+        instance.Act(applicable, 1, WorkflowActionType.Reject, "Raised in error", DateTimeOffset.UtcNow).Value.Should().Be(WorkflowStatus.Rejected);
+    }
 }

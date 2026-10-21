@@ -95,7 +95,8 @@ public interface IWorkflowService
 
     /// <summary>
     /// Delegates an approver's approvals to another user between two dates (out of office); refused for oneself or overlapping an
-    /// existing delegation of the same approver (<c>Workflow.DelegationOverlap</c>).
+    /// existing delegation of the same approver (<c>Workflow.DelegationOverlap</c>). Only the approver delegates their own approvals, unless
+    /// the acting user is a system administrator (<c>Workflow.DelegationNotOwn</c>).
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="fromUserId">The approver who is away.</param>
@@ -103,11 +104,15 @@ public interface IWorkflowService
     /// <param name="startsOn">The first day.</param>
     /// <param name="endsOn">The last day.</param>
     /// <param name="reason">Why.</param>
+    /// <param name="actingUserId">Who records the delegation: the approver who is away, or a system administrator.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The delegation id.</returns>
-    Task<Result<long>> DelegateAsync(long companyId, long fromUserId, long toUserId, DateOnly startsOn, DateOnly endsOn, string reason, CancellationToken ct = default);
+    Task<Result<long>> DelegateAsync(long companyId, long fromUserId, long toUserId, DateOnly startsOn, DateOnly endsOn, string reason, long actingUserId, CancellationToken ct = default);
 
-    /// <summary>Adds an approver to an in-progress instance's current stage.</summary>
+    /// <summary>
+    /// Adds an approver to an in-progress instance's current stage. The one adding must be able to approve that stage (or be a system
+    /// administrator); the requester (<c>Workflow.OwnDocument</c>) and the one adding (<c>Workflow.AddSelf</c>) are never added.
+    /// </summary>
     /// <param name="instanceId">The instance.</param>
     /// <param name="userId">The approver to add.</param>
     /// <param name="addedByUserId">Who adds them.</param>

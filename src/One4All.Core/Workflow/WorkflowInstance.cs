@@ -72,7 +72,8 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
     public DateTimeOffset? StageEnteredOnUtc { get; private set; }
 
     /// <summary>
-    /// Records an action by a user and advances the workflow. Eligibility must be checked by the caller.
+    /// Records an action by a user and advances the workflow. Eligibility must be checked by the caller; approval by the initiator
+    /// (in person or on their behalf) is refused here (<c>Workflow.OwnDocument</c>).
     /// </summary>
     /// <param name="applicableStages">The applicable stages (already filtered by value band), ordered by sequence.</param>
     /// <param name="userId">The acting user.</param>
@@ -99,6 +100,12 @@ public sealed class WorkflowInstance : AuditableEntity, ICompanyScoped
         if ((action is WorkflowActionType.Reject or WorkflowActionType.Return) && string.IsNullOrWhiteSpace(comment))
         {
             return Error.Validation("Workflow.CommentRequired", "A comment is required to reject or return.");
+        }
+
+        // Segregation of duties: whoever raised the document never approves it, in person or as someone's delegate (rejecting or returning it stays open).
+        if (action == WorkflowActionType.Approve && InitiatedByUserId > 0 && (userId == InitiatedByUserId || onBehalfOfUserId == InitiatedByUserId))
+        {
+            return Error.Forbidden("Workflow.OwnDocument", "Whoever raised a document cannot approve it; another approver must.");
         }
 
         _approvals.Add(new WorkflowApproval(CurrentStageSequence, userId, action, comment, nowUtc) { OnBehalfOfUserId = onBehalfOfUserId });

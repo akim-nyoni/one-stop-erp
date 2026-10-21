@@ -49,17 +49,21 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Delegate my approvals", ListTitle = "Approval delegations", KeyColumn = "Id",
-            Description = "While an approver is away, the delegate may approve anything they could, recorded as on their behalf. With a delegation id (Edit fills it in) "
+            Description = "While you are away, the delegate may approve anything you could, recorded as on your behalf. You delegate only your own approvals "
+                + "(a system administrator may record one for an approver who is away). With a delegation id (Edit fills it in) "
                 + "the delegate, dates and reason of that delegation change (the approver stays); Delete withdraws a delegation early (kept in history).",
-            Fields = [Req("From", "Approver who is away (user name)"), Req("To", "Delegate (user name)"), Today("Starts", "Starts"), Today("Ends", "Ends"), Req("Reason", "Reason", "Leave"),
+            Fields = [Opt("From", "Approver who is away (blank: me)"), Req("To", "Delegate (user name)"), Today("Starts", "Starts"), Today("Ends", "Ends"), Req("Reason", "Reason", "Leave"),
                 OptNum("Id", "Delegation id (change)")],
             Run = async (c, i) =>
             {
-                long from = await UserAsync(c, i.Text("From")).ConfigureAwait(true), to = await UserAsync(c, i.Text("To")).ConfigureAwait(true);
+                long from = await OptionalUserAsync(c, i.Optional("From")).ConfigureAwait(true) ?? c.UserId, to = await UserAsync(c, i.Text("To")).ConfigureAwait(true);
                 if (i.OptionalNumber("Id") is not decimal given)
                 {
-                    return Check(await c.Get<IWorkflowService>().DelegateAsync(c.CompanyId, from, to, i.Date("Starts"), i.Date("Ends"), i.Text("Reason")).ConfigureAwait(true), id => $"Delegation {id} recorded.");
+                    return Check(await c.Get<IWorkflowService>().DelegateAsync(c.CompanyId, from, to, i.Date("Starts"), i.Date("Ends"), i.Text("Reason"), c.UserId).ConfigureAwait(true),
+                        id => $"Delegation {id} recorded.");
                 }
+
+                await OwnDelegationAsync(c, from).ConfigureAwait(true);
 
                 long delegationId = (long)given;
                 Core.Workflow.ApprovalDelegation delegation = await c.Db.ApprovalDelegations.FirstOrDefaultAsync(d => d.CompanyId == c.CompanyId && d.Id == delegationId).ConfigureAwait(true)
@@ -102,6 +106,8 @@ public static partial class OperationCatalogue
                     throw new OperationException($"Delegation {id} is already withdrawn.");
                 }
 
+                await OwnDelegationAsync(c, delegation.FromUserId).ConfigureAwait(true);
+
                 delegation.Withdrawn = true;
                 await c.Db.SaveChangesAsync().ConfigureAwait(true);
                 return $"Delegation {id} withdrawn (kept in history).";
@@ -110,7 +116,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Add an approver to a document", ListTitle = "Waiting on me",
-            Description = "Adds someone to the current stage of one document's approval, alongside the stage's own approvers.",
+            Description = "Adds someone to the current stage of one document's approval, alongside the stage's own approvers. Only an approver of that stage (or a system "
+                + "administrator) can add one, and never the person who raised the document nor themselves.",
             Fields = [Num("Instance", "Workflow instance id"), Req("User", "Approver (user name)")],
             Run = async (c, i) => Check(await c.Get<IWorkflowService>().AddApproverAsync((long)i.Number("Instance"), await UserAsync(c, i.Text("User")).ConfigureAwait(true), c.UserId).ConfigureAwait(true),
                 "Approver added."),
@@ -279,6 +286,15 @@ public static partial class OperationCatalogue
         => Table(await c.Get<IWorkflowService>().PendingForUserAsync(c.CompanyId, c.UserId).ConfigureAwait(true),
             ("Instance", p => p.InstanceId), ("Document", p => $"{p.DocumentType} {p.DocumentReference}"), ("Value", p => M(p.Value)), ("Stage", p => p.StageName),
             ("Approvals", p => $"{p.ApprovalsSoFar}/{p.Quorum}"), ("On behalf of", p => p.OnBehalfOfUserId));
+
+    // Only the approver who is away changes or withdraws their delegation; a system administrator may for anyone.
+    private static async Task OwnDelegationAsync(OperationContext c, long fromUserId)
+    {
+        if (fromUserId != c.UserId && !await c.Db.Users.AnyAsync(u => u.Id == c.UserId && u.IsActive && u.IsSystemAdministrator).ConfigureAwait(true))
+        {
+            throw new OperationException("You can only delegate your own approvals.");
+        }
+    }
 
     private static async Task<DataTable> DelegationsAsync(OperationContext c)
     {

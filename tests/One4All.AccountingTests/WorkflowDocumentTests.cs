@@ -94,9 +94,9 @@ public sealed class WorkflowDocumentTests
         long journalFlow = await InstanceFor(WorkflowDocumentTypes.Journal, posted);
         (await journalApproval.ApproveAsync(companyId, posted, controller.Id)).Error.Code.Should().Be("Workflow.Governs");
 
-        // The preparer cannot approve their own journal even when added to the stage: the decision is not kept.
-        (await workflow.AddApproverAsync(journalFlow, clerk.Id, controller.Id)).IsSuccess.Should().BeTrue();
-        (await workflow.ActAsync(journalFlow, clerk.Id, WorkflowActionType.Approve, null)).Error.Code.Should().Be("Gl.SelfApproval");
+        // The preparer cannot be added to the stage nor approve their own journal: the decision is not kept.
+        (await workflow.AddApproverAsync(journalFlow, clerk.Id, controller.Id)).Error.Code.Should().Be("Workflow.OwnDocument");
+        (await workflow.ActAsync(journalFlow, clerk.Id, WorkflowActionType.Approve, null)).Error.Code.Should().Be("Workflow.OwnDocument");
         (await workflow.GetStatusAsync(journalFlow)).Value.Should().Be(WorkflowStatus.InProgress);
 
         (await workflow.ActAsync(journalFlow, controller.Id, WorkflowActionType.Approve, null)).Value.Should().Be(WorkflowStatus.Approved);
