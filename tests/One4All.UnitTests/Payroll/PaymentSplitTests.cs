@@ -19,4 +19,14 @@ public sealed class PaymentSplitTests
         EmployeePaymentSplit.Problem(null, 60m, 40m).Should().BeNull();
         EmployeePaymentSplit.Problem(250m, null, 90m).Should().BeNull();
     }
+
+    [Fact]
+    public void Splits_share_out_what_is_left_in_order_and_never_more()
+    {
+        // 1,000 net with 300 already paid in another currency: 60% would be 600 but only 700 is left, so the fixed 500 after it gets the last 100.
+        EmployeePaymentSplit share = new(1, 1, PayMethod.BankTransfer, "A", 0m, 60m);
+        EmployeePaymentSplit fixedPart = new(1, 1, PayMethod.MobileMoney, "B", 500m);
+        EmployeePaymentSplit.Allocate([share, fixedPart], 1000m, 700m).Select(x => x.Amount).Should().Equal(600m, 100m);
+        EmployeePaymentSplit.Allocate([share, fixedPart], 1000m, 0m).Select(x => x.Amount).Should().Equal(0m, 0m);
+    }
 }

@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using One4All.Application.Abstractions.Banking;
 using One4All.Application.Abstractions.Payroll;
 using One4All.Core.Payroll;
 using One4All.Infrastructure.Persistence;
@@ -137,5 +138,64 @@ public sealed class PayrollSettlementTests
         Core.Accounting.JournalEntry journal = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.JournalNumber == paid.JournalNumber);
         journal.Lines.Single(l => l.AccountCode == fxLoss).BaseDebit.Should().Be(10m);
         journal.Lines.Where(l => l.AccountCode == "2420").Sum(l => l.BaseDebit).Should().Be(1_250m, "the net pay accrued is cleared in full");
+    }
+    [SkippableFact]
+    public async Task A_split_paid_in_another_currency_moves_its_share_of_net_pay_into_it()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Core.Accounting.CurrencyCode nok = Core.Accounting.CurrencyCode.Parse("NOK");
+        if (!await db.Currencies.AnyAsync(c => c.Code == nok))
+        {
+            db.Currencies.Add(new Core.System.Currency(nok, "Norwegian Krone", "kr"));
+        }
+
+        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == nok && r.ToCurrency == Scenario.Usd))
+        {
+            db.ExchangeRates.Add(new Core.System.ExchangeRate(nok, Scenario.Usd, Core.System.ExchangeRateType.Daily, new DateOnly(2026, 1, 1), 0.10m));
+        }
+
+        db.Accounts.Add(new Core.Accounting.LedgerAccount(companyId, "1140", "Bank NOK", Core.Accounting.AccountType.Asset));
+        Core.Security.User login = new($"nk-ola-{companyId}", "Ola Nordmann");
+        db.Users.Add(login);
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC" };
+        db.PayElements.Add(basic);
+        await db.SaveChangesAsync();
+        Employee ola = new(companyId, "NK-1", "Ola Nordmann", 1000m, new DateOnly(2025, 1, 1))
+        {
+            UserId = login.Id, PaymentMethod = PayMethod.BankTransfer, BankName = "Home Bank", BankAccountNumber = "777",
+        };
+        ola.AssignPayElement(basic.Id);
+        db.Employees.Add(ola);
+        await db.SaveChangesAsync();
+
+        // The split is asked for and approved like any bank-detail change; an unknown currency is refused.
+        IPayrollSetupService setup = scope.ServiceProvider.GetRequiredService<IPayrollSetupService>();
+        PaymentSplitChange toNordic = new(PayMethod.BankTransfer, "NO-1", null, 40m, "Nordic Bank", "N1", Currency: "nok");
+        (await setup.RequestPaymentSplitAsync(companyId, "NK-1", toNordic with { Currency = "QQQ" }, 1)).Error.Code.Should().Be("Payroll.SplitCurrency");
+        long request = (await setup.RequestPaymentSplitAsync(companyId, "NK-1", toNordic, 1)).Value;
+        (await setup.DecideBankChangeAsync(companyId, request, true, 2, null)).IsSuccess.Should().BeTrue();
+        (await db.PaymentSplits.AsNoTracking().SingleAsync(s => s.EmployeeId == ola.Id)).Currency.Should().Be(nok);
+        (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-06", new DateOnly(2026, 6, 25), "2420", "NK-M06")).IsSuccess.Should().BeTrue();
+
+        // 40% of the 1,000 net is 400 base, NOK 4,000 at 0.10, from the NOK account; the other 600 by bank transfer.
+        IPayrollSettlementService settlement = scope.ServiceProvider.GetRequiredService<IPayrollSettlementService>();
+        Dictionary<PayMethod, string> bank = new() { [PayMethod.BankTransfer] = "1100" };
+        (await settlement.PayAsync(companyId, "NK-M06", new DateOnly(2026, 6, 25), bank)).Error.Code.Should().Be("Payroll.CurrencyAccount");
+        PayrollPayment paid = (await settlement.PayAsync(companyId, "NK-M06", new DateOnly(2026, 6, 25), bank, new Dictionary<Core.Accounting.CurrencyCode, string> { [nok] = "1140" })).Value;
+        paid.ByMethod.Should().Equal((PayMethod.BankTransfer, "1100", 600m));
+        paid.ByCurrency.Should().Equal((nok, "1140", 4000m, 400m));
+        (await settlement.StageAsync(companyId, "NK-M06")).Value.NetPayOutstanding.Should().Be(0m);
+
+        // The payslip shows the net pay by currency, and the bank file sends NOK 4,000 to Nordic Bank and 600 to the main account.
+        string payslip = (await scope.ServiceProvider.GetRequiredService<IEmployeeSelfService>().PayslipTextAsync(login.Id, "2026-06")).Value;
+        payslip.Should().Contain("in USD").And.Contain("600.00").And.Contain("in NOK at 0.1 (400.00)").And.Contain("4,000.00");
+        IBankFileService files = scope.ServiceProvider.GetRequiredService<IBankFileService>();
+        (await files.SaveLayoutAsync(new BankFileLayoutRequest(companyId, "NKB", "Plain EFT", null, "D|{Name}|{Branch}|{Account}|{Amount}", null))).IsSuccess.Should().BeTrue();
+        IReadOnlyList<BankFileOutput> payroll = (await files.PayrollFilesAsync(companyId, "NK-M06", "NKB")).Value;
+        payroll.Select(f => (f.Bank, f.Currency, f.Count, f.Total)).Should().Equal(("Home Bank", "USD", 1, 600m), ("Nordic Bank", "NOK", 1, 4000m));
     }
 }

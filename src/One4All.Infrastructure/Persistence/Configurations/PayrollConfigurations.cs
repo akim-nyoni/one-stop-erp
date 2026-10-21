@@ -434,6 +434,7 @@ internal sealed class EmployeePaymentSplitConfiguration : IEntityTypeConfigurati
         b.Property(x => x.Percent).HasPrecision(9, 4);
         b.Property(x => x.BankName).HasMaxLength(100);
         b.Property(x => x.BankBranch).HasMaxLength(60);
+        b.Property(x => x.Currency).HasMaxLength(3);
         b.HasIndex(x => x.EmployeeId);
     }
 }

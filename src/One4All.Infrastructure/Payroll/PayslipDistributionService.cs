@@ -219,17 +219,37 @@ internal static class StoredPayslips
         Dictionary<string, CurrencyCode> paidIn = await db.PayElements.AsNoTracking().Where(e => e.CompanyId == employee.CompanyId && e.PaidInCurrency != null)
             .ToDictionaryAsync(e => e.Code, e => e.PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
         CurrencyCode baseCurrency = await db.Companies.Where(c => c.Id == employee.CompanyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        // Splits paid in another currency then move their share of what is left into it, as the settlement and the bank file do.
         List<(string Currency, decimal Amount, decimal BaseAmount, decimal Rate)> byCurrency = [];
-        decimal netLeft = slips.Sum(p => p.NetPay);
+        decimal net = slips.Sum(p => p.NetPay);
+        decimal netLeft = net;
+        Dictionary<CurrencyCode, decimal> foreignBase = [];
         foreach (IGrouping<CurrencyCode, PayslipLine> foreign in lines.Where(l => l.Type == PayElementType.Earning && paidIn.TryGetValue(l.ElementCode, out CurrencyCode c) && c != baseCurrency)
-            .GroupBy(l => paidIn[l.ElementCode]).OrderBy(g => g.Key.Value, StringComparer.Ordinal))
+            .GroupBy(l => paidIn[l.ElementCode]))
         {
-            decimal portion = Math.Min(foreign.Sum(l => l.Amount), netLeft);
-            decimal? rate = portion > 0m ? await Accounting.ExchangeRateResolver.FindAsync(db, foreign.Key, baseCurrency, ExchangeRateType.Daily, payDate, ct).ConfigureAwait(false) : null;
-            if (portion > 0m && rate is > 0m)
+            decimal portion = Math.Max(Math.Min(foreign.Sum(l => l.Amount), netLeft), 0m);
+            foreignBase[foreign.Key] = foreignBase.GetValueOrDefault(foreign.Key) + portion;
+            netLeft -= portion;
+        }
+
+        List<EmployeePaymentSplit> splits = await db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == employee.CompanyId && s.EmployeeId == employee.Id).OrderBy(s => s.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        foreach ((EmployeePaymentSplit split, decimal amount) in EmployeePaymentSplit.Allocate(splits, net, netLeft).Where(x => x.Amount > 0m && x.Split.Currency is { } c && c != baseCurrency).ToList())
+        {
+            foreignBase[split.Currency!.Value] = foreignBase.GetValueOrDefault(split.Currency!.Value) + amount;
+            netLeft -= amount;
+        }
+
+        foreach ((CurrencyCode foreign, decimal portion) in foreignBase.Where(f => f.Value > 0m).OrderBy(f => f.Key.Value, StringComparer.Ordinal))
+        {
+            decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(db, foreign, baseCurrency, ExchangeRateType.Daily, payDate, ct).ConfigureAwait(false);
+            if (rate is > 0m)
             {
-                byCurrency.Add((foreign.Key.Value, decimal.Round(portion / rate.Value, 2, MidpointRounding.AwayFromZero), portion, rate.Value));
-                netLeft -= portion;
+                byCurrency.Add((foreign.Value, decimal.Round(portion / rate.Value, 2, MidpointRounding.AwayFromZero), portion, rate.Value));
+            }
+            else
+            {
+                netLeft += portion;
             }
         }
 

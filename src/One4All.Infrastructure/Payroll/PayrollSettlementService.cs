@@ -52,7 +52,7 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                 return Error.Rule("Payroll.NoNetPayAccount", $"Run {run.DocumentNumber} does not record its net pay control account; pay it by journal.");
             }
 
-            // Each employee's net pay: the earnings paid in another currency go out in it; the rest by how they are paid.
+            // Each employee's net pay: the earnings paid in another currency go out in it, then any split paid in another currency; the rest by how they are paid.
             var slips = await (from p in _db.Set<Payslip>().Include(p => p.Lines)
                                join e in _db.Set<Employee>() on p.EmployeeId equals e.Id
                                where p.CompanyId == companyId && p.RunReference == run.DocumentNumber
@@ -60,6 +60,9 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
             Dictionary<string, CurrencyCode> paidIn = await _db.PayElements.Where(e => e.CompanyId == companyId && e.PaidInCurrency != null)
                 .ToDictionaryAsync(e => e.Code, e => e.PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
             CurrencyCode currency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+            List<long> employeeIds = [.. slips.Select(s => s.Slip.EmployeeId).Distinct()];
+            ILookup<long, EmployeePaymentSplit> splits = (await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId && employeeIds.Contains(s.EmployeeId)).OrderBy(s => s.Id)
+                .ToListAsync(ct).ConfigureAwait(false)).ToLookup(s => s.EmployeeId);
 
             Dictionary<CurrencyCode, decimal> foreignBase = [];
             List<(PayMethod Method, decimal Net)> baseNet = [];
@@ -75,6 +78,16 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                     inForeign += portion;
                 }
 
+                // Then the employee's splits paid in another currency move their share of what is left into it (the splits share it out in order,
+                // as the bank file does, so a base split ahead of them keeps its place).
+                foreach ((EmployeePaymentSplit split, decimal amount) in EmployeePaymentSplit.Allocate(splits[s.Slip.EmployeeId], s.Slip.NetPay, s.Slip.NetPay - inForeign)
+                    .Where(x => x.Amount > 0m && x.Split.Currency is { } c && c != currency).ToList())
+                {
+                    CurrencyCode to = split.Currency!.Value;
+                    foreignBase[to] = foreignBase.GetValueOrDefault(to) + amount;
+                    inForeign += amount;
+                }
+
                 baseNet.Add((s.PaymentMethod, s.Slip.NetPay - inForeign));
             }
 
@@ -86,7 +99,7 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
             {
                 if (currencyAccounts is null || !currencyAccounts.TryGetValue(foreign, out string? account) || string.IsNullOrWhiteSpace(account))
                 {
-                    return Error.Validation("Payroll.CurrencyAccount", $"Say which {foreign} account pays the net pay earned in {foreign} ({baseAmount:N2} in base).");
+                    return Error.Validation("Payroll.CurrencyAccount", $"Say which {foreign} account pays the net pay in {foreign} ({baseAmount:N2} in base).");
                 }
 
                 decimal? payDateRate = await Accounting.ExchangeRateResolver.FindAsync(_db, foreign, currency, ExchangeRateType.Daily, run.PayDate, ct).ConfigureAwait(false);

@@ -1015,22 +1015,23 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Split net pay", ListTitle = "Pay splits",
             Description = "Asks to send part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their "
-                + "main account. Remove asks to take a split off. Like any bank-detail change, a different person approves it under Bank detail change before pay goes anywhere new.",
+                + "main account. A split can be paid in another currency: its share is worked out in base (a fixed amount is a base amount) and converted at the pay date's rate. Remove asks to take a split off. Like any bank-detail change, a different person approves it under Bank detail change before pay goes anywhere new.",
             Fields = [EmployeePick("Employee", "Employee"), Pick("Method", "Paid by", Enum.GetNames<PayMethod>()), Req("Destination", "Account or wallet number"), OptNum("Amount", "Fixed amount"),
-                OptNum("Percent", "Percent of net pay"), Opt("Bank", "Bank of that account (blank: the employee's bank)"), Opt("Branch", "Branch of that account"), Tick("Remove", "Remove this split")],
+                OptNum("Percent", "Percent of net pay"), Opt("Bank", "Bank of that account (blank: the employee's bank)"), Opt("Branch", "Branch of that account"),
+                Opt("Currency", "Paid in currency (blank: base)"), Tick("Remove", "Remove this split")],
             Run = async (c, i) =>
             {
                 long request = Check(await c.Get<IPayrollSetupService>().RequestPaymentSplitAsync(c.CompanyId, i.Text("Employee"), new PaymentSplitChange(Enum.Parse<PayMethod>(i.Text("Method")),
-                    i.Text("Destination"), i.OptionalNumber("Amount"), i.OptionalNumber("Percent"), i.Optional("Bank"), i.Optional("Branch"), i.Flag("Remove")), c.UserId).ConfigureAwait(true));
+                    i.Text("Destination"), i.OptionalNumber("Amount"), i.OptionalNumber("Percent"), i.Optional("Bank"), i.Optional("Branch"), i.Flag("Remove"), i.Optional("Currency")), c.UserId).ConfigureAwait(true));
                 return $"Split change requested ({request}); someone else approves it under Bank detail change.";
             },
             List = async c => Table(await (from s in c.Db.PaymentSplits.AsNoTracking()
                                            join e in c.Db.Employees.AsNoTracking() on s.EmployeeId equals e.Id
                                            where s.CompanyId == c.CompanyId
                                            orderby e.EmployeeNumber
-                                           select new { e.EmployeeNumber, e.FullName, s.Method, s.Destination, s.Amount, s.Percent }).ToListAsync().ConfigureAwait(true),
+                                           select new { e.EmployeeNumber, e.FullName, s.Method, s.Destination, s.Amount, s.Percent, s.Currency }).ToListAsync().ConfigureAwait(true),
                 ("Employee", s => s.EmployeeNumber), ("Name", s => s.FullName), ("Method", s => s.Method), ("To", s => s.Destination),
-                ("Share", s => s.Percent is decimal p ? $"{p:0.##}%" : M(s.Amount))),
+                ("Share", s => s.Percent is decimal p ? $"{p:0.##}%" : M(s.Amount)), ("Paid in", s => s.Currency?.ToString() ?? "Base")),
         };
         yield return new Operation
         {

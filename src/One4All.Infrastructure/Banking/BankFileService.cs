@@ -103,11 +103,13 @@ public sealed class BankFileService : IBankFileService
         List<Payslip> slips = await _db.Payslips.AsNoTracking().Where(p => p.CompanyId == companyId && p.RunReference == run.DocumentNumber && p.NetPay > 0m).ToListAsync(ct).ConfigureAwait(false);
         List<long> ids = [.. slips.Select(s => s.EmployeeId)];
         Dictionary<long, Employee> employees = await _db.Employees.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter]).Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
-        List<EmployeePaymentSplit> splits = await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId && ids.Contains(s.EmployeeId) && s.Method == PayMethod.BankTransfer)
+        // Every split takes its share (so a mobile-money split is not paid again to the main account); only bank-transfer splits are written to a file.
+        List<EmployeePaymentSplit> splits = await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId && ids.Contains(s.EmployeeId))
             .OrderBy(s => s.Id).ToListAsync(ct).ConfigureAwait(false);
 
         // Earnings paid in another currency (a pay element's PaidInCurrency) go out in that currency at the pay date's rate, in that currency's
-        // file for the employee's bank; the rest of the net pay, and any splits, go out in the base currency.
+        // file for the employee's bank; then the splits, each in its own currency (a split's base share converted at the same rate); the rest of the
+        // net pay goes out in the base currency.
         Dictionary<string, CurrencyCode> paidIn = await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null)
             .ToDictionaryAsync(e => e.Code, e => e.PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
         List<long> slipIds = [.. slips.Select(p => p.Id)];
@@ -163,15 +165,34 @@ public sealed class BankFileService : IBankFileService
                 remaining -= portion;
             }
 
-            foreach (EmployeePaymentSplit split in splits.Where(s => s.EmployeeId == employee.Id))
+            foreach ((EmployeePaymentSplit split, decimal amount) in EmployeePaymentSplit.Allocate(splits.Where(s => s.EmployeeId == employee.Id), slip.NetPay, remaining).Where(x => x.Amount > 0m).ToList())
             {
-                decimal amount = Math.Min(split.AmountFrom(slip.NetPay), remaining);
-                if (amount > 0m)
+                remaining -= amount;
+                if (split.Method != PayMethod.BankTransfer)
                 {
-                    payments.Add((split.BankName is { Length: > 0 } own ? own : bank, company.BaseCurrency.Value, reference, employee.FullName,
-                        split.BankName is { Length: > 0 } ? split.BankBranch ?? string.Empty : employee.BankBranch ?? string.Empty, split.Destination, amount));
-                    remaining -= amount;
+                    continue;
                 }
+
+                CurrencyCode currency = split.Currency is { } own && own != company.BaseCurrency ? own : company.BaseCurrency;
+                decimal paid = amount;
+                if (currency != company.BaseCurrency)
+                {
+                    if (!rates.TryGetValue(currency, out decimal rate))
+                    {
+                        decimal? found = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, ExchangeRateType.Daily, run.PayDate, ct).ConfigureAwait(false);
+                        if (found is not > 0m)
+                        {
+                            return Error.Rule("Bank.NoRate", $"There is no {currency} rate on {run.PayDate:yyyy-MM-dd} to pay {employee.EmployeeNumber}'s {currency} split at.");
+                        }
+
+                        rates[currency] = rate = found.Value;
+                    }
+
+                    paid = decimal.Round(amount / rate, 2, MidpointRounding.AwayFromZero);
+                }
+
+                payments.Add((split.BankName is { Length: > 0 } splitBank ? splitBank : bank, currency.Value, reference, employee.FullName,
+                    split.BankName is { Length: > 0 } ? split.BankBranch ?? string.Empty : employee.BankBranch ?? string.Empty, split.Destination, paid));
             }
 
             if (remaining > 0m && employee.PaymentMethod == PayMethod.BankTransfer)

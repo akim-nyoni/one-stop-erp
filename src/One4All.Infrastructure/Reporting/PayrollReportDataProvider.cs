@@ -983,7 +983,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             decimal net = slips.Where(p => p.EmployeeId == g.Key).OrderBy(p => p.PayDate).Select(p => p.NetPay).LastOrDefault();
             string primary = e is null ? "?" : e.PaymentMethod == PayMethod.MobileMoney ? $"MobileMoney {e.MobileMoneyNumber ?? "-"}" : $"{e.PaymentMethod} {e.BankAccountNumber ?? "-"}";
             return Row(("Employee", Name(employees, g.Key)), ("Primary", primary),
-                ("Splits", string.Join("; ", g.Select(s => $"{s.Method} {s.Destination} {(s.Percent is decimal p ? $"{p:0.##}%" : Money(s.Amount))}"))), ("Net", Money(net)),
+                ("Splits", string.Join("; ", g.Select(s => $"{s.Method} {s.Destination} {(s.Percent is decimal p ? $"{p:0.##}%" : Money(s.Amount))}{(s.Currency is { } c ? $" in {c}" : string.Empty)}"))), ("Net", Money(net)),
                 ("Remainder", Math.Max(0m, net - g.Sum(s => s.AmountFrom(net)))));
         })];
     }

@@ -305,7 +305,8 @@ public sealed record BankChangeRequest(long RequestId, string EmployeeNumber, st
 /// <param name="BankName">The bank of that account (null: the employee's bank).</param>
 /// <param name="BankBranch">Its branch.</param>
 /// <param name="Remove">True to take the split to that destination off.</param>
-public sealed record PaymentSplitChange(PayMethod Method, string Destination, decimal? Amount, decimal? Percent, string? BankName, string? BankBranch, bool Remove = false);
+/// <param name="Currency">The currency that part is paid in (null: the base currency); a fixed amount is still given in base and converted at the run's pay date rate.</param>
+public sealed record PaymentSplitChange(PayMethod Method, string Destination, decimal? Amount, decimal? Percent, string? BankName, string? BankBranch, bool Remove = false, string? Currency = null);
 
 /// <summary>
 /// Payroll master data (brief §4.15.1–4.15.2): employees, pay elements and their assignment, tax tables, a standard element set, and bank

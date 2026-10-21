@@ -725,7 +725,22 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Conflict("Payroll.SplitPending", $"{employee.EmployeeNumber} already has a split change waiting for approval.");
         }
 
-        PaymentSplitChange clean = change with { Destination = destination, BankName = Clean(change.BankName), BankBranch = Clean(change.BankBranch) };
+        // A split paid in another currency names one in the currency table; the base currency is the same as none.
+        string? currency = Clean(change.Currency)?.ToUpperInvariant();
+        if (currency is not null && !change.Remove)
+        {
+            if (!CurrencyCode.TryParse(currency, out CurrencyCode code) || !await _db.Currencies.AnyAsync(c => c.Code == code, ct).ConfigureAwait(false))
+            {
+                return Error.Validation("Payroll.SplitCurrency", $"{currency} is not a currency in the currency table.");
+            }
+
+            if (await _db.Companies.AnyAsync(c => c.Id == companyId && c.BaseCurrency == code, ct).ConfigureAwait(false))
+            {
+                currency = null;
+            }
+        }
+
+        PaymentSplitChange clean = change with { Destination = destination, BankName = Clean(change.BankName), BankBranch = Clean(change.BankBranch), Currency = change.Remove ? null : currency };
         DetailChangeRequest request = new(companyId, employee.Id, PaymentSplitField, same is null ? null : DescribeSplit(same), System.Text.Json.JsonSerializer.Serialize(clean))
         {
             RequestedByUserId = requestedByUserId,
@@ -744,13 +759,14 @@ public sealed class PayrollSetupService : IPayrollSetupService
         {
             _db.PaymentSplits.Add(new EmployeePaymentSplit(companyId, employeeId, change.Method, change.Destination, change.Amount ?? 0m, change.Percent)
             {
-                BankName = change.BankName, BankBranch = change.BankBranch,
+                BankName = change.BankName, BankBranch = change.BankBranch, Currency = change.Currency is string currency ? CurrencyCode.Parse(currency) : null,
             });
         }
     }
 
     private static string DescribeSplit(EmployeePaymentSplit split)
-        => $"{split.Method} {split.Destination} " + (split.Percent is decimal p ? p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%" : split.Amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture));
+        => $"{split.Method} {split.Destination} " + (split.Percent is decimal p ? p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%" : split.Amount.ToString("N2", System.Globalization.CultureInfo.InvariantCulture))
+            + (split.Currency is { } currency ? $" in {currency}" : string.Empty);
 
     private static string DescribeSplitRequest(string json)
     {
@@ -758,7 +774,8 @@ public sealed class PayrollSetupService : IPayrollSetupService
         return change is null ? json
             : change.Remove ? $"Remove {change.Method} {change.Destination}"
             : $"{change.Method} {change.Destination} " + (change.Percent is decimal p ? p.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture) + "%"
-                : (change.Amount ?? 0m).ToString("N2", System.Globalization.CultureInfo.InvariantCulture)) + (change.BankName is null ? string.Empty : $" at {change.BankName}");
+                : (change.Amount ?? 0m).ToString("N2", System.Globalization.CultureInfo.InvariantCulture))
+                + (change.Currency is null ? string.Empty : $" in {change.Currency}") + (change.BankName is null ? string.Empty : $" at {change.BankName}");
     }
 
     /// <inheritdoc />

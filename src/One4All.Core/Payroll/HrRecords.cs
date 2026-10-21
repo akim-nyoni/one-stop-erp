@@ -313,7 +313,7 @@ public sealed class EmployeePaymentSplit : Entity, ICompanyScoped
     /// <param name="employeeId">The employee.</param>
     /// <param name="method">How this part is paid.</param>
     /// <param name="destination">The bank account or wallet.</param>
-    /// <param name="amount">The fixed amount sent there each period (0 when a percentage is given).</param>
+    /// <param name="amount">The fixed amount sent there each period, in base even when the split is paid in another currency (0 when a percentage is given).</param>
     /// <param name="percent">The share of net pay sent there instead of a fixed amount (brief §4.15.1: "60% to bank A, 40% to mobile money").</param>
     public EmployeePaymentSplit(long companyId, long employeeId, PayMethod method, string destination, decimal amount, decimal? percent = null)
     {
@@ -333,6 +333,36 @@ public sealed class EmployeePaymentSplit : Entity, ICompanyScoped
 
     /// <summary>The branch of the destination account, when the split has its own bank.</summary>
     public string? BankBranch { get; set; }
+
+    /// <summary>
+    /// Gets or sets the currency this part is paid in (null: the base currency) - "60% of my net pay in USD to bank A, the rest in ZWG to bank B".
+    /// The share is worked out in base (a percentage of the base net pay, or <see cref="Amount"/>, which is always a base amount) and converted at the
+    /// run's pay date rate.
+    /// </summary>
+    public One4All.Core.Accounting.CurrencyCode? Currency { get; set; }
+
+    /// <summary>
+    /// Shares a net pay out among an employee's splits in the order given: each takes <see cref="AmountFrom"/> the whole net pay, never more than is
+    /// still left of <paramref name="available"/> (what the earnings paid in other currencies have not already taken).
+    /// </summary>
+    /// <param name="splits">The employee's splits, in order.</param>
+    /// <param name="netPay">The employee's net pay (in base).</param>
+    /// <param name="available">What is left of it to share (in base).</param>
+    /// <returns>Each split with the base amount it takes (zero when nothing is left).</returns>
+    public static IReadOnlyList<(EmployeePaymentSplit Split, decimal Amount)> Allocate(IEnumerable<EmployeePaymentSplit> splits, decimal netPay, decimal available)
+    {
+        ArgumentNullException.ThrowIfNull(splits);
+        List<(EmployeePaymentSplit, decimal)> shares = [];
+        decimal left = Math.Max(available, 0m);
+        foreach (EmployeePaymentSplit split in splits)
+        {
+            decimal amount = Math.Max(Math.Min(split.AmountFrom(netPay), left), 0m);
+            shares.Add((split, amount));
+            left -= amount;
+        }
+
+        return shares;
+    }
 
     /// <summary>What this split takes from a net pay: its percentage of it, or its fixed amount.</summary>
     /// <param name="netPay">The net pay.</param>
