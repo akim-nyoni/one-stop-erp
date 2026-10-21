@@ -269,9 +269,10 @@ internal static class TradingApiEndpoints
             return mapped.IsFailure ? Value(mapped) : Value(await purchases.PostPaymentAsync(mapped.Value, ct).ConfigureAwait(false));
         }).RequireAuthorization().WithName("PostSupplierPayment");
 
-        api.MapPost("/api/pos/sales", async (long companyId, PosSaleApi request, IPosService pos, CancellationToken ct) =>
+        // The cashier is whoever the token belongs to, never the user the body names.
+        api.MapPost("/api/pos/sales", async (long companyId, long userId, PosSaleApi request, IPosService pos, CancellationToken ct) =>
         {
-            Result<CompleteSaleRequest> mapped = TradingApiMapping.PosSale(companyId, request);
+            Result<CompleteSaleRequest> mapped = TradingApiMapping.PosSale(companyId, request, userId);
             return mapped.IsFailure ? Value(mapped) : Value(await pos.CompleteSaleAsync(mapped.Value, ct).ConfigureAwait(false));
         }).RequireAuthorization().WithName("PostTillSale");
     }

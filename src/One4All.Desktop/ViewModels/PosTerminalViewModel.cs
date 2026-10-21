@@ -823,7 +823,8 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     private async Task LoadTaxRatesAsync(One4AllDbContext db, CancellationToken ct)
     {
         DateOnly today = DateOnly.FromDateTime(DateTime.Today);
-        List<TaxCode> codes = await db.Set<TaxCode>()
+        // The rates come with their codes: without them every code would read as 0% and the till would charge no tax.
+        List<TaxCode> codes = await db.Set<TaxCode>().AsNoTracking().Include(t => t.Rates)
             .Where(t => t.CompanyId == _companyId)
             .ToListAsync(ct).ConfigureAwait(true);
 
@@ -1563,6 +1564,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         PosTicketLine line = _ticket.AddLine(item.Id, item.Description, unitPrice, rate, item.RevenueAccountCode, item.TaxCode, quantity);
         line.RequiresSerial = item.Tracking == ItemTracking.Serial;
         line.Weighed = embedded?.Kind == EmbeddedValueKind.Weight;
+        line.PriceLabel = embedded?.Kind == EmbeddedValueKind.Price ? code : line.PriceLabel;
         AddDepositFor(item.DepositItemId, quantity);
         TenderEntry = string.Empty;
         RebuildCart();
@@ -1590,6 +1592,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         PosTicketLine line = _ticket.AddLine(tile.ItemId, tile.Name, unitPrice, rate, tile.RevenueAccountCode, tile.TaxCode, quantity);
+        line.PriceLabel = embedded?.Kind == EmbeddedValueKind.Price ? code : line.PriceLabel;
         AddDepositFor(tile.DepositItemId, quantity);
         TenderEntry = string.Empty;
         RebuildCart();
@@ -2062,7 +2065,7 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         }
 
         decimal before = row.Line.UnitPriceNet;
-        Result applied = _ticket.OverridePrice(row.Line, price, supervised: true);
+        Result applied = _ticket.OverridePrice(row.Line, price, supervised: true, authorisedByUserId: supervisor);
         await AfterAdjustmentAsync(applied, PosEventKind.PriceOverride, $"{row.Line.Description}: price {before:N2} → {price:N2}", price, before, supervisor).ConfigureAwait(true);
     }
 

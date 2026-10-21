@@ -30,6 +30,8 @@ public sealed class PosService : IPosService
     private readonly Application.Abstractions.Trading.IAllocationService? _allocations;
 
     private readonly Application.Abstractions.Pos.ILoyaltyService? _loyalty;
+    private readonly Application.Abstractions.Inventory.IPricingService? _pricing;
+    private readonly IDeviceProvider? _devices;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -40,11 +42,16 @@ public sealed class PosService : IPosService
     /// <param name="webhooks">Publishes completed sales.</param>
     /// <param name="fiscal">The fiscal device (brief §3.5); none or a disabled one means sales are not fiscalised.</param>
     /// <param name="allocations">Settles a voided on-account sale's invoice against its credit.</param>
+    /// <param name="pricing">The price in force a sold line is held to (none: prices are not checked).</param>
+    /// <param name="devices">The barcode templates a price-embedded label is read back through.</param>
     public PosService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, Application.Abstractions.Licensing.ILicenceService? licence = null,
         Application.Abstractions.Integration.IWebhookService? webhooks = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null,
         Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.ICurrentUser? caller = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Pos.ILoyaltyService? loyalty = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Pos.ILoyaltyService? loyalty = null,
+        Application.Abstractions.Inventory.IPricingService? pricing = null, IDeviceProvider? devices = null)
     {
+        _pricing = pricing;
+        _devices = devices;
         _loyalty = loyalty;
         _permissions = permissions;
         _audit = audit;
@@ -121,7 +128,185 @@ public sealed class PosService : IPosService
 
     /// <inheritdoc />
     public Task<Result<CompleteSaleResult>> CompleteSaleAsync(CompleteSaleRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => CompleteSaleCoreAsync(request, ct), ct);
+        => _db.AtomicAsync<CompleteSaleResult>(async () =>
+        {
+            Result<CompleteSaleRequest> held = await HoldToItemsAsync(request, ct).ConfigureAwait(false);
+            return held.IsFailure ? held.Error : await CompleteSaleCoreAsync(held.Value, ct).ConfigureAwait(false);
+        }, ct);
+
+    // Each sold line is held to its item, never to what the till (or an API caller) says: the item's revenue account, its tax worked out again from the
+    // item's tax code with the till's rounding, a net that is the quantity at the unit price less the discount, and a unit price that is the item's price
+    // in force (for the customer, the quantity and the sale date, the price of one off the default list, or the price a scale label carries) unless a
+    // supervisor other than the cashier holding Pos.PriceOverride authorised another. A sale replayed from an offline till already happened: what does
+    // not agree is recorded as a till event for review, never refused (the till's own figures stand, so the replay still balances).
+    private async Task<Result<CompleteSaleRequest>> HoldToItemsAsync(CompleteSaleRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        List<long> itemIds = [.. request.Lines.Where(l => l.ItemId != 0).Select(l => l.ItemId).Distinct()];
+        Dictionary<long, Item> items = await _db.Items.AsNoTracking().Where(i => itemIds.Contains(i.Id) && i.CompanyId == request.CompanyId).ToDictionaryAsync(i => i.Id, ct).ConfigureAwait(false);
+        List<string> codes = [.. items.Values.Where(i => !string.IsNullOrWhiteSpace(i.TaxCode)).Select(i => i.TaxCode!.Trim().ToUpperInvariant()).Distinct()];
+        Dictionary<string, decimal> rates = new(StringComparer.OrdinalIgnoreCase);
+        foreach (TaxCode code in await _db.Set<TaxCode>().AsNoTracking().Include(t => t.Rates).Where(t => t.CompanyId == request.CompanyId && codes.Contains(t.Code.ToUpper())).ToListAsync(ct).ConfigureAwait(false))
+        {
+            rates[code.Code] = code.RateOn(request.SaleDate) / 100m; // stored as a percent, as the till reads it
+        }
+
+        List<PosSaleLineRequest> lines = [];
+        List<string> disagreements = [];
+        List<string> overridden = [];
+        foreach (PosSaleLineRequest line in request.Lines)
+        {
+            if (line.ItemId == 0)
+            {
+                lines.Add(line); // a non-stock sellable (a menu item) has no item to hold it to
+                continue;
+            }
+
+            if (!items.TryGetValue(line.ItemId, out Item? item))
+            {
+                return Error.NotFound("Pos.ItemNotFound", $"{line.Description}: item {line.ItemId} is not an item of this company.");
+            }
+
+            // A gift card load posts to the gift card liability the till names; it and a deposit (untaxed, on its liability) have their own checks below.
+            bool giftCard = !string.IsNullOrWhiteSpace(line.GiftCardNumber);
+            string revenue = giftCard || string.IsNullOrWhiteSpace(item.RevenueAccountCode) ? line.RevenueAccountCode : item.RevenueAccountCode.Trim();
+            decimal? rate = giftCard || item.ItemType == ItemType.Deposit ? null
+                : item.TaxCode is string taxCode && rates.TryGetValue(taxCode.Trim(), out decimal known) ? known : null;
+
+            decimal gross = PosMoney.Round(line.Quantity * line.UnitPrice);
+            if (line.PromotionDiscount < 0m || line.PromotionDiscount > Math.Abs(gross) || Math.Abs(line.LineNet + line.PromotionDiscount - gross) > 0.01m)
+            {
+                string problem = $"{line.Description}: {line.Quantity:0.###} at {line.UnitPrice:0.00} less {line.PromotionDiscount:0.00} discount is not a net of {line.LineNet:0.00}";
+                if (!request.OfflineReplay)
+                {
+                    return Error.Validation("Pos.LineNet", problem + ".");
+                }
+
+                disagreements.Add(problem);
+            }
+
+            decimal tax = rate is decimal r ? PosMoney.Round(line.LineNet * r) : line.TaxAmount;
+            if (tax != line.TaxAmount)
+            {
+                string problem = $"{line.Description}: tax on {line.LineNet:0.00} at {rate * 100m:0.##}% is {tax:0.00}, not {line.TaxAmount:0.00}";
+                if (!request.OfflineReplay)
+                {
+                    return Error.Validation("Pos.LineTax", problem + ".");
+                }
+
+                disagreements.Add(problem);
+            }
+
+            if (!giftCard && await PriceInForceAsync(request, line, item, rate ?? 0m, ct).ConfigureAwait(false) is decimal listed)
+            {
+                string problem = $"{line.Description}: {line.UnitPrice:0.00} where the price is {listed:0.00}";
+                if (request.OfflineReplay)
+                {
+                    disagreements.Add(problem);
+                }
+                else
+                {
+                    overridden.Add(problem);
+                }
+            }
+
+            lines.Add(line with { RevenueAccountCode = revenue });
+        }
+
+        if (overridden.Count > 0)
+        {
+            Result authorised = await PriceOverrideAuthorisedAsync(request, ct).ConfigureAwait(false);
+            if (authorised.IsFailure)
+            {
+                return Error.Forbidden(authorised.Error.Code, $"{authorised.Error.Message} ({string.Join("; ", overridden)}).");
+            }
+        }
+
+        if (disagreements.Count > 0)
+        {
+            _db.Set<PosEvent>().Add(new PosEvent(request.CompanyId, request.TerminalId, request.CashierUserId, PosEventKind.PriceOverride, _clock.UtcNow, request.SaleDate,
+                $"Offline sale {request.SaleNumber} differs from the server: {string.Join("; ", disagreements)}", request.Lines.Sum(l => l.LineNet + l.TaxAmount))
+            {
+                SaleNumber = request.SaleNumber, TillSessionId = request.TillSessionId,
+            });
+        }
+
+        return new CompleteSaleRequest
+        {
+            CompanyId = request.CompanyId, TerminalId = request.TerminalId, TillSessionId = request.TillSessionId, CashierUserId = request.CashierUserId, SaleNumber = request.SaleNumber,
+            SaleDate = request.SaleDate, WarehouseId = request.WarehouseId, CustomerId = request.CustomerId, SalesRepId = request.SalesRepId, TaxAccountCode = request.TaxAccountCode,
+            Lines = lines, AgeVerified = request.AgeVerified, PrescriptionReference = request.PrescriptionReference, Tenders = request.Tenders, Tip = request.Tip,
+            TipsAccountCode = request.TipsAccountCode, PriceOverrideAuthorisedByUserId = request.PriceOverrideAuthorisedByUserId, OfflineReplay = request.OfflineReplay,
+        };
+    }
+
+    // The price the line should have been sold at when its unit price is none the till could have rung up; null when the price stands (or the item has no
+    // price anywhere to hold it to).
+    private async Task<decimal?> PriceInForceAsync(CompleteSaleRequest request, PosSaleLineRequest line, Item item, decimal rate, CancellationToken ct)
+    {
+        if (_pricing is null)
+        {
+            return null;
+        }
+
+        // A scale's price label: the label's price (tax included) for this item, as the till reads it.
+        if (Barcodes.TryParseEmbedded(line.PriceLabel, _devices?.BarcodeRules) is { Kind: EmbeddedValueKind.Price } label
+            && (string.Equals((item.Plu ?? string.Empty).Trim().TrimStart('0'), label.ItemCode, StringComparison.Ordinal)
+                || string.Equals(item.Barcode?.Trim(), label.ItemCode, StringComparison.Ordinal) || string.Equals(item.Code, label.ItemCode, StringComparison.OrdinalIgnoreCase))
+            && Math.Abs(PosMoney.Round(label.Value / (1m + rate)) - line.UnitPrice) < 0.005m)
+        {
+            return null;
+        }
+
+        // The till prices a scanned line for the customer and the quantity on the pad, a tapped tile at the price of one off the default list.
+        List<(long? Customer, decimal Quantity)> asks = [(request.CustomerId, line.Quantity), (null, 1m)];
+        if (request.CustomerId is not null)
+        {
+            asks.Add((request.CustomerId, 1m));
+            asks.Add((null, line.Quantity));
+        }
+
+        decimal? first = null;
+        foreach ((long? customer, decimal quantity) in asks)
+        {
+            Result<Application.Abstractions.Inventory.ResolvedPrice> price = await _pricing.PriceAsync(request.CompanyId, customer, item.Id, quantity, request.SaleDate, ct).ConfigureAwait(false);
+            if (price.IsFailure)
+            {
+                continue;
+            }
+
+            if (Math.Abs(price.Value.UnitPrice - line.UnitPrice) < 0.005m)
+            {
+                return null;
+            }
+
+            first ??= price.Value.UnitPrice;
+        }
+
+        return first;
+    }
+
+    // A price other than the one in force stands only on a supervisor's word: someone other than the cashier, active, holding Pos.PriceOverride.
+    private async Task<Result> PriceOverrideAuthorisedAsync(CompleteSaleRequest request, CancellationToken ct)
+    {
+        if (request.PriceOverrideAuthorisedByUserId is not long supervisor)
+        {
+            return Result.Failure(Error.Forbidden("Pos.PriceOverride", "A price other than the item's price needs a supervisor's authority"));
+        }
+
+        if (supervisor == request.CashierUserId)
+        {
+            return Result.Failure(Error.Forbidden("Pos.PriceOverride", "A cashier cannot authorise their own price override"));
+        }
+
+        if (_permissions is null
+            || !(await _permissions.ResolveAsync(supervisor, ct).ConfigureAwait(false)).Has("Pos.PriceOverride", Core.Security.OperationFlags.OverridePrice))
+        {
+            return Result.Failure(Error.Forbidden("Pos.PriceOverride", $"User {supervisor} may not authorise a price override"));
+        }
+
+        return Result.Success();
+    }
 
     // One unit of work: its postings and record changes commit together or not at all.
     private async Task<Result<CompleteSaleResult>> CompleteSaleCoreAsync(CompleteSaleRequest request, CancellationToken ct)
@@ -538,7 +723,14 @@ public sealed class PosService : IPosService
 
     /// <inheritdoc />
     public Task<Result<IReadOnlyList<CompleteSaleResult>>> SplitBillAsync(SplitBillRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => SplitBillCoreAsync(request, ct), ct);
+        => _db.AtomicAsync<IReadOnlyList<CompleteSaleResult>>(async () =>
+        {
+            // The basket is held to its items before it is shared out (a part's share of a line need not be a whole quantity at the price).
+            ArgumentNullException.ThrowIfNull(request);
+            Result<CompleteSaleRequest> held = await HoldToItemsAsync(request.Basket, ct).ConfigureAwait(false);
+            return held.IsFailure ? held.Error
+                : await SplitBillCoreAsync(new SplitBillRequest { Basket = held.Value, Parts = request.Parts, Tenders = request.Tenders }, ct).ConfigureAwait(false);
+        }, ct);
 
     // Every part completes as its own sale inside one unit of work: one part refused undoes them all.
     private async Task<Result<IReadOnlyList<CompleteSaleResult>>> SplitBillCoreAsync(SplitBillRequest request, CancellationToken ct)

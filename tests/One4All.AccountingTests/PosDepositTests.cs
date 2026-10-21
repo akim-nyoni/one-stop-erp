@@ -54,8 +54,8 @@ public sealed class PosDepositTests
         };
 
         (await pos.CompleteSaleAsync(Sale("DEP-0", 0.75m, "2313"))).Error.Code.Should().Be("Pos.DepositLine");
-        (await pos.CompleteSaleAsync(Sale("DEP-0", 0m, "4000"))).Error.Code.Should().Be("Pos.DepositLine");
-        CompleteSaleResult sold = (await pos.CompleteSaleAsync(Sale("DEP-1", 0m, "2313"))).Value;
+        // The account is the deposit item's own liability, whatever account the till names (here a revenue account).
+        CompleteSaleResult sold = (await pos.CompleteSaleAsync(Sale("DEP-1", 0m, "4000"))).Value;
 
         List<JournalLine> lines = await (from l in db.Set<JournalLine>().AsNoTracking()
                                          join j in db.Journals.AsNoTracking() on l.JournalEntryId equals j.Id

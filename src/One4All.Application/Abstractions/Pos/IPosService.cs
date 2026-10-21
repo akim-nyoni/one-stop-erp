@@ -15,8 +15,15 @@ namespace One4All.Application.Abstractions.Pos;
 /// <param name="PromotionDiscount">The promotion discount taken off the line (LineNet is after it).</param>
 /// <param name="DiscountAccountCode">The account the discount posts to.</param>
 /// <param name="PromotionCode">The promotion(s) that gave it.</param>
+/// <param name="PriceLabel">The price-embedded label (an in-store EAN-13 a scale printed) the line was priced from, so the server can read the price back.</param>
+/// <remarks>
+/// The server holds every line to the item: the revenue account is the item's, the tax is worked out again from the item's tax code
+/// (<c>Pos.LineTax</c>), the net is the quantity at the unit price less the discount (<c>Pos.LineNet</c>), and a unit price other than the
+/// item's price in force needs <see cref="CompleteSaleRequest.PriceOverrideAuthorisedByUserId"/> (<c>Pos.PriceOverride</c>).
+/// </remarks>
 public readonly record struct PosSaleLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, decimal LineNet, decimal TaxAmount, string RevenueAccountCode,
-    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null, string? GiftCardNumber = null, string? Note = null, string? SerialNumber = null, bool GiftWrap = false);
+    decimal PromotionDiscount = 0m, string? DiscountAccountCode = null, string? PromotionCode = null, string? GiftCardNumber = null, string? Note = null, string? SerialNumber = null, bool GiftWrap = false,
+    string? PriceLabel = null);
 
 /// <summary>A tender in a POS sale request.</summary>
 /// <param name="TenderType">The tender type.</param>
@@ -80,6 +87,18 @@ public sealed class CompleteSaleRequest
 
     /// <summary>Gets the tips-payable account a tip is credited to.</summary>
     public string? TipsAccountCode { get; init; }
+
+    /// <summary>
+    /// Gets the supervisor who authorised a unit price other than the item's price in force: someone other than the cashier holding
+    /// <c>Pos.PriceOverride</c> (override price). Without one, such a sale is refused (<c>Pos.PriceOverride</c>).
+    /// </summary>
+    public long? PriceOverrideAuthorisedByUserId { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether this is a sale rung up offline and replayed: it already happened at the till, so a price, net or tax
+    /// that does not agree with the server is recorded as a till event for review rather than refused.
+    /// </summary>
+    public bool OfflineReplay { get; init; }
 }
 
 /// <summary>The result of completing a sale.</summary>

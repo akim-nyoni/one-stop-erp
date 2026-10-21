@@ -277,6 +277,7 @@ public sealed class PosEventService : IPosEventService
             {
                 CompanyId = request.CompanyId, TerminalId = request.TerminalId, TillSessionId = request.TillSessionId, CashierUserId = request.CashierUserId, SaleNumber = request.NewSaleNumber.Trim(),
                 SaleDate = request.Date, WarehouseId = request.WarehouseId, TaxAccountCode = request.TaxAccountCode, Lines = request.NewLines, Tenders = tenders,
+                PriceOverrideAuthorisedByUserId = request.AuthorisedByUserId, // the supervisor of the exchange answers for a new price other than the list's
             }, ct).ConfigureAwait(false);
             if (sold.IsFailure)
             {

@@ -98,6 +98,9 @@ public sealed class PosTicketLine
     /// <summary>Gets a value indicating whether the price was overridden.</summary>
     public bool IsOverridden => UnitPriceNet != ListUnitPriceNet;
 
+    /// <summary>Gets or sets the price-embedded label the line was priced from (sent with the sale so the server can read the price back).</summary>
+    public string? PriceLabel { get; set; }
+
     /// <summary>Gets the discount as a percentage of the line, if one was given that way.</summary>
     public decimal? DiscountPercent { get; private set; }
 
@@ -241,6 +244,9 @@ public sealed class PosTicket
 
     /// <summary>What the customer pays: the gross total plus any tip.</summary>
     public decimal AmountDue => GrossTotal + Tip;
+
+    /// <summary>Gets the supervisor who last authorised a price override on this ticket (sent with the sale; the server checks it).</summary>
+    public long? PriceOverrideAuthorisedByUserId { get; private set; }
 
     /// <summary>The outstanding balance (never negative).</summary>
     public decimal BalanceDue => Math.Max(0m, decimal.Round(AmountDue - Tendered, 4, MidpointRounding.ToEven));
@@ -440,8 +446,9 @@ public sealed class PosTicket
     /// <param name="line">The line.</param>
     /// <param name="unitPriceNet">The new tax-exclusive unit price.</param>
     /// <param name="supervised">Whether a supervisor authorised it.</param>
+    /// <param name="authorisedByUserId">The supervisor who authorised it (carried on the sale for the server to check).</param>
     /// <returns>Success, or why not.</returns>
-    public Result OverridePrice(PosTicketLine line, decimal unitPriceNet, bool supervised)
+    public Result OverridePrice(PosTicketLine line, decimal unitPriceNet, bool supervised, long? authorisedByUserId = null)
     {
         ArgumentNullException.ThrowIfNull(line);
         if (!_lines.Contains(line) || unitPriceNet < 0m)
@@ -455,6 +462,7 @@ public sealed class PosTicket
         }
 
         line.SetPrice(PosMoney.Round(unitPriceNet));
+        PriceOverrideAuthorisedByUserId = authorisedByUserId ?? PriceOverrideAuthorisedByUserId;
         return Result.Success();
     }
 
@@ -464,9 +472,10 @@ public sealed class PosTicket
     public IReadOnlyList<PosSaleLineRequest> SaleLines(string? discountAccountCode = null)
         => [.. _lines.Select(l => l.PromotionDiscount > 0m
             ? new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode, l.PromotionDiscount, l.PromotionAccountCode, l.PromotionCode, l.GiftCardNumber,
-                l.Note, l.SerialNumber, l.GiftWrap)
+                l.Note, l.SerialNumber, l.GiftWrap, l.PriceLabel)
             : new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPriceNet, l.LineNet, l.TaxAmount, l.RevenueAccountCode,
-                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null, l.GiftCardNumber, l.Note, l.SerialNumber, l.GiftWrap))];
+                l.Discount, l.Discount > 0m ? discountAccountCode : null, l.Discount > 0m ? (l.IsOverridden ? "OVERRIDE+DISC" : "MANUAL") : null, l.GiftCardNumber, l.Note, l.SerialNumber, l.GiftWrap,
+                l.PriceLabel))];
 
     /// <summary>Puts a gift card's sale or top-up on the ticket: one line of the card's value on the gift card item, posting to the gift card liability, no tax.</summary>
     /// <param name="itemId">The gift card item.</param>
@@ -528,7 +537,7 @@ public sealed class PosTicket
 
         foreach (PosSaleLineRequest parked in lines)
         {
-            PosTicketLine line = new(parked.ItemId, parked.Description, parked.UnitPrice, taxRateFor(parked), parked.RevenueAccountCode, null) { Quantity = parked.Quantity };
+            PosTicketLine line = new(parked.ItemId, parked.Description, parked.UnitPrice, taxRateFor(parked), parked.RevenueAccountCode, null) { Quantity = parked.Quantity, PriceLabel = parked.PriceLabel };
             line.Restore(parked.UnitPrice, parked.PromotionDiscount);
             _lines.Add(line);
         }
@@ -576,6 +585,7 @@ public sealed class PosTicket
         _lines.Clear();
         _tenders.Clear();
         Tip = 0m;
+        PriceOverrideAuthorisedByUserId = null;
     }
 
     /// <summary>
@@ -657,6 +667,7 @@ public sealed class PosTicket
             CompanyId = sale.CompanyId, TerminalId = sale.TerminalId, TillSessionId = sale.TillSessionId, CashierUserId = sale.CashierUserId, SaleNumber = sale.SaleNumber,
             SaleDate = sale.SaleDate, WarehouseId = sale.WarehouseId, TaxAccountCode = sale.TaxAccountCode, AgeVerified = sale.AgeVerified,
             PrescriptionReference = sale.PrescriptionReference, CustomerId = sale.CustomerId, Lines = sale.Lines, Tenders = tenders,
+            PriceOverrideAuthorisedByUserId = sale.PriceOverrideAuthorisedByUserId,
             Tip = Tip, TipsAccountCode = Tip > 0m ? context.TipsAccountCode!.Trim() : null,
         };
     }
@@ -692,6 +703,7 @@ public sealed class PosTicket
             PrescriptionReference = context.PrescriptionReference,
             CustomerId = context.CustomerId,
             SalesRepId = context.SalesRepId,
+            PriceOverrideAuthorisedByUserId = PriceOverrideAuthorisedByUserId,
             Lines = lines,
         };
     }

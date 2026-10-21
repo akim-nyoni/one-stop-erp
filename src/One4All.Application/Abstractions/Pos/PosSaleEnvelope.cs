@@ -63,7 +63,7 @@ public sealed record PosSaleEnvelope(
     /// <summary>The operation kind used to route this envelope to its replay handler.</summary>
     public const string Kind = "PosSale";
 
-    /// <summary>Rebuilds the <see cref="CompleteSaleRequest"/> this envelope captured.</summary>
+    /// <summary>Rebuilds the <see cref="CompleteSaleRequest"/> this envelope captured (marked as an offline replay).</summary>
     /// <returns>The sale request.</returns>
     public CompleteSaleRequest ToRequest() => new()
     {
@@ -79,6 +79,7 @@ public sealed record PosSaleEnvelope(
         PrescriptionReference = PrescriptionReference,
         Tip = Tip,
         TipsAccountCode = TipsAccountCode,
+        OfflineReplay = true,
         Lines = Lines
             .Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, GiftCardNumber: l.GiftCardNumber, Note: l.Note, SerialNumber: l.SerialNumber, GiftWrap: l.GiftWrap))
             .ToList(),

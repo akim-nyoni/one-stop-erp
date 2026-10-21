@@ -130,10 +130,13 @@ public sealed record PosSaleLineApi(long ItemId, string Description, decimal Qua
 /// <param name="IsChange">Whether this is change given back.</param>
 public sealed record PosTenderApi(string TenderType, string Currency, decimal Amount, string AccountCode, bool IsChange = false);
 
-/// <summary>A till sale as the REST API posts it (a self-service kiosk, an e-commerce front, an integration).</summary>
+/// <summary>
+/// A till sale as the REST API posts it (a self-service kiosk, an e-commerce front, an integration). Each line is sold at the item's price in force
+/// (there is no supervisor at the API to authorise another), with the item's revenue account and its tax worked out by the server.
+/// </summary>
 /// <param name="TerminalId">The terminal.</param>
 /// <param name="TillSessionId">The open till session.</param>
-/// <param name="CashierUserId">The cashier.</param>
+/// <param name="CashierUserId">Ignored: the cashier is the signed-in user the token belongs to.</param>
 /// <param name="SaleNumber">The sale number.</param>
 /// <param name="SaleDate">The sale date.</param>
 /// <param name="WarehouseId">The warehouse stock leaves.</param>
@@ -246,8 +249,9 @@ public static class TradingApiMapping
     /// <summary>A till sale request.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="api">The sale as posted.</param>
+    /// <param name="cashierUserId">The signed-in user, who is the cashier (null: the cashier the document names, for callers inside the server).</param>
     /// <returns>The request, or a validation error.</returns>
-    public static Result<CompleteSaleRequest> PosSale(long companyId, PosSaleApi api)
+    public static Result<CompleteSaleRequest> PosSale(long companyId, PosSaleApi api, long? cashierUserId = null)
     {
         ArgumentNullException.ThrowIfNull(api);
         if (api.Lines is null || api.Lines.Count == 0 || api.Tenders is null || api.Tenders.Count == 0)
@@ -274,7 +278,7 @@ public static class TradingApiMapping
 
         return new CompleteSaleRequest
         {
-            CompanyId = companyId, TerminalId = api.TerminalId, TillSessionId = api.TillSessionId, CashierUserId = api.CashierUserId, SaleNumber = api.SaleNumber, SaleDate = api.SaleDate, WarehouseId = api.WarehouseId,
+            CompanyId = companyId, TerminalId = api.TerminalId, TillSessionId = api.TillSessionId, CashierUserId = cashierUserId ?? api.CashierUserId, SaleNumber = api.SaleNumber, SaleDate = api.SaleDate, WarehouseId = api.WarehouseId,
             CustomerId = api.CustomerId, TaxAccountCode = api.TaxAccountCode,
             Lines = [.. api.Lines.Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, Note: l.Note, SerialNumber: l.SerialNumber, GiftWrap: l.GiftWrap))],
             Tenders = tenders,
