@@ -75,6 +75,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
             "PYRLSTAFFPURCHASES" => await StaffPurchasesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLHOUSINGRENT" => await HousingRentAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLCURRENCYSPLIT" => await CurrencySplitAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
+            "PYRLREGISTERBYCURRENCY" => await RegisterByCurrencyAsync(companyId, fromDate, toDate, Text(parameters, "RunReference"), ct).ConfigureAwait(false),
             "PYRLARREARS" => await ArrearsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLVARIABLES" => await VariablesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
             "PYRLREMITTANCEINVOICES" => await RemittanceInvoicesAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -772,6 +773,93 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                     ("Earnings", earnings is decimal e ? Money(e) : "no rate"), ("Rate", rate is decimal x ? x.ToString("0.####", CultureInfo.InvariantCulture) : "no rate"), ("EarningsBase", Money(earningsBase)),
                     ("Share", (share * 100m).ToString("0.0", CultureInfo.InvariantCulture) + "%"), ("Method", method), ("TaxCurrency", taxCurrency is decimal t ? Money(t) : "no rate"),
                     ("Deducted", Money(decimal.Round(deducted * share, 2, MidpointRounding.ToEven))), ("TaxBase", taxBase)));
+            }
+        }
+
+        return rows;
+    }
+
+    // PR75: per run and currency, the gross earnings paid in it, the PAYE and other deductions falling on it (the lines' currency splits, the base
+    // taking the rest of each line) and the net pay paid in it as the settlement pays it: earnings paid in another currency go out in it, never
+    // more than the net, then the employee's splits paid in another currency take their share of what is left. Amounts in a currency at the run's
+    // pay date rate.
+    private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RegisterByCurrencyAsync(long companyId, DateOnly fromDate, DateOnly toDate, string? runReference,
+        CancellationToken ct)
+    {
+        CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        Dictionary<string, CurrencyCode> paidIn = (await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(e => e.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase);
+        List<Payslip> slips = runReference is null
+            ? await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)
+            : await _db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId && p.RunReference.ToUpper() == runReference.ToUpper()).OrderBy(p => p.PayDate)
+                .ToListAsync(ct).ConfigureAwait(false);
+        List<long> employeeIds = [.. slips.Select(p => p.EmployeeId).Distinct()];
+        ILookup<long, EmployeePaymentSplit> splits = (await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId && employeeIds.Contains(s.EmployeeId)).OrderBy(s => s.Id)
+            .ToListAsync(ct).ConfigureAwait(false)).ToLookup(s => s.EmployeeId);
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (IGrouping<string, Payslip> run in slips.GroupBy(p => p.RunReference.Length == 0 ? p.PeriodLabel : p.RunReference, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g.Min(p => p.PayDate)).ThenBy(g => g.Key, StringComparer.Ordinal))
+        {
+            Dictionary<CurrencyCode, (HashSet<long> Employees, decimal Gross, decimal Paye, decimal Other, decimal Net)> totals = [];
+            void Add(CurrencyCode currency, long employeeId, decimal gross = 0m, decimal paye = 0m, decimal other = 0m, decimal net = 0m)
+            {
+                if (!totals.TryGetValue(currency, out var total))
+                {
+                    total = (new HashSet<long>(), 0m, 0m, 0m, 0m);
+                }
+
+                total.Employees.Add(employeeId);
+                totals[currency] = (total.Employees, total.Gross + gross, total.Paye + paye, total.Other + other, total.Net + net);
+            }
+
+            foreach (Payslip slip in run)
+            {
+                CurrencyCode CurrencyOf(string code) => paidIn.TryGetValue(code, out CurrencyCode c) ? c : baseCurrency;
+                Dictionary<CurrencyCode, decimal> foreignEarnings = [];
+                foreach (PayslipLine line in slip.Lines)
+                {
+                    if (line.Type == PayElementType.Earning)
+                    {
+                        CurrencyCode currency = CurrencyOf(line.ElementCode);
+                        Add(currency, slip.EmployeeId, gross: line.Amount);
+                        if (currency != baseCurrency)
+                        {
+                            foreignEarnings[currency] = foreignEarnings.GetValueOrDefault(currency) + line.Amount;
+                        }
+                    }
+                    else if (line.Type == PayElementType.Deduction)
+                    {
+                        bool tax = IsTax(line);
+                        decimal foreign = 0m;
+                        foreach ((string code, decimal portion) in PayslipCurrencySplit.Parse(line.CurrencySplit))
+                        {
+                            Add(CurrencyCode.Parse(code), slip.EmployeeId, paye: tax ? portion : 0m, other: tax ? 0m : portion);
+                            foreign += portion;
+                        }
+
+                        Add(baseCurrency, slip.EmployeeId, paye: tax ? line.Amount - foreign : 0m, other: tax ? 0m : line.Amount - foreign);
+                    }
+                }
+
+                // The settlement pays only a positive net; a nil or negative one stays in base.
+                Dictionary<CurrencyCode, decimal> foreignNet = slip.NetPay > 0m ? Payroll.PayrollCurrencies.ForeignNet(foreignEarnings, slip.NetPay, splits[slip.EmployeeId], baseCurrency) : [];
+                foreach ((CurrencyCode currency, decimal amount) in foreignNet)
+                {
+                    Add(currency, slip.EmployeeId, net: amount);
+                }
+
+                Add(baseCurrency, slip.EmployeeId, net: slip.NetPay - foreignNet.Values.Sum());
+            }
+
+            DateOnly payDate = run.Min(p => p.PayDate);
+            foreach ((CurrencyCode currency, var total) in totals.OrderBy(t => t.Key == baseCurrency ? 0 : 1).ThenBy(t => t.Key.Value, StringComparer.Ordinal))
+            {
+                decimal? rate = currency == baseCurrency ? 1m : await Accounting.ExchangeRateResolver.FindAsync(_db, currency, baseCurrency, ExchangeRateType.Daily, payDate, ct).ConfigureAwait(false);
+                string InCurrency(decimal amount) => rate is decimal r and > 0m ? Money(decimal.Round(amount / r, 2, MidpointRounding.AwayFromZero)) : "no rate";
+                rows.Add(Row(("Run", run.Key), ("Period", run.First().PeriodLabel), ("PayDate", Date(payDate)), ("Currency", currency.Value),
+                    ("Rate", rate is decimal x ? x.ToString("0.######", CultureInfo.InvariantCulture) : "no rate"), ("Employees", total.Employees.Count), ("GrossBase", Money(total.Gross)),
+                    ("Gross", InCurrency(total.Gross)), ("Paye", Money(total.Paye)), ("OtherDeductions", Money(total.Other)), ("Net", InCurrency(total.Net)), ("NetBase", total.Net)));
             }
         }
 

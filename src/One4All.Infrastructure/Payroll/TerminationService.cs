@@ -7,6 +7,7 @@ using One4All.Application.Payroll;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
 using One4All.Core.Payroll;
+using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Payroll;
@@ -248,6 +249,15 @@ public sealed class TerminationService : ITerminationService
 
         sb.AppendLine(rule);
         sb.AppendLine(Row($"NET PAY ({company.BaseCurrency.Value})", termination.NetPay));
+        DateOnly payDate = termination.JournalNumber is string accrued
+            ? await _db.Set<JournalEntry>().Where(j => j.CompanyId == companyId && j.JournalNumber == accrued).Select(j => (DateOnly?)j.PostingDate).FirstOrDefaultAsync(ct).ConfigureAwait(false)
+                ?? termination.LastDay
+            : termination.LastDay;
+        foreach ((string currency, decimal amount, decimal baseAmount, decimal rate) in await NetByCurrencyAsync(companyId, termination, payDate, ct).ConfigureAwait(false))
+        {
+            sb.AppendLine(Row(rate == 1m ? $"  in {currency}" : $"  in {currency} at {rate.ToString("0.####", CultureInfo.InvariantCulture)} ({baseAmount.ToString("N2", CultureInfo.InvariantCulture)})", amount));
+        }
+
         if (termination.UnrecoveredLoans > 0m)
         {
             sb.AppendLine(Row("Loans still owed", termination.UnrecoveredLoans));
@@ -287,7 +297,27 @@ public sealed class TerminationService : ITerminationService
         string tableCode = request.TaxTableCode.Trim().ToUpperInvariant();
         DateOnly payDate = request.PayDate ?? request.LastDay;
         TaxTable? table = await TableAsync(request.CompanyId, tableCode, payDate, ct).ConfigureAwait(false);
-        decimal Tax(decimal ordinary) => table is null ? 0m : PayeTable.Tax(table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), ordinary);
+
+        // Tax per currency, as the run does it: when the leaver's tax element splits by currency and some of their pay goes out in another currency,
+        // the final ordinary pay is shared in the mix of their last regular payslip and each currency with a table of its own is taxed on it.
+        Func<decimal, Result<decimal>>? split = table is null ? null : await SplitTaxAsync(request.CompanyId, employee.Id, table, payDate, ct).ConfigureAwait(false);
+        Error? taxError = null;
+        decimal Tax(decimal ordinary)
+        {
+            if (table is null)
+            {
+                return 0m;
+            }
+
+            if (split is null)
+            {
+                return PayeTable.Tax(table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), ordinary);
+            }
+
+            Result<decimal> shared = split(ordinary);
+            taxError ??= shared.IsFailure ? shared.Error : null;
+            return shared.IsFailure ? 0m : shared.Value;
+        }
 
         // Gratuity and severance on their own table when the company gives one (brief §4.15.8: terminal benefits taxed in bands, after the tax-free part).
         Func<decimal, decimal>? terminalTax = null;
@@ -307,7 +337,107 @@ public sealed class TerminationService : ITerminationService
         decimal unreturned = await _db.Set<EmployeeAssetIssue>().Where(a => a.EmployeeId == employee.Id && a.ReturnedOn == null).SumAsync(a => (decimal?)a.Value, ct).ConfigureAwait(false) ?? 0m;
         FinalPayStatement statement = FinalPay.Calculate(request.Type, employee.BasicSalary, employee.EngagementDate, request.LastDay, lastMonthPaid, leaveDays, loans.Sum(l => l.Outstanding),
             request.Policy, Tax, request.AnnualBonus, unreturned + Math.Max(0m, request.Overpayment), terminalTax);
+        if (taxError is not null)
+        {
+            return taxError;
+        }
+
         return (employee, statement, loans);
+    }
+
+    // The tax on an amount of final ordinary pay shared by currency (PayrollCurrencies.SplitTax, the run's own rule), or null when it is all taxed on
+    // the base table: the leaver has no active tax element on the table that splits by currency, or their last regular payslip paid nothing in
+    // another currency.
+    private async Task<Func<decimal, Result<decimal>>?> SplitTaxAsync(long companyId, long employeeId, TaxTable baseTable, DateOnly payDate, CancellationToken ct)
+    {
+        List<long> assigned = await _db.Set<EmployeePayElement>().Where(a => a.EmployeeId == employeeId && a.IsActive).Select(a => a.PayElementId).ToListAsync(ct).ConfigureAwait(false);
+        PayElement? element = await _db.PayElements.AsNoTracking()
+            .Where(e => e.CompanyId == companyId && assigned.Contains(e.Id) && e.Basis == CalculationBasis.TaxTable && e.SplitCurrencyTax
+                && (e.TaxTableCode == null || e.TaxTableCode == baseTable.Code))
+            .OrderBy(e => e.Sequence).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (element is null)
+        {
+            return null;
+        }
+
+        Dictionary<string, decimal> mix = await EarningsMixAsync(companyId, employeeId, ct).ConfigureAwait(false);
+        if (mix.All(m => m.Key.Length == 0 || m.Value == 0m))
+        {
+            return null;
+        }
+
+        List<TaxTable> tables = await _db.Set<TaxTable>().AsNoTracking().Include(t => t.Bands).Where(t => t.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        Dictionary<string, decimal> rates = new(StringComparer.Ordinal);
+        foreach (string currency in mix.Keys.Where(k => k.Length > 0))
+        {
+            if (await Accounting.ExchangeRateResolver.FindAsync(_db, CurrencyCode.Parse(currency), baseCurrency, ExchangeRateType.Daily, payDate, ct).ConfigureAwait(false) is decimal rate)
+            {
+                rates[currency] = rate;
+            }
+        }
+
+        return ordinary =>
+        {
+            Dictionary<string, decimal> portions = PayslipCurrencySplit.Apportion(ordinary, mix);
+            decimal baseTax = PayeTable.Tax(baseTable.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), ordinary);
+            Result<(decimal Tax, Dictionary<string, decimal> Shares)> shared = PayrollCurrencies.SplitTax(element.TaxTableCode, tables, portions, rates, baseTax, ordinary, payDate, 1m, 0m);
+            return shared.IsFailure ? shared.Error : shared.Value.Tax;
+        };
+    }
+
+    // The leaver's taxable earnings (in base) by the currency they were paid in on their last regular payslip ("" the base currency): the final
+    // ordinary pay (salary, notice, leave, bonus) goes out in the same mix.
+    private async Task<Dictionary<string, decimal>> EarningsMixAsync(long companyId, long employeeId, CancellationToken ct)
+    {
+        Dictionary<string, decimal> mix = new(StringComparer.Ordinal);
+        Payslip? last = await _db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId && p.EmployeeId == employeeId && p.RunKind == PayRunKind.Regular)
+            .OrderByDescending(p => p.PayDate).ThenByDescending(p => p.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (last is null)
+        {
+            return mix;
+        }
+
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        Dictionary<string, CurrencyCode> paidIn = await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null)
+            .ToDictionaryAsync(e => e.Code, e => e.PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase, ct).ConfigureAwait(false);
+        foreach (PayslipLine line in last.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable))
+        {
+            string currency = paidIn.TryGetValue(line.ElementCode, out CurrencyCode c) && c != baseCurrency ? c.Value : string.Empty;
+            mix[currency] = mix.GetValueOrDefault(currency) + line.Amount;
+        }
+
+        return mix;
+    }
+
+    // The final net pay by currency, as the payslip footer shows it: the foreign share of the ordinary pay goes out in its currency (never more than
+    // the net), then any payment split in another currency; the rest in base. Each foreign amount at the pay date's rate.
+    private async Task<List<(string Currency, decimal Amount, decimal BaseAmount, decimal Rate)>> NetByCurrencyAsync(long companyId, Termination termination, DateOnly payDate, CancellationToken ct)
+    {
+        List<(string Currency, decimal Amount, decimal BaseAmount, decimal Rate)> byCurrency = [];
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        decimal ordinary = termination.ProRataSalary + termination.Notice + termination.Leave;
+        Dictionary<string, decimal> mix = await EarningsMixAsync(companyId, termination.EmployeeId, ct).ConfigureAwait(false);
+        List<KeyValuePair<CurrencyCode, decimal>> earnings = mix.Values.Sum() == 0m ? []
+            : [.. PayslipCurrencySplit.Apportion(ordinary, mix).Where(p => p.Key.Length > 0).Select(p => KeyValuePair.Create(CurrencyCode.Parse(p.Key), p.Value))];
+        List<EmployeePaymentSplit> splits = await _db.PaymentSplits.AsNoTracking().Where(s => s.CompanyId == companyId && s.EmployeeId == termination.EmployeeId).OrderBy(s => s.Id)
+            .ToListAsync(ct).ConfigureAwait(false);
+        decimal netLeft = termination.NetPay;
+        foreach ((CurrencyCode foreign, decimal portion) in PayrollCurrencies.ForeignNet(earnings, termination.NetPay, splits, baseCurrency).OrderBy(f => f.Key.Value, StringComparer.Ordinal))
+        {
+            if (await Accounting.ExchangeRateResolver.FindAsync(_db, foreign, baseCurrency, ExchangeRateType.Daily, payDate, ct).ConfigureAwait(false) is decimal rate and > 0m)
+            {
+                byCurrency.Add((foreign.Value, decimal.Round(portion / rate, 2, MidpointRounding.AwayFromZero), portion, rate));
+                netLeft -= portion;
+            }
+        }
+
+        if (byCurrency.Count > 0)
+        {
+            byCurrency.Insert(0, (baseCurrency.Value, netLeft, netLeft, 1m));
+        }
+
+        return byCurrency;
     }
 
     // The base-currency table of a code in force on a date (the latest effective by then).

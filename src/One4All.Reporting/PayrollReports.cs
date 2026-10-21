@@ -238,5 +238,11 @@ public static class PayrollReports
             [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("EmployeeNumber", ParameterType.String)]);
         yield return Listing("PR69", "Payslip Reprint Log", "Payroll", "Payslips printed more than once: each print after the first with when and by whom.",
             "PyrlReprints", [new Column("Employee", "Employee", 160), new Column("Period", "Period", 70), new Column("Print", "Print no.", 55), new Column("When", "When", 115), new Column("User", "By", 100)], Period);
+        yield return Listing("PR75", "Payroll Register by Currency", "Payroll", "Per run and currency: the gross earnings paid in it (base and in the currency at the run's pay date rate), "
+            + "PAYE and other deductions falling on it, and the net pay paid in it as the settlement pays it (one run, or every run in the period).",
+            "PyrlRegisterByCurrency", [new Column("Run", "Run", 90), new Column("Period", "Period", 65), new Column("PayDate", "Pay date", 70), new Column("Currency", "Ccy", 40),
+             new Column("Rate", "Rate", 60), new Column("Employees", "Employees", 60), new Column("GrossBase", "Gross (base)", 90), new Column("Gross", "Gross (ccy)", 90),
+             new Column("Paye", "PAYE (base)", 85), new Column("OtherDeductions", "Other deductions (base)", 95), new Column("Net", "Net (ccy)", 90), new Column("NetBase", "Net (base)", 90, true)],
+            [("FromDate", ParameterType.Date), ("ToDate", ParameterType.Date), ("RunReference", ParameterType.String)]);
     }
 }

@@ -2,7 +2,7 @@
 
 Generated from the system report definitions (`SystemReportCatalogue.All()`); do not edit by hand - run the `ReportCatalogueDocumentTests` with `ONE4ALL_WRITE_CATALOGUE=1` to regenerate.
 
-631 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
+632 reports. Every report renders to HTML · PDF · XLSX · CSV · Text.
 
 ## Budget
 
@@ -474,6 +474,7 @@ Generated from the system report definitions (`SystemReportCatalogue.All()`); do
 | PR72 | Variable Input Register | Overtime, absences and once-off earnings and deductions keyed or imported for each period, and what each was paid at. | FromDate (Date, optional), ToDate (Date, optional) | Period, Employee, Element, Units, Amount, Source, Status, Paid | - | Sum(Paid) |
 | PR73 | Third-Party Invoices Raised | The AP invoices raised for the tax authority, schemes and garnishee creditors from payroll runs, with what is still outstanding on each. | FromDate (Date, optional), ToDate (Date, optional) | Run, Period, Payee, Supplier, Account, Invoice, Outstanding, Amount | - | Sum(Amount) |
 | PR74 | Payslip (designable) | Every payslip line in the period - employee, section, element and amount with the slip's gross, deductions and net - as the data source for a company's own payslip layout in the report designer (one employee, or all). | FromDate (Date, optional), ToDate (Date, optional), EmployeeNumber (String, optional) | Employee, Number, Department, Period, PayDate, Section, Element, Description, Amount, Gross, Deductions, Net | - | Sum(Amount) |
+| PR75 | Payroll Register by Currency | Per run and currency: the gross earnings paid in it (base and in the currency at the run's pay date rate), PAYE and other deductions falling on it, and the net pay paid in it as the settlement pays it (one run, or every run in the period). | FromDate (Date, optional), ToDate (Date, optional), RunReference (String, optional) | Run, Period, PayDate, Currency, Rate, Employees, GrossBase, Gross, Paye, OtherDeductions, Net, NetBase | - | Sum(NetBase) |
 | PR8 | Parallel Run Comparison | Go-live parallel run: One4All's payslips against the imported legacy payroll, per period, employee and element (NET for net pay). | FromDate (Date, optional), ToDate (Date, optional) | Period, Employee, Element, One4All, Legacy, Status, Difference | - | Sum(Difference) |
 | PR9 | Supplementary Runs & Reversal Register | Every supplementary, backpay and reversal run in the period, and every run reversed: reason, approval and journals. | FromDate (Date, optional), ToDate (Date, optional) | Run, Period, Kind, PayDate, Reason, Employees, Journal, Reversal, Net | - | Sum(Net) |
 

@@ -763,66 +763,47 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         decimal scale = 12m / periodsPerYear;
 
         // Tax credits come off the table's tax, never below nil.
-        decimal Credited(decimal amount) => TaxCredits.Apply(amount, TaxCredits.Total(vars.GetValueOrDefault(TaxCreditsKey) as IEnumerable<TaxCreditRule> ?? [], Number, scale));
+        decimal credits = TaxCredits.Total(vars.GetValueOrDefault(TaxCreditsKey) as IEnumerable<TaxCreditRule> ?? [], Number, scale);
         IEnumerable<PayeBand> Bands(decimal times) => table.Bands.Select(b => new PayeBand(b.From * times, b.To * times, b.RatePercent));
         decimal taxable = Number("TAXABLE");
         if (element.CumulativeTax)
         {
             decimal period = Math.Max(1m, Number(TaxPeriodVariable));
-            return Credited(PayeTable.Tax(Bands(period * scale), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code));
+            return TaxCredits.Apply(PayeTable.Tax(Bands(period * scale), Number(YtdTaxableVariable) + taxable) - Number("YTD_" + element.Code), credits);
         }
 
         decimal annual = Number("ANNUALTAXABLE");
         decimal regular = taxable - annual;
         decimal tax = PayeTable.Tax(Bands(scale), regular);
         tax = annual == 0m ? tax : tax + PayeTable.Tax(Bands(12m), (regular * periodsPerYear) + annual) - PayeTable.Tax(Bands(12m), regular * periodsPerYear);
-        tax = Credited(tax);
-        return element.SplitCurrencyTax ? SplitByCurrency(element, vars, tax, taxable, payDate) : tax;
+        return element.SplitCurrencyTax ? SplitByCurrency(element, vars, tax, taxable, payDate, scale, credits) : TaxCredits.Apply(tax, credits);
     }
 
-    // Split-currency tax: each foreign currency's taxable earnings with a table of its own are taxed on it at the pay date's rate; everything else
-    // bears its share of the base table's tax on the whole remuneration.
-    private static Result<decimal> SplitByCurrency(PayElement element, IReadOnlyDictionary<string, object?> vars, decimal baseTax, decimal taxable, DateOnly payDate)
+    // Split-currency tax (PayrollCurrencies.SplitTax): each foreign currency with a table of its own taxed on it, scaled to the period, the
+    // rest sharing the base table's tax; the credits come off the total so the line's currency split adds up to the tax deducted.
+    private static Result<decimal> SplitByCurrency(PayElement element, IReadOnlyDictionary<string, object?> vars, decimal baseTax, decimal taxable, DateOnly payDate,
+        decimal scale, decimal credits)
     {
         if (taxable == 0m || vars.GetValueOrDefault(TaxableByCurrencyKey) is not IReadOnlyDictionary<string, decimal> portions || portions.Keys.All(k => k.Length == 0))
         {
-            return baseTax;
+            return TaxCredits.Apply(baseTax, credits);
         }
 
         IEnumerable<TaxTable> tables = vars.GetValueOrDefault(TaxTablesKey) as IEnumerable<TaxTable> ?? [];
         IReadOnlyDictionary<string, decimal> rates = vars.GetValueOrDefault(PayRatesKey) as IReadOnlyDictionary<string, decimal> ?? new Dictionary<string, decimal>();
-        decimal tax = 0m;
-        Dictionary<string, decimal> shares = new(StringComparer.Ordinal);
-        foreach ((string currency, decimal earnings) in portions)
+        Result<(decimal Tax, Dictionary<string, decimal> Shares)> split = PayrollCurrencies.SplitTax(element.TaxTableCode, tables, portions, rates, baseTax, taxable, payDate, scale, credits);
+        if (split.IsFailure)
         {
-            TaxTable? own = currency.Length == 0 ? null : tables
-                .Where(t => t.Currency?.Value == currency && t.EffectiveFrom <= payDate && (element.TaxTableCode == null || string.Equals(t.Code, element.TaxTableCode, StringComparison.OrdinalIgnoreCase)))
-                .OrderBy(t => t.EffectiveFrom).LastOrDefault();
-            if (own is null)
-            {
-                shares[currency] = shares.GetValueOrDefault(currency) + (baseTax * earnings / taxable);
-                tax += baseTax * earnings / taxable;
-                continue;
-            }
-
-            if (!rates.TryGetValue(currency, out decimal rate) || rate <= 0m)
-            {
-                return Error.Validation("Payroll.NoRate", $"No {currency} rate on {payDate:yyyy-MM-dd} to tax the earnings paid in it.");
-            }
-
-            decimal inCurrency = earnings / rate;
-            decimal ownTax = PayeTable.Tax(own.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), inCurrency) * rate;
-            shares[currency] = shares.GetValueOrDefault(currency) + ownTax;
-            tax += ownTax;
+            return split.Error;
         }
 
         // What each currency bears is kept for the line's currency split.
         if (vars.GetValueOrDefault(TaxSplitsKey) is Dictionary<string, Dictionary<string, decimal>> splits)
         {
-            splits[element.Code] = shares;
+            splits[element.Code] = split.Value.Shares;
         }
 
-        return decimal.Round(tax, 2, MidpointRounding.ToEven);
+        return split.Value.Tax;
     }
 
     private static void Add(Dictionary<string, decimal> map, string account, decimal amount) =>

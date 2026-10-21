@@ -337,6 +337,11 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Error.Validation("Payroll.BasisGroupRequired", "A percent-of-group element needs the group it is a percentage of.");
         }
 
+        if (element.CumulativeTax && element.SplitCurrencyTax)
+        {
+            return CumulativeSplitTax;
+        }
+
         if (element.Floor is decimal floor && element.Ceiling is decimal ceiling && floor > ceiling)
         {
             return Error.Validation("Payroll.FloorAboveCeiling", "An element's floor cannot be above its ceiling.");
@@ -411,6 +416,9 @@ public sealed class PayrollSetupService : IPayrollSetupService
         return Result.Success();
     }
 
+    private static readonly Error CumulativeSplitTax = Error.Validation("Payroll.CumulativeSplitTax",
+        "An element cannot be both cumulative tax and tax per currency: cumulative tax is worked on the base table only. Choose one.");
+
     // The options as the element keeps them; a recovery or a benefit category only makes sense on the right element type.
     private static Result Apply(PayElement element, PayElementOptions options)
     {
@@ -427,6 +435,12 @@ public sealed class PayrollSetupService : IPayrollSetupService
         if (options.AmountsInPaidCurrency && string.IsNullOrWhiteSpace(options.PaidInCurrency))
         {
             return Result.Failure(Error.Validation("Payroll.AmountCurrency", "Amounts keyed in the paid-in currency need the currency the element is paid in."));
+        }
+
+        // Cumulative tax works the year to date on the base table only; a split by currency would be ignored, so the two are not combined.
+        if (options.CumulativeTax && options.SplitCurrencyTax)
+        {
+            return Result.Failure(CumulativeSplitTax);
         }
 
         element.Recovers = options.Recovers;

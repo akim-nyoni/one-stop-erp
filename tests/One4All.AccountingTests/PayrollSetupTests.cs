@@ -65,10 +65,15 @@ public sealed class PayrollSetupTests
         (elements["STAFFPURCH"].Recovers, elements["HOUSERENT"].Recovers, elements["HOUSING"].BenefitCategory).Should().Be((PayRecovery.StaffPurchases, PayRecovery.HousingRent, "Housing"));
         (await setup.SetPayElementOptionsAsync(companyId, "HOUSING", new PayElementOptions(PayRecovery.HousingRent))).Error.Code.Should().Be("Payroll.RecoveryType");
         (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(PaidInCurrency: "XX"))).Error.Code.Should().Be("Payroll.PaidInCurrency");
-        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(CumulativeTax: true, SplitCurrencyTax: true))).IsSuccess.Should().BeTrue();
+        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(CumulativeTax: true, SplitCurrencyTax: true))).Error.Code.Should().Be("Payroll.CumulativeSplitTax",
+            "cumulative tax is worked on the base table only");
+        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(CumulativeTax: true))).IsSuccess.Should().BeTrue();
         (await setup.SetPayElementOptionsAsync(companyId, "TRANSPORT", new PayElementOptions(BenefitCategory: "Travel", PaidInCurrency: "eur", IsAnnualPayment: true))).IsSuccess.Should().BeTrue();
         PayElement paye = await db.PayElements.AsNoTracking().SingleAsync(p => p.CompanyId == companyId && p.Code == "PAYE");
-        (paye.CumulativeTax, paye.SplitCurrencyTax).Should().Be((true, true));
+        (paye.CumulativeTax, paye.SplitCurrencyTax).Should().Be((true, false));
+        (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions(SplitCurrencyTax: true))).IsSuccess.Should().BeTrue();
+        paye = await db.PayElements.AsNoTracking().SingleAsync(p => p.CompanyId == companyId && p.Code == "PAYE");
+        (paye.CumulativeTax, paye.SplitCurrencyTax).Should().Be((false, true));
         PayElement transport = await db.PayElements.AsNoTracking().SingleAsync(p => p.CompanyId == companyId && p.Code == "TRANSPORT");
         (transport.BenefitCategory, transport.PaidInCurrency?.Value, transport.IsAnnualPayment).Should().Be(("Travel", "EUR", true));
         (await setup.SetPayElementOptionsAsync(companyId, "PAYE", new PayElementOptions())).IsSuccess.Should().BeTrue("the run below expects the standard options");

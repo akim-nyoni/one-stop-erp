@@ -5,6 +5,7 @@ using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Payroll;
 using One4All.Core.Accounting;
 using One4All.Core.Payroll;
+using One4All.Core.System;
 using One4All.Infrastructure.Persistence;
 using Xunit;
 
@@ -131,5 +132,61 @@ public sealed class TerminationTests
         run.IsSuccess.Should().BeTrue(run.IsFailure ? run.Error.ToString() : null);
         (await db.Payslips.AsNoTracking().Where(p => p.CompanyId == companyId).Select(p => p.EmployeeId).ToListAsync()).Should().NotContain([retrenched, resigning]).And.HaveCount(1);
         (await terminations.CertificateOfServiceAsync(companyId, "TM-003")).Error.Code.Should().Be("Payroll.NotTerminated");
+    }
+
+    [SkippableFact]
+    public async Task Final_pay_is_taxed_and_shown_by_currency_as_the_run_does()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        CurrencyCode kes = CurrencyCode.Parse("KES");
+        if (!await db.Currencies.AnyAsync(c => c.Code == kes))
+        {
+            db.Currencies.Add(new Currency(kes, "Kenyan Shilling", "KSh"));
+        }
+
+        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == kes && r.ToCurrency == Scenario.Usd && r.RateType == ExchangeRateType.Daily))
+        {
+            db.ExchangeRates.Add(new ExchangeRate(kes, Scenario.Usd, ExchangeRateType.Daily, new DateOnly(2026, 1, 1), 0.01m));   // 100 a dollar
+        }
+
+        TaxTable dollars = new(companyId, "PAYE", new DateOnly(2026, 1, 1));
+        dollars.AddBand(0m, 200m, 0m);
+        dollars.AddBand(200m, null, 20m);
+        TaxTable shillings = new(companyId, "PAYE-KES", new DateOnly(2026, 1, 1), kes);
+        shillings.AddBand(0m, 50_000m, 0m);
+        shillings.AddBand(50_000m, null, 10m);
+        db.AddRange(dollars, shillings);
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC", Taxable = true };
+        PayElement local = new(companyId, "LOCAL", "Allowance paid in shillings", PayElementType.Earning, CalculationBasis.FixedAmount, 2, "6100") { Taxable = true, PaidInCurrency = kes };
+        PayElement split = new(companyId, "PAYE-S", "PAYE (split)", PayElementType.Deduction, CalculationBasis.TaxTable, 3, "2400") { SplitCurrencyTax = true };
+        db.PayElements.AddRange(basic, local, split);
+        await db.SaveChangesAsync();
+        Employee employee = new(companyId, "TC-1", "Two Currencies", 1_000m, new DateOnly(2025, 1, 1));
+        employee.AssignPayElement(basic.Id);
+        employee.AssignPayElement(local.Id, overrideAmount: 500m);
+        employee.AssignPayElement(split.Id);
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
+        var run = await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-04", new DateOnly(2026, 4, 25), "2420", "TC-04");
+        run.IsSuccess.Should().BeTrue(run.IsFailure ? run.Error.ToString() : null);
+
+        // A third of April's taxable pay was in shillings, so is a third of the final 483.87 (15 of May's 31 days): the base table's 56.77 on
+        // the whole falls two thirds on the dollars (37.85); the 161.29 in shillings is 16,129 KSh, nil on its own table. On the base table
+        // alone it would be 56.77.
+        ITerminationService terminations = scope.ServiceProvider.GetRequiredService<ITerminationService>();
+        var done = await terminations.TerminateAsync(new TerminationRequest(companyId, "TC-1", TerminationType.Resignation, new DateOnly(2026, 5, 15), "Moving on")
+        {
+            Policy = new TerminalPolicy(1m, 22m, 2m, 4m, 10m), SalaryExpenseAccount = "6100", TerminalBenefitsAccount = "6100", PayeLiabilityAccount = "2400", NetPayAccount = "2420", ApprovedByUserId = 5,
+        });
+        done.IsSuccess.Should().BeTrue(done.IsFailure ? done.Error.ToString() : null);
+        (done.Value.Statement.ProRataSalary, done.Value.Statement.OrdinaryTax, done.Value.Statement.Net).Should().Be((483.87m, 37.85m, 446.02m));
+
+        // The slip's footer: the shillings' share (161.29, within the net) paid in shillings at the pay date's rate, the rest in dollars.
+        string slip = (await terminations.FinalPaySlipAsync(companyId, "TC-1")).Value;
+        slip.Should().Contain("in USD").And.Contain("284.73").And.Contain("in KES at 0.01 (161.29)").And.Contain("16,129.00");
     }
 }
