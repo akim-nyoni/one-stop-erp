@@ -589,6 +589,12 @@ public sealed class PosService : IPosService
             return Error.Rule("Pos.SaleNotCompleted", "Only a completed sale can be voided.");
         }
 
+        // A sale already partly or wholly refunded cannot be voided as well: the void would reverse the refunded lines' money and stock a second time.
+        if (await _db.PosEvents.AnyAsync(e => e.CompanyId == companyId && e.Kind == PosEventKind.Refund && e.SaleNumber == sale.SaleNumber, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Pos.SaleRefunded", $"Sale {sale.SaleNumber} has refunds against it; refund the remaining lines instead of voiding it.");
+        }
+
         if (sale.TotalTax != 0m && string.IsNullOrWhiteSpace(taxAccountCode))
         {
             return Error.Validation("Pos.TaxAccountRequired", "Voiding a sale with tax needs the output-tax account.");

@@ -72,6 +72,8 @@ public sealed class FiscalisationExtrasTests
         refundEvent.FiscalVerification.Should().StartWith("https://verify.example/");
         device.Signed.Should().Contain(r => r.Kind == FiscalDocumentKind.Refund && r.DocumentNumber == refunded.Value.JournalNumber && r.ReferenceDocumentNumber == "FX-1" && r.TotalGross == 5.75m);
 
+        // A sale with a refund against it cannot also be voided: that would reverse the refunded line twice (sixteenth audit).
+        (await pos.VoidSaleAsync(companyId, first.SaleId, day, "Changed mind", "2200", authorisedByUserId: 2)).Error.Code.Should().Be("Pos.SaleRefunded");
         (await pos.VoidSaleAsync(companyId, second.SaleId, day, "Keyed twice", "2200", authorisedByUserId: 2)).IsSuccess.Should().BeTrue();
         PosEvent voidEvent = await db.PosEvents.AsNoTracking().SingleAsync(e => e.CompanyId == companyId && e.Kind == PosEventKind.SaleVoid);
         (voidEvent.Reason, voidEvent.AuthorisedByUserId).Should().Be(("Keyed twice", 2L), "the void keeps its reason and the supervisor who authorised it (thirteenth audit #4)");
