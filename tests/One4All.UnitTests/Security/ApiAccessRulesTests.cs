@@ -30,10 +30,35 @@ public sealed partial class ApiAccessRulesTests
         ApiAccessRules.Allows(new EffectivePermissions(new Dictionary<string, OperationFlags>(), true), new ApiRequirement(["GeneralLedger"], true)).Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData("GET", "/api/sop/orders", "SalesOrders", false)]
+    [InlineData("GET", "/api/sop/orders/SO-1", "SalesOrders", false)]
+    [InlineData("POST", "/api/sop/orders", "SalesOrders", true)]
+    [InlineData("POST", "/api/sop/orders/SO-1/despatch", "SalesOrders", true)]
+    [InlineData("POST", "/api/sop/orders/SO-1/invoice", "SalesOrders", true)]
+    [InlineData("GET", "/api/pop/orders", "Procurement", false)]
+    [InlineData("GET", "/api/pop/orders/PO-1", "Procurement", false)]
+    [InlineData("POST", "/api/pop/orders", "Procurement", true)]
+    [InlineData("POST", "/api/pop/orders/PO-1/receipts", "Procurement", true)]
+    [InlineData("POST", "/api/pop/invoices/match", "Procurement", true)]
+    [InlineData("GET", "/api/stock/on-hand", "Inventory", false)]
+    [InlineData("GET", "/api/stock/valuation", "Inventory", false)]
+    [InlineData("POST", "/api/stock/receipts", "Inventory", true)]
+    [InlineData("POST", "/api/stock/issues", "Inventory", true)]
+    [InlineData("POST", "/api/stock/transfers", "Inventory", true)]
+    [InlineData("POST", "/api/stock/adjustments", "Inventory", true)]
+    public void Order_and_stock_routes_need_their_module_to_read_and_a_changing_grant_to_write(string method, string path, string module, bool write)
+    {
+        ApiRequirement requirement = ApiAccessRules.Requirement(method, path)!;
+        requirement.Modules.Should().Contain(module);
+        requirement.IsWrite.Should().Be(write);
+    }
+
     [Fact]
     public void Every_api_area_in_the_server_is_governed()
     {
-        string program = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Server", "Program.cs"));
+        string program = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Server", "Program.cs"))
+            + File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Server", "OrdersApiEndpoints.cs"));
         List<string> ungoverned = [.. Route().Matches(program).Select(m => m.Groups[1].Value).Distinct()
             .Where(path => !ApiAccessRules.AnonymousRoutes.Contains(path) && ApiAccessRules.Requirement("GET", path) is null)];
         ungoverned.Should().BeEmpty("every API area needs a permission module in ApiAccessRules");

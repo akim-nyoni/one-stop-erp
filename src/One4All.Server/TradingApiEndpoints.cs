@@ -316,11 +316,21 @@ internal static class TradingApiEndpoints
 
     private static string? Clean(string? value, bool upper = true) => string.IsNullOrWhiteSpace(value) ? null : upper ? value.Trim().ToUpperInvariant() : value.Trim();
 
-    private static IResult NotFound(string message) => Results.Json(new { error = message }, statusCode: StatusCodes.Status404NotFound);
+    /// <summary>A 404 with the message.</summary>
+    /// <param name="message">The message.</param>
+    /// <returns>The response.</returns>
+    internal static IResult NotFound(string message) => Results.Json(new { error = message }, statusCode: StatusCodes.Status404NotFound);
 
-    private static IResult BadRequest(string message) => Results.Json(new { error = message }, statusCode: StatusCodes.Status400BadRequest);
+    /// <summary>A 400 with the message.</summary>
+    /// <param name="message">The message.</param>
+    /// <returns>The response.</returns>
+    internal static IResult BadRequest(string message) => Results.Json(new { error = message }, statusCode: StatusCodes.Status400BadRequest);
 
-    private static IResult Value<T>(Result<T> result)
+    /// <summary>The value (200), or the error as 404 / 409 / 403 / 400 by its type with a body of error and code.</summary>
+    /// <typeparam name="T">The value type.</typeparam>
+    /// <param name="result">The result.</param>
+    /// <returns>The response.</returns>
+    internal static IResult Value<T>(Result<T> result)
     {
         if (result.IsSuccess)
         {
@@ -337,5 +347,8 @@ internal static class TradingApiEndpoints
         return Results.Json(new { error = result.Error.Message, code = result.Error.Code }, statusCode: status);
     }
 
-    private static IResult Action(Result result) => result.IsSuccess ? Results.Ok(new { ok = true }) : Value(Result<bool>.Failure(result.Error));
+    /// <summary>{ ok: true } (200), or the error as <see cref="Value{T}"/> answers it.</summary>
+    /// <param name="result">The result.</param>
+    /// <returns>The response.</returns>
+    internal static IResult Action(Result result) => result.IsSuccess ? Results.Ok(new { ok = true }) : Value(Result<bool>.Failure(result.Error));
 }

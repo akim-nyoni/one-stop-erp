@@ -63,4 +63,41 @@ public sealed class ApiAccessTests
         (await Ask(scoped.Id, "GET", "/api/ar/customers/1/statement", ("companyId", $"{home}"))).Allowed.Should().BeTrue();
         (await Ask(scoped.Id, "GET", "/api/ar/customers/1/statement", ("companyId", $"{other}"))).StatusCode.Should().Be(403);
     }
+
+    [SkippableFact]
+    public async Task Order_and_stock_routes_are_held_to_their_modules()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long home = await Scenario.SeedAsync(db);
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        Role storeman = new($"Storeman {tag}");
+        storeman.Grant("Inventory.Valuation", OperationFlags.View);
+        storeman.Grant("Procurement.Grn", OperationFlags.View | OperationFlags.Create);
+        db.Roles.Add(storeman);
+        await db.SaveChangesAsync();
+        User user = new($"storeman.{tag}", "Storeman");
+        user.SetPasswordHash("hash", mustChange: false);
+        user.AssignRole(storeman.Id);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        IApiAccessService access = scope.ServiceProvider.GetRequiredService<IApiAccessService>();
+        Task<ApiAccessDecision> Ask(string method, string path)
+            => access.AuthoriseAsync(new ApiAccessRequest(user.Id, method, path, new Dictionary<string, string> { ["companyId"] = $"{home}" }));
+
+        // Stock may be read but not moved; goods may be received against an order (as the signed-in user); sales orders are out of reach.
+        (await Ask("GET", "/api/stock/on-hand")).Allowed.Should().BeTrue();
+        (await Ask("GET", "/api/stock/valuation")).Allowed.Should().BeTrue();
+        (await Ask("POST", "/api/stock/receipts")).StatusCode.Should().Be(403);
+        (await Ask("POST", "/api/stock/transfers")).StatusCode.Should().Be(403);
+        ApiAccessDecision receipt = await Ask("POST", "/api/pop/orders/PO-1/receipts");
+        receipt.Allowed.Should().BeTrue();
+        receipt.MissingActorParameters.Should().Contain("userId");
+        (await Ask("GET", "/api/pop/orders")).Allowed.Should().BeTrue();
+        (await Ask("GET", "/api/sop/orders")).StatusCode.Should().Be(403);
+        (await Ask("POST", "/api/sop/orders/SO-1/despatch")).StatusCode.Should().Be(403);
+    }
 }
