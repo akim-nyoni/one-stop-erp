@@ -22370,6 +22370,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
 
+                    b.Property<string>("CurrencySplit")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("currency_split");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasMaxLength(120)

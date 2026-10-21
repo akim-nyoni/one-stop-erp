@@ -447,6 +447,14 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         Dictionary<string, decimal> taxableByCurrency = new(StringComparer.Ordinal);
         vars[TaxableByCurrencyKey] = taxableByCurrency;
 
+        // Each deduction's (and employer contribution's) base amounts by the currency of the earnings it falls on: split-currency tax as the
+        // tax was worked out, filled in by the tax calculation; the lines' own splits once resolved.
+        Dictionary<string, Dictionary<string, decimal>> taxSplits = new(StringComparer.OrdinalIgnoreCase);
+        vars[TaxSplitsKey] = taxSplits;
+        Dictionary<string, Dictionary<string, decimal>> lineSplits = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> elementCodes = new(elements.Values.Select(e => e.Code), StringComparer.OrdinalIgnoreCase);
+        bool PaidInForeign() => taxableByCurrency.Any(c => c.Key.Length > 0 && c.Value != 0m);
+
         // The bases flagged earnings build up (pensionable pay, the social security base…) and each element group's total.
         foreach (string basis in new[] { "PENSIONABLE", "SOCIALSECURITYBASE", "OVERTIMEBASE", "LEAVEBASE", "UNIONBASE", "TERMINALBASE" })
         {
@@ -492,6 +500,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 assignment = new EmployeePayElement(element.Id, assignment.OverrideAmount, assignment.OverrideRate, units);
             }
 
+            taxSplits.Remove(element.Code);
             Result<decimal> resolved = variable?.Amount is decimal fixedAmount ? fixedAmount : Resolve(element, assignment, vars);
             if (resolved.IsFailure)
             {
@@ -575,7 +584,15 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             vars["TAXABLE"] = taxable;
             vars["ANNUALTAXABLE"] = annualTaxable;
             vars["DEDUCTIONS"] = deductions;
-            payslip.AddLine(element.Code, element.Name, element.Type, amount, element.Taxable, string.Join("; ", workings));
+            string? currencySplit = null;
+            if (element.Type is PayElementType.Deduction or PayElementType.EmployerContribution && PaidInForeign())
+            {
+                Dictionary<string, decimal> portions = CurrencyPortions(element, amount, taxSplits, lineSplits, taxableByCurrency, elementCodes);
+                lineSplits[element.Code] = portions;
+                currencySplit = PayslipCurrencySplit.Format(portions);
+            }
+
+            payslip.AddLine(element.Code, element.Name, element.Type, amount, element.Taxable, string.Join("; ", workings), currencySplit);
         }
 
         // Staff loans (brief §4.15.5): the period's interest is charged (a memo line) and the instalment deducted, never taking net pay below zero.
@@ -595,7 +612,8 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 if (take > 0m)
                 {
                     payslip.AddLine(LoanLinePrefix + id.ToString(System.Globalization.CultureInfo.InvariantCulture), $"Loan {reference} repayment", PayElementType.Deduction, take, false,
-                        take < due ? $"instalment {Money(installment)} (due {Money(due)}) held to {Money(take)} of net pay" : $"instalment {Money(installment)} on a balance of {Money(outstanding + interest)}");
+                        take < due ? $"instalment {Money(installment)} (due {Money(due)}) held to {Money(take)} of net pay" : $"instalment {Money(installment)} on a balance of {Money(outstanding + interest)}",
+                        PaidInForeign() ? PayslipCurrencySplit.Format(PayslipCurrencySplit.Apportion(take, taxableByCurrency)) : null);
                     available -= take;
                 }
             }
@@ -605,6 +623,32 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
     }
 
     private const string BasicNoteKey = "__BASICNOTE";
+
+    private const string TaxSplitsKey = "__TAXSPLITS";
+
+    // A deduction's base amounts by currency: split-currency tax as the tax calculation shared it; a formula on exactly one element that has
+    // a split (a levy on PAYE) in that element's proportions; anything else in proportion to the taxable earnings by currency.
+    private static Dictionary<string, decimal> CurrencyPortions(PayElement element, decimal amount, IReadOnlyDictionary<string, Dictionary<string, decimal>> taxSplits,
+        IReadOnlyDictionary<string, Dictionary<string, decimal>> lineSplits, IReadOnlyDictionary<string, decimal> taxableByCurrency, IReadOnlySet<string> elementCodes)
+    {
+        if (taxSplits.TryGetValue(element.Code, out Dictionary<string, decimal>? tax))
+        {
+            return decimal.Round(tax.Values.Sum(), 2, MidpointRounding.ToEven) == amount ? PayslipCurrencySplit.Exact(amount, tax) : PayslipCurrencySplit.Apportion(amount, tax);
+        }
+
+        if (element.Basis == CalculationBasis.Formula && element.Formula is string formula)
+        {
+            List<string> followed = [.. System.Text.RegularExpressions.Regex.Matches(formula, "[A-Za-z_][A-Za-z0-9_]*").Select(m => m.Value)
+                .Where(name => !string.Equals(name, element.Code, StringComparison.OrdinalIgnoreCase) && elementCodes.Contains(name) && lineSplits.ContainsKey(name))
+                .Distinct(StringComparer.OrdinalIgnoreCase)];
+            if (followed.Count == 1)
+            {
+                return PayslipCurrencySplit.Apportion(amount, lineSplits[followed[0]]);
+            }
+        }
+
+        return PayslipCurrencySplit.Apportion(amount, taxableByCurrency);
+    }
 
     private static string Money(decimal value) => value.ToString("#,0.00", System.Globalization.CultureInfo.InvariantCulture);
 
@@ -748,6 +792,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
         IEnumerable<TaxTable> tables = vars.GetValueOrDefault(TaxTablesKey) as IEnumerable<TaxTable> ?? [];
         IReadOnlyDictionary<string, decimal> rates = vars.GetValueOrDefault(PayRatesKey) as IReadOnlyDictionary<string, decimal> ?? new Dictionary<string, decimal>();
         decimal tax = 0m;
+        Dictionary<string, decimal> shares = new(StringComparer.Ordinal);
         foreach ((string currency, decimal earnings) in portions)
         {
             TaxTable? own = currency.Length == 0 ? null : tables
@@ -755,6 +800,7 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 .OrderBy(t => t.EffectiveFrom).LastOrDefault();
             if (own is null)
             {
+                shares[currency] = shares.GetValueOrDefault(currency) + (baseTax * earnings / taxable);
                 tax += baseTax * earnings / taxable;
                 continue;
             }
@@ -765,7 +811,15 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             }
 
             decimal inCurrency = earnings / rate;
-            tax += PayeTable.Tax(own.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), inCurrency) * rate;
+            decimal ownTax = PayeTable.Tax(own.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), inCurrency) * rate;
+            shares[currency] = shares.GetValueOrDefault(currency) + ownTax;
+            tax += ownTax;
+        }
+
+        // What each currency bears is kept for the line's currency split.
+        if (vars.GetValueOrDefault(TaxSplitsKey) is Dictionary<string, Dictionary<string, decimal>> splits)
+        {
+            splits[element.Code] = shares;
         }
 
         return decimal.Round(tax, 2, MidpointRounding.ToEven);

@@ -107,6 +107,7 @@ internal sealed class PayslipLineConfiguration : IEntityTypeConfiguration<Paysli
         b.HasKey(x => x.Id);
         b.Property(x => x.ElementCode).HasMaxLength(30);
         b.Property(x => x.Workings).HasMaxLength(1000);
+        b.Property(x => x.CurrencySplit).HasMaxLength(PayslipCurrencySplit.MaxLength);
         b.Property(x => x.Description).HasMaxLength(120);
         b.Property(x => x.Type).HasConversion<int>();
     }

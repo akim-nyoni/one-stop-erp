@@ -88,9 +88,14 @@ public sealed class Payslip : AuditableEntity, ICompanyScoped
     /// <param name="amount">The amount.</param>
     /// <param name="taxable">Whether the line is taxable.</param>
     /// <param name="workings">How the amount was worked out at the time (brief §4.15.7: a full trace per employee per element).</param>
-    public void AddLine(string elementCode, string description, PayElementType type, decimal amount, bool taxable, string? workings = null)
+    /// <param name="currencySplit">The base amounts of the line belonging to each foreign currency (see <see cref="PayslipCurrencySplit"/>), or null.</param>
+    public void AddLine(string elementCode, string description, PayElementType type, decimal amount, bool taxable, string? workings = null, string? currencySplit = null)
     {
-        PayslipLine line = new(elementCode, description, type, amount, taxable) { Workings = workings is null ? null : workings.Length > 1000 ? workings[..1000] : workings };
+        PayslipLine line = new(elementCode, description, type, amount, taxable)
+        {
+            Workings = workings is null ? null : workings.Length > 1000 ? workings[..1000] : workings,
+            CurrencySplit = currencySplit is null ? null : currencySplit[..Math.Min(currencySplit.Length, PayslipCurrencySplit.MaxLength)],
+        };
         line.Stamp(CompanyId, PayDate);
         _lines.Add(line);
         switch (type)
@@ -152,6 +157,12 @@ public sealed class PayslipLine : Entity
 
     /// <summary>Gets how the amount was worked out when the run was calculated: the basis, the values it used and any limits applied.</summary>
     public string? Workings { get; init; }
+
+    /// <summary>
+    /// Gets the base amounts of the line that belong to each foreign currency the employee's taxable earnings were paid in, invariant
+    /// "ZWG=30.00;EUR=12.50" (the base currency's portion is the amount less these); null when the payslip had no foreign-currency earnings.
+    /// </summary>
+    public string? CurrencySplit { get; init; }
 
     /// <summary>The element code.</summary>
     public string ElementCode { get; private set; }
