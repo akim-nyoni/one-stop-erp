@@ -59,6 +59,10 @@ public sealed class PosTests
             IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
             sessionId = (await pos.OpenTillAsync(companyId, terminalId, cashierUserId: 1, openingFloat: 100m)).Value;
 
+            // One open session per till: the same cashier opening it again carries on in it; another cashier is refused (sixteenth audit #5).
+            (await pos.OpenTillAsync(companyId, terminalId, cashierUserId: 1, openingFloat: 100m)).Value.Should().Be(sessionId);
+            (await pos.OpenTillAsync(companyId, terminalId, cashierUserId: 2, openingFloat: 50m)).Error.Code.Should().Be("Pos.TillAlreadyOpen");
+
             // Sell 10 @ 2.00, net 20 + VAT 3 = 23; tender cash 25 with 2 change.
             var sale = await pos.CompleteSaleAsync(new CompleteSaleRequest
             {
@@ -87,6 +91,15 @@ public sealed class PosTests
 
             var zread = await pos.CloseTillAsync(sessionId);
             zread.Value.ZReadNumber.Should().Be(1);
+
+            // A cashed-up session takes no more sales.
+            (await pos.CompleteSaleAsync(new CompleteSaleRequest
+            {
+                CompanyId = companyId, TerminalId = terminalId, TillSessionId = sessionId, CashierUserId = 1,
+                SaleNumber = "S-LATE", SaleDate = new DateOnly(2026, 3, 2), WarehouseId = warehouseId, TaxAccountCode = "2200",
+                Lines = [new PosSaleLineRequest(itemId, "Soda 500ml", 1m, 2.00m, 2m, 0.3m, "4000")],
+                Tenders = [new PosTenderRequest(TenderType.Cash, Scenario.Usd, 2.3m, "1000", IsChange: false)],
+            })).Error.Code.Should().Be("Pos.SessionClosed");
         }
 
         // Stock reduced by the sale (100 received − 10 sold).

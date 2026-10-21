@@ -73,6 +73,16 @@ public sealed class PosService : IPosService
             }
         }
 
+        // One open session per till: the same cashier opening it again (the till restarted) carries on in the open session; anyone else waits
+        // for it to be cashed up or for a cashier switch, so a session can never be left open beside a new one and escape its count.
+        TillSession? open = await _db.Set<TillSession>().AsNoTracking()
+            .Where(s => s.CompanyId == companyId && s.TerminalId == terminalId && s.Status == TillSessionStatus.Open).OrderByDescending(s => s.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (open is not null)
+        {
+            return open.CashierUserId == cashierUserId ? open.Id
+                : Error.Conflict("Pos.TillAlreadyOpen", $"This till already has an open session (opened {open.OpenedOnUtc.ToLocalTime():yyyy-MM-dd HH:mm} by another cashier): cash it up, or switch the cashier to you.");
+        }
+
         TillSession session = new(companyId, terminalId, cashierUserId, _clock.UtcNow, openingFloat);
         _db.Set<TillSession>().Add(session);
 
@@ -116,6 +126,18 @@ public sealed class PosService : IPosService
     // One unit of work: its postings and record changes commit together or not at all.
     private async Task<Result<CompleteSaleResult>> CompleteSaleCoreAsync(CompleteSaleRequest request, CancellationToken ct)
     {
+        // A sale is rung up in an open session of its own till: never into a session already cashed up (its count and Z are done) or another till's.
+        TillSession? session = await _db.Set<TillSession>().AsNoTracking().FirstOrDefaultAsync(s => s.Id == request.TillSessionId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        if (session is null || session.TerminalId != request.TerminalId)
+        {
+            return Error.Rule("Pos.SessionNotFound", $"Till session {request.TillSessionId} is not a session of this till.");
+        }
+
+        if (session.Status != TillSessionStatus.Open)
+        {
+            return Error.Rule("Pos.SessionClosed", $"Till session {request.TillSessionId} has been cashed up; the sale must be rung up in an open session.");
+        }
+
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
         CurrencyCode baseCurrency = company.BaseCurrency;
 
