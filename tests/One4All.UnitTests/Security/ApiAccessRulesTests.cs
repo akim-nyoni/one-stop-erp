@@ -67,6 +67,28 @@ public sealed partial class ApiAccessRulesTests
         requirement.IsWrite.Should().Be(write);
     }
 
+    [Theory]
+    [InlineData("GET", "/api/gl/trial-balance", "GeneralLedger", false)]
+    [InlineData("GET", "/api/gl/accounts", "GeneralLedger", false)]
+    [InlineData("GET", "/api/ar/aged-debtors", "Sales", false)]
+    [InlineData("GET", "/api/ap/aged-creditors", "Purchasing", false)]
+    [InlineData("POST", "/api/receipting/receipts", "Sales", true)]
+    [InlineData("POST", "/api/receipting/receipts", "CashBook", true)]
+    [InlineData("POST", "/api/receipting/receipts/RC-1/reverse", "Sales", true)]
+    [InlineData("GET", "/api/receipting/payers", "CashBook", false)]
+    [InlineData("POST", "/api/banking/statement-lines/5/customer-receipt", "CashBook", true)]
+    [InlineData("POST", "/api/banking/statement-lines/5/supplier-payment", "CashBook", true)]
+    [InlineData("POST", "/api/banking/statement-lines/5/to-account", "CashBook", true)]
+    [InlineData("GET", "/api/pos/sales", "Pos", false)]
+    [InlineData("POST", "/api/pos/sales/S-1/void", "Pos", true)]
+    [InlineData("GET", "/api/pos/tills/TILL1/x-read", "Pos", false)]
+    public void Ledger_receipting_bank_and_till_routes_need_their_module_to_read_and_a_changing_grant_to_write(string method, string path, string module, bool write)
+    {
+        ApiRequirement requirement = ApiAccessRules.Requirement(method, path)!;
+        requirement.Modules.Should().Contain(module);
+        requirement.IsWrite.Should().Be(write);
+    }
+
     [Fact]
     public void Every_api_area_in_the_server_is_governed()
     {

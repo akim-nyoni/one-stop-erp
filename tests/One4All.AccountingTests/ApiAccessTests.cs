@@ -100,4 +100,41 @@ public sealed class ApiAccessTests
         (await Ask("GET", "/api/sop/orders")).StatusCode.Should().Be(403);
         (await Ask("POST", "/api/sop/orders/SO-1/despatch")).StatusCode.Should().Be(403);
     }
+
+    [SkippableFact]
+    public async Task Ledger_receipting_bank_and_till_routes_are_held_to_their_modules()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long home = await Scenario.SeedAsync(db);
+        string tag = Guid.NewGuid().ToString("N")[..8];
+        Role cashier = new($"Till cashier {tag}");
+        cashier.Grant("Pos.Sale", OperationFlags.View);
+        cashier.Grant("CashBook.Teller", OperationFlags.View | OperationFlags.Create | OperationFlags.Post);
+        db.Roles.Add(cashier);
+        await db.SaveChangesAsync();
+        User user = new($"cashier.{tag}", "Cashier");
+        user.SetPasswordHash("hash", mustChange: false);
+        user.AssignRole(cashier.Id);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        IApiAccessService access = scope.ServiceProvider.GetRequiredService<IApiAccessService>();
+        Task<ApiAccessDecision> Ask(string method, string path)
+            => access.AuthoriseAsync(new ApiAccessRequest(user.Id, method, path, new Dictionary<string, string> { ["companyId"] = $"{home}" }));
+
+        // Till sales and X-reads may be read but a sale not voided; receipts may be taken (as the signed-in cashier) and statement lines posted; the GL is out of reach.
+        (await Ask("GET", "/api/pos/sales")).Allowed.Should().BeTrue();
+        (await Ask("GET", "/api/pos/tills/TILL1/x-read")).Allowed.Should().BeTrue();
+        (await Ask("POST", "/api/pos/sales/S-1/void")).StatusCode.Should().Be(403);
+        ApiAccessDecision receipt = await Ask("POST", "/api/receipting/receipts");
+        receipt.Allowed.Should().BeTrue();
+        receipt.MissingActorParameters.Should().Contain("userId");
+        (await Ask("GET", "/api/receipting/payers")).Allowed.Should().BeTrue();
+        (await Ask("POST", "/api/banking/statement-lines/5/to-account")).Allowed.Should().BeTrue();
+        (await Ask("GET", "/api/gl/trial-balance")).StatusCode.Should().Be(403);
+        (await Ask("GET", "/api/ap/aged-creditors")).StatusCode.Should().Be(403);
+    }
 }
