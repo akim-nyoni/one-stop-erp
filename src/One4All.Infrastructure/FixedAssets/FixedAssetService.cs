@@ -297,7 +297,14 @@ public sealed class FixedAssetService : IFixedAssetService
     }
 
     /// <inheritdoc />
-    public async Task<Result<DepreciationRunResult>> RunDepreciationAsync(long companyId, DateOnly date, string documentNumber, CancellationToken ct = default)
+    /// <remarks>
+    /// One unit of work: the journal and the assets' depreciated-to month commit together, and a run overlapping another (the scheduler and a user)
+    /// loses the race on the asset rows, runs again and finds the month already charged, so a month is never charged twice.
+    /// </remarks>
+    public Task<Result<DepreciationRunResult>> RunDepreciationAsync(long companyId, DateOnly date, string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => RunDepreciationCoreAsync(companyId, date, documentNumber, ct), ct);
+
+    private async Task<Result<DepreciationRunResult>> RunDepreciationCoreAsync(long companyId, DateOnly date, string documentNumber, CancellationToken ct)
     {
         Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
         if (company is null)

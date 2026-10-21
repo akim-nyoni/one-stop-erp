@@ -15,6 +15,9 @@ namespace One4All.Infrastructure.Accounting;
 /// </summary>
 public sealed class VatReturnService : IVatReturnService
 {
+    // The advisory lock space for VAT settlements ("VATS" in ASCII, shifted clear of company ids).
+    private const long VatSettlementLockBase = 0x5641545300000000L;
+
     private readonly One4AllDbContext _db;
     private readonly IPostingEngine _postingEngine;
 
@@ -32,12 +35,26 @@ public sealed class VatReturnService : IVatReturnService
     private readonly ITaxComplianceService? _tax;
 
     /// <inheritdoc />
-    public async Task<Result<VatSettlementResult>> SettleAsync(SettleVatRequest request, CancellationToken ct = default)
+    /// <remarks>
+    /// One unit of work: the settlement journal and the filed return commit together, and the company's VAT settlements are taken one at a time
+    /// (a transaction lock), so two users settling the same period cannot both pass the "already filed" check and post it twice.
+    /// </remarks>
+    public Task<Result<VatSettlementResult>> SettleAsync(SettleVatRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        return _db.AtomicAsync(() => SettleCoreAsync(request, ct), ct);
+    }
+
+    private async Task<Result<VatSettlementResult>> SettleCoreAsync(SettleVatRequest request, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(request.VatPayableAccountCode))
         {
             return Error.Validation("Vat.PayableAccount", "The VAT payable account is required.");
         }
+
+        // One settlement at a time per company, held to the end of this transaction.
+        long lockKey = VatSettlementLockBase + request.CompanyId;
+        await _db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct).ConfigureAwait(false);
 
         Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
 
