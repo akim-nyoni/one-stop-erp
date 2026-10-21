@@ -510,7 +510,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GradesAsync(long companyId, CancellationToken ct)
         => [.. (await EmployeesAsync(companyId, ct).ConfigureAwait(false)).Values.Where(e => e.Status != EmployeeStatus.Terminated).GroupBy(e => e.Grade ?? "(none)").OrderBy(g => g.Key, StringComparer.Ordinal)
             .Select(g => Row(("Grade", g.Key), ("Headcount", g.Count()), ("Female", g.Count(e => e.Gender == Gender.Female)), ("Male", g.Count(e => e.Gender == Gender.Male)),
-                ("Unspecified", g.Count(e => e.Gender == Gender.Unspecified)), ("Range", $"{Money(g.Min(e => e.BasicSalary))} – {Money(g.Max(e => e.BasicSalary))}"),
+                ("Unspecified", g.Count(e => e.Gender == Gender.Unspecified)), ("Range", $"{Money(g.Min(e => e.BasicSalary))} - {Money(g.Max(e => e.BasicSalary))}"),
                 ("Average", Math.Round(g.Average(e => e.BasicSalary), 2, MidpointRounding.AwayFromZero))))];
 
     private static readonly string[] PaymentFields = ["PaymentMethod", "BankName", "BankBranch", "BankAccountNumber", "MobileMoneyNumber"];
