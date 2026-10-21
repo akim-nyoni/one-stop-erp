@@ -17,14 +17,22 @@ namespace One4All.Desktop.Operations;
 /// <content>HR and attendance, banking, sales and schools operations, and the document printer.</content>
 public static partial class OperationCatalogue
 {
-    // The accounts paying pay in other currencies, written "EUR:1120; ZAR:1130".
-    private static Dictionary<CurrencyCode, string> ForeignAccounts(string? text)
+    // The accounts paying pay in other currencies: up to two currencies, each picked from the currency table with the account paying it.
+    private static OperationField[] ForeignAccountFields(string step) =>
+    [
+        Opt("Foreign1", $"Foreign currency 1 ({step})"), Opt("ForeignAccount1", $"Paying account for it ({step})"),
+        Opt("Foreign2", $"Foreign currency 2 ({step})"), Opt("ForeignAccount2", $"Paying account for that ({step})"),
+    ];
+
+    private static Dictionary<CurrencyCode, string> ForeignAccounts(OperationInput i)
     {
         Dictionary<CurrencyCode, string> foreign = [];
-        foreach (string part in (text ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        foreach ((string currency, string account) in new[] { ("Foreign1", "ForeignAccount1"), ("Foreign2", "ForeignAccount2") })
         {
-            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
-            foreign[bits.Length == 2 ? CurrencyCode.Parse(bits[0]) : throw new OperationException($"Write each as CUR:account (\"{part}\").")] = bits[1];
+            if (i.Optional(currency) is string code)
+            {
+                foreign[CurrencyCode.Parse(code.Trim().ToUpperInvariant())] = i.Optional(account) ?? throw new OperationException($"Pick the account paying the {code.Trim().ToUpperInvariant()} pay.");
+            }
         }
 
         return foreign;
@@ -45,7 +53,7 @@ public static partial class OperationCatalogue
                 Today("LastDay", "Last day"), Opt("Reason", "Reason"), Num("NoticeMonths", "Notice (months)", "1"), Num("WorkingDays", "Working days a month", "22"), Num("GratuityWeeks", "Gratuity weeks a year", "2"),
                 Num("SeveranceWeeks", "Severance weeks a year", "4"), Num("TerminalTax", "Terminal benefits tax %", "0"), Req("Salary", "Salary expense account", "6100"),
                 Req("Benefits", "Terminal benefits account", "6100"), Req("Paye", "PAYE liability account", "2400"), Req("NetPay", "Net pay account", "2420"), OptNum("Item", "Checklist item id"),
-                Opt("Bank", "Bank account paying (release)"), Opt("Foreign", "Foreign-currency accounts paying (release; EUR:1120; ZAR:1130)"), OptNum("Bonus", "Year's bonus (paid pro rata)"), OptNum("Overpayment", "Overpayment to recover"),
+                Opt("Bank", "Bank account paying (release)"), .. ForeignAccountFields("release"), OptNum("Bonus", "Year's bonus (paid pro rata)"), OptNum("Overpayment", "Overpayment to recover"),
                 Opt("Recoveries", "Recoveries account (property, overpayments)"), OptNum("TaxFree", "Tax-free terminal benefits"),
                 Opt("TerminalTable", "Terminal tax table (bands, instead of the rate)")],
             Run = async (c, i) =>
@@ -62,7 +70,7 @@ public static partial class OperationCatalogue
                         return Check(await terminations.FinalPaySlipAsync(c.CompanyId, i.Text("Number")).ConfigureAwait(true));
                     case "Release final pay":
                         string? paid = Check(await terminations.ReleaseFinalPayAsync(c.CompanyId, i.Text("Number"), i.Date("LastDay"), i.Optional("Bank") ?? string.Empty,
-                            ForeignAccounts(i.Optional("Foreign"))).ConfigureAwait(true));
+                            ForeignAccounts(i)).ConfigureAwait(true));
                         return paid is null ? "Released (nothing was due)." : $"Final pay released (journal {paid}).";
                 }
 
@@ -634,7 +642,7 @@ public static partial class OperationCatalogue
                 + "currency go out of that currency's account at the pay date's rate - and clears the net pay control; "
                 + "Close closes the run once its net pay control is clear; Stage shows where a run stands.",
             Fields = [Pick("Step", "Step", ["Pay", "Close", "Stage"]), CommittedRun("Run", "Payroll run"), Opt("Bank", "Bank account for transfers", "1100"), Opt("Cash", "Cash account"),
-                Opt("Mobile", "Mobile-money float account"), Opt("Cheque", "Bank account cheques are drawn on"), Opt("Foreign", "Foreign-currency accounts (EUR:1120; ZAR:1130)"), Today()],
+                Opt("Mobile", "Mobile-money float account"), Opt("Cheque", "Bank account cheques are drawn on"), .. ForeignAccountFields("pay"), Today()],
             Run = async (c, i) =>
             {
                 IPayrollSettlementService settlement = c.Get<IPayrollSettlementService>();
@@ -654,7 +662,7 @@ public static partial class OperationCatalogue
                         Use(Core.Payroll.PayMethod.Cash, "Cash");
                         Use(Core.Payroll.PayMethod.MobileMoney, "Mobile");
                         Use(Core.Payroll.PayMethod.Cheque, "Cheque");
-                        PayrollPayment paid = Check(await settlement.PayAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), accounts, ForeignAccounts(i.Optional("Foreign"))).ConfigureAwait(true));
+                        PayrollPayment paid = Check(await settlement.PayAsync(c.CompanyId, i.Text("Run"), i.Date("Date"), accounts, ForeignAccounts(i)).ConfigureAwait(true));
                         return $"Paid in journal {paid.JournalNumber}: " + string.Join("; ", paid.ByMethod.Select(m => $"{m.Method} {M(m.Amount)} from {m.FundingAccountCode}")
                             .Concat(paid.ByCurrency.Select(f => $"{f.Currency} {M(f.Amount)} ({M(f.BaseAmount)} base) from {f.FundingAccountCode}")));
                     case "Close":
