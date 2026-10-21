@@ -32,8 +32,15 @@ internal static class PayrollApiEndpoints
 
     private static void MapEmployees(RouteGroupBuilder api)
     {
-        api.MapGet("/api/hr/employees/{number}", async (string number, long companyId, One4AllDbContext db, CancellationToken ct) =>
+        api.MapGet("/api/hr/employees/{number}", async (string number, long companyId, long userId, One4AllDbContext db, IPermissionService permissions, CancellationToken ct) =>
         {
+            // The record carries national ID, tax and social security numbers, date of birth and next of kin: any payroll right opens the area
+            // (a leave clerk's included), so the record itself needs the employee record's own view right.
+            if (!(await permissions.ResolveAsync(userId, ct).ConfigureAwait(false)).Has("Payroll.Employee", OperationFlags.View))
+            {
+                return Value(Result<bool>.Failure(Error.Forbidden("Api.EmployeeRecord", "Reading an employee's record needs the employee record right (Payroll.Employee, view).")));
+            }
+
             string key = OrdersApiMapping.Key(number);
             Employee? employee = await db.Employees.AsNoTracking().FirstOrDefaultAsync(e => e.CompanyId == companyId && e.EmployeeNumber.ToUpper() == key, ct).ConfigureAwait(false);
             return employee is null ? NotFound($"No employee {key}.") : Results.Ok(await ViewAsync(db, employee, ct).ConfigureAwait(false));
