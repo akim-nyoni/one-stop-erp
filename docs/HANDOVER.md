@@ -74,11 +74,24 @@ comments, docs, commit messages): use a plain hyphen. a search for U+2014 across
 - Imports and take-on: `IOpeningBalanceService` and `IVerticalImportService` with `ImportTemplates` and the System Manager Import screen.
 - Backups: `IBackupService` (`BackupService` wraps pg_dump/pg_restore; restore by record, by file, and switch-over).
 
+## Screen conventions (user rules, 2026-10-20)
+
+- Dates are always picked on a calendar (OptDate / Today, or a label containing yyyy-MM-dd becomes a date picker); never typed.
+- Currencies are always picked from the currency table (CurrencyPick, or any text field whose label says currency); never typed.
+- Master and reference screens have Add, Edit, Delete and History: Run changes an existing key (upsert), Delete soft-deletes or retires
+  (`SoftDelete<T>`, `Retire<T>`), or `Editable = true` when nothing may be deleted. Transactions keep reverse / cancel instead.
+  No Remove step that duplicates Delete. Add / Edit / Delete show only when the user's roles allow them (OperationsViewModel
+  UserCanAdd / ShowEdit / ShowDelete); saving an Edit needs the Edit right.
+- Fields that name an account, customer, supplier or user become pick lists automatically; fields that take a file get Browse...;
+  journal lines (label "Journal lines") get the journal grid; document lines (label with ITEM:) get the item grid.
+- Messages that point to another screen name its real menu path (Module > Group > Screen) from NavigationMap.
+
 ## State at handover
 
-Updated 2026-10-19. The twelfth and thirteenth lists are complete. The fourteenth audit (three Explore agents, 2026-10-18) is ranked in the memory
-file under "FOURTEENTH AUDIT"; all twenty items are done (the last, #20, guards the housing ownership chain in the database). Continue with its
-"later" list: currency rounding on postings is in progress (the posting engine now keeps amounts to each currency's decimals), then prepayment
-release schedules, cash forecast by currency, the allocation grid, hierarchy-driven financial statements, supplier settlement discount, POS
-commission, leave coverage, the student sub-ledger, housing faults on the service desk, the schools API, safe/treasury, offline restaurant tabs
-and field-based documents. After that, run a fifteenth audit. The last rows of `docs/PROGRESS.md` say exactly what each increment did.
+Updated 2026-10-21. The fifteenth audit and its later items are done, and the persona usability backlog (memory file
+one4all-usability-backlog) is worked through except the housing remainder listed there. Then the remaining later items: multi-currency
+payroll and REST API breadth. Verify with `tools/dev/verify-snapshot.ps1` (a worktree at ..\ERP-verify) so editing can go on meanwhile.
+The last rows of `docs/PROGRESS.md` say exactly what each increment did.
+
+Earlier state (2026-10-19): the twelfth to fourteenth lists are complete; the fourteenth audit's "later" list was worked through before the
+fifteenth audit.
