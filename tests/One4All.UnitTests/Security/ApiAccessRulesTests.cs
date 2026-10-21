@@ -54,11 +54,24 @@ public sealed partial class ApiAccessRulesTests
         requirement.IsWrite.Should().Be(write);
     }
 
+    [Theory]
+    [InlineData("GET", "/api/master/customers", "Sales", false)]
+    [InlineData("POST", "/api/master/suppliers", "Purchasing", true)]
+    [InlineData("PUT", "/api/master/items/5", "Inventory", true)]
+    [InlineData("POST", "/api/pos/sales", "Pos", true)]
+    [InlineData("GET", "/api/schools/students", "School", false)]
+    public void Master_data_pos_and_schools_are_governed_by_their_own_module(string method, string path, string module, bool write)
+    {
+        ApiRequirement requirement = ApiAccessRules.Requirement(method, path)!;
+        requirement.Modules.Should().Equal(module);
+        requirement.IsWrite.Should().Be(write);
+    }
+
     [Fact]
     public void Every_api_area_in_the_server_is_governed()
     {
-        string program = File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Server", "Program.cs"))
-            + File.ReadAllText(Path.Combine(RepositoryRoot(), "src", "One4All.Server", "OrdersApiEndpoints.cs"));
+        // Every file of the server that maps routes, not only Program.cs: master data, POS and schools are mapped in files of their own.
+        string program = string.Concat(Directory.GetFiles(Path.Combine(RepositoryRoot(), "src", "One4All.Server"), "*.cs").Select(File.ReadAllText));
         List<string> ungoverned = [.. Route().Matches(program).Select(m => m.Groups[1].Value).Distinct()
             .Where(path => !ApiAccessRules.AnonymousRoutes.Contains(path) && ApiAccessRules.Requirement("GET", path) is null)];
         ungoverned.Should().BeEmpty("every API area needs a permission module in ApiAccessRules");

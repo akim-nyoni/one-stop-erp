@@ -66,7 +66,9 @@ public static partial class ApiAccessRules
             return new ApiRequirement([], write);
         }
 
-        return ModulesByArea.TryGetValue(segments[1], out string[]? modules) ? new ApiRequirement(modules, write) : null;
+        // Master data is governed per record kind: customers by the sales ledger, suppliers by the purchase ledger, items by inventory.
+        string area = string.Equals(segments[1], "master", StringComparison.OrdinalIgnoreCase) && segments.Length > 2 ? $"master/{segments[2]}" : segments[1];
+        return ModulesByArea.TryGetValue(area, out string[]? modules) ? new ApiRequirement(modules, write) : null;
     }
 
     /// <summary>The licence modules behind an API area's permission modules (from the permission catalogue); any one licensed suffices.</summary>
