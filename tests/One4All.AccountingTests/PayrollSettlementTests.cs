@@ -96,4 +96,46 @@ public sealed class PayrollSettlementTests
         paid.ByCurrency.Should().Equal((Scenario.Eur, "1120", 200m, 220m));
         (await settlement.StageAsync(companyId, "MC-M03")).Value.NetPayOutstanding.Should().Be(0m);
     }
+
+    [SkippableFact]
+    public async Task Net_pay_owed_in_a_currency_is_fixed_at_the_pay_dates_rate_and_paying_later_books_the_exchange_difference()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Core.Accounting.CurrencyCode sek = Core.Accounting.CurrencyCode.Parse("SEK");
+        if (!await db.Currencies.AnyAsync(c => c.Code == sek))
+        {
+            db.Currencies.Add(new Core.System.Currency(sek, "Swedish Krona", "kr"));
+        }
+
+        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == sek && r.ToCurrency == Scenario.Usd))
+        {
+            db.ExchangeRates.Add(new Core.System.ExchangeRate(sek, Scenario.Usd, Core.System.ExchangeRateType.Daily, new DateOnly(2026, 1, 1), 1.25m));
+            db.ExchangeRates.Add(new Core.System.ExchangeRate(sek, Scenario.Usd, Core.System.ExchangeRateType.Daily, new DateOnly(2026, 7, 1), 1.30m));
+        }
+
+        db.Accounts.Add(new Core.Accounting.LedgerAccount(companyId, "1130", "Bank SEK", Core.Accounting.AccountType.Asset));
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC" };
+        PayElement krona = new(companyId, "SEKALLOW", "Allowance paid in SEK", PayElementType.Earning, CalculationBasis.FixedAmount, 2, "6100") { FixedAmount = 250m, PaidInCurrency = sek };
+        db.PayElements.AddRange(basic, krona);
+        await db.SaveChangesAsync();
+        Employee dee = new(companyId, "FX-1", "Dee Abroad", 1000m, new DateOnly(2025, 1, 1)) { PaymentMethod = PayMethod.BankTransfer, BankAccountNumber = "333" };
+        dee.AssignPayElement(basic.Id);
+        dee.AssignPayElement(krona.Id);
+        db.Employees.Add(dee);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-06", new DateOnly(2026, 6, 25), "2420", "FX-M06")).IsSuccess.Should().BeTrue();
+
+        // 250 base at the pay date's 1.25 is SEK 200 owed, as the payslip shows. Paid on 2 July at 1.30 the SEK 200 cost 260 base: a 10 exchange loss.
+        PayrollPayment paid = (await scope.ServiceProvider.GetRequiredService<IPayrollSettlementService>().PayAsync(companyId, "FX-M06", new DateOnly(2026, 7, 2),
+            new Dictionary<PayMethod, string> { [PayMethod.BankTransfer] = "1100" }, new Dictionary<Core.Accounting.CurrencyCode, string> { [sek] = "1130" })).Value;
+        paid.ByCurrency.Should().Equal((sek, "1130", 200m, 260m));
+        string fxLoss = await db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == Core.Accounting.ControlAccountType.FxLoss).Select(a => a.AccountCode).FirstAsync();
+        Core.Accounting.JournalEntry journal = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.JournalNumber == paid.JournalNumber);
+        journal.Lines.Single(l => l.AccountCode == fxLoss).BaseDebit.Should().Be(10m);
+        journal.Lines.Where(l => l.AccountCode == "2420").Sum(l => l.BaseDebit).Should().Be(1_250m, "the net pay accrued is cleared in full");
+    }
 }

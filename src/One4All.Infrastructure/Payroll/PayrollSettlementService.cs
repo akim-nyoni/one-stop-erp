@@ -78,7 +78,10 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                 baseNet.Add((s.PaymentMethod, s.Slip.NetPay - inForeign));
             }
 
+            // What is owed in each currency is fixed at the pay date's rate - what was taxed and shown on the payslip; paid later at the payment
+            // date's rate it costs a different base amount, and the difference is a realised exchange gain or loss.
             List<(CurrencyCode Currency, string Account, decimal Amount, decimal BaseAmount, decimal Rate)> byCurrency = [];
+            decimal exchange = 0m;
             foreach ((CurrencyCode foreign, decimal baseAmount) in foreignBase.Where(f => f.Value > 0m).OrderBy(f => f.Key.Value, StringComparer.Ordinal))
             {
                 if (currencyAccounts is null || !currencyAccounts.TryGetValue(foreign, out string? account) || string.IsNullOrWhiteSpace(account))
@@ -86,13 +89,31 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                     return Error.Validation("Payroll.CurrencyAccount", $"Say which {foreign} account pays the net pay earned in {foreign} ({baseAmount:N2} in base).");
                 }
 
+                decimal? payDateRate = await Accounting.ExchangeRateResolver.FindAsync(_db, foreign, currency, ExchangeRateType.Daily, run.PayDate, ct).ConfigureAwait(false);
                 decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, foreign, currency, ExchangeRateType.Daily, paidOn, ct).ConfigureAwait(false);
-                if (rate is not > 0m)
+                if (payDateRate is not > 0m || rate is not > 0m)
                 {
-                    return Error.Rule("Payroll.NoRate", $"There is no {foreign} rate on {paidOn:yyyy-MM-dd} to pay the {foreign} net pay at.");
+                    return Error.Rule("Payroll.NoRate", $"There is no {foreign} rate on {(payDateRate is not > 0m ? run.PayDate : paidOn):yyyy-MM-dd} to pay the {foreign} net pay at.");
                 }
 
-                byCurrency.Add((foreign, account.Trim().ToUpperInvariant(), decimal.Round(baseAmount / rate.Value, 2, MidpointRounding.AwayFromZero), baseAmount, rate.Value));
+                decimal owed = decimal.Round(baseAmount / payDateRate.Value, 2, MidpointRounding.AwayFromZero);
+                decimal paidBase = decimal.Round(owed * rate.Value, 2, MidpointRounding.AwayFromZero);
+                exchange += baseAmount - paidBase;
+                byCurrency.Add((foreign, account.Trim().ToUpperInvariant(), owed, paidBase, rate.Value));
+            }
+
+            // A gain (the currency weakened) is credited to FX gain, a loss debited to FX loss.
+            string? exchangeAccount = null;
+            if (exchange != 0m)
+            {
+                ControlAccountType fxType = exchange > 0m ? ControlAccountType.FxGain : ControlAccountType.FxLoss;
+                exchangeAccount = await _db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == fxType).OrderBy(a => a.AccountCode).Select(a => a.AccountCode)
+                    .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                if (exchangeAccount is null)
+                {
+                    return Error.Rule("Payroll.NoFxAccount", $"Net pay paid at a different rate from the pay date's gives an exchange {(exchange > 0m ? "gain" : "loss")} of {Math.Abs(exchange):N2}; "
+                        + $"set up an {fxType} control account first.");
+                }
             }
 
             List<(PayMethod Method, string Account, decimal Amount)> byMethod = [];
@@ -106,7 +127,7 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                 byMethod.Add((method.Key, account.Trim().ToUpperInvariant(), method.Sum()));
             }
 
-            decimal total = byMethod.Sum(m => m.Amount) + byCurrency.Sum(c => c.BaseAmount);
+            decimal total = byMethod.Sum(m => m.Amount) + byCurrency.Sum(c => c.BaseAmount) + exchange;
             if (total <= 0m)
             {
                 return Error.Rule("Payroll.NothingToPay", $"Run {run.DocumentNumber} has no net pay to pay.");
@@ -125,6 +146,14 @@ public sealed class PayrollSettlementService : IPayrollSettlementService
                         AccountCode = c.Account, Side = JournalSide.Credit, TransactionAmount = c.Amount, Currency = c.Currency, ExchangeRate = c.Rate, BaseAmount = c.BaseAmount,
                         Narrative = $"Net pay in {c.Currency}",
                     }),
+                    .. (exchangeAccount is null ? Array.Empty<JournalLineRequest>() :
+                    [
+                        new JournalLineRequest
+                        {
+                            AccountCode = exchangeAccount, Side = exchange > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(exchange),
+                            Narrative = "Exchange difference on net pay paid in another currency",
+                        },
+                    ]),
                 ],
             }, ct).ConfigureAwait(false);
             if (posted.IsFailure)
