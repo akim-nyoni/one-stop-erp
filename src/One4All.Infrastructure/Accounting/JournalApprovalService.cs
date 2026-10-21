@@ -60,10 +60,12 @@ public sealed class JournalApprovalService : IJournalApprovalService
 
     private Task<Result<PostingReceipt>> HoldAsync(JournalRequest request, long preparedByUserId, CancellationToken ct)
     {
+        // A manual journal is a general ledger entry whatever the caller says: claiming another module ("AR") would let it post into a period
+        // closed for the ledger but still open for that module.
         JournalRequest held = new()
         {
             CompanyId = request.CompanyId,
-            SourceModule = request.SourceModule,
+            SourceModule = "GL",
             PostingDate = request.PostingDate,
             TransactionCurrency = request.TransactionCurrency,
             DocumentType = request.DocumentType,

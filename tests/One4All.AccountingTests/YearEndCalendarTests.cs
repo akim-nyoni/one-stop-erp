@@ -64,7 +64,7 @@ public sealed class YearEndCalendarTests
         FiscalYear next = await db.FiscalYears.AsNoTracking().Include(y => y.Periods).SingleAsync(y => y.Id == closed.NextYearId);
         (next.Code, next.StartDate, next.EndDate, next.Periods.Count(p => !p.IsAdjustment), next.Periods.Count(p => p.IsAdjustment)).Should().Be(("2028/29", new DateOnly(2028, 7, 1), new DateOnly(2029, 6, 30), 12, 1));
         (await yearEnd.RunAsync(companyId, yearId, "3200")).Error.Code.Should().Be("YearEnd.AlreadyClosed");
-        (await Post(new DateOnly(2028, 1, 10), 5m)).Error.Code.Should().Be("Posting.PeriodNotOpen");
+        (await Post(new DateOnly(2028, 1, 10), 5m)).Error.Code.Should().Be("Posting.YearClosed");
 
         // Reverse: the profit is back in the year; then close again.
         IGeneralLedgerReports reports = scope.ServiceProvider.GetRequiredService<IGeneralLedgerReports>();

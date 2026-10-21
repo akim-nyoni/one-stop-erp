@@ -47,6 +47,17 @@ public sealed class BankReconciliationLockTests
         });
 
         (await Deposit(new DateOnly(2026, 3, 5), 250m)).IsSuccess.Should().BeTrue();
+
+        // An entry held (deferred) before the sign-off and released after it is refused like a new one: the lock applies when it really posts.
+        PostingReceipt held = (await engine.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId, SourceModule = "CB", PostingDate = new DateOnly(2026, 3, 18), TransactionCurrency = Scenario.Usd, Deferred = true,
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = "1100", Side = JournalSide.Debit, TransactionAmount = 15m },
+                new JournalLineRequest { AccountCode = "4000", Side = JournalSide.Credit, TransactionAmount = 15m },
+            ],
+        })).Value;
         IBankReconciliationService banking = scope.ServiceProvider.GetRequiredService<IBankReconciliationService>();
         (await banking.ImportStatementLinesAsync(companyId, bank.Id, [new StatementLineImport(new DateOnly(2026, 3, 5), "Deposit", 250m, null)])).IsSuccess.Should().BeTrue();
         (await banking.AutoMatchAsync(companyId, bank.Id)).Value.Should().Be(1);
@@ -56,6 +67,7 @@ public sealed class BankReconciliationLockTests
         (await db.Set<BankAccount>().AsNoTracking().SingleAsync(b => b.Id == bank.Id)).ReconciledTo.Should().Be(march);
 
         (await Deposit(new DateOnly(2026, 3, 20), 40m)).Error.Code.Should().Be("Posting.BankReconciled");
+        (await engine.ReleaseDeferredAsync(companyId, held.JournalId)).Error.Code.Should().Be("Posting.BankReconciled");
         (await Deposit(new DateOnly(2026, 4, 2), 40m)).IsSuccess.Should().BeTrue();
         (await banking.ImportStatementLinesAsync(companyId, bank.Id, [new StatementLineImport(new DateOnly(2026, 3, 30), "Late charge", -5m, null)])).Error.Code.Should().Be("Cb.ReconciledLocked");
         long matched = await db.Set<BankStatementLine>().Where(l => l.BankAccountId == bank.Id && l.IsReconciled).Select(l => l.Id).SingleAsync();

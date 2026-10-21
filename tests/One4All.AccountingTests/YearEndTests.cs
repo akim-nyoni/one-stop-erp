@@ -73,6 +73,16 @@ public sealed class YearEndTests
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             (await db.FiscalYears.AnyAsync(y => y.CompanyId == companyId && y.Code == "2027")).Should().BeTrue();
 
+            // The closed year takes no more postings from any module, and its periods are not reopened one module at a time (sixteenth audit #4).
+            IPostingEngine closedEngine = scope.ServiceProvider.GetRequiredService<IPostingEngine>();
+            (await closedEngine.PostAsync(new JournalRequest
+            {
+                CompanyId = companyId, SourceModule = "IN", PostingDate = new DateOnly(2026, 6, 15), TransactionCurrency = Scenario.Usd,
+                Lines = [L("5000", JournalSide.Debit, 5m), L("1100", JournalSide.Credit, 5m)],
+            })).Error.Code.Should().Be("Posting.YearClosed");
+            (await scope.ServiceProvider.GetRequiredService<IPeriodService>().SetStatusAsync(companyId, fiscalYearId, 6, "GL", One4All.Core.System.PeriodStatus.Open))
+                .Error.Code.Should().Be("Period.YearClosed");
+
             // The year-end pack (GL20, brief §14 report 20): the result before closing, the closing entries and the retained earnings they fed.
             await scope.ServiceProvider.GetRequiredService<One4All.Infrastructure.Persistence.Seeding.ReportCatalogueSeeder>().SeedAsync();
             var pack = await scope.ServiceProvider.GetRequiredService<IReportRunner>().RenderAsync(companyId, "GL20",
@@ -93,7 +103,7 @@ public sealed class YearEndTests
                 EnforceManualJournalRules = true, Lines = [L("1000", JournalSide.Debit, 5m), L("4000", JournalSide.Credit, 5m)],
             });
             late.IsFailure.Should().BeTrue();
-            late.Error.Code.Should().Be("Posting.PeriodNotOpen");
+            late.Error.Code.Should().Be("Posting.YearClosed");
         }
     }
 }

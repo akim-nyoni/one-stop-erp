@@ -31,6 +31,12 @@ public sealed class PeriodService : IPeriodService
             return Result.Failure(Error.NotFound("Period.NotFound", $"Period {periodNumber} not found in fiscal year {fiscalYearId}."));
         }
 
+        // A period of a year the year-end has closed is not reopened one module at a time: the year-end is reversed to reopen the year.
+        if (year.IsClosed && status is PeriodStatus.Open or PeriodStatus.Future)
+        {
+            return Result.Failure(Error.Rule("Period.YearClosed", $"Fiscal year {year.Code} has been closed by the year-end; reverse the year-end to reopen its periods."));
+        }
+
         // A permanently closed period can never take another posting, so a draft or deferred journal of that module
         // dated in it would be stranded: it must be posted or deleted first. (A plain close can be reopened.)
         if (status == PeriodStatus.PermanentlyClosed)

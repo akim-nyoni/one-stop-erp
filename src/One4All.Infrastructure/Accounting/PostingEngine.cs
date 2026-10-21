@@ -492,6 +492,25 @@ public sealed class PostingEngine : IPostingEngine
 
         (FiscalYear fiscalYear, FiscalPeriod fiscalPeriod) = periodResult.Value;
 
+        // A journal held for approval may be released weeks later: the locks that applied when it was held apply again now - a bank account since
+        // reconciled past its date, or a VAT return since filed over its date, takes no more entries.
+        List<string> lineAccounts = [.. journal.Lines.Select(l => l.AccountCode).Distinct()];
+        string? lockedBank = await _db.Set<Core.Banking.BankAccount>()
+            .Where(b => b.CompanyId == companyId && lineAccounts.Contains(b.GlAccountCode) && b.ReconciledTo != null && b.ReconciledTo >= journal.PostingDate)
+            .Select(b => b.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (lockedBank is not null)
+        {
+            return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} has been reconciled past {journal.PostingDate:yyyy-MM-dd} since journal {journal.JournalNumber} was held; reverse it and post the entry in an open period.");
+        }
+
+        if (journal.DocumentType != "VatReturn"
+            && await _db.VatReturnFilings.AnyAsync(f => f.CompanyId == companyId && f.FromDate <= journal.PostingDate && f.ToDate >= journal.PostingDate, ct).ConfigureAwait(false)
+            && await _db.Accounts.AnyAsync(a => a.CompanyId == companyId && lineAccounts.Contains(a.AccountCode)
+                && (a.ControlAccountType == ControlAccountType.VatOutput || a.ControlAccountType == ControlAccountType.VatInput), ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Tax.PeriodFiled", $"The VAT return covering {journal.PostingDate:yyyy-MM-dd} has been filed since journal {journal.JournalNumber} was held; post the VAT in an open period.");
+        }
+
         journal.MarkPosted(journal.JournalNumber, fiscalYear.Id, fiscalPeriod.Id, DateTimeOffset.UtcNow);
         await UpdatePeriodBalancesAsync(companyId, fiscalYear.Id, fiscalPeriod.Id, journal, ct).ConfigureAwait(false);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -917,6 +936,13 @@ public sealed class PostingEngine : IPostingEngine
                 }
 
                 continue;
+            }
+
+            // A year the year-end routine has closed takes nothing, whatever a period's module status says (a module that never had a status
+            // row, or a period reopened since): an entry after the closing journal would leave retained earnings wrong - reverse the year-end instead.
+            if (year.IsClosed)
+            {
+                return Error.Rule("Posting.YearClosed", $"Fiscal year {year.Code} has been closed by the year-end; {date:yyyy-MM-dd} takes no postings unless the year-end is reversed.");
             }
 
             PeriodStatus status = period.StatusFor(moduleCode);
