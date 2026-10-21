@@ -303,7 +303,8 @@ public sealed class PayrollSetupService : IPayrollSetupService
         target.DepartmentAccounts = Clean(element.DepartmentAccounts);
         target.LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant();
         target.LookupBands = Clean(element.LookupBands);
-        return Apply(target, new PayElementOptions(element.Recovers, element.BenefitCategory, element.PaidInCurrency, element.CumulativeTax, element.SplitCurrencyTax, element.IsAnnualPayment));
+        return Apply(target, new PayElementOptions(element.Recovers, element.BenefitCategory, element.PaidInCurrency, element.CumulativeTax, element.SplitCurrencyTax, element.IsAnnualPayment,
+            element.AmountsInPaidCurrency));
     }
 
     // What a new or edited element must satisfy: a name and account, a formula for a formula element, the contribution's expense account, a readable lookup
@@ -423,12 +424,18 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Result.Failure(Error.Validation("Payroll.PaidInCurrency", $"{given} is not a currency code."));
         }
 
+        if (options.AmountsInPaidCurrency && string.IsNullOrWhiteSpace(options.PaidInCurrency))
+        {
+            return Result.Failure(Error.Validation("Payroll.AmountCurrency", "Amounts keyed in the paid-in currency need the currency the element is paid in."));
+        }
+
         element.Recovers = options.Recovers;
         element.BenefitCategory = Clean(options.BenefitCategory);
         element.PaidInCurrency = Clean(options.PaidInCurrency) is string currency ? CurrencyCode.Parse(currency.ToUpperInvariant()) : null;
         element.CumulativeTax = options.CumulativeTax;
         element.SplitCurrencyTax = options.SplitCurrencyTax;
         element.IsAnnualPayment = options.IsAnnualPayment;
+        element.AmountsInPaidCurrency = options.AmountsInPaidCurrency;
         return Result.Success();
     }
 

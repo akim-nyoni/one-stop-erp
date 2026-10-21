@@ -106,8 +106,9 @@ public sealed record NewEmployee(string EmployeeNumber, string FullName, decimal
 /// <param name="CumulativeTax">Cumulative tax.</param>
 /// <param name="SplitCurrencyTax">Tax per currency.</param>
 /// <param name="IsAnnualPayment">An annual payment.</param>
+/// <param name="AmountsInPaidCurrency">The element's amounts are keyed in the currency it is paid in.</param>
 public sealed record PayElementOptions(PayRecovery Recovers = PayRecovery.None, string? BenefitCategory = null, string? PaidInCurrency = null, bool CumulativeTax = false, bool SplitCurrencyTax = false,
-    bool IsAnnualPayment = false);
+    bool IsAnnualPayment = false, bool AmountsInPaidCurrency = false);
 
 public sealed record EmployeeUpdate
 {
@@ -255,6 +256,9 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
 
     /// <summary>The currency the element is paid in when not the base currency (its own bank file at the pay date's rate).</summary>
     public string? PaidInCurrency { get; init; }
+
+    /// <summary>The element's amounts are keyed in <see cref="PaidInCurrency"/> and converted to base at the run's rate.</summary>
+    public bool AmountsInPaidCurrency { get; init; }
 
     /// <summary>Tax computed cumulatively over the tax year (year-to-date earnings and tax).</summary>
     public bool CumulativeTax { get; init; }

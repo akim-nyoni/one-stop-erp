@@ -159,6 +159,13 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     public CurrencyCode? PaidInCurrency { get; set; }
 
     /// <summary>
+    /// Gets or sets a value indicating whether the element's amounts are keyed in <see cref="PaidInCurrency"/> rather than base (a ZWG allowance of
+    /// ZWG 2,500): a fixed amount, a balance instalment, a rate per unit, their per-employee overrides and an amount keyed for the period are
+    /// converted to base at the run's rate for the currency before the floor, ceiling and rounding apply.
+    /// </summary>
+    public bool AmountsInPaidCurrency { get; set; }
+
+    /// <summary>
     /// Gets or sets the deduction's suspension priority under net-pay protection: 0 (the default - tax, pension, court orders) is never
     /// suspended; otherwise the highest number is suspended first.
     /// </summary>

@@ -498,8 +498,27 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
                 return resolved.Error;
             }
 
+            // Amounts keyed in the element's own currency (a fixed sum, an instalment, a rate per unit, a keyed amount) come into base at the run's rate.
+            string? converted = null;
+            if (element.AmountsInPaidCurrency && element.PaidInCurrency is { } amountCurrency
+                && (variable?.Amount is not null || element.Basis is CalculationBasis.FixedAmount or CalculationBasis.BalanceDriven or CalculationBasis.RatePerUnit))
+            {
+                IReadOnlyDictionary<string, decimal> payRates = vars.GetValueOrDefault(PayRatesKey) as IReadOnlyDictionary<string, decimal> ?? new Dictionary<string, decimal>();
+                if (!payRates.TryGetValue(amountCurrency.Value, out decimal payRate) || payRate <= 0m)
+                {
+                    return Error.Validation("Payroll.NoRate", $"No {amountCurrency.Value} rate on the pay date to convert {element.Code}'s amount; enter the day's rate first.");
+                }
+
+                converted = $"{amountCurrency.Value} {Money(resolved.Value)} at {payRate.ToString("0.######", System.Globalization.CultureInfo.InvariantCulture)}";
+                resolved = decimal.Round(resolved.Value * payRate, 2, MidpointRounding.AwayFromZero);
+            }
+
             decimal amount = element.ApplyLimits(resolved.Value);
             List<string> workings = [variable?.Amount is decimal keyed ? $"keyed for the period: {Money(keyed)}" : Workings(element, assignment, vars)];
+            if (converted is not null)
+            {
+                workings.Add(converted);
+            }
 
             // A pro-rated earning follows the days employed in the period, as basic does (a keyed amount is taken as it is).
             if (element.ProRated && element.Type == PayElementType.Earning && variable?.Amount is null && share < 1m)

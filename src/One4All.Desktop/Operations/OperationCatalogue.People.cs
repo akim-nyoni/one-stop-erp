@@ -317,7 +317,7 @@ public static partial class OperationCatalogue
                 Tick("ProRated", "Pro-rated for a part period"), Tick("NoArrears", "Never goes into arrears (deduction)"), Tick("Terminal", "Counts towards terminal benefits"), Tick("Union", "Subject to union dues"),
                 OptNum("Balance", "Balance to recover (assign; balance-driven element)"),
                 Pick("Recovers", "Recovers (deduction)", Enum.GetNames<PayRecovery>()), Opt("BenefitCategory", "Taxable-benefit category (PR34), e.g. Housing"), Opt("PaidIn", "Paid in currency (blank: base)"),
-                Tick("CumulativeTax", "Cumulative tax (year to date)"), Tick("SplitTax", "Tax per currency (split-currency pay)"), Tick("Annual", "Annual payment (bonus tax spread)"),
+                Tick("AmountsInCurrency", "Amounts keyed in the paid-in currency"), Tick("CumulativeTax", "Cumulative tax (year to date)"), Tick("SplitTax", "Tax per currency (split-currency pay)"), Tick("Annual", "Annual payment (bonus tax spread)"),
                 Opt("TableCurrency", "Tax table currency (blank: base; one table per currency for split-currency tax)"),
                 Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
                 Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …"),
@@ -357,7 +357,7 @@ public static partial class OperationCatalogue
                         return $"Tax table created (id {table}){(tableCurrency is null ? string.Empty : $" in {tableCurrency}")}.";
                     case "Set element options":
                         _ = Check(await setup.SetPayElementOptionsAsync(c.CompanyId, i.Optional("Code") ?? string.Empty, new PayElementOptions(Enum.Parse<PayRecovery>(i.Text("Recovers")),
-                            i.Optional("BenefitCategory"), i.Optional("PaidIn"), i.Flag("CumulativeTax"), i.Flag("SplitTax"), i.Flag("Annual"))).ConfigureAwait(true), string.Empty);
+                            i.Optional("BenefitCategory"), i.Optional("PaidIn"), i.Flag("CumulativeTax"), i.Flag("SplitTax"), i.Flag("Annual"), i.Flag("AmountsInCurrency"))).ConfigureAwait(true), string.Empty);
                         return $"Options set on {i.Optional("Code")?.ToUpperInvariant()}.";
                     case "Preview formula":
                         Dictionary<string, decimal> values = new(StringComparer.OrdinalIgnoreCase);
@@ -396,7 +396,7 @@ public static partial class OperationCatalogue
                 ("Basis group", e => e.BasisGroup ?? string.Empty), ("Floor", e => e.Floor), ("Ceiling", e => e.Ceiling), ("Round to", e => e.RoundTo), ("Rounding", e => e.Rounding),
                 ("Expense", e => e.ContributionExpenseAccountCode ?? string.Empty), ("Dept accounts", e => e.DepartmentAccounts ?? string.Empty),
                 ("Lookup variable", e => e.LookupVariable ?? string.Empty), ("Lookup bands", e => e.LookupBands ?? string.Empty), ("Recovers", e => e.Recovers),
-                ("Benefit category", e => e.BenefitCategory ?? string.Empty), ("Paid in", e => e.PaidInCurrency?.ToString() ?? string.Empty), ("Cumulative tax", e => e.CumulativeTax),
+                ("Benefit category", e => e.BenefitCategory ?? string.Empty), ("Paid in", e => e.PaidInCurrency?.ToString() ?? string.Empty), ("Amounts keyed in the paid-in currency", e => e.AmountsInPaidCurrency), ("Cumulative tax", e => e.CumulativeTax),
                 ("Split tax", e => e.SplitCurrencyTax), ("Annual", e => e.IsAnnualPayment)),
         };
         yield return new Operation
@@ -2295,6 +2295,6 @@ public static partial class OperationCatalogue
             Rounding = Enum.Parse<PayRounding>(i.Text("Rounding")), ContributionExpenseAccountCode = i.Optional("Expense"), DepartmentAccounts = i.Optional("DeptAccounts"),
             LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
             Recovers = Enum.Parse<PayRecovery>(i.Text("Recovers")), BenefitCategory = i.Optional("BenefitCategory"), PaidInCurrency = i.Optional("PaidIn"),
-            CumulativeTax = i.Flag("CumulativeTax"), SplitCurrencyTax = i.Flag("SplitTax"), IsAnnualPayment = i.Flag("Annual"),
+            CumulativeTax = i.Flag("CumulativeTax"), SplitCurrencyTax = i.Flag("SplitTax"), IsAnnualPayment = i.Flag("Annual"), AmountsInPaidCurrency = i.Flag("AmountsInCurrency"),
         };
 }

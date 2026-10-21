@@ -21662,6 +21662,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("account_code");
 
+                    b.Property<bool>("AmountsInPaidCurrency")
+                        .HasColumnType("boolean")
+                        .HasColumnName("amounts_in_paid_currency");
+
                     b.Property<bool>("ArrearsRecoverable")
                         .HasColumnType("boolean")
                         .HasColumnName("arrears_recoverable");

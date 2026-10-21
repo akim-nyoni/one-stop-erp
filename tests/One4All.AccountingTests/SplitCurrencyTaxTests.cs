@@ -72,4 +72,43 @@ public sealed class SplitCurrencyTaxTests
         run.TotalDeductions.Should().Be(163.33m + 200m);
         (await db.Set<Payslip>().AsNoTracking().Include(p => p.Lines).SingleAsync(p => p.EmployeeId == splitPaid.Id)).Lines.Single(l => l.ElementCode == "PAYE-S").Amount.Should().Be(163.33m);
     }
+
+    [SkippableFact]
+    public async Task Amounts_keyed_in_the_paid_in_currency_come_into_base_at_the_runs_rate()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        if (!await db.Currencies.AnyAsync(c => c.Code == Tzs))
+        {
+            db.Currencies.Add(new Currency(Tzs, "Tanzanian Shilling", "TSh"));
+        }
+
+        if (!await db.ExchangeRates.AnyAsync(r => r.FromCurrency == Tzs && r.ToCurrency == Scenario.Usd && r.RateType == ExchangeRateType.Daily))
+        {
+            db.ExchangeRates.Add(new ExchangeRate(Tzs, Scenario.Usd, ExchangeRateType.Daily, new DateOnly(2026, 1, 1), 0.0004m));   // 2,500 a dollar
+        }
+
+        PayElement basic = new(companyId, "BASIC", "Basic Salary", PayElementType.Earning, CalculationBasis.Formula, 1, "6100") { Formula = "BASIC", Taxable = true };
+        PayElement local = new(companyId, "LOCAL", "Allowance keyed in shillings", PayElementType.Earning, CalculationBasis.FixedAmount, 2, "6100")
+        {
+            Taxable = true, PaidInCurrency = Tzs, AmountsInPaidCurrency = true,
+        };
+        db.PayElements.AddRange(basic, local);
+        await db.SaveChangesAsync();
+        Employee employee = new(companyId, "AC-1", "Amount Currency", 1_000m, new DateOnly(2025, 1, 1));
+        employee.AssignPayElement(basic.Id);
+        employee.AssignPayElement(local.Id, overrideAmount: 1_250_000m);
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
+
+        // TSh 1,250,000 at 0.0004 is 500.00 in base: gross 1,500, and the line says what was keyed and the rate.
+        PayrollRunResult run = (await scope.ServiceProvider.GetRequiredService<IPayrollService>().RunAsync(companyId, "2026-05", new DateOnly(2026, 5, 25), "2420", "AC-05")).Value;
+        run.TotalGross.Should().Be(1_500m);
+        PayslipLine line = (await db.Set<Payslip>().AsNoTracking().Include(p => p.Lines).SingleAsync(p => p.EmployeeId == employee.Id)).Lines.Single(l => l.ElementCode == "LOCAL");
+        line.Amount.Should().Be(500m);
+        line.Workings.Should().Contain("TZS 1,250,000.00 at 0.0004");
+    }
 }

@@ -90,7 +90,7 @@ public sealed partial class PayrollService
 
         // The pay date's rate for each currency elements are paid in (split-currency tax converts at it).
         Dictionary<string, decimal> rates = new(StringComparer.Ordinal);
-        if (elements.Values.Any(e => e.SplitCurrencyTax))
+        if (elements.Values.Any(e => e.SplitCurrencyTax || e.AmountsInPaidCurrency))
         {
             Core.Accounting.CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
             foreach (Core.Accounting.CurrencyCode currency in elements.Values.Where(e => e.PaidInCurrency is not null).Select(e => e.PaidInCurrency!.Value).Distinct())
