@@ -46,7 +46,7 @@ public sealed class ReportExpressionContext
 /// <c>NumberToWords</c>, <c>ToBase</c>). No file, network or reflection access is exposed (brief §13.1).
 /// The same engine backs payroll pay-element formulas (brief §4.15.2).
 /// </summary>
-public sealed class ReportExpressionEngine
+public sealed partial class ReportExpressionEngine
 {
     /// <summary>The functions an expression can call, for the designer's completion (each takes brackets).</summary>
     public static IReadOnlyList<string> Functions { get; } = ["Upper", "Lower", "Trim", "Left", "Right", "Mid", "Replace", "Len", "Proper", "Abs", "Round", "Min", "Max", "Ceiling", "Floor", "Today", "AddDays", "AddMonths", "Year", "Month", "Day", "EndOfMonth", "DateDiff", "DateDiffIn", "FiscalPeriod", "FiscalYear", "If", "IsNull", "Coalesce", "Case", "Case2", "Case3", "Format", "NumberToWords", "AmountToWords", "NumberToWordsPt", "AmountToWordsPt"];
@@ -103,8 +103,49 @@ public sealed class ReportExpressionEngine
             }
         }
 
-        return _interpreter.Eval(expression, parameters.ToArray());
+        return _interpreter.Eval(DecimalLiterals(expression), parameters.ToArray());
     }
+
+    // Money is decimal: a literal with a decimal point and no suffix ("PAYE * 0.03") is read as decimal rather than double, so it multiplies
+    // decimal amounts; whole numbers stay int (Round's places, Left's count) and text inside quotes is left as it is.
+    private static string DecimalLiterals(string expression)
+    {
+        if (!expression.Contains('.', StringComparison.Ordinal))
+        {
+            return expression;
+        }
+
+        System.Text.StringBuilder result = new(expression.Length + 4);
+        int start = 0;
+        char? quote = null;
+        for (int i = 0; i <= expression.Length; i++)
+        {
+            bool end = i == expression.Length;
+            char ch = end ? ' ' : expression[i];
+            if (quote is null && (end || ch is '"' or '\''))
+            {
+                result.Append(RealLiteral().Replace(expression[start..i], "$1m"));
+                start = i;
+                quote = end ? null : ch;
+            }
+            else if (quote is char open && ch == open && (i == 0 || expression[i - 1] != '\\'))
+            {
+                result.Append(expression, start, i + 1 - start);
+                start = i + 1;
+                quote = null;
+            }
+        }
+
+        if (start < expression.Length)
+        {
+            result.Append(expression, start, expression.Length - start);
+        }
+
+        return result.ToString();
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<![\w.])(\d+\.\d+)(?![\w.])", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex RealLiteral();
 
     /// <summary>Evaluates an expression to a boolean (null/false → false).</summary>
     /// <param name="expression">The expression text.</param>
