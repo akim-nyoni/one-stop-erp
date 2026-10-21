@@ -72,14 +72,19 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Register a waiting-list applicant", ListTitle = "Applicants",
-            Description = "Registers an applicant (a second registration with the same national ID is refused) and gives the waiting-list number and priority score.",
+            Description = "Registers an applicant (a second registration with the same national ID is refused) and gives the waiting-list number and priority score. "
+                + "Ticked, it also opens the applicant's customer account (the waiting-list number as its code, the national ID on it) unless a customer already has that "
+                + "national ID, so deposits, sales and rent can be charged without keying the customer separately.",
             Fields = [Req("Id", "National ID"), Req("Name", "Full name"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()), Req("Born", "Date of birth (yyyy-MM-dd)"),
                 Req("Resident", "Resident since (yyyy-MM-dd)"), Num("Dependants", "Dependants", "0"), Tick("Disability", "Has a disability"), Num("Income", "Monthly income", "0"),
                 Pick("Tenure", "Current tenure", Enum.GetNames<CurrentTenure>()), Today("Registered", "Registration date"),
                 Pick("Marital", "Marital status", Enum.GetNames<MaritalStatus>()), Pick("Regime", "Marriage regime", ["", .. Enum.GetNames<MaritalRegime>()]),
-                Opt("SpouseId", "Spouse / co-applicant national ID"), Opt("SpouseName", "Spouse / co-applicant name")],
+                Opt("SpouseId", "Spouse / co-applicant national ID"), Opt("SpouseName", "Spouse / co-applicant name"),
+                Tick("Customer", "Open the applicant's customer account", true)],
             Run = async (c, i) =>
             {
+                // The registration and the customer account are one unit: the services join this transaction.
+                await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction unit = await c.Db.Database.BeginTransactionAsync().ConfigureAwait(true);
                 WaitingListRegistration registered = Check(await c.Get<IWaitingListService>().RegisterAsync(new WaitingListApplication
                 {
                     CompanyId = c.CompanyId, IdNumber = i.Text("Id"), FullName = i.Text("Name"), Category = Enum.Parse<HousingCategory>(i.Text("Category")), DateOfBirth = Day(i.Text("Born")),
@@ -89,7 +94,31 @@ public static partial class OperationCatalogue
                     MaritalRegime = i.Optional("Regime") is string regime ? Enum.Parse<MaritalRegime>(regime) : null,
                     SpouseIdNumber = i.Optional("SpouseId"), SpouseName = i.Optional("SpouseName"),
                 }).ConfigureAwait(true));
-                return $"Registered as {registered.WaitingListNumber}, priority score {registered.Score.Total:0.##} ({string.Join(", ", registered.Score.Lines.Select(l => $"{l.Factor} {l.Points:0.##}"))}).";
+                string account = string.Empty;
+                if (i.Flag("Customer"))
+                {
+                    string idNumber = i.Text("Id").Trim();
+                    string? existing = await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId && x.NationalIdNumber == idNumber).Select(x => x.Code)
+                        .FirstOrDefaultAsync().ConfigureAwait(true);
+                    if (existing is not null)
+                    {
+                        account = $" Customer {existing} already has this national ID and is used for the applicant.";
+                    }
+                    else
+                    {
+                        Core.Accounting.CurrencyCode currency = await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).SingleAsync().ConfigureAwait(true);
+                        long customerId = Check(await c.Get<Application.Abstractions.MasterData.IMasterDataService>()
+                            .CreateCustomerAsync(c.CompanyId, registered.WaitingListNumber, i.Text("Name"), currency).ConfigureAwait(true));
+                        Core.Trading.Customer customer = await c.Db.Customers.SingleAsync(x => x.Id == customerId).ConfigureAwait(true);
+                        customer.NationalIdNumber = idNumber;
+                        await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                        account = $" Customer account {customer.Code} opened for the applicant.";
+                    }
+                }
+
+                await unit.CommitAsync().ConfigureAwait(true);
+                return $"Registered as {registered.WaitingListNumber}, priority score {registered.Score.Total:0.##} ({string.Join(", ", registered.Score.Lines.Select(l => $"{l.Factor} {l.Points:0.##}"))})."
+                    + account;
             },
             List = ApplicantsAsync,
         };
