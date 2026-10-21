@@ -799,20 +799,68 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Surrender a stand", ListTitle = "Surrenders this year",
-            Description = "A holder gives a stand back to council (requested by you, approved by another user): an instalment agreement closes and what is owed is written off, "
-                + "a sold stand comes back into inventory at the lower of cost and net realisable value, and any refund is credited to the holder's account.",
-            Fields = [Req("Stand", "Stand number"), Req("Reason", "Reason"), Req("Approver", "Approving user name"), Req("GainLoss", "Surrender gain / loss account"),
-                Opt("Available", "Stands available (inventory) account (a sold stand)"), OptNum("Nrv", "Net realisable value (a sold stand)"), OptNum("Refund", "Refund to the holder"),
-                Opt("RefundAccount", "Refund charged to account"), Today()],
+            Description = "A holder gives a stand back to council. Request: you key the surrender and its accounts; another user then approves it (carrying it out) or rejects it "
+                + "with a reason. On approval an instalment agreement closes and what is owed is written off, a sold stand comes back into inventory at the lower of cost and "
+                + "current market value, and any refund is credited to the holder's account.",
+            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject"]),
+                Lookup("Request", "Surrender request (approve / reject)", false, async c => (await c.Db.StandSurrenderRequests.AsNoTracking()
+                        .Where(r => r.CompanyId == c.CompanyId && r.Status == Core.Housing.SurrenderRequestStatus.Pending).OrderBy(r => r.Id).ToListAsync().ConfigureAwait(true))
+                    .Select(r => (r.Id.ToString(CultureInfo.InvariantCulture), $"stand {r.StandNumber} - {r.Reason} - {D(r.Date)}")).ToList()),
+                Opt("Stand", "Stand number (request)"), Opt("Reason", "Reason (request / reject)"), Opt("GainLoss", "Surrender gain / loss account (request)"),
+                Opt("Available", "Stands available (inventory) account (request, a sold stand)"), OptNum("Nrv", "Current market value (request, a sold stand)"),
+                OptNum("Refund", "Refund to the holder (request)"), Opt("RefundAccount", "Refund charged to account (request)"), Today()],
             Run = async (c, i) =>
             {
+                if (i.Text("Step") == "Request")
+                {
+                    string stand = (i.Optional("Stand") ?? throw new OperationException("Give the stand number.")).Trim().ToUpperInvariant();
+                    if (await c.Db.StandSurrenderRequests.AnyAsync(r => r.CompanyId == c.CompanyId && r.StandNumber == stand && r.Status == Core.Housing.SurrenderRequestStatus.Pending)
+                        .ConfigureAwait(true))
+                    {
+                        throw new OperationException($"Stand {stand} already has a surrender request awaiting approval.");
+                    }
+
+                    if (!await c.Db.HousingStands.AnyAsync(s => s.CompanyId == c.CompanyId && s.StandNumber == stand && s.CurrentHolderCustomerId != null).ConfigureAwait(true))
+                    {
+                        throw new OperationException($"Stand {stand} has no holder to surrender it.");
+                    }
+
+                    Core.Housing.SurrenderRequest request = new(c.CompanyId, stand, i.Date("Date"), i.Optional("Reason") ?? throw new OperationException("Give the reason."),
+                        i.Optional("GainLoss") ?? throw new OperationException("Give the surrender gain / loss account."), i.Optional("Available") ?? string.Empty,
+                        i.OptionalNumber("Nrv") ?? 0m, i.OptionalNumber("Refund") ?? 0m, i.Optional("RefundAccount"), c.UserId);
+                    c.Db.StandSurrenderRequests.Add(request);
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Surrender of stand {stand} requested; another user approves or rejects it here.";
+                }
+
+                long id = long.TryParse(i.Optional("Request"), NumberStyles.None, CultureInfo.InvariantCulture, out long picked) ? picked
+                    : throw new OperationException("Pick the surrender request.");
+                Core.Housing.SurrenderRequest pending = await c.Db.StandSurrenderRequests
+                    .FirstOrDefaultAsync(r => r.CompanyId == c.CompanyId && r.Id == id && r.Status == Core.Housing.SurrenderRequestStatus.Pending).ConfigureAwait(true)
+                    ?? throw new OperationException("That surrender request is no longer awaiting a decision.");
+                if (pending.RequestedByUserId == c.UserId)
+                {
+                    throw new OperationException("You asked for this surrender; another user decides it.");
+                }
+
+                if (i.Text("Step") == "Reject")
+                {
+                    pending.Reject(c.UserId, i.Optional("Reason") ?? throw new OperationException("Give the reason for rejecting it."));
+                    await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                    return $"Surrender of stand {pending.StandNumber} rejected.";
+                }
+
+                // The surrender and the request's approval are one unit: the service joins this transaction.
+                await using Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction unit = await c.Db.Database.BeginTransactionAsync().ConfigureAwait(true);
                 StandSurrenderEntry done = Check(await c.Get<IRepossessionService>().SurrenderAsync(new StandSurrenderRequest
                 {
-                    CompanyId = c.CompanyId, StandNumber = i.Text("Stand"), Date = i.Date("Date"), Reason = i.Text("Reason"), RequestedByUserId = c.UserId,
-                    ApprovedByUserId = await UserAsync(c, i.Text("Approver")).ConfigureAwait(true), GainLossAccountCode = i.Text("GainLoss"),
-                    StandsAvailableAccountCode = i.Optional("Available") ?? string.Empty, NetRealisableValue = i.OptionalNumber("Nrv") ?? 0m, Refund = i.OptionalNumber("Refund") ?? 0m,
-                    RefundAccountCode = i.Optional("RefundAccount"),
+                    CompanyId = c.CompanyId, StandNumber = pending.StandNumber, Date = pending.Date, Reason = pending.Reason, RequestedByUserId = pending.RequestedByUserId,
+                    ApprovedByUserId = c.UserId, GainLossAccountCode = pending.GainLossAccountCode, StandsAvailableAccountCode = pending.StandsAvailableAccountCode,
+                    NetRealisableValue = pending.NetRealisableValue, Refund = pending.Refund, RefundAccountCode = pending.RefundAccountCode,
                 }).ConfigureAwait(true));
+                pending.Approve(c.UserId, done.Reference);
+                await c.Db.SaveChangesAsync().ConfigureAwait(true);
+                await unit.CommitAsync().ConfigureAwait(true);
                 return $"{done.Reference}: stand {done.StandNumber} surrendered by {done.Holder}; receivable {M(done.ReceivableDerecognised)} written off, "
                     + $"back in inventory at {M(done.InventoryRecognised)}, refund {M(done.Refund)} credited.";
             },

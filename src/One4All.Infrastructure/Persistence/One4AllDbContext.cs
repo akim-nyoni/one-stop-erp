@@ -393,6 +393,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Loyalty members.</summary>
     public DbSet<Core.Pos.LoyaltyMember> LoyaltyMembers => Set<Core.Pos.LoyaltyMember>();
 
+    /// <summary>Gets the stand surrender requests awaiting a second user's approval.</summary>
+    public DbSet<Core.Housing.SurrenderRequest> StandSurrenderRequests => Set<Core.Housing.SurrenderRequest>();
+
     /// <summary>Loyalty points movements.</summary>
     public DbSet<Core.Pos.LoyaltyMovement> LoyaltyMovements => Set<Core.Pos.LoyaltyMovement>();
 

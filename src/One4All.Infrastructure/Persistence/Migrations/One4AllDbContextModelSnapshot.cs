@@ -12164,6 +12164,117 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("stand_swap", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.SurrenderRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<string>("GainLossAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("gain_loss_account_code");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<decimal>("NetRealisableValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("net_realisable_value");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<decimal>("Refund")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("refund");
+
+                    b.Property<string>("RefundAccountCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("refund_account_code");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<uint>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<string>("StandNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("stand_number");
+
+                    b.Property<string>("StandsAvailableAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("stands_available_account_code");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<string>("SurrenderReference")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("surrender_reference");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_surrender_request");
+
+                    b.HasIndex("CompanyId", "StandNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_surrender_request_one_pending_per_stand")
+                        .HasFilter("status = 0");
+
+                    b.ToTable("stand_surrender_request", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.Tenancy", b =>
                 {
                     b.Property<long>("Id")
