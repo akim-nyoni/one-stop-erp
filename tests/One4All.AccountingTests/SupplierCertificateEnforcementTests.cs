@@ -70,8 +70,10 @@ public sealed class SupplierCertificateEnforcementTests
         };
         (await ap.PostPaymentAsync(Pay(builder, "SC-P1", 100m, new DateOnly(2026, 4, 1)))).Value.WithheldBase.Should().Be(0m);
 
-        // With the default set, the uncleared builder has 10% withheld; the certified contractor has none.
+        // With the default set, the uncleared builder has 10% withheld; the certified contractor has none. (No yearly threshold here: every
+        // payment counts, so the certificate rule is tested alone.)
         (await db.Companies.FindAsync(companyId))!.WithholdingWithoutClearanceTaxCode = "WHT10";
+        (await db.Companies.FindAsync(companyId))!.WithholdingThreshold = 0m;
         await db.SaveChangesAsync();
         (await ap.PostPaymentAsync(Pay(builder, "SC-P2", 200m, new DateOnly(2026, 4, 2)))).Value.WithheldBase.Should().Be(20m);
         (await ap.PostPaymentAsync(Pay(certified, "SC-P3", 300m, new DateOnly(2026, 4, 2)))).Value.WithheldBase.Should().Be(0m);

@@ -94,6 +94,9 @@ public sealed class OpenItem : AuditableEntity, ICompanyScoped
     /// <summary>Whether the invoice or credit note still waits for the fiscal device.</summary>
     public bool FiscalQueued { get; set; }
 
+    /// <summary>The tax on an invoice or credit note in transaction currency, as the fiscal device is given it (kept so a queued document is signed with it).</summary>
+    public decimal FiscalTax { get; set; }
+
     /// <summary>The transaction currency.</summary>
     public CurrencyCode Currency { get; private set; }
 

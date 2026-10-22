@@ -35,6 +35,47 @@ internal static class AtomicWork
     public static Task<Result> AtomicAsync(this One4AllDbContext db, Func<Task<Result>> work, CancellationToken ct)
         => RunAsync(db, work, r => r.IsSuccess, ct);
 
+    /// <summary>
+    /// Runs <paramref name="work"/> once the unit of work in progress has committed: for what must never happen for work that is rolled
+    /// back or attempted again after a lost race, such as asking the fiscal device to sign a document. Outside any transaction it runs
+    /// now. Work registered inside a transaction some other caller opened (not one of these units) does not run; what it was for must be
+    /// picked up again later (a document left queued for the device is signed by the retry task).
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="work">The work; it saves what it changes itself, and should not throw (a failure is swallowed: the unit has committed).</param>
+    /// <returns>A task that completes when the work has run or been registered.</returns>
+    public static async Task AfterCommitAsync(this One4AllDbContext db, Func<Task> work)
+    {
+        if (db.Database.CurrentTransaction is IDbContextTransaction open)
+        {
+            db.AfterCommit.Add((open, work));
+            return;
+        }
+
+        await work().ConfigureAwait(false);
+    }
+
+    // The work waiting for this transaction, in the order registered. The unit has committed: a failure here must not make the caller
+    // think it did not, so it is swallowed and whatever the work was for stays as the unit left it (a document stays queued).
+    private static async Task RunAfterCommitAsync(One4AllDbContext db, IDbContextTransaction committed)
+    {
+        List<Func<Task>> waiting = [.. db.AfterCommit.Where(w => ReferenceEquals(w.Transaction, committed)).Select(w => w.Work)];
+        db.AfterCommit.Clear();
+        foreach (Func<Task> work in waiting)
+        {
+#pragma warning disable CA1031 // The unit has committed; what follows it cannot undo it, and must not report it as failed.
+            try
+            {
+                await work().ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                // Left for the retry that picks up what this work was for.
+            }
+#pragma warning restore CA1031
+        }
+    }
+
     /// <summary>How many times a unit of work that lost a concurrency race is attempted in all.</summary>
     internal const int MaxAttempts = 8;
 
@@ -47,6 +88,8 @@ internal static class AtomicWork
 
         for (int attempt = 1; ; attempt++)
         {
+            // Work registered to follow an attempt that did not commit (or a transaction of some other caller) never runs.
+            db.AfterCommit.Clear();
             List<TrackedState> before = Snapshot(db);
             await using IDbContextTransaction transaction = await db.Database.BeginTransactionAsync(ct).ConfigureAwait(false);
             try
@@ -55,6 +98,7 @@ internal static class AtomicWork
                 if (succeeded(result))
                 {
                     await transaction.CommitAsync(ct).ConfigureAwait(false);
+                    await RunAfterCommitAsync(db, transaction).ConfigureAwait(false);
                     return result;
                 }
 

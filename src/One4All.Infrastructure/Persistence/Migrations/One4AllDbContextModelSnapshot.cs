@@ -32976,6 +32976,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("unreceipted_refund_limit");
 
+                    b.Property<decimal>("WithholdingThreshold")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("withholding_threshold");
+
                     b.Property<string>("WithholdingWithoutClearanceTaxCode")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")
@@ -34955,6 +34960,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<bool>("FiscalQueued")
                         .HasColumnType("boolean")
                         .HasColumnName("fiscal_queued");
+
+                    b.Property<decimal>("FiscalTax")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("fiscal_tax");
 
                     b.Property<string>("FiscalVerification")
                         .HasMaxLength(400)

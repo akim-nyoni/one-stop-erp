@@ -262,13 +262,11 @@ public sealed class PosEventService : IPosEventService
             SaleNumber = sale.SaleNumber, ItemId = r.Line.ItemId, SaleLineId = r.Line.Id, Quantity = r.Quantity, OriginalAmount = r.Line.LineNet + r.Line.TaxAmount,
             Reason = request.Reason.Trim(), AuthorisedByUserId = request.AuthorisedByUserId, Reference = posting.Value.JournalNumber, Outcome = request.Restock ? "Restocked" : "Not restocked",
         })];
-        if (await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(request.CompanyId, posting.Value.JournalNumber, gross, refunded.Sum(r => r.Tax), sale.BaseCurrency.Value, now,
-                FiscalDocumentKind.Refund, sale.SaleNumber), ct).ConfigureAwait(false) is FiscalReceiptResult signed)
+        // The refund receipt is queued here and signed once the refund commits (below).
+        bool fiscalised = _fiscal is { IsEnabled: true };
+        foreach (PosEvent e in events)
         {
-            foreach (PosEvent e in events)
-            {
-                (e.FiscalCode, e.FiscalVerification, e.FiscalQueued) = (signed.FiscalCode, signed.SignatureOrQr, signed.Queued || signed.FiscalCode is null);
-            }
+            e.FiscalQueued = fiscalised;
         }
 
         _db.PosEvents.AddRange(events);
@@ -283,6 +281,18 @@ public sealed class PosEventService : IPosEventService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (fiscalised)
+        {
+            await Accounting.FiscalSigning.SignAfterCommitAsync(_db, _fiscal, new FiscalReceiptRequest(request.CompanyId, posting.Value.JournalNumber, gross, refunded.Sum(r => r.Tax),
+                sale.BaseCurrency.Value, now, FiscalDocumentKind.Refund, sale.SaleNumber), signed =>
+                {
+                    foreach (PosEvent e in events)
+                    {
+                        (e.FiscalCode, e.FiscalVerification, e.FiscalQueued) = (signed.FiscalCode, signed.SignatureOrQr, false);
+                    }
+                }, ct).ConfigureAwait(false);
+        }
+
         return new PosRefundResult(events[0].Id, posting.Value.JournalNumber, gross);
     }
 
@@ -610,12 +620,8 @@ public sealed class PosEventService : IPosEventService
             ItemId = item.Id, Quantity = request.Quantity, Reason = $"No receipt: {request.Reason.Trim()}", AuthorisedByUserId = request.AuthorisedByUserId, Reference = posting.Value.JournalNumber,
             Outcome = request.RestockWarehouseId is null ? "Not restocked" : "Restocked",
         };
-        if (await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(request.CompanyId, posting.Value.JournalNumber, gross, request.TaxAmount, company.BaseCurrency.Value, _clock.UtcNow,
-                FiscalDocumentKind.Refund), ct).ConfigureAwait(false) is FiscalReceiptResult signedRefund)
-        {
-            (refund.FiscalCode, refund.FiscalVerification, refund.FiscalQueued) = (signedRefund.FiscalCode, signedRefund.SignatureOrQr, signedRefund.Queued || signedRefund.FiscalCode is null);
-        }
-
+        // The refund receipt is queued here and signed once the refund commits (below).
+        refund.FiscalQueued = _fiscal is { IsEnabled: true };
         _db.PosEvents.Add(refund);
         Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, gross, request.RefundAccountCode, $"Refund without receipt: {item.Description}", request.CashierUserId,
             request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
@@ -625,6 +631,13 @@ public sealed class PosEventService : IPosEventService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (refund.FiscalQueued)
+        {
+            await Accounting.FiscalSigning.SignAfterCommitAsync(_db, _fiscal, new FiscalReceiptRequest(request.CompanyId, posting.Value.JournalNumber, gross, request.TaxAmount,
+                company.BaseCurrency.Value, _clock.UtcNow, FiscalDocumentKind.Refund),
+                signed => (refund.FiscalCode, refund.FiscalVerification, refund.FiscalQueued) = (signed.FiscalCode, signed.SignatureOrQr, false), ct).ConfigureAwait(false);
+        }
+
         return new PosRefundResult(refund.Id, posting.Value.JournalNumber, gross);
     }
 }

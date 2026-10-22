@@ -300,7 +300,10 @@ public sealed class PaymentRunService : IPaymentRunService
             bool held = Held(supplier, bankChanging.Contains(supplier.Id)) is not null;
             decimal apply = held ? 0m : Math.Min(available, due);
             decimal toPay = held ? 0m : due - apply;
-            decimal withholding = toPay > 0m ? await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false) : 0m;
+
+            // The payment's base value at the invoices' own rates, for the year's withholding threshold (the run itself posts at the day's rate).
+            decimal toPayBase = due == 0m ? toPay : decimal.Round(toPay * group.Sum(i => i.OutstandingBase) / due, 2, MidpointRounding.ToEven);
+            decimal withholding = toPay > 0m ? await WithholdingOnAsync(request, supplier, toPay, ct, toPayBase).ConfigureAwait(false) : 0m;
             lines.Add(new PaymentProposalLine(supplier.Id, supplier.Code, supplier.Name, group.Key.Currency, group.Count(), due, available, apply, toPay, held, withholding, bankChanging.Contains(supplier.Id))
             {
                 Priority = supplier.PaymentPriority,
@@ -592,10 +595,14 @@ public sealed class PaymentRunService : IPaymentRunService
     }
 
     // The withholding the payment run deducts from a payment (payment currency): the code's rate when the supplier has no
-    // valid tax clearance on the payment date, otherwise none - the same rule the purchase ledger applies.
-    private async Task<decimal> WithholdingOnAsync(PaymentRunRequest request, Supplier supplier, decimal amount, CancellationToken ct)
+    // valid tax clearance on the payment date, otherwise none - the same rule the purchase ledger applies. Given the payment's base value
+    // (a proposal), the year's withholding threshold is checked too; without it (a run, after the ledger has decided withholding applies) it is not.
+    private async Task<decimal> WithholdingOnAsync(PaymentRunRequest request, Supplier supplier, decimal amount, CancellationToken ct, decimal? amountBase = null)
     {
-        if (await TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, ct).ConfigureAwait(false) is not string code)
+        string? code = amountBase is decimal paymentBase
+            ? await TraderCertificates.WithholdingCodeForPaymentAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, paymentBase, ct).ConfigureAwait(false)
+            : await TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, ct).ConfigureAwait(false);
+        if (code is null)
         {
             return 0m;
         }

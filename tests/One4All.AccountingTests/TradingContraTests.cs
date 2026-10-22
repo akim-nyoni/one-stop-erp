@@ -82,4 +82,37 @@ public sealed class TradingContraTests
             tb.Rows.Should().NotContain(r => r.AccountCode == "1900" && (r.Debit != 0m || r.Credit != 0m));
         }
     }
+
+    [SkippableFact]
+    public async Task Contra_refuses_items_in_different_currencies()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Customer customer = new(companyId, "XPARTNER", "Euro Partner (AR)", Scenario.Eur);
+        Supplier supplier = new(companyId, "XPARTNER", "Dollar Partner (AP)", Scenario.Usd);
+        db.AddRange(customer, supplier);
+        await db.SaveChangesAsync();
+
+        var arInvoice = await scope.ServiceProvider.GetRequiredService<ISalesLedgerService>().PostInvoiceAsync(new SalesInvoiceRequest
+        {
+            CompanyId = companyId, CustomerId = customer.Id, DocumentNumber = "XCN-AR1", DocumentDate = new DateOnly(2026, 3, 1),
+            Currency = Scenario.Eur, NetAmount = 300m, TaxAmount = 0m, SalesAccountCode = "4000",
+        });
+        arInvoice.IsSuccess.Should().BeTrue(arInvoice.IsFailure ? arInvoice.Error.Message : null);
+        long apItemId = (await scope.ServiceProvider.GetRequiredService<IPurchaseLedgerService>().PostInvoiceAsync(new PurchaseInvoiceRequest
+        {
+            CompanyId = companyId, SupplierId = supplier.Id, DocumentNumber = "XCN-AP1", DocumentDate = new DateOnly(2026, 3, 2),
+            Currency = Scenario.Usd, NetAmount = 200m, ExpenseAccountCode = "5000",
+        })).Value.OpenItemId;
+
+        // A EUR receipt and a USD payment of the same 100 would leave the clearing account out by the exchange rate: refused, nothing posted.
+        var contra = await scope.ServiceProvider.GetRequiredService<IAllocationService>().ContraAsync(companyId, customer.Id, arInvoice.Value.OpenItemId, supplier.Id, apItemId, 100m,
+            new DateOnly(2026, 3, 5), "1900", "XCONTRA-1");
+        contra.Error.Code.Should().Be("Trd.ContraCurrency");
+        (await db.OpenItems.AsNoTracking().AnyAsync(i => i.CompanyId == companyId && i.DocumentNumber == "XCONTRA-1")).Should().BeFalse();
+        (await db.OpenItems.AsNoTracking().SingleAsync(i => i.Id == apItemId)).OutstandingTransaction.Should().Be(200m);
+    }
 }

@@ -165,6 +165,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Gets or sets the audit chain heads written in the current transaction (see <see cref="Auditing.AuditChainLock.HeldHead"/>).</summary>
     internal (object Transaction, Dictionary<long, string> Heads)? ChainHeads { get; set; }
 
+    /// <summary>Gets the work waiting for the unit of work in progress to commit (see <see cref="AtomicWork.AfterCommitAsync"/>), with the transaction it waits for.</summary>
+    internal List<(object Transaction, Func<Task> Work)> AfterCommit { get; } = [];
+
     /// <summary>Archived years of the audit log.</summary>
     public DbSet<AuditArchive> AuditArchives => Set<AuditArchive>();
 

@@ -157,6 +157,12 @@ public sealed class Sale : AuditableEntity, ICompanyScoped
         FiscalError = null;
     }
 
+    /// <summary>
+    /// Marks the receipt as waiting for the device before it has been tried: a sale is signed only once it has committed, and one that
+    /// never gets as far as the device stays waiting for the retry task.
+    /// </summary>
+    public void AwaitFiscal() => FiscalStatus = FiscalStatus.Queued;
+
     /// <summary>Queues the receipt for the device (unreachable or refused), to be retried.</summary>
     /// <param name="reason">Why.</param>
     public void QueueFiscal(string reason)

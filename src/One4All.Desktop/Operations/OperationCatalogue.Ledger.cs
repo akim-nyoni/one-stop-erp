@@ -256,11 +256,13 @@ public static partial class OperationCatalogue
             Module = module, Title = "Tax exemption certificates", ListTitle = "Certificates expiring within 30 days (or lately expired)",
             Description = "Record a customer's or supplier's exemption certificate (while valid no tax is charged either way; an exempt tax code needs one), or a supplier's tax clearance "
                 + "(while valid no withholding is deducted from payments), or withdraw one by its id (Delete on the list withdraws it from today). A renewed certificate is "
-                + "recorded as a new one, so the history of each stays.",
+                + "recorded as a new one, so the history of each stays. Set default withholding also sets the yearly threshold (1,000 in base currency by default): a supplier without "
+                + "clearance has tax withheld from the payment that brings the year's payments to it to the threshold, and from every later one that year.",
             Fields = [Pick("Step", "Step", ["Record", "Withdraw", "Set default withholding"]), Pick("Ledger", "Who", ["Customer", "Supplier"]), Pick("Purpose", "For", ["Tax exemption", "Tax clearance (supplier)"]),
                 Opt("Trader", "Customer / supplier code"), Opt("Number", "Certificate number"),
                 Today("From", "Valid from"), OptDate("To", "Valid to"), Opt("IssuedBy", "Issued by"), OptNum("Id", "Certificate id (withdraw)"),
-                Opt("Wht", "Withholding code for suppliers without clearance (blank: none)")],
+                Opt("Wht", "Withholding code for suppliers without clearance (blank: none)"),
+                OptNum("Threshold", "Withhold once the year's payments to a supplier reach (base currency; 0: every payment; blank: keep)")],
             Run = async (c, i) =>
             {
                 ITaxComplianceService tax = c.Get<ITaxComplianceService>();
@@ -272,9 +274,20 @@ public static partial class OperationCatalogue
                         throw new OperationException($"{wht} is not an active withholding tax code.");
                     }
 
-                    (await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true)).WithholdingWithoutClearanceTaxCode = wht;
+                    decimal? threshold = i.OptionalNumber("Threshold");
+                    if (threshold is < 0m)
+                    {
+                        throw new OperationException("The withholding threshold cannot be negative.");
+                    }
+
+                    Core.System.Company company = await c.Db.Companies.SingleAsync(x => x.Id == c.CompanyId).ConfigureAwait(true);
+                    company.WithholdingWithoutClearanceTaxCode = wht;
+                    company.WithholdingThreshold = threshold ?? company.WithholdingThreshold;
                     await c.Db.SaveChangesAsync().ConfigureAwait(true);
-                    return wht is null ? "Payments withhold tax only where they ask for it." : $"Payments to suppliers without a valid tax clearance now withhold {wht} unless they name another code.";
+                    string from = company.WithholdingThreshold > 0m
+                        ? $" once the year's payments to the supplier reach {company.WithholdingThreshold:N2}"
+                        : " on every payment";
+                    return wht is null ? "Payments withhold tax only where they ask for it." : $"Payments to suppliers without a valid tax clearance now withhold {wht}{from} unless they name another code.";
                 }
 
                 if (i.Text("Step") == "Withdraw")

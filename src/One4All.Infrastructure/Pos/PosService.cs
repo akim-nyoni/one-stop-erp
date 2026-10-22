@@ -331,6 +331,10 @@ public sealed class PosService : IPosService
         {
             AgeVerified = request.AgeVerified, PrescriptionReference = string.IsNullOrWhiteSpace(request.PrescriptionReference) ? null : request.PrescriptionReference.Trim(),
         };
+        if (_fiscal is { IsEnabled: true })
+        {
+            sale.AwaitFiscal(); // saved with the sale; it is signed once the sale commits
+        }
 
         // Age-restricted, quantity-limited and prescription-only items (brief §4.1).
         List<long> soldIds = [.. request.Lines.Select(l => l.ItemId).Distinct()];
@@ -724,10 +728,11 @@ public sealed class PosService : IPosService
             earned = points.Value;
         }
 
-        // The receipt is signed by the fiscal device; an unreachable or refusing device queues it (the sale stands) for the retry task.
+        // The receipt is signed by the fiscal device once the sale has committed (never twice when the unit is attempted again after a lost
+        // race, never for a sale that rolls back); an unreachable or refusing device leaves it queued (the sale stands) for the retry task.
         if (_fiscal is { IsEnabled: true })
         {
-            await FiscaliseAsync(sale, ct).ConfigureAwait(false);
+            await _db.AfterCommitAsync(() => FiscaliseAsync(sale, ct)).ConfigureAwait(false);
         }
 
         if (_webhooks is not null)
@@ -965,14 +970,17 @@ public sealed class PosService : IPosService
         {
             TillSessionId = sale.TillSessionId, SaleNumber = sale.SaleNumber, Reason = reason.Trim(), Reference = posting.Value.JournalNumber, AuthorisedByUserId = authorisedByUserId,
         };
-        if (sale.FiscalStatus != FiscalStatus.NotRequired && await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, posting.Value.JournalNumber, sale.TotalGross, sale.TotalTax,
-                sale.BaseCurrency.Value, _clock.UtcNow, FiscalDocumentKind.Refund, sale.SaleNumber), ct).ConfigureAwait(false) is FiscalReceiptResult signedVoid)
-        {
-            (voided.FiscalCode, voided.FiscalVerification, voided.FiscalQueued) = (signedVoid.FiscalCode, signedVoid.SignatureOrQr, signedVoid.Queued || signedVoid.FiscalCode is null);
-        }
-
+        // A fiscalised sale's void is a refund receipt: queued here, signed once the void commits.
+        bool fiscalVoid = sale.FiscalStatus != FiscalStatus.NotRequired && _fiscal is { IsEnabled: true };
+        voided.FiscalQueued = fiscalVoid;
         _db.PosEvents.Add(voided);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (fiscalVoid)
+        {
+            await Accounting.FiscalSigning.SignAfterCommitAsync(_db, _fiscal, new FiscalReceiptRequest(companyId, posting.Value.JournalNumber, sale.TotalGross, sale.TotalTax,
+                sale.BaseCurrency.Value, _clock.UtcNow, FiscalDocumentKind.Refund, sale.SaleNumber),
+                signed => (voided.FiscalCode, voided.FiscalVerification, voided.FiscalQueued) = (signed.FiscalCode, signed.SignatureOrQr, false), ct).ConfigureAwait(false);
+        }
         await Security.SemanticAudit.RecordAsync(_audit, _caller, companyId, "POS", "Sale", sale.SaleNumber, Core.Audit.AuditAction.Void, $"Voided by journal {posting.Value.JournalNumber}", reason,
             ct: ct).ConfigureAwait(false);
         return posting.Value.JournalNumber;
@@ -1556,27 +1564,13 @@ public sealed class PosService : IPosService
             }
         }
 
-        foreach (OpenItem item in await _db.OpenItems.Where(i => i.CompanyId == companyId && i.FiscalQueued).OrderBy(i => i.Id).Take(500).ToListAsync(ct).ConfigureAwait(false))
-        {
-            FiscalReceiptResult? result = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, item.DocumentNumber, item.OriginalTransaction, 0m, item.Currency.Value,
-                _clock.UtcNow, item.ItemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice, item.ReferenceDocumentNumber), ct).ConfigureAwait(false);
-            if (result is { Queued: false, FiscalCode: not null } ok)
-            {
-                (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (ok.FiscalCode, ok.SignatureOrQr, false);
-                signed++;
-            }
-            else
-            {
-                waiting++;
-            }
-        }
-
         if (signed > 0)
         {
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return (signed, waiting);
+        (int signedItems, int waitingItems) = await Accounting.FiscalSigning.SignQueuedOpenItemsAsync(_db, _fiscal, companyId, _clock.UtcNow, 500, ct).ConfigureAwait(false);
+        return (signed + signedItems, waiting + waitingItems);
     }
 
     private async Task<(int Fiscalised, int StillQueued)> RetrySalesAsync(long companyId, CancellationToken ct)

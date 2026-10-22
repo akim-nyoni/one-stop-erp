@@ -78,4 +78,47 @@ public sealed class WithholdingTaxTests
         tb.Rows.Single(r => r.AccountCode == "1100").Credit.Should().Be(1_500m);  // 700 + 500 + 300
         tb.Rows.Single(r => r.AccountCode == "2100").Debit.Should().Be(500m);    // the invoice is settled in full; the 500 is on account
     }
+
+    [SkippableFact]
+    public async Task Withholding_starts_with_the_payment_that_brings_the_years_total_to_the_threshold()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.Add(new LedgerAccount(companyId, "2495", "Withholding Tax Payable", AccountType.Liability));
+        TaxCode wht = new(companyId, "WHT30", "Withholding 30%", TaxType.Withholding) { OutputAccountCode = "2495", IsActive = true };
+        wht.AddRate(new DateOnly(2026, 1, 1), 30m);
+        db.TaxCodes.Add(wht);
+        Supplier uncleared = new(companyId, "WHT-T", "Small Trader", Scenario.Usd);
+        db.Suppliers.Add(uncleared);
+        Core.System.Company company = await db.Companies.FindAsync(companyId) ?? throw new InvalidOperationException("No company.");
+        company.WithholdingWithoutClearanceTaxCode = "WHT30";
+        await db.SaveChangesAsync();
+        company.WithholdingThreshold.Should().Be(1_000m, "the statutory US$1,000 a year is the default");
+
+        IPurchaseLedgerService ap = scope.ServiceProvider.GetRequiredService<IPurchaseLedgerService>();
+        async Task<decimal> Pay(string number, decimal amount, DateOnly date) => (await ap.PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId, SupplierId = uncleared.Id, DocumentNumber = number, PaymentDate = date, Currency = Scenario.Usd, Amount = amount, BankAccountCode = "1100",
+        })).Value.WithheldBase;
+
+        // 400 and 500 in the year: 900 in all, under the threshold - nothing withheld.
+        (await Pay("WHT-T1", 400m, new DateOnly(2026, 1, 10))).Should().Be(0m);
+        (await Pay("WHT-T2", 500m, new DateOnly(2026, 2, 10))).Should().Be(0m);
+
+        // 200 more brings the year to 1,100: that payment is withheld in full (30% of 200), and so is every later one that year.
+        (await Pay("WHT-T3", 200m, new DateOnly(2026, 3, 10))).Should().Be(60m);
+        (await Pay("WHT-T4", 100m, new DateOnly(2026, 4, 10))).Should().Be(30m);
+
+        // A single payment of the threshold or more is withheld on its own.
+        Supplier other = new(companyId, "WHT-T2", "Large Trader", Scenario.Usd);
+        db.Suppliers.Add(other);
+        await db.SaveChangesAsync();
+        (await ap.PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId, SupplierId = other.Id, DocumentNumber = "WHT-T5", PaymentDate = new DateOnly(2026, 4, 10), Currency = Scenario.Usd, Amount = 1_000m, BankAccountCode = "1100",
+        })).Value.WithheldBase.Should().Be(300m);
+    }
 }

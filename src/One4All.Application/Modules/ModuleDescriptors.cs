@@ -63,7 +63,7 @@ public static class BuiltInModules
         new ModuleDescriptor("Security", "Users & Security", LicenceModules.Core, "\U0001F510", "#546E7A", ["audit"], [], []),
         new ModuleDescriptor("GeneralLedger", "General Ledger", LicenceModules.GeneralLedger, "\U0001F4D8", "#1565C0", ["gl", "accounting", "interco", "consolidation"], ["tax.certificate-expiry", "gl.recurring-journals", "gl.prepayment-release"], ["General Ledger"]),
         new ModuleDescriptor("Sales", "Accounts Receivable", LicenceModules.AccountsReceivable, "\U0001F9FE", "#2E7D32", ["ar", "credit", "trading", "receipting", "pricing", "messages", "master/customers"],
-            ["statements.email", "trading.recurring-invoices", "ar.finance-charges", "ar.arrangements"], ["Sales & Schools", "Customers"]),
+            ["statements.email", "trading.recurring-invoices", "ar.finance-charges", "ar.arrangements", "ar.fiscal-invoices"], ["Sales & Schools", "Customers"]),
         new ModuleDescriptor("Purchasing", "Accounts Payable", LicenceModules.AccountsPayable, "\U0001F4B8", "#C62828", ["ap", "trading", "master/suppliers"], [], ["Suppliers"]),
         new ModuleDescriptor("CashBook", "Cash Book", LicenceModules.CashBook, "\U0001F3E6", "#00838F", ["banking", "treasury", "receipting"], ["bank.standing-orders"], ["Banking", "Receipting"]),
         new ModuleDescriptor("Inventory", "Inventory", LicenceModules.Inventory, "\U0001F4E6", "#6D4C41", ["stock", "pricing", "master/items"], ["stock.expiry-alerts"], ["Stock", "Weighbridge"]),

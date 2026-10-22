@@ -156,6 +156,13 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public string? WithholdingWithoutClearanceTaxCode { get; set; }
 
+    /// <summary>
+    /// The year's payments to a supplier (base currency, calendar year of the payment date) from which withholding tax applies to a
+    /// supplier without a tax clearance (Income Tax Act section 80: US$1,000 in aggregate). Below it nothing is withheld; the payment that
+    /// brings the year's total to it is withheld in full, as is every later payment that year. Zero: every payment is withheld.
+    /// </summary>
+    public decimal WithholdingThreshold { get; set; } = 1_000m;
+
     /// <summary>Whether supplier payment runs must be saved, reviewed and approved by a second person before they pay (brief §4.6).</summary>
     public bool PaymentRunApprovalRequired { get; set; }
 

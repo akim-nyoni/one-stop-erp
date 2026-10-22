@@ -37,4 +37,49 @@ internal static class TraderCertificates
             : requested;
         return string.IsNullOrWhiteSpace(code) ? null : code.Trim().ToUpperInvariant();
     }
+
+    /// <summary>
+    /// The withholding code to apply to a payment to a supplier (<see cref="WithholdingCodeAsync"/>), but only once the supplier's payments
+    /// in the calendar year reach the company's <see cref="Core.System.Company.WithholdingThreshold"/>: the year's earlier payments (reversed
+    /// ones left out) with this one. The payment that reaches it is withheld in full, and so is every later one that year.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="supplier">The supplier paid.</param>
+    /// <param name="date">The payment date.</param>
+    /// <param name="requested">The code the payment asks for, or null for the company's default.</param>
+    /// <param name="paymentBase">The gross payment in base currency.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The code, or null when nothing is withheld.</returns>
+    public static async Task<string?> WithholdingCodeForPaymentAsync(One4AllDbContext db, long companyId, Supplier supplier, DateOnly date, string? requested, decimal paymentBase,
+        CancellationToken ct)
+    {
+        string? code = await WithholdingCodeAsync(db, companyId, supplier, date, requested, ct).ConfigureAwait(false);
+        return code is null || await ReachesThresholdAsync(db, companyId, supplier.Id, date, paymentBase, ct).ConfigureAwait(false) ? code : null;
+    }
+
+    /// <summary>Whether the supplier's payments in the calendar year of the date, with this one, reach the company's withholding threshold.</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="supplierId">The supplier.</param>
+    /// <param name="date">The payment date.</param>
+    /// <param name="paymentBase">The gross payment in base currency.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True when withholding applies to the payment.</returns>
+    public static async Task<bool> ReachesThresholdAsync(One4AllDbContext db, long companyId, long supplierId, DateOnly date, decimal paymentBase, CancellationToken ct)
+    {
+        decimal threshold = await db.Companies.Where(c => c.Id == companyId).Select(c => c.WithholdingThreshold).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (threshold <= 0m || paymentBase >= threshold)
+        {
+            return true;
+        }
+
+        DateOnly yearStart = new(date.Year, 1, 1);
+        decimal paid = await db.OpenItems
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsPayable && i.TraderId == supplierId && i.ItemType == OpenItemType.Payment
+                && i.DocumentDate >= yearStart && i.DocumentDate <= date
+                && !db.Journals.Any(r => r.CompanyId == companyId && r.ReversalOfJournalId == i.JournalEntryId))
+            .SumAsync(i => i.OriginalBase, ct).ConfigureAwait(false);
+        return paid + paymentBase >= threshold;
+    }
 }

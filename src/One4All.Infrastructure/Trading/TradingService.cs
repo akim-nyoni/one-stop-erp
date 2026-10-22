@@ -215,7 +215,14 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             SalesInvoiceRequest request = requests[i];
             (Customer customer, decimal gross, decimal baseGross) = heads[i];
             items.Add(new OpenItem(companyId, TradingLedger.AccountsReceivable, customer.Id, OpenItemType.Invoice, LedgerSign.Debit, request.DocumentNumber, request.DocumentDate,
-                customer.DueDateFor(request.DocumentDate), request.Currency, 1m, gross, baseGross) { JournalEntryId = posted.Value[i].JournalId, Narrative = request.Narrative });
+                customer.DueDateFor(request.DocumentDate), request.Currency, 1m, gross, baseGross)
+            {
+                JournalEntryId = posted.Value[i].JournalId, Narrative = request.Narrative,
+
+                // Tax invoices for the fiscal device: a batch (a billing run's thousands of bills) is queued, not signed one by one while it
+                // posts; the ar.fiscal-invoices task (or pos.fiscal-retry) signs them after it commits.
+                FiscalQueued = _fiscal is { IsEnabled: true }, FiscalTax = request.TaxAmount,
+            });
         }
 
         _db.OpenItems.AddRange(items);
@@ -436,6 +443,15 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         if (arItem is null || apItem is null)
         {
             return Result.Failure(Error.NotFound("Ar.ContraItemNotFound", "The customer or supplier invoice open item was not found."));
+        }
+
+        // The receipt and the payment both post the one amount through the clearing account, each in its own item's currency: only in the
+        // same currency (so at the same day's rate) do the two legs cancel there. Items in different currencies are settled by a receipt
+        // and a payment of their own, so each carries its own exchange difference.
+        if (arItem.Currency != apItem.Currency)
+        {
+            return Result.Failure(Error.Rule("Trd.ContraCurrency",
+                $"A contra sets off items in one currency: the customer's item is in {arItem.Currency.Value} and the supplier's in {apItem.Currency.Value}."));
         }
 
         if (amount > arItem.OutstandingTransaction || amount > apItem.OutstandingTransaction)
@@ -1382,9 +1398,10 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal rate = rateResult.Value;
         decimal baseAmount = Round(request.Amount * rate);
 
-        // Withholding tax applies to a supplier without a valid tax clearance on the payment date: the code asked for, else the company's default.
+        // Withholding tax applies to a supplier without a valid tax clearance on the payment date (the code asked for, else the company's default)
+        // once the year's payments to it, with this one, reach the company's threshold.
         TaxCode? withholding = null;
-        if (await TraderCertificates.WithholdingCodeAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, ct).ConfigureAwait(false) is string code)
+        if (await TraderCertificates.WithholdingCodeForPaymentAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, baseAmount, ct).ConfigureAwait(false) is string code)
         {
             withholding = await _db.TaxCodes.Include(t => t.Rates)
                 .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
@@ -1936,20 +1953,23 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             ReferenceDocumentNumber = reference,
         };
 
-        // E-invoicing (brief §3.5): a sales ledger tax invoice or credit note is signed by the fiscal device like a till receipt; unreachable means it waits for the retry task.
-        if (ledger == TradingLedger.AccountsReceivable && itemType is OpenItemType.Invoice or OpenItemType.CreditNote && _fiscal is { IsEnabled: true })
+        // E-invoicing (brief §3.5): a sales ledger tax invoice or credit note is signed by the fiscal device like a till receipt. It is queued
+        // here and signed only once the unit of work commits (never twice on a retried unit, never for one rolled back); a device that cannot
+        // be reached leaves it queued for the retry task.
+        bool fiscalised = Accounting.FiscalSigning.IsFiscalised(ledger, itemType) && _fiscal is { IsEnabled: true };
+        if (fiscalised)
         {
-            string? buyerTaxNumber = await _db.Customers.AsNoTracking().Where(c => c.Id == traderId).Select(c => c.TaxRegistration).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-            FiscalReceiptResult? signed = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, documentNumber, amountTxn, tax, currency.Value, DateTimeOffset.UtcNow,
-                itemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice, reference, buyerTaxNumber), ct).ConfigureAwait(false);
-            if (signed is FiscalReceiptResult result)
-            {
-                (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (result.FiscalCode, result.SignatureOrQr, result.Queued || result.FiscalCode is null);
-            }
+            (item.FiscalQueued, item.FiscalTax) = (true, tax);
         }
 
         _db.OpenItems.Add(item);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        if (fiscalised)
+        {
+            string? buyerTaxNumber = await _db.Customers.AsNoTracking().Where(c => c.Id == traderId).Select(c => c.TaxRegistration).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            await Accounting.FiscalSigning.SignAfterCommitAsync(_db, _fiscal, Accounting.FiscalSigning.RequestFor(item, buyerTaxNumber, DateTimeOffset.UtcNow),
+                signed => (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (signed.FiscalCode, signed.SignatureOrQr, false), ct).ConfigureAwait(false);
+        }
 
         return new TradingPostingResult(item.Id, posting.Value.JournalNumber, amountBase);
     }
