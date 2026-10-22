@@ -10,7 +10,7 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Add or change an employee
 
-Engage an employee, or update one (blank fields stay as they are). Bank details are set at engagement; later changes go through 'Bank detail change' and a second person's approval.
+Engage an employee, or update one (blank fields stay as they are); an existing employee number always updates that employee. Bank details are set at engagement; later changes go through 'Bank detail change' and a second person's approval. Where payroll needs approval ('Set payroll approval'), the bank details given at engagement and any change of basic salary or payment method also wait there for another user; a salary or payment change dated later takes effect from the first payroll run paid on or after that date ('Pay change history' keeps every one). Delete removes only an employee never paid, with no loans or leave on record; anyone else leaves through 'Termination and final pay'.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -26,7 +26,7 @@ Engage an employee, or update one (blank fields stay as they are). Bank details 
 | Grade | no | Text |
 | National ID | no | Text |
 | Tax number | no | Text |
-| Contract end (yyyy-MM-dd) | no | Text |
+| Contract end | no | Date |
 | Paid by | yes | One of: BankTransfer, Cash, MobileMoney, Cheque; default BankTransfer |
 | Bank (engage only) | no | Text |
 | Bank branch (engage only) | no | Text |
@@ -46,6 +46,7 @@ Engage an employee, or update one (blank fields stay as they are). Bank details 
 | Next of kin's phone | no | Text |
 | Next of kin is (relationship) | no | Text |
 | Housing tenancy number (update; rent recovered from pay; '-' clears) | no | Text |
+| Salary / payment-method change effective from (update; blank: today) | no | Date |
 
 The list beside the form shows: Employees.
 
@@ -67,7 +68,7 @@ The rest of the employee master: addresses, phone, job title, notice period and 
 | Dependant is | yes | One of: Beneficiary, MedicalAidDependant, Both; default Beneficiary |
 | Dependant's name | no | Text |
 | Relationship | no | Text |
-| Born (yyyy-MM-dd) | no | Text |
+| Born | no | Date |
 | ID number | no | Text |
 | Beneficiary share % | no | Number |
 | Medical-aid number | no | Text |
@@ -90,7 +91,7 @@ The list beside the form shows: Documents expiring in 90 days.
 
 ### Bank detail change
 
-Ask for a change of an employee's bank or mobile-money details; a different person approves or rejects it before it takes effect (blank fields are left as they are).
+Ask for a change of an employee's bank or mobile-money details; a different person approves or rejects it before it takes effect (blank fields are left as they are). Net-pay splits, and - where payroll needs approval - salary and payment-method changes made on the employee record, wait in the same list and are approved or rejected here by someone other than whoever asked (and not by the employee themselves).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -103,7 +104,17 @@ Ask for a change of an employee's bank or mobile-money details; a different pers
 | Request id (approve / reject) | no | Number |
 | Note | no | Text |
 
-The list beside the form shows: Bank changes awaiting approval.
+The list beside the form shows: Bank and pay changes awaiting approval.
+
+### Pay change history
+
+Every change of an employee's basic salary or payment method: who asked and when, from what to what, from when, who approved or rejected it, and when it was applied. Pick an employee for their history; the list shows the company's.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Employee | yes | Choice |
+
+The list beside the form shows: Salary and payment-method changes.
 
 ### Set an employee's pay group
 
@@ -130,11 +141,11 @@ The list beside the form shows: Acting appointments.
 
 ### An employee leaves (final pay)
 
-Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay, the terminal rate on benefits; loans recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are cleared, release the final pay from the bank; print the certificate.
+Preview the final pay (last month pro rata, notice, leave, gratuity, severance by the termination type; PAYE on ordinary pay; on benefits above the tax-free amount, the terminal tax table's bands when one is given, else the terminal rate; loans recovered as far as the pay allows), then terminate - the final pay posts in one journal and later runs leave the employee out. Clear checklist items by id; once all are cleared, release the final pay from the bank (any part the slip shows in another currency from that currency's account, at the final pay's rate); print the certificate.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Preview, Terminate, Clear item, Release final pay, Certificate of service; default Preview |
+| Step | yes | One of: Preview, Terminate, Clear item, Release final pay, Final pay slip, Certificate of service; default Preview |
 | Employee number | yes | Text |
 | Type | yes | One of: Resignation, Dismissal, Retrenchment, Retirement, Death, EndOfContract, Absconding; default Resignation |
 | Last day | yes | Date |
@@ -150,9 +161,15 @@ Preview the final pay (last month pro rata, notice, leave, gratuity, severance b
 | Net pay account | yes | Text; default 2420 |
 | Checklist item id | no | Number |
 | Bank account paying (release) | no | Text |
+| Foreign currency 1 (release) | no | Text |
+| Paying account for it (release) | no | Text |
+| Foreign currency 2 (release) | no | Text |
+| Paying account for that (release) | no | Text |
 | Year's bonus (paid pro rata) | no | Number |
 | Overpayment to recover | no | Number |
 | Recoveries account (property, overpayments) | no | Text |
+| Tax-free terminal benefits | no | Number |
+| Terminal tax table (bands, instead of the rate) | no | Text |
 
 The list beside the form shows: Clearance checklist.
 
@@ -236,7 +253,7 @@ An employee's medical records - fitness assessments, illness, injury, disability
 | Record is | yes | One of: Fitness, Illness, Injury, Disability, Other; default Fitness |
 | Note | no | Text |
 | Fit for work | yes | One of: Not assessed, Fit, Not fit; default Not assessed |
-| Review on (yyyy-MM-dd) | no | Text |
+| Review on | no | Date |
 | Date | yes | Date |
 
 ## Organisation
@@ -366,7 +383,7 @@ Shows who is on leave between two dates (optionally one department); cancels lea
 | To | yes | Date |
 | Department (calendar) | no | Text |
 | Leave record id (cancel) | no | Number |
-| Back at work on (yyyy-mm-dd; blank: cancel outright) | no | Text |
+| Back at work on (blank: cancel outright) | no | Date |
 | Days given back (blank: pro rata) | no | Number |
 
 The list beside the form shows: Leave this month.
@@ -387,11 +404,11 @@ The list beside the form shows: Leave balances.
 
 ### Leave policies
 
-Per leave type: yearly days (service bands "5:24;10:30" raise them after so many completed years), earned monthly or granted at the leave-year start, joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). A balance ceiling stops accrual; carried days can lapse so many months into the year; leave can be taken in advance down to so many days; sick tiers "11:50;21:0" pay so much from the nth sick day of the year. Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions. Advance leave pay pays the leave starting in the month ahead into the pay period (LEAVEPAY) and recovers it in the recovery period (LEAVEADV).
+Saving an existing leave type changes its policy (and puts a retired one back in use); Delete stops it accruing. Per leave type: yearly days (service bands "5:24;10:30" raise them after so many completed years), earned monthly or granted at the leave-year start, joiners pro rata, and a carry-over cap applied as the leave year turns (the excess is forfeited). A balance ceiling stops accrual; carried days can lapse so many months into the year; leave can be taken in advance down to so many days; sick tiers "11:50;21:0" pay so much from the nth sick day of the year. Run month accrues for a month (the scheduled task does the month just ended); Apply sick pay sets the period's deductions. Advance leave pay pays the leave starting in the month ahead into the pay period (LEAVEPAY) and recovers it in the recovery period (LEAVEADV). Send attendance to payroll puts the month's approved overtime on OVERTIME / OVERTIME2 and deducts unpaid days (absences no leave covers, and the leave type as unpaid leave) on the element.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Save policy, Run month, Apply sick pay, Advance leave pay, Credit time off in lieu; default Save policy |
+| Step | yes | One of: Save policy, Run month, Apply sick pay, Send attendance to payroll, Advance leave pay, Credit time off in lieu; default Save policy |
 | Leave type | yes | Text; default ANNUAL |
 | Days a year | no | Number |
 | Earned monthly | no | Flag; default True |
@@ -410,6 +427,8 @@ Per leave type: yearly days (service bands "5:24;10:30" raise them after so many
 | Recovery period (advance) | no | Text |
 | Days by grade GRADE=days; … (policy) | no | Text |
 | Most of a department away at once (policy) | no | Number |
+| Rolling sick cycle in months (policy; blank: the leave year) | no | Number |
+| Unpaid leave: loan instalments held back while on it (policy) | no | Flag; default False |
 | Employee number (time off in lieu) | no | Text |
 | Overtime hours (time off in lieu) | no | Number |
 | Hours in a working day | yes | Number; default 8 |
@@ -467,35 +486,35 @@ Lines 'employee, element, units, amount' separated by ';'. Untick 'Import' to pr
 
 ### 1. Calculate the payroll
 
-Calculates a pay group's payroll without posting it, for someone else to approve. Recalculating replaces the earlier draft.
+Step 1 of the payroll: calculates a pay group's payroll without posting it, for someone else to approve. The run number given here (the next in sequence when left blank) is the one picked to approve, commit and pay it. Recalculating the same run replaces the earlier draft.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Pay group (blank = default) | no | Text |
 | Period | yes | Text; default 2026-10 |
 | Date | yes | Date |
-| Run document number | yes | Text |
+| Run number (blank: next in sequence) | no | Text |
 | Net pay control account | yes | Text; default 2420 |
 
 The list beside the form shows: Payroll drafts.
 
 ### 2. Approve the payroll
 
-Approves a calculated payroll (not your own; a large movement needs two different approvers).
+Step 2: approves a calculated payroll run, picked by its run number (not your own; a large movement needs two different approvers).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Draft id (from the list) | yes | Number |
+| Payroll run to approve | yes | Choice |
 
 The list beside the form shows: Payroll drafts.
 
 ### 3. Commit the payroll
 
-Saves the payslips and posts the journal - refused if anything changed since approval.
+Step 3: saves the approved run's payslips and posts its journal - refused if anything changed since approval. Then pay it under step 4 with the same run number.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Draft id (from the list) | yes | Number |
+| Approved payroll run to commit | yes | Choice |
 
 The list beside the form shows: Payroll drafts.
 
@@ -506,27 +525,16 @@ After commit: Pay posts the run's net pay from the account for each pay method (
 | Field | Required | Notes |
 | --- | --- | --- |
 | Step | yes | One of: Pay, Close, Stage; default Pay |
-| Run document number | yes | Text |
+| Payroll run | yes | Choice |
 | Bank account for transfers | no | Text; default 1100 |
 | Cash account | no | Text |
 | Mobile-money float account | no | Text |
 | Bank account cheques are drawn on | no | Text |
-| Foreign-currency accounts (EUR:1120; ZAR:1130) | no | Text |
+| Foreign currency 1 (pay) | no | Text |
+| Paying account for it (pay) | no | Text |
+| Foreign currency 2 (pay) | no | Text |
+| Paying account for that (pay) | no | Text |
 | Date | yes | Date |
-
-The list beside the form shows: Payroll runs.
-
-### Run the payroll in one step
-
-Calculates and commits a pay group's payroll for the period (blank group = the default payroll): payslips and one balanced journal. A period is paid once per group.
-
-| Field | Required | Notes |
-| --- | --- | --- |
-| Pay group (blank = default) | no | Text |
-| Period | yes | Text; default 2026-10 |
-| Date | yes | Date |
-| Run document number | yes | Text |
-| Net pay control account | yes | Text; default 2420 |
 
 The list beside the form shows: Payroll runs.
 
@@ -557,6 +565,7 @@ Corrects a committed period with extra (or negative) element amounts - a visible
 | Reason | yes | Text |
 | Net pay control account | yes | Text; default 2420 |
 | Lines: EMPLOYEE:ELEMENT:amount; … | yes | Text |
+| Approved by (user name; required where payroll needs approval) | no | Text |
 
 The list beside the form shows: Payroll runs.
 
@@ -566,7 +575,7 @@ A formally approved reversal: reversing journal and negative payslips. The appro
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Run document or journal number | yes | Text |
+| Payroll run | yes | Choice |
 | Date | yes | Date |
 | Reason | yes | Text |
 | Approved by (user name) | yes | Text |
@@ -588,12 +597,13 @@ Recalculates every period paid since the effective date at the new basic salary 
 | Run document number | no | Text |
 | Reason | no | Text |
 | Net pay control account | yes | Text; default 2420 |
+| Approved by (user name; required where payroll needs approval) | no | Text |
 
 The list beside the form shows: Payroll runs.
 
 ### Split net pay
 
-Sends part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. Remove takes a split off.
+Asks to send part of an employee's net pay to another bank account or wallet - a fixed amount, or a percentage (e.g. 40% to mobile money); the rest goes to their main account. A split can be paid in another currency: its share is worked out in base (a fixed amount is a base amount) and converted at the pay date's rate. Remove asks to take a split off. Like any bank-detail change, a different person approves it under Bank detail change before pay goes anywhere new.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -604,9 +614,24 @@ Sends part of an employee's net pay to another bank account or wallet - a fixed 
 | Percent of net pay | no | Number |
 | Bank of that account (blank: the employee's bank) | no | Text |
 | Branch of that account | no | Text |
+| Paid in currency (blank: base) | no | Text |
 | Remove this split | no | Flag; default False |
 
 The list beside the form shows: Pay splits.
+
+### Run the payroll in one step (no approval)
+
+Calculates and commits a pay group's payroll for the period (blank group = the default payroll): payslips and one balanced journal. A period is paid once per group.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Pay group (blank = default) | no | Text |
+| Period | yes | Text; default 2026-10 |
+| Date | yes | Date |
+| Run number (blank: next in sequence) | no | Text |
+| Net pay control account | yes | Text; default 2420 |
+
+The list beside the form shows: Payroll runs.
 
 ## Loans, claims and provisions
 
@@ -650,7 +675,7 @@ Raises a run's AP invoices for the tax authority, schemes and garnishee creditor
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Run document or journal number | yes | Text |
+| Payroll run | yes | Choice |
 
 The list beside the form shows: Payroll runs.
 
@@ -716,11 +741,11 @@ The list beside the form shows: Requests awaiting HR.
 
 ### Pay elements and tax tables
 
-Create a pay element, assign one to (or end one for) an employee, create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. '0-100:0; 100-300:20; 300-:30' - or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).
+Create a pay element or edit one (every field but its code and type, entered in full as for a new one; creating an existing code edits it), assign one to (or end one for) an employee, delete one no employee is on (past payslips keep it), create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. '0-100:0; 100-300:20; 300-:30' - or add the standard elements (BASIC, OVERTIME, HOUSING, TRANSPORT, PAYE on the tax table).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Create element, Set element options, Assign to employee, End for employee, Create tax table, Add standard elements, Preview formula; default Create element |
+| Step | yes | One of: Create element, Edit element, Set element options, Assign to employee, End for employee, Create tax table, Add standard elements, Preview formula; default Create element |
 | Element / table code | no | Text |
 | Element name | no | Text |
 | Element type | yes | One of: Earning, Deduction, EmployerContribution, Memo, Provision; default Earning |
@@ -750,6 +775,7 @@ Create a pay element, assign one to (or end one for) an employee, create a tax t
 | Recovers (deduction) | yes | One of: None, StaffPurchases, HousingRent; default None |
 | Taxable-benefit category (PR34), e.g. Housing | no | Text |
 | Paid in currency (blank: base) | no | Text |
+| Amounts keyed in the paid-in currency | no | Flag; default False |
 | Cumulative tax (year to date) | no | Flag; default False |
 | Tax per currency (split-currency pay) | no | Flag; default False |
 | Annual payment (bonus tax spread) | no | Flag; default False |
@@ -769,7 +795,7 @@ The list beside the form shows: Pay elements.
 
 ### Tax credits
 
-Credits taken off the tax the table works out, never below nil: a fixed amount a month (say an elderly credit from 65) or a percentage of a pay element (say half the medical-aid deduction), for everyone or only the employees given it.
+Credits taken off the tax the table works out, never below nil: a fixed amount a month (say an elderly credit from 65) or a percentage of a pay element (say half the medical-aid deduction), for everyone or only the employees given it. Saving an existing code changes that credit (and puts it back in use); Delete stops it being given.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -795,6 +821,15 @@ The month the tax year starts in (1 = January; 3 for a March–February year). Y
 | First month of the tax year (1–12) | yes | Number; default 1 |
 
 The list beside the form shows: Deductions and their suspension priority.
+
+### Set payroll approval
+
+Whether payroll needs a second user: regular runs then go calculate, approve (by someone else), commit, and supplementary and backpay runs name their approver. Nobody ever approves a run that pays themselves.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Payroll needs approval by a second user | no | Flag; default False |
+| Invoice the third parties (tax, funds, court orders) with every committed run | no | Flag; default False |
 
 ### Set net-pay protection
 
@@ -826,7 +861,7 @@ A court order deducted from pay through a deduction element until the total is s
 
 ### Benefits in kind
 
-Taxable benefits (a company car valued from the vehicle scale by engine size or cost, housing, school fees, medical): taxed each pay period they apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate.
+Taxable benefits (a company car valued from the vehicle scale by engine size or cost, housing, school fees, medical): taxed each pay period they apply and shown on the payslip as memo lines. Also the vehicle scale's bands, the deemed interest rate cheap staff loans are taxed at, and a loan's own rate. Add benefit with a benefit id changes that benefit's engine size, cost and monthly value; Delete on the list ends a benefit today (it stays in history).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -948,5 +983,6 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | PR72 | Variable Input Register | Overtime, absences and once-off earnings and deductions keyed or imported for each period, and what each was paid at. |
 | PR73 | Third-Party Invoices Raised | The AP invoices raised for the tax authority, schemes and garnishee creditors from payroll runs, with what is still outstanding on each. |
 | PR74 | Payslip (designable) | Every payslip line in the period - employee, section, element and amount with the slip's gross, deductions and net - as the data source for a company's own payslip layout in the report designer (one employee, or all). |
+| PR75 | Payroll Register by Currency | Per run and currency: the gross earnings paid in it (base and in the currency at the run's pay date rate), PAYE and other deductions falling on it, and the net pay paid in it as the settlement pays it (one run, or every run in the period). |
 | PR8 | Parallel Run Comparison | Go-live parallel run: One4All's payslips against the imported legacy payroll, per period, employee and element (NET for net pay). |
 | PR9 | Supplementary Runs & Reversal Register | Every supplementary, backpay and reversal run in the period, and every run reversed: reason, approval and journals. |

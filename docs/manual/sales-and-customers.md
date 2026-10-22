@@ -26,11 +26,11 @@ The list beside the form shows: Customers.
 
 ### Customer addresses and contacts
 
-Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who receive statements, remittance advices and purchase orders by email. Remove takes an address or contact id. The list shows the trader typed in Code.
+Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who receive statements, remittance advices and purchase orders by email. Add with an existing address or contact id changes that address or contact (Edit fills it in); Delete removes an address or retires a contact.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Add address, Add contact, Remove address, Remove contact; default Add address |
+| Step | yes | One of: Add address, Add contact; default Add address |
 | Customer code | yes | Text |
 | Address kind | yes | One of: Postal, Physical, Delivery; default Postal |
 | Address line 1 | no | Text |
@@ -47,7 +47,7 @@ Postal, physical and delivery addresses (the default postal address prints on in
 | Receives statements | no | Flag; default False |
 | Receives remittances | no | Flag; default False |
 | Receives purchase orders | no | Flag; default False |
-| Address / contact id (remove) | no | Number |
+| Address / contact id (blank: a new one) | no | Number |
 
 The list beside the form shows: Directory.
 
@@ -68,7 +68,7 @@ The list beside the form shows: Increases awaiting approval.
 
 ### Customer ageing basis and group
 
-How a customer's debts are aged (from the invoice date or the due date), and the parent account it belongs to for consolidated group statements (blank: none).
+How a customer's debts are aged (from the invoice date or the due date), and the parent account it belongs to for consolidated group statements (blank: none). Saving a customer already listed changes its setting; Delete puts it back to the default (aged by due date, no parent).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -80,7 +80,7 @@ The list beside the form shows: Customers in groups or aged by invoice date.
 
 ### Customer exchange-rate type
 
-The rate type this trader's foreign documents convert at (e.g. a contract or bank rate kept in the rate table). Daily (or blank) uses the daily rate; a document dated before any rate of the type falls back to the daily rate.
+The rate type this trader's foreign documents convert at (e.g. a contract or bank rate kept in the rate table). Daily (or blank) uses the daily rate; a document dated before any rate of the type falls back to the daily rate. Saving a trader already listed changes its rate type; Delete puts it back on the daily rate.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -111,21 +111,21 @@ The list beside the form shows: Quotations.
 
 ### Sales orders
 
-Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; lines ITEM:quantity, or blank for everything outstanding - a part despatch leaves the rest on back order), invoice what has been despatched (tax at each line's tax code), take back goods returned from a despatch, or cancel what is left of the order.
+Take an order (lines ITEM:quantity[:price[:tax code]]; no price takes the customer's price book), despatch it from a warehouse (stock issued at cost; lines ITEM:quantity, or blank for everything outstanding - a part despatch leaves the rest on back order), invoice what has been despatched (tax at each line's tax code), take back goods returned from a despatch, take back invoiced goods (an itemised credit note at the invoiced price, the goods restocked at the cost they went out at), or cancel what is left of the order.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Create, Despatch, Invoice, Return, Cancel; default Create |
+| Step | yes | One of: Create, Despatch, Invoice, Return, Return invoiced, Cancel; default Create |
 | Order number | yes | Text |
 | Date | yes | Date |
 | Customer code (create) | no | Text |
-| Lines (create: ITEM:qty[:price[:tax]]; despatch/return: ITEM:qty) | no | Text |
+| Lines (create: ITEM:qty[ UNIT][:price[:tax]]; despatch / return / return invoiced: ITEM:qty) | no | Text |
 | Revenue account (create; blank: the item's) | no | Text |
 | Warehouse code (despatch, return) | no | Text |
-| Delivery / invoice number | no | Text |
+| Delivery / invoice / credit note number | no | Text |
 | Vehicle (despatch) | no | Text |
 | Driver (despatch) | no | Text |
-| Output tax account (invoice) | no | Text |
+| Output tax account (invoice, return invoiced) | no | Text |
 | Reason (return, cancel) | no | Text |
 
 The list beside the form shows: Open sales orders.
@@ -255,11 +255,11 @@ The list beside the form shows: Deliveries not yet confirmed.
 
 ### Delivery vehicles and loads
 
-Register a vehicle (capacity in kg, optional m³ and drops a day, usual driver); put a delivery on a vehicle's run for a day at a stop (refused when it would overload the vehicle by weight or exceed its drops); or show a vehicle's load for a day in run order.
+Register a vehicle (capacity in kg, optional m³ and drops a day, usual driver; registering an existing one changes it and puts it back in use); put a delivery on a vehicle's run for a day at a stop (refused when it would overload the vehicle by weight or exceed its drops); or show a vehicle's load for a day in run order. Delete takes a vehicle off the runs.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Assign, Load, Register vehicle; default Assign |
+| Step | yes | One of: Register vehicle, Assign, Load; default Register vehicle |
 | Vehicle registration | yes | Text |
 | Delivery reference (assign) | no | Text |
 | Day | yes | Date |
@@ -305,20 +305,21 @@ The list beside the form shows: Delivery zone rates.
 
 ### Customer invoice or credit note
 
-Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account).
+Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account, worked out from the code when no tax amount is given). A blank number takes the next serial number; a number already used is refused. A credit note against an invoice cannot credit more than the invoice less earlier credits, settles what is unpaid on it, and is required when a fiscal device signs credit notes.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Document | yes | One of: Invoice, Credit note; default Invoice |
 | Customer | yes | Choice |
-| Document number | yes | Text |
+| Document number (blank: the next number) | no | Text |
 | Date | yes | Date |
 | Net amount | yes | Number |
-| Tax amount | yes | Number; default 0 |
+| Tax amount (0 with a tax code: worked out) | yes | Number; default 0 |
 | Sales account | yes | Text |
 | Tax account | no | Text |
 | Tax code | no | Text |
 | Currency (blank: the customer's) | no | Text |
+| Original invoice (credit note) | no | Choice |
 | Reason code (credit note) | no | Text |
 | Narrative | no | Text |
 | Supervisor allowing it over the credit limit (user name) | no | Text |
@@ -364,12 +365,13 @@ The list beside the form shows: Open customer items.
 
 ### Match payments to invoices
 
-Match a receipt or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, settle a customer invoice against the same party's supplier invoice (contra), or write off a bad debt claiming back the VAT on it once it is overdue long enough.
+Auto-allocate matches an account's receipts and credits to its invoices (exact amounts first, then oldest first; everyone: the whole ledger). Or match a receipt or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, settle a customer invoice against the same party's supplier invoice (contra), or ask to write off a bad debt (claiming back the VAT on it once it is overdue long enough) - another user with the write-off right approves or rejects it by request id before anything is written off.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Allocate, Unallocate, Contra, Write off; default Allocate |
-| Customer code | yes | Text |
+| Step | yes | One of: Allocate, Auto-allocate, Auto-allocate everyone, Unallocate, Contra, Write off, Approve write-off, Reject write-off; default Allocate |
+| Customer code (blank only for auto-allocate everyone) | no | Text |
+| Write-off request id (approve / reject) | no | Number |
 | Invoice number | no | Text |
 | Receipt / credit note number | no | Text |
 | Amount (blank: as much as is open) | no | Number |
@@ -379,7 +381,7 @@ Match a receipt or credit note to an invoice (in part: give the amount; blank ma
 | Supplier invoice number (contra) | no | Text |
 | Contra clearing account | no | Text |
 | Bad debt expense account (write off) | no | Text |
-| Reason (write off / back) | no | Text |
+| Reason (unallocate, write off / back) | no | Text |
 | Overdue at least (days) for VAT relief | yes | Number; default 180 |
 | Document number (contra) | no | Text |
 
@@ -405,7 +407,7 @@ The list beside the form shows: Open customer items.
 
 ### Recurring sales invoices
 
-An invoice to a customer raised every so many months from a first date; Generate raises all that are due; Stop / restart one.
+An invoice to a customer raised every so many months from a first date; Generate raises all that are due; Stop / restart one. Create with an existing reference changes that template's amounts, accounts, interval and narrative from its next run (its trader and next run date stay); Delete stops it (kept in history; Restart brings it back).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -427,7 +429,7 @@ The list beside the form shows: Recurring invoices.
 
 ### Price lists
 
-Create a price list in a currency (one may be the default), set an item's price on it (with a minimum quantity for a quantity break), or put a customer on a list (blank list: back to the default).
+Create a price list in a currency (one may be the default), set an item's price on it (with a minimum quantity for a quantity break), or put a customer on a list (blank list: back to the default). Create with an existing code changes that list's name and whether it is the default (its currency stays). Delete takes a list out of use; the default list and a list customers still buy from cannot be.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -445,7 +447,7 @@ The list beside the form shows: Price lists.
 
 ### Price a list from cost
 
-Items with no price on the list are priced from cost (average, else standard): a markup on cost or a margin on price, rounded to a price point. Basis None turns it off.
+Items with no price on the list are priced from cost (average, else standard): a markup on cost or a margin on price, rounded to a price point. Saving a list again changes its settings; Basis None (or Delete in the list) turns it off - the price list itself stays.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -477,7 +479,7 @@ The list beside the form shows: Price lists.
 
 ### Sales commissions
 
-A sales rep's commission statement for a period (by customer, on the rep's basis: invoiced, collected or gross margin), or the month-end accrual of every rep's commission earned. Save a rep sets up or changes one; Assign customer puts a customer with a rep. Link employee makes a rep an employee; To payroll sends every linked rep's commission for From–To to the pay period's commission element (instead of accruing it).
+A sales rep's commission statement for a period (by customer, on the rep's basis: invoiced, collected or gross margin), or the month-end accrual of every rep's commission earned. Save a rep sets up or changes one; Assign customer puts a customer with a rep. Link employee makes a rep an employee; To payroll sends every linked rep's commission from From to To to the pay period's commission element (instead of accruing it). Delete takes a rep out of use once no customer is assigned to it (Save rep brings it back).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -507,7 +509,7 @@ The customer's statement as at a date, ready to print or send: open-item, or bal
 | --- | --- | --- |
 | Customer | yes | Choice |
 | As at | yes | Date |
-| Balance-forward period from (yyyy-MM-dd; blank: the customer's style) | no | Text |
+| Balance-forward period from (blank: the customer's style) | no | Date |
 | Set the customer's style | yes | One of: (leave), OpenItem, BalanceForward; default (leave) |
 
 The list beside the form shows: Open customer items.
@@ -570,7 +572,7 @@ Hands a customer's overdue debt to a collector or lawyer (a case), records the s
 | Case number | no | Text |
 | Handed over to / court | no | Text |
 | Summons number | no | Text |
-| Hearing date (yyyy-MM-dd) | no | Text |
+| Hearing date | no | Date |
 | Reason (write-off) | no | Text |
 | Bad debt account | no | Text |
 | Outcome (close) | yes | One of: Settled, Withdrawn; default Settled |
@@ -675,8 +677,8 @@ Prints the packing slip in the standard business document layout, or through the
 | AR30 | Aged Debtors by Sales Rep and Currency | Debtors aged as at the date, grouped by sales rep (or agent) and currency, in base. |
 | AR31 | Customer Ledger | One customer's documents in date order with running balance and what is still outstanding on each. |
 | AR33 | Sales Day Book | Invoices, credit notes and debit notes raised in the period, in transaction and base currency. |
-| AR34 | Sales Analysis with Margin | Invoiced order lines and POS sales in the period by customer and item, against current average cost. |
-| AR35 | Top Customers (Pareto) | Customers ranked by net sales in the period, with share and cumulative share. |
+| AR34 | Sales Analysis with Margin | Invoiced order lines and POS sales in the period by customer, sales agent, branch, item and item category, against current average cost, with margin and each line's share of total sales (group or sort by any column in the designer for the other views). |
+| AR35 | Top / Bottom Customers (Pareto), Growth & Lapsed | Customers ranked by net sales in the period, with share, cumulative share, the same period a year earlier and the growth, and the last invoice date; customers who bought in the twelve months before the period but not in it follow as lapsed (sort ascending for the bottom N). |
 | AR36 | Customer Sales History & Trend | Per customer: net sales this year to date against the same period last year, and the last three months against the three before. |
 | AR37 | Credit Notes & Returns Analysis | Credit notes raised in the period by reason code, with customer and narrative. |
 | AR38 | Receipts / Collections Report | Customer receipts in the period by day, bank account (method), currency and the user who posted them. |
@@ -685,6 +687,7 @@ Prints the packing slip in the standard business document layout, or through the
 | AR41 | Promise-to-Pay Diary | Promises recorded by credit control: amount, date promised and whether kept, broken or still open at the date. |
 | AR42 | Dunning / Reminder Letters | Every customer with overdue debt at the date, at its reminder level (first, second, final), with the letter itself - overdue amount after unallocated credits and the oldest days overdue. |
 | AR43 | Bad Debt Write-off Listing | Write-offs in the period with the customer, document and the debt case that approved it. |
+| AR43-ECL | Expected Credit Loss Provision Matrix (IFRS 9) | Receivables at the date by days past due, each band's expected loss rate and the provision it calls for, then the total against the allowance already booked on the allowance account and the adjustment to post (the standard matrix; post it from Credit control). |
 | AR44 | Customer Deposits & Advance Payments Held | Money received from customers and not yet applied to an invoice at the date - deposits, advances and payments on account - with how long each has been held, in transaction currency and base. |
 | AR45 | Lay-bye Status & Arrears | Every lay-bye plan with price, paid, balance and days to (or past) its final date. |
 | AR46 | Sales Agent Commission Statement & Accrual Schedule | Per sales rep for the period: commission earned on each customer's base, the rep's total to accrue, optionally for one rep. |

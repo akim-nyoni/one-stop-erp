@@ -3,9 +3,9 @@
 Goal: show that products and services, warehouses, stock movements, counts and production work end to end. Allow 15 to 20 minutes. Sample data loaded; signed in as admin.
 
 ## Products
-1. Open **Add a product or service**. A stock, service or other item with the accounts its sales and cost post to, how its stock is costed (weighted average, FIFO, standard with its variance accounts, or specific identification), batch or serial tracking and a shelf life. Fill in: Item code, Description, Type, Costing method, Tracking. Press OK and point out the result line and the list on the right.
+1. Open **Add a product or service**. A stock, service or other item: its unit, barcode and selling price (on the default price list), and the accounts its sales and cost post to - left blank, they are taken from another item in the same category. Fill in: Item code, Description, Type, Costing method, Tracking. Press OK and point out the result line and the list on the right.
 2. Open **Find a product**. Searches codes, PLUs, barcodes (item, pack, alias), synonyms, brands and descriptions. Fill in: Search for. Press OK and point out the result line and the list on the right.
-3. Open **Product picture, description and size**. An item's long description, its length, width and height in centimetres (the volume follows) and weight, and its picture (a JPEG, PNG, GIF or WebP file of at most 1 MB; Remove picture drops it). Fill in: Step, Product. Press OK and point out the result line and the list on the right.
+3. Open **Sizes and colours**. Sizes and colours of one product: a variant is its own stock item (own code, barcode, stock and price), made from the base item - its unit, tax code, category, accounts, tracking and brand copied - and kept under it so the variants list and report together. Fill in: Step, Base item code. Press OK and point out the result line and the list on the right.
 
 ## Warehouses
 4. Open **Add a warehouse**. A stock location of the current company. Fill in: Code, Name. Press OK and point out the result line and the list on the right.
@@ -27,9 +27,9 @@ Goal: show that products and services, warehouses, stock movements, counts and p
 14. Open **Disassemble finished goods**. Takes finished units apart into their components; their cost is split over the components recovered at each one's average cost, or by their relative sales value on the default price list (joint products: a carcass into cuts). Fill in: BOM code, Warehouse, Units taken apart, Date, Assembly clearing account. Press OK and point out the result line and the list on the right.
 
 ## Look up
-15. Open **Stock on hand and back orders**. An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether stock now covers it. Fill in: Product. Press OK and point out the result line and the list on the right.
-16. Open **Trace a batch or serial (recall)**. For a recall: where a batch or serial came from (receipts, with the supplier), where it went (issues and sales, with the customer), and what is still on hand in each warehouse. Fill in: Product, Batch / serial number. Press OK and point out the result line and the list on the right.
-17. Open **Suggest picks (first expiry, first out)**. Which batches to pick for a quantity, earliest expiry first, never expired stock. Fill in: Product, Warehouse, Quantity, Date. Press OK and point out the result line and the list on the right.
+15. Open **How many do I have? (stock on hand)**. How many of each product are in stock, per warehouse. Press OK and point out the result line and the list on the right.
+16. Open **Available to promise and back orders**. An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether stock now covers it. Fill in: Product. Press OK and point out the result line and the list on the right.
+17. Open **Trace a batch or serial (recall)**. For a recall: where a batch or serial came from (receipts, with the supplier), where it went (issues and sales, with the customer), and what is still on hand in each warehouse. Fill in: Product, Batch / serial number. Press OK and point out the result line and the list on the right.
 
 ## Valuation
 18. Open **Revalue an item's standard cost**. Sets a new standard cost for a standard-costed item: the stock on hand is revalued at the new standard and the difference posts to the revaluation account. Fill in: Product, New standard cost, Date, Revaluation account. Press OK and point out the result line and the list on the right.

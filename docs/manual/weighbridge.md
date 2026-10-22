@@ -30,7 +30,7 @@ Outbound loads weigh empty first (leave the weight blank to use the vehicle's st
 | Weight keyed by hand | no | Flag; default False |
 | Why keyed | no | Text |
 | Authorised by (user name) | no | Text |
-| Sales order number (outbound) | no | Text |
+| Sales order (outbound) or purchase order (inbound) | no | Text |
 | Read the weight from the scale | no | Flag; default False |
 
 The list beside the form shows: Tickets still on the bridge.
@@ -65,6 +65,7 @@ Bills a customer for every completed outbound load up to the invoice date that h
 | Sales account | yes | Text; default 4000 |
 | Haulage revenue account (blank = sales) | no | Text |
 | Tax code | no | Text |
+| Authorised by (user name; needed when the price differs from the order's or price book's) | no | Text |
 
 The list beside the form shows: Completed loads not yet invoiced.
 

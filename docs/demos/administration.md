@@ -13,7 +13,7 @@ Goal: show that the company, users and security, importing data and looking afte
 6. Open **Quick column layout**. Pick and order the columns of a simple listing.
 
 ## Users and security
-7. Open **Create a user**. A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name). Fill in: Login name, Display name, Initial password. Press OK and point out the result line and the list on the right.
+7. Open **Create a user**. A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name). Fill in: Login name, Display name. Press OK and point out the result line and the list on the right.
 8. Open **Reset a password**. Sets a new password the user must change at next sign-in, and clears any lockout. Fill in: Login name, New password. Press OK and point out the result line and the list on the right.
 9. Open **Activate or deactivate a user**. A deactivated user cannot sign in; the last system administrator stays active. Fill in: Login name. Press OK and point out the result line and the list on the right.
 

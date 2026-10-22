@@ -10,7 +10,7 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Students, hostels and routes
 
-Admit a student under their guardian's account (the customer billed); set up a hostel or transport route with its capacity and fee per term; place a student in a hostel and on a route (blank takes them out) within capacity.
+Admit a student under their guardian's account (the customer billed); set up a hostel or transport route with its capacity and fee per term; place a student in a hostel and on a route (blank takes them out) within capacity. Admitting an existing admission number changes that student's name and gender; saving an existing hostel or route code changes its capacity and fee.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -43,6 +43,14 @@ Staff discount: the percentage off compulsory fees for staff children while the 
 | Employee number (staff parent) | no | Text |
 | Why withheld | no | Text |
 
+### A student's fees and balance
+
+One student's fees out of the family's account: every fee invoice, credit and debit note raised for the student (to the guardian or the sponsor), what has been paid on each and what is still owed.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Admission number | yes | Text |
+
 ### Top up / spend a student wallet
 
 A top-up is paid into the bank; a spend (tuck shop) is limited to the balance and the student's daily limit.
@@ -64,7 +72,7 @@ The list beside the form shows: Wallet balances.
 
 ### Fee structures and term billing
 
-A fee structure per grade and term with its items (compulsory ones billed to every student in the grade, optional ones only to those taking them); Bill term invoices every enrolled student of the grade under the prefix (a rerun skips those already billed); Bill student invoices one.
+A fee structure per grade and term with its items (compulsory ones billed to every student in the grade, optional ones only to those taking them); Bill term invoices every enrolled student of the grade under the prefix (a rerun skips those already billed); Bill student invoices one. Saving an existing structure code changes its name (grade, term and account stay); Delete takes it out of use, leaving the invoices already raised.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -94,7 +102,7 @@ Request a bursary (percentage or value off compulsory fees) - it reduces fees on
 | Percentage or value (request) | no | Number |
 | Reason / decision note | no | Text |
 | Reference (decide) | no | Text |
-| Last day it applies (yyyy-MM-dd) | no | Text |
+| Last day it applies | no | Date |
 | Expiring within (days) | yes | Number; default 60 |
 | Date | yes | Date |
 
@@ -158,8 +166,8 @@ Term dates (with pro rata, a joiner pays from the admission date and a leaver is
 | Fee structure code | no | Text |
 | Admission number | no | Text |
 | Optional fee item id (from the list) | no | Number |
-| Term start / admission date (yyyy-MM-dd) | no | Text |
-| Term end (yyyy-MM-dd) | no | Text |
+| Term start / admission date | no | Date |
+| Term end | no | Date |
 | Pro rata joiners and leavers | no | Flag; default True |
 | Term invoice prefix (withdraw) | no | Text |
 | Left on (withdraw) | yes | Date |
@@ -168,7 +176,7 @@ The list beside the form shows: Optional fee items.
 
 ### Classes and streams
 
-Classes by grade and stream with capacity and the grade they move up to (blank: final year). Place a student within capacity; at year end, promote the school once.
+Classes by grade and stream with capacity and the grade they move up to (blank: final year). Place a student within capacity; at year end, promote the school once. Saving an existing grade and stream changes that class (and puts a closed one back in use); Delete closes a class nobody is enrolled in.
 
 | Field | Required | Notes |
 | --- | --- | --- |

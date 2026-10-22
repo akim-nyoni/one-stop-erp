@@ -10,7 +10,7 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Register an applicant
 
-Registers an applicant (a second registration with the same national ID is refused) and gives the waiting-list number and priority score.
+Registers an applicant (a second registration with the same national ID is refused) and gives the waiting-list number and priority score. Ticked, it also opens the applicant's customer account (the waiting-list number as its code, the national ID on it) unless a customer already has that national ID, so deposits, sales and rent can be charged without keying the customer separately. The registration is dated today, the day it is captured; for an earlier date, register today and use Waiting-list control (Request date change), which a second user decides.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -23,21 +23,21 @@ Registers an applicant (a second registration with the same national ID is refus
 | Has a disability | no | Flag; default False |
 | Monthly income | yes | Number; default 0 |
 | Current tenure | yes | One of: Lodger, Tenant, Homeless, WithRelatives, InformalSettlement; default Lodger |
-| Registration date | yes | Date |
 | Marital status | yes | One of: Single, Married, Cohabiting, Divorced, Widowed; default Single |
 | Marriage regime | yes | One of: , InCommunity, OutOfCommunity, Customary |
 | Spouse / co-applicant national ID | no | Text |
 | Spouse / co-applicant name | no | Text |
+| Open the applicant's customer account | no | Flag; default True |
 
 The list beside the form shows: Applicants.
 
 ### Find an applicant and their place
 
-With a waiting-list number (or applicant id): the applicant's status, place by seniority and score. Without one: the ranking for a category, by seniority or score.
+With a waiting-list number, national ID or name (or part of it): the applicant's status, place by seniority and score; when several names match they are listed to narrow down. Without one: the ranking for a category, by seniority or score.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Waiting-list number (blank for the ranking) | no | Text |
+| Waiting-list number, national ID or name (blank for the ranking) | no | Text |
 | Category | yes | One of: HighDensity, MediumDensity, LowDensity, Flats, Rental; default HighDensity |
 | Order | yes | One of: Seniority, Score; default Seniority |
 | As at | yes | Date |
@@ -59,7 +59,7 @@ Contact: an applicant's gender, addresses, phone and employer. Lodge / Verify: s
 | Employer | no | Text |
 | Document | yes | One of: IdCopy, ProofOfResidence, Payslip, Affidavit, Other; default IdCopy |
 | Description / name (death) | no | Text |
-| Document / case id | no | Number |
+| Document / case id (case from the list) | no | Number |
 | Verifying officer | no | Text |
 | National ID (death) | no | Text |
 | Reason (decision) | no | Text |
@@ -76,7 +76,7 @@ Request a change to an applicant's registration date (with the reason) and have 
 | Step | yes | One of: Request date change, Decide date change, Confirm interest, Run renewals, Notices; default Request date change |
 | Waiting-list number | no | Text |
 | Reason (date change) | no | Text |
-| Request id (decide) | no | Number |
+| Date change request (decide) | no | Choice |
 | Approve | no | Flag; default False |
 | Renewal cycle (months) | yes | Number; default 12 |
 | Grace (days) | yes | Number; default 30 |
@@ -118,9 +118,13 @@ Policy: who qualifies (minimum age, years resident, overall income ceiling) and 
 | Points for a disability | yes | Number; default 15 |
 | Points if homeless | yes | Number; default 20 |
 | Points if lodging | yes | Number; default 8 |
+| Points per year of age (policy) | no | Number |
+| Age points from age | no | Number |
+| Points for a cooperative member | no | Number |
 | First-time buyers only | no | Flag; default False |
 | Refuse earlier forfeiture | no | Flag; default False |
 | Require rates clearance | no | Flag; default False |
+| Let rental units only from the rental waiting list | no | Flag; default False |
 | Category for the ceiling | yes | One of: HighDensity, MediumDensity, LowDensity, Flats, Rental; default HighDensity |
 | Its income ceiling (blank: none) | no | Number |
 
@@ -130,7 +134,7 @@ The list beside the form shows: Rules in force.
 
 ### Land, schemes and stands
 
-Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands ("S1:300; S2:250" - number:size m²), its cost apportioned equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available).
+Acquire land into land WIP at its cost; create a housing scheme; subdivide a parcel into stands ("S1:300; S2:250" - number:size m²), its cost apportioned equally or by area into stands available; sell a stand outright for cash (an invoice to the buyer, cost of sales out of stands available). Create scheme with an existing code changes that scheme's name and delivery model; Delete removes a scheme that has no stands, developer agreements, pricing rules or quotas (kept in history).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -157,7 +161,7 @@ The list beside the form shows: Schemes.
 
 ### Stand, parcel and scheme details
 
-Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and the services available (water, sewer, road, electricity, storm water). Remark: adds a dated line to the stand's remarks history; Remarks lists it. Parcel: locality, ward, land use, tenure, improvements and occupation. Scheme: funding source and start / completion dates.
+Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and the services available (water, sewer, road, electricity, storm water). Remark: adds a dated line to the stand's remarks history; Remarks lists it. Parcel: locality, ward, land use, tenure, improvements and occupation. Scheme: funding source, start / completion dates and the deposit an offer must be secured with before it is accepted. Edit fills a stand's details in to change them (a stand carries cost and history, so it is never deleted here).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -179,8 +183,9 @@ Stand: address, ward / suburb / zone, intended use, zoning, servicing phase and 
 | Parcel tenure | yes | One of: , Freehold, StateLand, Leasehold, Communal, Customary, Trust |
 | Parcel occupation | yes | One of: , Vacant, Occupied, InformallySettled, UnderDispute |
 | Scheme funding | yes | One of: , OwnRevenue, Loan, Grant, DeveloperContribution, Mixed |
-| Scheme start (yyyy-MM-dd) | no | Text |
-| Scheme completion (yyyy-MM-dd) | no | Text |
+| Scheme start | no | Date |
+| Scheme completion | no | Date |
+| Scheme deposit before acceptance | no | Number |
 
 The list beside the form shows: Stand register.
 
@@ -217,7 +222,7 @@ Proposes a pricing rule - for one stand, a size band or a whole scheme, from a d
 | Levy per m² | yes | Number; default 0 |
 | Margin % | yes | Number; default 0 |
 | Round to | yes | Number; default 1 |
-| Rule id (approve) | no | Number |
+| Rule id (approve, from the list) | no | Number |
 | Date | yes | Date |
 
 The list beside the form shows: Pricing rules.
@@ -262,7 +267,7 @@ On a land parcel: register an encumbrance (servitude, caveat, mortgage, lease, r
 | Step | yes | One of: Encumbrance, Lift encumbrance, Open dispute, Advance dispute, Dispose; default Encumbrance |
 | Parcel number | no | Text |
 | Encumbrance type | yes | One of: Servitude, Caveat, Mortgage, Lease, RestrictiveCondition, Wayleave; default Servitude |
-| Encumbrance id (lift) | no | Number |
+| Encumbrance (lift) | no | Choice |
 | Reference / resolution | no | Text |
 | In favour of / claimant / counterparty | no | Text |
 | Description / particulars / note | no | Text |
@@ -272,7 +277,7 @@ On a land parcel: register an encumbrance (servitude, caveat, mortgage, lease, r
 | Stand number (dispute, optional) | no | Text |
 | Disposal | yes | One of: Sale, Exchange, Donation, Expropriation; default Sale |
 | Area m² (disposal) | yes | Number; default 0 |
-| Consideration | yes | Number; default 0 |
+| Sale price | yes | Number; default 0 |
 | Land account | no | Text |
 | Proceeds account | no | Text |
 | Gain / loss account | no | Text |
@@ -284,11 +289,11 @@ The list beside the form shows: Land disputes.
 
 ### Land acquisition
 
-Open an acquisition (method, counterparty, authorising resolution), record its valuation, sign off each due-diligence item, capitalise costs into land WIP, see its position (cost build-up and what still blocks it), complete it into the land bank, or abandon it (costs written off).
+Open an acquisition (method, counterparty, authorising resolution), record its valuation, sign off each due-diligence item, capitalise costs into land WIP, see its position (cost build-up and what still blocks it), complete it into the land bank, or abandon it (costs written off). Under a land acquisition workflow, submit it for approval at its value first; it completes once approved.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Open, Valuation, Council offer, Counterparty offer, Agree price, Break off talks, Sign off, Add cost, Position, Complete, Abandon; default Open |
+| Step | yes | One of: Open, Valuation, Council offer, Counterparty offer, Agree price, Break off talks, Sign off, Add cost, Position, Submit for approval, Complete, Abandon; default Open |
 | Acquisition number | no | Text |
 | Parcel number (open) | no | Text |
 | Description / finding / reference | no | Text |
@@ -318,7 +323,7 @@ Lodge a claim on a land parcel, serve the notice (opening the objection window),
 | Claimant / objector / assessor / forum / notice reference | no | Text |
 | Grounds / note | no | Text |
 | Amount | no | Number |
-| Objection / offer / dispute id | no | Number |
+| Objection / offer / dispute id (from the list, under Open steps) | no | Number |
 | Upheld / accepted | no | Flag; default False |
 | Objection window (days) | yes | Number; default 30 |
 | Land cost account (lodge) | no | Text |
@@ -347,21 +352,22 @@ The list beside the form shows: Blocks in force.
 
 ### Allocation run
 
-Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify); the committee rejects a pairing with a reason or substitutes the next applicant stating why the skipped one was skipped; approve it (someone else; offers go out with a deadline; with a resolution the meeting's date and members are kept), cancel it, or verify a ballot's draw.
+Propose a run for a scheme's available stands (seniority, score, or a seeded ballot anyone can re-run to verify); the committee rejects a pairing with a reason or substitutes the next applicant stating why the skipped one was skipped; approve it (someone else; offers go out with a deadline; with a resolution the meeting's date and members are kept; approving needs the allocation-approval permission), cancel it, or verify a ballot's draw. Expired offers wait in a queue for an officer to lapse or extend them with a reason. A swap of two allottees' stands is asked for as a document and approved or rejected by another officer before the stands change hands.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Propose, Reject line, Substitute line, Approve, Cancel, Verify draw, Swap stands; default Propose |
+| Step | yes | One of: Propose, Reject line, Substitute line, Approve, Cancel, Verify draw, Swap stands, Approve swap, Reject swap, Expired offers, Lapse offer, Extend offer; default Propose |
 | Only these stands (substitution run; ',') | no | Text |
+| Swap document (approve / reject swap) | no | Choice |
 | Pairing sequence (reject / substitute) | no | Number |
 | Reason (reject / substitute) | no | Text |
 | Committee resolution (approve) | no | Text |
-| Meeting date yyyy-MM-dd (approve) | no | Text |
+| Meeting date (approve) | no | Date |
 | Committee members present (approve) | no | Text |
-| Certificate (swap) | no | Text |
+| Certificate (swap / lapse / extend) | no | Text |
 | Other certificate (swap) | no | Text |
 | Swap document | no | Text |
-| Swap reason | no | Text |
+| Reason (swap / lapse / extend) | no | Text |
 | Scheme code (propose) | no | Text |
 | Category | yes | One of: HighDensity, MediumDensity, LowDensity, Flats, Rental; default HighDensity |
 | Method | yes | One of: Seniority, Score, Ballot; default Seniority |
@@ -374,7 +380,7 @@ The list beside the form shows: Allocation runs.
 
 ### Offers: accept, decline, print letters
 
-Records the applicant's answer to an allocation offer by its certificate number; a decline needs the reason and frees the stand. Offer letter prints the offer (price, deposit, deadline) for the applicant; Allocation letter prints the confirmation once accepted.
+Records the applicant's answer to an allocation offer by its certificate number; a decline needs the reason and frees the stand. Offer letter prints the offer (price, deposit, deadline) for the applicant; Allocation letter prints the confirmation once accepted. When the scheme wants a deposit held before acceptance, it can be taken here with the acceptance: give its amount, receipt and accounts.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -383,12 +389,17 @@ Records the applicant's answer to an allocation offer by its certificate number;
 | Reason (decline) | no | Text |
 | Date | yes | Date |
 | Deposit % (letters) | no | Number |
+| Deposit taken now (accept; blank: none) | no | Number |
+| Deposit receipt reference (accept) | no | Text |
+| Bank / cash account the deposit is paid into (accept) | no | Text |
+| Deposit liability account (accept) | no | Text |
+| Customer paying the deposit (accept; blank: the applicant's customer by national ID) | no | Text |
 
 The list beside the form shows: Stands.
 
 ### Allocation quotas
 
-Sets the share of allocations reserved for a beneficiary group (women, youth, disabled, elderly, civil servants), for a scheme or overall; declares the groups an applicant belongs to (comma-separated) so allocation runs can meet the quotas.
+Sets the share of allocations reserved for a beneficiary group (women, youth, disabled, elderly, civil servants), for a scheme or overall; declares the groups an applicant belongs to (comma-separated) so allocation runs can meet the quotas. Setting a quota already listed changes its target; Delete sets it to 0% (no share reserved).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -471,16 +482,17 @@ The list beside the form shows: Instalment agreements.
 
 ### Stand deposits and cancellations
 
-Take a deposit against an allocation (held as a liability), apply it when the sale goes ahead or refund it; cancel an instalment agreement at the buyer's request (requested by you, approved by another user): what was paid less occupation rental, the admin charge and arrears is refunded and the stand repossessed.
+Take a deposit against an allocation (held as a liability) and apply it when the sale goes ahead. Refund: once the offer is declined, lapsed or cancelled (or the allocation has ended), you request the refund with its reason and bank account; another user holding the deposit refund approve right then approves it (paying it) or rejects it with a reason. Cancel an instalment agreement at the buyer's request (requested by you, approved by another user): what was paid less occupation rental, the admin charge and arrears is refunded and the stand repossessed.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Take deposit, Apply deposit, Refund deposit, Cancel agreement; default Take deposit |
+| Step | yes | One of: Take deposit, Apply deposit, Request refund, Approve refund, Reject refund, Cancel agreement; default Take deposit |
 | Allocation certificate (deposit) | no | Text |
+| Deposit refund awaiting approval (approve / reject) | no | Choice |
 | Instalment agreement (cancel) | no | Text |
 | Customer code (take) | no | Text |
-| Amount (take) / NRV (cancel) | yes | Number; default 0 |
-| Receipt reference / reason | no | Text |
+| Amount (take) / current market value (cancel) | yes | Number; default 0 |
+| Receipt reference (take) / reason (refund, reject, cancel) | no | Text |
 | Bank account | no | Text |
 | Deposit liability account (take) | no | Text |
 | Monthly occupation rental (cancel) | yes | Number; default 0 |
@@ -523,6 +535,25 @@ Takes back a stand sold on instalments (requested by you, approved by another us
 | Date | yes | Date |
 
 The list beside the form shows: Repossessions this year.
+
+### Surrender a stand
+
+A holder gives a stand back to council. Request: you key the surrender and its accounts; another user then approves it (carrying it out) or rejects it with a reason. On approval an instalment agreement closes and what is owed is written off, a sold stand comes back into inventory at the lower of cost and current market value, and any refund is credited to the holder's account.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Step | yes | One of: Request, Approve, Reject; default Request |
+| Surrender request (approve / reject) | no | Choice |
+| Stand number (request) | no | Text |
+| Reason (request / reject) | no | Text |
+| Surrender gain / loss account (request) | no | Text |
+| Stands available (inventory) account (request, a sold stand) | no | Text |
+| Current market value (request, a sold stand) | no | Number |
+| Refund to the holder (request) | no | Number |
+| Refund charged to account (request) | no | Text |
+| Date | yes | Date |
+
+The list beside the form shows: Surrenders this year.
 
 ### Stand leases
 
@@ -580,18 +611,19 @@ The list beside the form shows: Schemes.
 
 ### Transfer of ownership
 
-Lodge a transfer (sale, cession, inheritance, donation, court order) to a new holder; verify each requirement with its document; the checklist shows what is outstanding (rates and housing account clearances are checked live); submit, approve (by someone else), complete or reject.
+Lodge a transfer (sale, cession, inheritance, donation, court order) to a new holder; verify each requirement with its document; the checklist shows what is outstanding (rates and housing account clearances are checked live); an approving officer may record that the transferee assumes the housing balance; submit, approve (by someone else), complete or reject.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Lodge, Verify, Checklist, Submit, Approve, Complete, Reject; default Lodge |
+| Step | yes | One of: Lodge, Verify, Checklist, Assume balance, Submit, Approve, Complete, Reject; default Lodge |
 | Application number | no | Text |
 | Stand number (lodge) | no | Text |
 | Transfer type | yes | One of: Sale, Cession, Inheritance, Donation, CourtOrder, Matrimonial, CompanyOrTrust, ChangeOfName, Correction, DeceasedJointHolder; default Sale |
 | New holder customer code (lodge) | no | Text |
-| Consideration | yes | Number; default 0 |
+| Sale price | yes | Number; default 0 |
 | Requirement (verify) | yes | One of: MunicipalClearance, HousingAccountClear, Identity, SpousalConsent, OriginalDocuments, EstateDocuments, FeesReceipted, TaxWithholding; default MunicipalClearance |
 | Document reference / reason | no | Text |
+| Clearing account (assume balance) | no | Text |
 | Date | yes | Date |
 
 The list beside the form shows: Transfer applications.
@@ -646,7 +678,7 @@ Registers a sectional title scheme on a stand with its units' floor areas ("U1:8
 | Units: number:floor area; … (register) | no | Text |
 | Unit number (transfer) | no | Text |
 | To customer code (transfer) | no | Text |
-| Consideration / levy | yes | Number; default 0 |
+| Sale price / levy | yes | Number; default 0 |
 | Levy period (yyyyMM) | yes | Number; default 0 |
 | Levy income account | no | Text |
 | Date | yes | Date |
@@ -669,6 +701,7 @@ Add unit: a council rental unit with its rooms and rent. Let: a tenancy to a cus
 | Monthly rent | yes | Number; default 0 |
 | Rent income account (add unit) | no | Text |
 | Tenant customer code (let) | no | Text |
+| Rental waiting-list number (let) | no | Text |
 | Tenancy number (end) | no | Text |
 | Deposit (let) | yes | Number; default 0 |
 | Bank account (deposit / refund) | no | Text |
@@ -680,7 +713,7 @@ The list beside the form shows: Tenancies.
 
 ### Rent tariffs and review
 
-Tariff: the monthly rent for a kind of unit from the first of a month, optionally only in one suburb and for one income category (the most specific applies). Suburb / Income category: place a unit, classify a tenant household. Apply tariffs: from the first of a month every unit's asking rent and every running tenancy's rent follows its tariff. Review by %: raises every rent (or one unit type's) by a percentage.
+Tariff: the monthly rent for a kind of unit from the first of a month, optionally only in one suburb and for one income category (the most specific applies). Suburb / Income category: place a unit, classify a tenant household. Apply tariffs: from the first of a month every unit's asking rent and every running tenancy's rent follows its tariff. Review by %: raises every rent (or one unit type's) by a percentage. A tariff for a unit type, suburb, category and date already listed changes its rent (Edit fills it in); a tariff is superseded by a later one rather than deleted.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -706,7 +739,7 @@ Add occupant / move out: the household living with the tenant, within the unit's
 | Name (occupant / lodger) | no | Text |
 | National ID | no | Text |
 | Relationship to the tenant | no | Text |
-| Occupant id (move out) | no | Number |
+| Occupant (move out) | no | Choice |
 | Rooms let to the lodger | yes | Number; default 1 |
 | Monthly lodger fee | yes | Number; default 0 |
 | Lodger fee income account | no | Text |
@@ -728,7 +761,7 @@ Report a repair on a unit; complete it with its cost (recharged to the tenant wh
 | Void reason | no | Text |
 | Refurbishment job (contract) number | no | Text |
 | Planned: every (months, 0 = once) | yes | Number; default 12 |
-| Planned task id | no | Number |
+| Planned task (Planned done) | no | Choice |
 | Description / findings | no | Text |
 | Cost | yes | Number; default 0 |
 | Repairs expense account | no | Text |
@@ -738,7 +771,7 @@ Report a repair on a unit; complete it with its cost (recharged to the tenant wh
 | Inspector | no | Text |
 | Condition grade (1–5) | yes | Number; default 3 |
 | Needs follow-up | no | Flag; default False |
-| Inspection id (close) | no | Number |
+| Inspection (close) | no | Choice |
 | Date | yes | Date |
 
 The list beside the form shows: Rental units.
@@ -861,13 +894,15 @@ The list beside the form shows: Developer agreements.
 
 ### Development levies
 
-Defines a levy charged on allocation or on transfer - flat, per m² or a percentage of the price - to an income account, or deactivates it; charges the levies due on an allocation certificate or a transfer application.
+Defines a levy charged on allocation or on transfer - flat, per m² or a percentage of the price - to an income account, or deactivates it; charges the levies due on an allocation certificate or a transfer application. Define with an existing code changes that levy's name, rate and income account for charges raised from now on (its trigger and basis stay); Delete deactivates it (charges already raised stand).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Define, Deactivate, Charge allocation, Charge transfer; default Define |
+| Step | yes | One of: Define, Deactivate, Defer, Charge allocation, Charge transfer; default Define |
 | Levy code | no | Text |
 | Name | no | Text |
+| Months its income is spread over (defer; 0: at once) | no | Number |
+| Deferred income account (defer) | no | Text |
 | Charged on | yes | One of: Allocation, Transfer; default Allocation |
 | Basis | yes | One of: Flat, PerSquareMetre, PercentOfPrice; default Flat |
 | Rate / amount | yes | Number; default 0 |
@@ -899,7 +934,7 @@ The list beside the form shows: Covenants.
 
 ### Housing cooperatives
 
-Registers a cooperative, adds and removes members, allocates stands to it ("S1,S2") and sub-allocates each to a member; Stands lists what it holds and to whom. Account: links its receivables account (customer code). Charge: invoices it. Contribution: a member's payment receipted on its account. Statement: its account for the period from the date in Since to Date, with each member's contributions.
+Registers a cooperative, adds and removes members, allocates stands to it ("S1,S2") and sub-allocates each to a member; Stands lists what it holds and to whom. Account: links its receivables account (customer code). Charge: invoices it. Contribution: a member's payment receipted on its account. Statement: its account for the period from the date in Since to Date, with each member's contributions. Register with an existing code corrects that cooperative's name and registration number (a cooperative holding stands and an account is not deleted).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -913,7 +948,8 @@ Registers a cooperative, adds and removes members, allocates stands to it ("S1,S
 | Amount | yes | Number; default 0 |
 | Income account (charge) / bank (contribution) | no | Text |
 | Document / receipt number | no | Text |
-| Statement from (yyyy-MM-dd) | no | Text |
+| Statement from | no | Date |
+| Approving user name (allocate stands) | no | Text |
 | Date | yes | Date |
 
 The list beside the form shows: Cooperatives.
@@ -932,14 +968,15 @@ Registers a settlement (with its enumeration cut-off date), approves its upgradi
 | Household number | no | Text |
 | Head's national ID | no | Text |
 | Head's name | no | Text |
-| Head's date of birth (yyyy-MM-dd) | no | Text |
+| Head's date of birth | no | Date |
 | Household size | yes | Number; default 1 |
 | Monthly income | yes | Number; default 0 |
-| Occupied since (yyyy-MM-dd) | no | Text |
+| Occupied since | no | Date |
 | Structure | yes | One of: Shack, Brick, Mixed, Other; default Shack |
 | Structure reference | no | Text |
 | Waiting-list category | yes | One of: HighDensity, MediumDensity, LowDensity, Flats, Rental; default HighDensity |
 | Stand number (regularise) | no | Text |
+| Approving user name (regularise) | no | Text |
 | Date | yes | Date |
 
 The list beside the form shows: Settlements.
@@ -1071,4 +1108,5 @@ Assesses the IFRS 9 expected credit loss on housing debtors (instalment buyers a
 | H95 | Housing Executive Dashboard | Land bank, stands, waiting list, allocations, titles and debtors at a glance. |
 | H96 | Housing Delivery / Statutory Return | Stands delivered in the year by density, tenure and beneficiary category. |
 | H97 | Ward Housing Pack | One ward for its councillor: schemes, stands by status, allocations, beneficiaries, instalment arrears and the council-wide waiting list. |
+| H98 | Stand Holder vs Municipal Ratepayer | Stands whose holder on the housing register is not the ratepayer the municipal property is billed to, with any transfer application in progress - each to be put through a transfer with a rates clearance certificate so the bills go to the holder. |
 | HSE-STAND | Housing Stand Register | Stands with status, apportioned cost, selling price and current holder. |

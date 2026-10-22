@@ -26,6 +26,8 @@ Register an asset (Dr cost, Cr the funding account; the class fills in method, l
 | Department (register) | no | Text |
 | Gain on disposal account | no | Text |
 | Loss on disposal account | no | Text |
+| Sold to customer (dispose: invoiced; Funding is then the proceeds account) | no | Text |
+| Tax code on the sale (dispose to a customer) | no | Text |
 | Revaluation reserve account | no | Text |
 | Revaluation write-down expense account | no | Text |
 | New location (move) | no | Text |
@@ -64,7 +66,7 @@ The list beside the form shows: Asset classes.
 
 ### Asset insurance and warranty
 
-Who insures an asset, the policy and the sum insured with its expiry, and when the manufacturer's warranty ends (report M213 and the expiry alerts read them).
+Who insures an asset, the policy and the sum insured with its expiry, and when the manufacturer's warranty ends (report M213 and the expiry alerts read them). Saving an asset again changes its details (a blank keeps what is there); Delete clears the asset's insurance and warranty details (the asset itself stays).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -72,8 +74,8 @@ Who insures an asset, the policy and the sum insured with its expiry, and when t
 | Insurer | no | Text |
 | Policy number | no | Text |
 | Sum insured | no | Number |
-| Insurance expires (yyyy-MM-dd) | no | Text |
-| Warranty ends (yyyy-MM-dd) | no | Text |
+| Insurance expires | no | Date |
+| Warranty ends | no | Date |
 
 The list beside the form shows: Insurance and warranty.
 
@@ -158,14 +160,15 @@ The list beside the form shows: Open counts.
 
 ### Plan recurring maintenance
 
-A task repeated every N months for an asset.
+A task repeated every N months for an asset. Giving an existing plan id changes its task, interval and next due date (the asset stays); Delete stops the plan (its maintenance log is kept).
 
 | Field | Required | Notes |
 | --- | --- | --- |
+| Plan id (blank: a new plan) | no | Number |
 | Asset number | yes | Text |
 | Task | yes | Text |
 | Every (months) | yes | Number; default 6 |
-| First due | yes | Date |
+| Next due | yes | Date |
 
 The list beside the form shows: Maintenance plans.
 

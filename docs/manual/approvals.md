@@ -28,17 +28,29 @@ Acts on every listed instance (ids separated by commas); each succeeds or fails 
 
 The list beside the form shows: Waiting on me.
 
-### Delegate my approvals
+### Discuss a document
 
-While an approver is away, the delegate may approve anything they could, recorded as on their behalf.
+The comment thread of a document under approval: ask the requester a question, answer an approver, or add a fact, without approving or rejecting. The requester, anyone who has acted on it and anyone who may approve its current stage can write; leave the comment blank to read the thread.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Approver who is away (user name) | yes | Text |
+| Workflow instance id | yes | Number |
+| Comment (blank: read the thread) | no | Text |
+
+The list beside the form shows: Waiting on me.
+
+### Delegate my approvals
+
+While you are away, the delegate may approve anything you could, recorded as on your behalf. You delegate only your own approvals (a system administrator may record one for an approver who is away). With a delegation id (Edit fills it in) the delegate, dates and reason of that delegation change (the approver stays); Delete withdraws a delegation early (kept in history).
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Approver who is away (blank: me) | no | Text |
 | Delegate (user name) | yes | Text |
-| From | yes | Date |
-| To | yes | Date |
+| Starts | yes | Date |
+| Ends | yes | Date |
 | Reason | yes | Text; default Leave |
+| Delegation id (change) | no | Number |
 
 The list beside the form shows: Approval delegations.
 
@@ -71,7 +83,7 @@ The list beside the form shows: Waiting on me.
 
 ### Add an approver to a document
 
-Adds someone to the current stage of one document's approval, alongside the stage's own approvers.
+Adds someone to the current stage of one document's approval, alongside the stage's own approvers. Only an approver of that stage (or a system administrator) can add one, and never the person who raised the document nor themselves.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -105,7 +117,7 @@ The list beside the form shows: Waiting on me.
 
 ### Request a master-data change
 
-Changes a tariff's rates or a customer's, supplier's or item's field - held for the "MasterDataChange" workflow when one is defined, applied at once otherwise. Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.
+Changes a tariff's rates or a customer's, supplier's or item's field - held for the "MasterDataChange" workflow when one is defined, applied at once otherwise. Tariff: FixedCharge, PerUnitRate, RatePerValuationCents, RatePerSquareMetre, MinimumCharge, IsActive. Customer: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, InterestExempt, TaxRegistration, Email, IsActive. Supplier: Name, PaymentTermsDays, SettlementDiscountPercent, SettlementDiscountDays, OnHold, TaxRegistration, TaxClearanceExpiry, IsActive. Item: Description, TaxCode, StandardCost, CostOfSalesAccountCode, RevenueAccountCode, IsActive.
 
 | Field | Required | Notes |
 | --- | --- | --- |

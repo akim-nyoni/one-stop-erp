@@ -10,7 +10,7 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Create a company
 
-A new company with a head-office branch, held to the licence's company limit.
+A new company with a head-office branch, held to the licence's company limit. An existing code changes that company's name and time zone (its base currency stays: its books are kept in it). Companies are kept rather than deleted.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ The list beside the form shows: Companies.
 
 ### Add a branch
 
-A branch or site of the current company.
+A branch or site of the current company. An existing code changes that branch's name (a deleted branch with the code is brought back). The head office cannot be deleted.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -112,11 +112,11 @@ The list beside the form shows: Import templates.
 
 ### Message templates
 
-The email, SMS and WhatsApp templates bulk sends use (statements STATEMENT, fee statements FEES, reminders REMINDER, bills BILL), with {{Field}} merge fields. Save: creates or rewords a template (\n in the body starts a new line). Preview: renders it with sample values "Name=Thandi;Account=C001" and lists fields still blank. Seed standard: adds the standard templates this company is missing without touching reworded ones.
+The email, SMS and WhatsApp templates bulk sends use (statements STATEMENT, fee statements FEES, reminders REMINDER, bills BILL), with {{Field}} merge fields. Save: creates or rewords a template (\n in the body starts a new line). Preview: renders it with sample values "Name=Thandi;Account=C001" and lists fields still blank. Seed standard: adds the standard templates this company is missing without touching reworded ones. An existing code, channel and language rewords that template; templates are kept rather than deleted (sent messages name them).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: List, Save, Preview, Seed standard; default List |
+| Step | yes | One of: Save, Preview, Seed standard, List; default Save |
 | Template code | no | Text |
 | Channel | yes | One of: Email, Sms, WhatsApp, InApp; default Email |
 | Language | no | Text; default en |
@@ -141,7 +141,7 @@ The list beside the form shows: Message batches.
 
 ### Language and terminology
 
-The company's locale (screen language where translated, and the date and number formats of its reports - e.g. en-ZW, pt-MZ) and its own words for standard terms (Stand → Erf) on screens and report labels. Sign in again to see the screens change.
+The company's locale (screen language where translated, and the date and number formats of its reports - e.g. en-ZW, pt-MZ) and its own words for standard terms (Stand → Erf) on screens and report labels. Sign in again to see the screens change. A term already replaced is changed by saving it again; Delete puts the standard word back.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -213,7 +213,7 @@ The list beside the form shows: Saved report versions.
 
 ### Email a report on a schedule
 
-A report emailed every time the report-subscriptions job runs: to a list of addresses, or burst by a field to each customer's or supplier's contacts (or the address in a field); and/or saved to a folder or printed on a printer. Parameters may use date tokens (@Today, @MonthStart, @PrevMonthEnd ...).
+A report emailed every time the report-subscriptions job runs: to a list of addresses, or burst by a field to each customer's or supplier's contacts (or the address in a field); and/or saved to a folder or printed on a printer. Parameters may use date tokens (@Today, @MonthStart, @PrevMonthEnd ...). An existing code changes that subscription (and starts it again if it was stopped); Delete stops it, keeping its delivery log.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -221,7 +221,7 @@ A report emailed every time the report-subscriptions job runs: to a list of addr
 | Report code | yes | Text |
 | Format | yes | One of: Pdf, Xlsx, Csv, Html; default Pdf |
 | Email addresses (; separated) | no | Text |
-| Burst by field (optional) | no | Text |
+| Burst by field | no | Text |
 | Field holding the email (burst) | no | Text |
 | Or burst to the contacts of | yes | One of: (email field), Customers, Suppliers; default (email field) |
 | Parameters (Name=value; ...) | no | Text |
@@ -265,14 +265,14 @@ The list beside the form shows: Stock valuation (snapshot).
 
 ### Create a user
 
-A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name).
+A login who must change the initial password at first sign-in (8+ characters, letters and digits, not the user name). An existing login name changes that user's display name and e-mail (a password given is set as a new one they must change). Delete deactivates the user: they can no longer sign in, and their history stays; the last system administrator stays active.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Login name | yes | Text |
 | Display name | yes | Text |
 | E-mail | no | Text |
-| Initial password | yes | Text |
+| Initial password (blank when changing a user) | no | Text |
 
 The list beside the form shows: Users and their roles.
 
@@ -300,7 +300,7 @@ The list beside the form shows: Users and their roles.
 
 ### Create a role
 
-A role, optionally starting from a copy of another role's permissions (edit grants in the permission grid).
+A role, optionally starting from a copy of another role's permissions (edit grants in the permission grid). An existing role name changes its description (a deleted role with the name is brought back). Delete is refused for a system role and for a role users or groups still hold.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -366,7 +366,7 @@ The list beside the form shows: Users and their roles.
 
 ### API keys for integrations
 
-An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). The key is shown once - copy it then; rotating issues a new one and the old stops working; revoking stops the client.
+An integration signs in with the X-Api-Key header and acts with the permissions of the service user named (create one with only what it needs). The key is shown once - copy it then; rotating issues a new one and the old stops working; revoking (or Delete on the list) stops the client.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -404,7 +404,7 @@ The list beside the form shows: Opening balance reconciliation.
 
 ### Import templates and data export
 
-Template: saves the CSV template for an import (its header row and an example row) to fill in. Export: saves a register (accounts, warehouses, customers, suppliers, items, employees) in its import layout, to correct in a spreadsheet or load into another company.
+Template: saves the CSV template for an import (its header row and an example row) to fill in. Export: saves a register (accounts, warehouses, customers, suppliers, items, employees, stock on hand, fixed assets, staff loans, cost centres, departments, students, stands) in its import layout, to correct in a spreadsheet or load into another company.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -507,14 +507,17 @@ The list beside the form shows: Failed offline operations.
 
 ### Printers per workstation
 
-The printer, tray and copies a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips). Workstation * is the default for every computer without its own; this computer's name is filled in. The report viewer's print dialog opens on the chosen printer.
+The printers a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips): a Windows printer (USB or shared) or a network receipt printer by its IP address and port (usually 9100). Set makes it the purpose's only printer; Add another prints to it as well (a customer and a shop copy, a second counter); Remove all takes every printer of the purpose away; Test prints a test slip. Workstation * is the default for every computer without its own; this computer's name is filled in. Tills print receipts on their workstation's receipt printers (copies from the receipt layout); the report viewer's print dialog opens on the chosen printer. Edit opens a printer in the form (Set or Add another saves the change); Delete on the list removes that one printer.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Set, Remove; default Set |
+| Step | yes | One of: Set, Add another, Remove all, Test; default Set |
 | Workstation (computer name, or *) | yes | Text; default BLACKBOX |
 | Purpose | yes | One of: Reports, Documents, Receipts, Cheques, Labels, Payslips; default Reports |
-| Printer | no | Choice |
+| Connection | yes | One of: Windows printer, Network (IP address); default Windows printer |
+| Printer (Windows name, or a name for a network printer) | no | Choice |
+| Network printer IP address | no | Text |
+| Network printer port | yes | Number; default 9100 |
 | Tray (Auto, Manual, Cassette, Tractor) | no | Text |
 | Copies | yes | Number; default 1 |
 
@@ -546,8 +549,10 @@ The list beside the form shows: Webhook deliveries (latest 200).
 | DB255 | Trend & Seasonality Analysis | Revenue, expenses and profit month by month for the 24 months to the date, with each month against the same month a year before. |
 | SYS-PERIOD | Period Status | Accounting periods with their open/closed status for the key ledgers (GL, AR, AP) - a month-end close aid. |
 | SYS235 | Audit Trail Report | Every audit-logged action in the period - who, when, what record, which fields and why - optionally for one record type or user. |
-| SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours in closed sessions, terminals used and reports run. |
+| SYS236 | User Activity Report | Per user over the period: sign-ins, failed attempts, lockouts, first and last sign-in, hours active (closed sessions, and open ones to their last activity), terminals used, screens used and actions run, and reports run (SYS236-S lists the screens). |
+| SYS236-S | Screen Usage | Every desktop screen used in the period, per user: how often it was opened and run, and when it was last used. |
 | SYS237 | Permission Matrix | Every role with each permission it grants and the operations allowed. |
+| SYS237-U | Permission Matrix by User | Every active user with each permission they hold through their roles, groups and individual overrides, and the operations allowed; system administrators are shown as holding everything. The auditor's users-by-permissions view. |
 | SYS238 | User, Role & Group Membership | Every user with direct roles, groups, roles held through groups and individual overrides. |
 | SYS239 | Segregation of Duties Violations (all modules) | Every active user whose combined permissions break a separation-of-duties rule. |
 | SYS240 | Master Data Change Report | Changes in the period to customers, suppliers, items, accounts, tariffs, properties, employees, price lists, users and roles. |

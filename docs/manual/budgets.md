@@ -81,6 +81,16 @@ Submit (department) → start review (Finance) → return with reasons or recomm
 
 The list beside the form shows: Budgets in preparation.
 
+### Activate a budget version
+
+Puts an approved version into force for its year, type and department, superseding the version active before it. Where the company requires approval only an approved version can be activated, and whoever submitted or approved it cannot be the one to activate it.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Budget id | yes | Number |
+
+The list beside the form shows: Budgets in preparation.
+
 ### Propose or revise a figure
 
 Finance proposes a figure on a budget under review (kept beside the department's request); the department revises a draft or returned one.
@@ -154,7 +164,7 @@ The list beside the form shows: Budgets in preparation.
 
 ### Preparation deadlines and budget alerts
 
-Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go and their thresholds - with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). The scheduled task budget.notices does both daily.
+Set a department's submission deadline; remind budget holders whose submission is due within the days given (or overdue); set where utilisation alerts go and their thresholds - with a department named, that department's budget holder e-mail and own thresholds; send the alerts now (each vote and threshold once). The scheduled task budget.notices does both daily. Edit fills a department's deadline in to change it; Delete clears a department's deadline.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -355,7 +365,7 @@ The list beside the form shows: Open commitments.
 | B1 | Budget Preparation Status Board | Every department's budget preparation for the year of the date: not started, in progress, submitted or approved, against the deadline. |
 | B10 | Revenue Budget Build-up | Driver-based revenue lines: the volume each is built on, the implied rate and the amount. |
 | B11 | Budget Version Register | Every budget version of the year ever created: number, type, status, author and date, why it was raised, who approved it under which resolution, and its seal hash with whether it still verifies. |
-| B12 | Budget Version Comparison | For each budget with more than one version: the latest against the one before, per account. |
+| B12 | Budget Version Comparison | For each budget with more than one version (or the one named): the latest against the one before, or any two versions chosen, per account - or per account and period, or per account and cost centre. |
 | B13 | Original vs Recommended vs Approved | Per department and account: what was first requested, the last draft recommended, what was approved, and the cut. |
 | B14 | Budget Approval Audit | Every status change of the year's budgets - submitted, approved, activated, superseded - with who made it and the days since the previous step. |
 | B15 | Multi-Year Budget & Actual Comparison | Each budgeted account's budget and actual for this year and the two before. |
@@ -387,7 +397,7 @@ The list beside the form shows: Open commitments.
 | B39 | Forecast vs Forecast Movement | Between the last two reforecast rounds of the year: each vote's forecast before and after, the movement and the reason given. |
 | B4 | Consolidated Draft Budget by Hierarchy | The latest drafts rolled up department → division → directorate → company, at the level asked for. |
 | B40 | Rolling Forecast | The next N months from the date: per vote, the latest reforecast (else the budget) month by month. |
-| B41 | Cash Budget vs Actual Cash Flow | Month by month to the date: the cash budget's net flow against the actual net movement on the bank accounts, and the variance. |
+| B41 | Cash Budget vs Actual Cash Flow | Every month of the year: the cash budget's net flow against the actual net movement on the bank accounts up to the date, then the cash forecast (receivables and payables due, payment runs, scheduled and manual flows) for the months still to come, and the variance. |
 | B42 | Capital Project Budget vs Actual vs Commitment | Each capital project: budget, cost to date, commitments, the share spent and the cost to complete. |
 | B43 | Revenue Budget Performance | Per revenue source (income account), year to date: budget, billed, collected (the share of the billed invoices since paid), billed against budget and the collection rate. |
 | B44 | Budget Accuracy Review | For the year before the as-at date's year: each account's full-year budget against actual, the variance and how accurate the budget was. |

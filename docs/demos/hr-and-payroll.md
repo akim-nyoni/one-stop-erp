@@ -3,7 +3,7 @@
 Goal: show that employees, leave, time and attendance, and the payroll work end to end. Allow 15 to 20 minutes. Sample data loaded; signed in as admin.
 
 ## Employees
-1. Open **Add or change an employee**. Engage an employee, or update one (blank fields stay as they are). Fill in: Step, Employee number, Engagement date, Employment, Paid by, Paid, Marital status. Press OK and point out the result line and the list on the right.
+1. Open **Add or change an employee**. Engage an employee, or update one (blank fields stay as they are); an existing employee number always updates that employee. Fill in: Step, Employee number, Engagement date, Employment, Paid by, Paid, Marital status. Press OK and point out the result line and the list on the right.
 2. Open **Employee contacts, photo and dependants**. The rest of the employee master: addresses, phone, job title, notice period and workers' compensation class (blank stays, a space clears); the photograph (a JPEG, PNG or BMP file; blank removes it); and beneficiaries (with their share, all shares at most 100%) and medical-aid dependants. Fill in: Step, Dependant is. Press OK and point out the result line and the list on the right.
 3. Open **File an employee document**. A contract, permit, licence or certificate on the employee's file. Fill in: Employee, Document type. Press OK and point out the result line and the list on the right.
 
@@ -30,15 +30,15 @@ Goal: show that employees, leave, time and attendance, and the payroll work end 
 ## Running the payroll
 16. Open **Enter overtime, allowances and deductions**. Overtime hours (units on a rate-per-unit element) or a once-off amount for one employee and period. Fill in: Employee, Element code, Period. Press OK and point out the result line and the list on the right.
 17. Open **Import pay variables**. Lines 'employee, element, units, amount' separated by ';'. Fill in: Period, Lines: EMP,ELEMENT,units,amount; …. Press OK and point out the result line and the list on the right.
-18. Open **1. Calculate the payroll**. Calculates a pay group's payroll without posting it, for someone else to approve. Fill in: Period, Date, Run document number, Net pay control account. Press OK and point out the result line and the list on the right.
+18. Open **1. Calculate the payroll**. Step 1 of the payroll: calculates a pay group's payroll without posting it, for someone else to approve. Fill in: Period, Date, Net pay control account. Press OK and point out the result line and the list on the right.
 
 ## Loans, claims and provisions
 19. Open **Staff loans**. Grants a staff loan (paid out, recovered through payroll by the instalment) or records a repayment made outside payroll. Fill in: Step, Principal / repayment, Monthly instalment (grant), Bank / funding account, Document number, Date. Press OK and point out the result line and the list on the right.
 20. Open **Expense claims**. A staff member's claim for out-of-pocket expenses (lines DESCRIPTION:ACCOUNT:amount; …), approved by a user other than the claimant, rejected, or reimbursed from a bank or cash account. Fill in: Step, Claim reference, Date. Press OK and point out the result line and the list on the right.
-21. Open **Raise third-party invoices**. Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier - clearing the payroll liabilities into payables. Fill in: Run document or journal number. Press OK and point out the result line and the list on the right.
+21. Open **Raise third-party invoices**. Raises a run's AP invoices for the tax authority, schemes and garnishee creditors that have a supplier - clearing the payroll liabilities into payables. Fill in: Payroll run. Press OK and point out the result line and the list on the right.
 
 ## Payroll setup
-22. Open **Pay elements and tax tables**. Create a pay element, assign one to (or end one for) an employee, create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. Fill in: Step, Element type, Calculation, Tax table effective from, Recovers (deduction), Rounding. Press OK and point out the result line and the list on the right.
+22. Open **Pay elements and tax tables**. Create a pay element or edit one (every field but its code and type, entered in full as for a new one; creating an existing code edits it), assign one to (or end one for) an employee, delete one no employee is on (past payslips keep it), create a tax table - bands as 'from-to:rate' separated by ';', the last open-ended, e.g. Fill in: Step, Element type, Calculation, Tax table effective from, Recovers (deduction), Rounding. Press OK and point out the result line and the list on the right.
 23. Open **Tax credits**. Credits taken off the tax the table works out, never below nil: a fixed amount a month (say an elderly credit from 65) or a percentage of a pay element (say half the medical-aid deduction), for everyone or only the employees given it. Fill in: Step, Credit code, Basis, Monthly amount (fixed), Percent (of an element). Press OK and point out the result line and the list on the right.
 24. Open **Set the tax year**. The month the tax year starts in (1 = January; 3 for a March–February year). Fill in: First month of the tax year (1–12). Press OK and point out the result line and the list on the right.
 

@@ -14,7 +14,7 @@ See every table and its open tab.
 
 ### Take an order
 
-Opens an order at a table or for takeaway / delivery, adds menu items (by course, seat and price level) and modifiers, voids or comps a line (with an authorising user), moves the order, sends it or a course to the kitchen, tracks a delivery, or shows its lines (with the line ids the other steps use).
+Opens an order at a table or for takeaway / delivery, adds menu items (by course, seat and price level) and modifiers, voids or comps a line (with an authorising user; voiding a line already sent to the kitchen, or cancelling an order with one, needs a supervisor and writes the food off as wastage from the kitchen warehouse to the wastage account), moves the order, sends it or a course to the kitchen, tracks a delivery, or shows its lines (with the line ids the other steps use).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -42,13 +42,15 @@ Opens an order at a table or for takeaway / delivery, adds menu items (by course
 | Kitchen ticket number | no | Text |
 | Delivery status | yes | One of: Pending, Assigned, OutForDelivery, Delivered, Failed; default Pending |
 | Reason | no | Text |
+| Kitchen warehouse (fired food written off) | no | Choice |
+| Wastage account (fired food) | no | Text |
 | Date | yes | Date |
 
 The list beside the form shows: Open orders.
 
 ### Bill an order
 
-Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), across several tenders (ACCOUNT:amount; …), to a gift card or to a customer's house account - with service charge, tip and discount - issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill.
+Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), across several tenders (ACCOUNT:amount; …), to a gift card or to a customer's house account - with service charge, tip and discount - issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill (a supervisor authorises it). Cash goes into an open till session (the till named, else your own open till) and is counted at its cash-up; a tender is ACCOUNT:amount, or ACCOUNT:amount:CARD for a non-cash one.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -72,6 +74,8 @@ Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), ac
 | Sales account (house account) | no | Text |
 | Bill id (reverse) | no | Number |
 | Reason (reverse) | no | Text |
+| Till code taking the cash (blank: my open till) | no | Text |
+| Supervisor authorising the reversal (user name) | no | Text |
 | Date | yes | Date |
 
 The list beside the form shows: Recent bills.
@@ -107,11 +111,11 @@ The list beside the form shows: Tickets in the kitchen.
 
 ### Kitchen station printers
 
-Which printer each preparation station's tickets print on (KITCHEN for dishes with no station): a Windows printer by name, or a network printer by host and port. A station with no printer works from its kitchen display. Reprint sends a ticket (and its per-station tickets) again, marked REPRINT.
+Which printer each preparation station's tickets print on (KITCHEN for dishes with no station): a Windows printer by name, or a network printer by host and port. A station with no printer works from its kitchen display. Setting a station that already has a printer changes it; Delete on the list takes its printer away. Reprint sends a ticket (and its per-station tickets) again, marked REPRINT.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Set, Remove, Reprint; default Set |
+| Step | yes | One of: Set, Reprint; default Set |
 | Station | no | Text |
 | Windows printer name | no | Text |
 | Network printer host | no | Text |
@@ -148,7 +152,8 @@ Books a table for a guest at a time (yyyy-mm-dd hh:mm), seats the guest when the
 | Table number (reserve) | no | Text |
 | Guest name | no | Text |
 | Party size | yes | Number; default 2 |
-| When: yyyy-mm-dd hh:mm (reserve) | no | Text |
+| Date (reserve) | no | Date |
+| Time hh:mm (reserve) | no | Text |
 | Phone | no | Text |
 | Notes | no | Text |
 | Reservation id | no | Number |
@@ -183,7 +188,7 @@ The list beside the form shows: Waiting.
 
 ### Menu items
 
-Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed), sets a price for a price level (happy hour, staff…), marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) - fired orders give each station its own ticket - and shows a station's queue.
+Creates a menu item with its recipe (ingredients ITEM:quantity; … issued from stock when billed); Create with an existing code changes its name, price and tax code (its accounts and recipe stay). Also sets a price for a price level (happy hour, staff…), marks an item available or not, refreshes availability from the stock of a warehouse, sends an item to a preparation station (grill, bar…) - fired orders give each station its own ticket - and shows a station's queue.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -203,7 +208,7 @@ The list beside the form shows: Menu.
 
 ### Tables and sections
 
-Sets up the floor: tables and their seats, sections (with a server; on or off), combined tables for a large party, and the automatic gratuity added for parties of a given size.
+Sets up the floor: tables and their seats (Create table with an existing number changes its seats), sections (with a server; on or off), combined tables for a large party, and the automatic gratuity added for parties of a given size.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -227,8 +232,8 @@ Place each table on the floor plan grid (across, down) with its shape; the plan 
 | --- | --- | --- |
 | Step | yes | One of: Place table, Tab warnings, Warnings now; default Place table |
 | Table number | no | Text |
-| Across (0–99) | yes | Number; default 0 |
-| Down (0–99) | yes | Number; default 0 |
+| Across (0 to 99) | yes | Number; default 0 |
+| Down (0 to 99) | yes | Number; default 0 |
 | Shape | yes | One of: Square, Round, Booth, BarSeat; default Square |
 | Warn after (minutes) | yes | Number; default 90 |
 | Warn over (total) | yes | Number; default 0 |

@@ -13,7 +13,7 @@ Goal: show that the asset register, depreciation, counts, maintenance and capita
 6. Open **Close an asset count**. Closes the count: anything not seen is missing. Fill in: Count number. Press OK and point out the result line and the list on the right.
 
 ## Maintenance
-7. Open **Plan recurring maintenance**. A task repeated every N months for an asset. Fill in: Asset number, Task, Every (months), First due. Press OK and point out the result line and the list on the right.
+7. Open **Plan recurring maintenance**. A task repeated every N months for an asset. Fill in: Asset number, Task, Every (months), Next due. Press OK and point out the result line and the list on the right.
 8. Open **Complete planned maintenance**. Logs the planned task as done and rolls the next due date forward. Fill in: Plan id (from the list), Date, Cost. Press OK and point out the result line and the list on the right.
 
 ## Capital projects

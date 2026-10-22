@@ -9,8 +9,8 @@ Goal: show that preparing, approving, changing and monitoring budgets work end t
 
 ## Preparation
 4. Open **Move a budget through preparation**. Submit (department) → start review (Finance) → return with reasons or recommend → approve with the board/council resolution (not by the submitter). Fill in: Budget id, Step. Press OK and point out the result line and the list on the right.
-5. Open **Propose or revise a figure**. Finance proposes a figure on a budget under review (kept beside the department's request); the department revises a draft or returned one. Fill in: Budget id, Account, Period, Amount. Press OK and point out the result line and the list on the right.
-6. Open **Show a budget's negotiation trail**. Every step and every proposal, the department's figure beside Finance's, round by round. Fill in: Budget id. Press OK and point out the result line and the list on the right.
+5. Open **Activate a budget version**. Puts an approved version into force for its year, type and department, superseding the version active before it. Fill in: Budget id. Press OK and point out the result line and the list on the right.
+6. Open **Propose or revise a figure**. Finance proposes a figure on a budget under review (kept beside the department's request); the department revises a draft or returned one. Fill in: Budget id, Account, Period, Amount. Press OK and point out the result line and the list on the right.
 
 ## Changes
 7. Open **Move money between budget lines (virements)**. Moves budget from one vote to another - between cost centres, or to another department's budget of the same year - requested with a justification, approved or rejected by another user whose authorisation level covers the amount's band (Bands: limit:level; …, blank limit for the top band); the register shows each vote's original, virements in and out, and current amount. Fill in: Step, Period, Amount. Press OK and point out the result line and the list on the right.

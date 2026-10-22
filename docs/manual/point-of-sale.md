@@ -18,7 +18,7 @@ Cash in or out of a drawer other than by sales; posted, and counted in the cash 
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Till session id (from the list) | yes | Number |
+| Till session | yes | Choice |
 | Kind | yes | One of: Pickup, PaidOut, FloatTopUp; default Pickup |
 | Amount | yes | Number |
 | Till cash account | yes | Text; default 1000 |
@@ -36,8 +36,8 @@ A blind till's cashier declares the count ("120; ZAR 500; EUR 20") before the ca
 | Field | Required | Notes |
 | --- | --- | --- |
 | Step | yes | One of: Position, Blind on, Blind off; default Position |
-| Till session id (position) | no | Number |
-| Till code (blind on / off) | no | Text |
+| Till session (position) | no | Choice |
+| Till (blind on / off) | no | Choice |
 
 The list beside the form shows: Tills.
 
@@ -77,7 +77,7 @@ The list beside the form shows: Parked sales.
 
 ### Refund a sale
 
-Refunds units of a completed sale's line (by item code): revenue and tax back, money out of the refund account, goods back on the shelf if ticked. Needs a supervisor other than you.
+Refunds units of a completed sale's line (by item code): revenue and tax back, goods back on the shelf if ticked. The money goes back the way the sale was paid (cash out of the till session, card to the card, on account as a credit to the customer, gift card back onto the card) unless another method is chosen, which needs third-level refund authority. Needs a supervisor with refund authority other than you.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -86,7 +86,8 @@ Refunds units of a completed sale's line (by item code): revenue and tax back, m
 | Quantity | yes | Number |
 | Till code | yes | Text |
 | Date | yes | Date |
-| Refund paid from (account) | yes | Text; default 1000 |
+| Paid back by | yes | One of: Original tenders, Cash, Card, MobileMoney, BankTransfer, Cheque; default Original tenders |
+| Cash (or other method) paid from (account) | no | Text; default 1000 |
 | Output tax account | no | Text; default 2200 |
 | Reason | yes | Text |
 | Authorised by (user name) | yes | Text |
@@ -151,7 +152,7 @@ How many days after a sale an ordinary supervisor may authorise its refund (blan
 
 ### Promotions
 
-NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','.
+NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free), PercentOff (items or a category), MealDeal (courses separated by '|'). Items as codes separated by ','. An existing code changes that promotion (its kind stays; a stopped one runs again); Delete stops it running (sales already made keep it).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -179,9 +180,20 @@ NForPrice (N items for a price), BuyXGetY (no reward items = lowest price free),
 
 The list beside the form shows: Promotions.
 
+### Promotion results
+
+What each promotion did over a period at the tills: the lines and quantity sold under it, the sales they made and the discount it gave away (voided sales left out).
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| From | yes | Date |
+| To | yes | Date |
+
+The list beside the form shows: Promotions this month.
+
 ### Promotional codes
 
-A campaign of discount codes (a % or an amount off, a minimum spend, uses per code, a cap on redemptions, a validity window); quote or redeem a code against a spend; and analyse a campaign (codes used, redemptions, spend and discount given). A campaign may be limited to customer types and to item categories (the minimum spend and discount then count only those lines: give the basket as CATEGORY:amount; …).
+A campaign of discount codes (a % or an amount off, a minimum spend, uses per code, a cap on redemptions, a validity window); quote or redeem a code against a spend; and analyse a campaign (codes used, redemptions, spend and discount given). A campaign may be limited to customer types and to item categories (the minimum spend and discount then count only those lines: give the basket as CATEGORY:amount; …). Create campaign with an existing campaign code changes it (and adds any new codes given; the discount is fixed once a code is redeemed); Delete stops its codes working.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -211,7 +223,7 @@ Shows what the running promotions take off a basket at a date and time.
 | Field | Required | Notes |
 | --- | --- | --- |
 | Lines: ITEM:quantity; … (at the default price list) | yes | Text |
-| When (yyyy-MM-dd HH:mm) | yes | Text; default 2026-10-17 11:06 |
+| When (yyyy-MM-dd HH:mm) | yes | Text; default 2026-10-22 18:17 |
 | Loyalty member | no | Flag; default False |
 | Customer type | no | Text |
 | Coupon codes (',') | no | Text |
@@ -265,7 +277,7 @@ Loads a card of printed stock with its value when sold (Dr cash, Cr gift card li
 | Card number | yes | Text |
 | Value | yes | Number |
 | Date | yes | Date |
-| Expires (yyyy-MM-dd, optional) | no | Text |
+| Expires (optional) | no | Date |
 | Cash account | yes | Text; default 1000 |
 | Gift card liability account | yes | Text |
 
@@ -293,7 +305,7 @@ The list beside the form shows: Gift cards.
 
 ### Till favourite buttons
 
-Items pinned to the till's ★ Favourites tabs - for one terminal or every till, and optionally for one cashier (their own come first, then the till's, then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name). Profile: what kind of counter the terminal is. Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.
+Items pinned to the till's ★ Favourites tabs - for one terminal or every till, and optionally for one cashier (their own come first, then the till's, then every till's), on a page (★ Favourites, ★ Favourites 2…) in a colour (#RRGGBB or a name); an item already pinned there has its position, page and colour changed; Delete in the list unpins it. Profile: what kind of counter the terminal is. Function keys: the terminal's F1–F12 (F2=TenderCash; F3=TenderCard; …) over its profile's defaults.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -304,7 +316,6 @@ Items pinned to the till's ★ Favourites tabs - for one terminal or every till,
 | Position | yes | Number; default 10 |
 | Page | yes | Number; default 1 |
 | Tile colour | no | Text |
-| Remove it | no | Flag; default False |
 | Terminal profile | yes | One of: General, Supermarket, Bar, Butchery, WeighbridgeKiosk, Restaurant; default General |
 | Function keys F2=TenderCash; … (blank: the profile's) | no | Text |
 
@@ -312,11 +323,12 @@ The list beside the form shows: Favourites.
 
 ### Till product categories
 
-Places a category under another so the till can drill down (blank parent: top level), and sets the costing method items created in it take when none is given.
+Adds an item category (a new code) or changes one (an existing code: its name, and a retired one comes back into use); places it under another so the till can drill down (blank parent: top level), and sets the costing method items created in it take when none is given. Delete retires a category with no active items.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Category code | yes | Text |
+| Name (blank: as it is) | no | Text |
 | Parent category code | no | Text |
 | Costing method for new items | yes | One of: Keep, WeightedAverage, Fifo, Standard, SpecificIdentification; default Keep |
 
@@ -331,6 +343,47 @@ The currency the till gives change in (blank: base), converted at the day's rate
 | Change currency (blank: base) | no | Text |
 | Base cash rounding increment | no | Number |
 | Rounding difference account | no | Text |
+
+### Receipt layout and preview
+
+How receipts print: 80mm (48 characters) or 58mm (32) paper, a logo picture printed at the top, the title, header and footer lines (separate lines with |), what is shown and how many copies. Blank till: the company's layout; a till code gives that till its own. Preview shows the receipt as it prints, inside the paper's edges, without saving; Save keeps it (a till or the company that already has a layout has it changed); Delete in the list takes a till's own layout away.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Step | yes | One of: Preview, Save, Show saved, Set logo, Remove logo; default Preview |
+| Till code (blank: every till) | no | Text |
+| Paper | yes | One of: 80mm, 58mm; default 80mm |
+| Logo picture file (PNG, JPG, BMP; set logo) | no | Text |
+| Title | no | Text; default SALES RECEIPT |
+| Header lines (address | phone | message) | no | Text |
+| Footer lines (blank: Thank you!) | no | Text |
+| Show the cashier | no | Flag; default True |
+| Show the till | no | Flag; default True |
+| Show quantity x unit price | no | Flag; default False |
+| Show subtotal and tax | no | Flag; default True |
+| Show the company's tax number | no | Flag; default False |
+| Show the fiscal code | no | Flag; default True |
+| Copies | yes | Number; default 1 |
+
+The list beside the form shows: Receipt layouts.
+
+### Receipt and till printers
+
+The printers a workstation uses for each kind of printing (reports, documents, receipts, cheques, labels, payslips): a Windows printer (USB or shared) or a network receipt printer by its IP address and port (usually 9100). Set makes it the purpose's only printer; Add another prints to it as well (a customer and a shop copy, a second counter); Remove all takes every printer of the purpose away; Test prints a test slip. Workstation * is the default for every computer without its own; this computer's name is filled in. Tills print receipts on their workstation's receipt printers (copies from the receipt layout); the report viewer's print dialog opens on the chosen printer. Edit opens a printer in the form (Set or Add another saves the change); Delete on the list removes that one printer.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Step | yes | One of: Set, Add another, Remove all, Test; default Set |
+| Workstation (computer name, or *) | yes | Text; default BLACKBOX |
+| Purpose | yes | One of: Reports, Documents, Receipts, Cheques, Labels, Payslips; default Reports |
+| Connection | yes | One of: Windows printer, Network (IP address); default Windows printer |
+| Printer (Windows name, or a name for a network printer) | no | Choice |
+| Network printer IP address | no | Text |
+| Network printer port | yes | Number; default 9100 |
+| Tray (Auto, Manual, Cassette, Tractor) | no | Text |
+| Copies | yes | Number; default 1 |
+
+The list beside the form shows: Printers.
 
 ### Cashier cards and fingerprints
 
@@ -370,3 +423,5 @@ The list beside the form shows: Users and their roles.
 | POS120 | Offline Sync Log | Operations captured offline in the period: kind, status, attempts, when synced and any error. |
 | POS121 | Fiscal Submission Log | Sales submitted to the fiscal device or revenue authority in the period, with the fiscal receipt reference and outcome. |
 | POS122 | Receipt / Invoice / Refund Slip Layouts | A sale's slip as printed on 58 mm or 80 mm roll paper or an A4 page, with any refunds taken against it as a refund slip below. |
+| POS123 | Allowance Vouchers Outstanding | Fuel, meal and other allowance vouchers issued and not yet redeemed or cancelled as at the To date, per holder and kind, with how many of them have expired. |
+| POS124 | Gift Card Liability by Age | Every gift card still carrying value as at the To date, aged from issue (0–90, 91–180, 181–365, over 365 days) with its expiry and status: the liability on the books, and where breakage is likely. |

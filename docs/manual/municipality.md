@@ -94,17 +94,20 @@ The list beside the form shows: Open objections.
 
 ### Indigent register
 
-Registers a household as indigent (income under the maximum) with its subsidy % and review date; reviews it (staying on only while still under the maximum); applies the month's subsidies to their bills.
+Registers a household as indigent (income at or under the council's qualifying maximum, shown below) with its subsidy % and review date. Request: you key the means test; another user holding the indigent approve right then approves or rejects it (with a reason). Review: stays on only while still under the maximum. Apply subsidies: credits the month's charges (not interest or penalties), each currency in that currency. Set threshold: the council's qualifying maximum household income.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Register, Review, Apply subsidies; default Register |
-| Stand number (register) | no | Text |
+| Step | yes | One of: Request, Approve, Reject, Review, Apply subsidies, Set threshold; default Request |
+| Council's qualifying maximum income (policy) | no | Choice |
+| Registration awaiting approval (approve / reject) | no | Choice |
+| Stand number (request) | no | Text |
 | Registration id (review) | no | Number |
 | Household income | yes | Number; default 0 |
 | Subsidy % | yes | Number; default 100 |
-| Maximum income to qualify | yes | Number; default 0 |
+| New qualifying maximum income (set threshold) | no | Number |
 | Next review due | yes | Date |
+| Reason (reject) | no | Text |
 | Subsidy (expense) account | no | Text |
 | Date | yes | Date |
 
@@ -156,17 +159,17 @@ Creates a reading route for a meter reader (meter serials in walking order, comm
 
 ### Disconnections and reconnections
 
-Lists stands whose arrears for a service pass a threshold, raises a disconnection (or reconnection) order for one, executes it (a reconnection with its fee) or cancels it.
+Lists stands whose arrears for a service pass a threshold, raises a disconnection (or reconnection) order for one, authorises a disconnection (someone other than whoever raised it), executes it (with its disconnection or reconnection fee) or cancels it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Candidates, Raise, Execute, Cancel; default Candidates |
+| Step | yes | One of: Candidates, Raise, Authorise, Execute, Cancel; default Candidates |
 | Service | yes | One of: Rates, Water, Sewer, Refuse, StreetLighting, Licence, Electricity, Other; default Rates |
 | Arrears threshold | yes | Number; default 0 |
 | Stand number (raise) | no | Text |
 | Order | yes | One of: Disconnect, Reconnect; default Disconnect |
 | Order number | no | Text |
-| Reconnection fee | yes | Number; default 0 |
+| Disconnection / reconnection fee | yes | Number; default 0 |
 | Fee revenue account | no | Text |
 | Date | yes | Date |
 
@@ -187,7 +190,7 @@ Takes a deposit for a service on a stand (held as a liability), refunds it or ap
 
 ### Prepaid vending
 
-Sells prepaid units (water or electricity) to a stand: part of the payment can go to its arrears; the rest buys units and gives a token.
+Sells prepaid units (water or electricity) to a stand: part of the payment can go to its arrears; the rest buys units and gives a token. Until the prepaid vendor's token generator is registered, tokens come from a test generator and each sale says so.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -250,7 +253,7 @@ The list beside the form shows: Tariffs.
 
 ### Council service types
 
-The council's own services (e.g. extra refuse bins, fire levy): billed like a built-in category, metered or not, with the deposit a new connection pays.
+The council's own services (e.g. extra refuse bins, fire levy): billed like a built-in category, metered or not, with the deposit a new connection pays. An existing code changes that service (and brings a retired one back into use); Delete stops new connections to it, existing ones carry on.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -325,7 +328,7 @@ Adds plots to a cemetery section ("A1,A2,A3") at a price and capacity, sells a p
 | Plot reference (sell / interment) | no | Text |
 | Holder customer code | no | Text |
 | Deceased name | no | Text |
-| Date of death (yyyy-MM-dd) | no | Text |
+| Date of death | no | Date |
 | Revenue / fee account | no | Text |
 | Date | yes | Date |
 
@@ -355,7 +358,7 @@ Log, assign and close faults reported by the public.
 
 ### Fault ticket categories
 
-The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times - the clocks the fault desk measures every ticket against.
+The kinds of fault the public reports (a burst pipe, a missed refuse collection), each with the service it concerns and its response and resolution times - the clocks the fault desk measures every ticket against. An existing code changes that category (tickets already logged keep their due times).
 
 | Field | Required | Notes |
 | --- | --- | --- |

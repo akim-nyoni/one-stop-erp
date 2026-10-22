@@ -10,22 +10,25 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Add a product or service
 
-A stock, service or other item with the accounts its sales and cost post to, how its stock is costed (weighted average, FIFO, standard with its variance accounts, or specific identification), batch or serial tracking and a shelf life.
+A stock, service or other item: its unit, barcode and selling price (on the default price list), and the accounts its sales and cost post to - left blank, they are taken from another item in the same category. How its stock is costed (weighted average, FIFO, standard with its variance accounts, or specific identification), batch or serial tracking and a shelf life are further down.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Item code | yes | Text |
 | Description | yes | Text |
 | Type | yes | One of: Stock, NonStock, Service, Kit, Weighed, Fuel, Deposit; default Stock |
-| Revenue account | no | Text |
-| Cost of sales account | no | Text |
+| Category | no | Text |
+| Unit (EA, KG, L; blank is EA) | no | Text |
+| Barcode | no | Text |
+| Selling price (default price list) | no | Number |
+| Revenue account (blank: as the category) | no | Text |
+| Cost of sales account (blank: as the category) | no | Text |
 | Costing method | yes | One of: WeightedAverage, Fifo, Standard, SpecificIdentification; default WeightedAverage |
 | Standard cost | no | Number |
 | Price variance account (standard) | no | Text |
 | Usage variance account (standard) | no | Text |
 | Tracking | yes | One of: None, Batch, Serial; default None |
 | Shelf life (days) | no | Number |
-| Category | no | Text |
 
 The list beside the form shows: Items.
 
@@ -37,9 +40,23 @@ Searches codes, PLUs, barcodes (item, pack, alias), synonyms, brands and descrip
 | --- | --- | --- |
 | Search for | yes | Text |
 
+### Sizes and colours
+
+Sizes and colours of one product: a variant is its own stock item (own code, barcode, stock and price), made from the base item - its unit, tax code, category, accounts, tracking and brand copied - and kept under it so the variants list and report together. Add with an existing variant code changes its size and colour.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Step | yes | One of: Add, List; default Add |
+| Base item code | yes | Text |
+| Variant item code (add) | no | Text |
+| Size | no | Text |
+| Colour | no | Text |
+
+The list beside the form shows: Variants.
+
 ### Product picture, description and size
 
-An item's long description, its length, width and height in centimetres (the volume follows) and weight, and its picture (a JPEG, PNG, GIF or WebP file of at most 1 MB; Remove picture drops it).
+An item's long description, its length, width and height in centimetres (the volume follows) and weight, its customs (HS) code, country of origin, brand and the tax code its sales take (which must apply to goods or services as the item is), and its picture (a JPEG, PNG, GIF or WebP file of at most 1 MB; Remove picture drops it). A blank field leaves the value as it is.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -50,6 +67,10 @@ An item's long description, its length, width and height in centimetres (the vol
 | Width (cm) | no | Number |
 | Height (cm) | no | Number |
 | Weight (kg) | no | Number |
+| HS (customs) code | no | Text |
+| Country of origin | no | Text |
+| Brand | no | Text |
+| Tax code | no | Text |
 | Picture file | no | Text |
 
 The list beside the form shows: Items.
@@ -72,7 +93,7 @@ Barcode / Synonym: the value. Pack: unit code, factor and its barcode. Supplier:
 
 ### Product sale limits
 
-Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference.
+Age-restricted items need the till's age check, a per-sale limit caps the quantity in one sale, and prescription-only items need a prescription reference. Saving an item again changes its limits; Delete in the list clears them.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -103,6 +124,20 @@ Prints shelf labels at a price list's prices (all items, or a comma-separated li
 | Price list code | yes | Text |
 | Item codes (comma-separated) | no | Text |
 | Labels per row | yes | Number; default 2 |
+| Format | yes | One of: Text, ZPL, EPL; default Text |
+| Send to the label printer (System Manager › Devices) | no | Flag; default False |
+
+### Print a weighed pack's label
+
+A weighed pack's label (deli, butchery): the weight, the price per kilogram and the pack's price, with the price-embedded EAN-13 (22 + PLU + cents) the till reads back - in ZPL for the label printer.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Item | yes | Choice |
+| Weight (kg) | yes | Number |
+| Price per kg (blank: the price list's) | no | Number |
+| Price list code (for the price) | no | Text |
+| Send to the label printer (System Manager › Devices) | no | Flag; default False |
 
 ## Warehouses
 
@@ -148,7 +183,7 @@ An item's reorder level and quantity at one warehouse; replenishment for that wa
 
 ### Replenishment policy
 
-Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. With a forecast window, the reorder level rises to the average daily issues over that window times the lead time - scaled, with seasonal factors, by the factor for the month the lead time ends in (twelve numbers, January first).
+Min/max and forecast: at or below the reorder level (on hand plus on order) a reorder is suggested, up to the maximum if set, else the reorder quantity. With a forecast window, the reorder level rises to the average daily issues over that window times the lead time - scaled, with seasonal factors, by the factor for the month the lead time ends in (twelve numbers, January first). Saving an item again changes its policy; Delete in the list clears it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -363,14 +398,25 @@ The list beside the form shows: Bills of materials.
 
 ## Look up
 
-### Stock on hand and back orders
+### How many do I have? (stock on hand)
+
+How many of each product are in stock, per warehouse. Pick a product (and a warehouse) to see just that one; the list shows every product with stock.
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Product | no | Choice |
+| Warehouse (blank: all) | no | Choice |
+
+The list beside the form shows: Stock on hand.
+
+### Available to promise and back orders
 
 An item's stock on hand, allocated to sales orders, on order and free - available to promise; the list shows every back-ordered sales order line and whether stock now covers it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Product | yes | Choice |
-| Warehouse code (blank: all) | no | Text |
+| Warehouse (blank: all) | no | Choice |
 
 The list beside the form shows: Back orders.
 

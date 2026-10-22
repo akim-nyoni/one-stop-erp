@@ -26,11 +26,11 @@ The list beside the form shows: Suppliers.
 
 ### Supplier addresses and contacts
 
-Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who receive statements, remittance advices and purchase orders by email. Remove takes an address or contact id. The list shows the trader typed in Code.
+Postal, physical and delivery addresses (the default postal address prints on invoices, statements, orders, remittances and letters) and the people who receive statements, remittance advices and purchase orders by email. Add with an existing address or contact id changes that address or contact (Edit fills it in); Delete removes an address or retires a contact.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Add address, Add contact, Remove address, Remove contact; default Add address |
+| Step | yes | One of: Add address, Add contact; default Add address |
 | Supplier code | yes | Text |
 | Address kind | yes | One of: Postal, Physical, Delivery; default Postal |
 | Address line 1 | no | Text |
@@ -47,7 +47,7 @@ Postal, physical and delivery addresses (the default postal address prints on in
 | Receives statements | no | Flag; default False |
 | Receives remittances | no | Flag; default False |
 | Receives purchase orders | no | Flag; default False |
-| Address / contact id (remove) | no | Number |
+| Address / contact id (blank: a new one) | no | Number |
 
 The list beside the form shows: Directory.
 
@@ -71,7 +71,7 @@ The list beside the form shows: Changes awaiting approval.
 
 ### Supplier exchange-rate type
 
-The rate type this trader's foreign documents convert at (e.g. a contract or bank rate kept in the rate table). Daily (or blank) uses the daily rate; a document dated before any rate of the type falls back to the daily rate.
+The rate type this trader's foreign documents convert at (e.g. a contract or bank rate kept in the rate table). Daily (or blank) uses the daily rate; a document dated before any rate of the type falls back to the daily rate. Saving a trader already listed changes its rate type; Delete puts it back on the daily rate.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -82,7 +82,7 @@ The list beside the form shows: Suppliers on their own rate.
 
 ### Supplier contracts (framework agreements)
 
-A supplier contract with a term and a ceiling: orders placed under it are checked against both, and report PO133 shows how much of it is used.
+A supplier contract with a term and a ceiling: orders placed under it are checked against both, and report PO133 shows how much of it is used. An existing reference changes that agreement's description, term and ceiling (its supplier stays). Delete ends the agreement yesterday, so no further orders can be called off under it (orders already placed stand).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -126,7 +126,7 @@ The list beside the form shows: Rebate agreements.
 
 ### Purchase requisition
 
-Raise a requisition (budget-checked), submit it, approve or reject it (someone else approves), and convert an approved one into a purchase order. Lines: ITEM:quantity@price; ITEM:quantity@price
+Raise a requisition (budget-checked), submit it, approve or reject it (someone else approves), and convert an approved one into a purchase order. Lines: ITEM:quantity@price; ITEM:quantity@price (add #TAXCODE after the price for a tax code other than the item's or supplier's)
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -138,7 +138,7 @@ Raise a requisition (budget-checked), submit it, approve or reject it (someone e
 | New order number (convert) | no | Text |
 | Date | yes | Date |
 | Expense account the lines are budget-checked against (create) | no | Text |
-| Required by yyyy-MM-dd (create) | no | Text |
+| Required by (create) | no | Date |
 | Justification (create) | no | Text |
 | Department (create) | no | Text |
 | Cost centre (create) | no | Text |
@@ -166,7 +166,7 @@ The list beside the form shows: RFQs.
 
 ### Purchase order
 
-Raise an order directly (budget-checked; over-budget needs an approver), cancel one, or print it. Lines: ITEM:quantity@price; ITEM:quantity@price
+Raise an order directly (budget-checked; over-budget needs an approver), cancel one, or print it. Lines: ITEM:quantity@price; ITEM:quantity@price (add #TAXCODE after the price for a tax code other than the item's or supplier's)
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -175,7 +175,7 @@ Raise an order directly (budget-checked; over-budget needs an approver), cancel 
 | Supplier code (create) | no | Text |
 | Currency | no | Text; default USD |
 | Lines (create) | no | Text |
-| Required by (yyyy-MM-dd) | no | Text |
+| Required by | no | Date |
 | Budget approver user (over budget) | no | Text |
 | Reason (cancel) | no | Text |
 | Order date | yes | Date |
@@ -216,14 +216,15 @@ The list beside the form shows: Deliveries late or due within a week.
 
 ### Receive goods
 
-Books a goods received note against an order into a warehouse (stock in, goods-received-not-invoiced accrued). Leave Lines blank to receive everything still outstanding; otherwise ITEM:quantity; ITEM:quantity.
+Books a goods received note into a warehouse (stock in, goods-received-not-invoiced accrued). Pick the order and leave Lines blank to receive everything still outstanding, or give ITEM:quantity; ITEM:quantity (or ITEM:2 BOX in a unit the item is bought in). Goods that came without an order: leave the order blank, give the supplier and the lines as ITEM:quantity@price - an order is raised for them and received at once. The GRN number is given the next in sequence when left blank.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Order number | yes | Text |
+| Order (blank: goods without an order) | no | Choice |
 | Warehouse | yes | Choice |
-| GRN number | yes | Text |
-| Lines (blank: all outstanding) | no | Text |
+| Supplier code (no order) | no | Text |
+| Lines (blank: all outstanding; no order: ITEM:quantity@price) | no | Text |
+| GRN number (blank: next in sequence) | no | Text |
 | Date | yes | Date |
 | Supervisor authorising an over-receipt (user name) | no | Text |
 
@@ -306,7 +307,7 @@ Posts the supplier's invoice against the order (three-way match within the price
 | Order number | yes | Text |
 | Supplier invoice number | yes | Text |
 | Lines (blank: received, at order price) | no | Text |
-| Price tolerance % | yes | Number; default 5 |
+| Price tolerance % (blank: the supplier's or company's rule; may only tighten it) | no | Number |
 | Price variance account | no | Text |
 | Budget approver user (over budget) | no | Text |
 | Invoice date | yes | Date |
@@ -323,7 +324,7 @@ Submits a supplier invoice that may not match (outside the tolerance it is held 
 | Order number (submit) | no | Text |
 | Supplier invoice number (submit) | no | Text |
 | Lines: ITEM:quantity@price; … (submit; blank: received at order price) | no | Text |
-| Price tolerance % | yes | Number; default 5 |
+| Price tolerance % (blank: the supplier's or company's rule; may only tighten it) | no | Number |
 | Dispute id | no | Number |
 | Note | no | Text |
 | Price variance account | no | Text |
@@ -331,38 +332,56 @@ Submits a supplier invoice that may not match (outside the tolerance it is held 
 
 The list beside the form shows: Open disputes.
 
-### Match payments to invoices
+### Matching tolerances
 
-Match a payment or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, or write back an old creditor invoice that will never be paid (the liability released to income).
+The rules a supplier invoice is matched by: its price may differ from the order price by up to the price tolerance, and its quantity may exceed what was received by up to the quantity tolerance; a goods receipt may exceed the order by up to the over-receipt tolerance. The company's rules apply to every supplier without rules of its own (blank a supplier's value to fall back). A clerk matching an invoice may tighten the price tolerance, never widen it. Edit fills a row in to change it; Delete puts a supplier back on the company's rules (the company's own rules cannot be deleted).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Allocate, Unallocate, Write back; default Allocate |
-| Supplier code | yes | Text |
+| Supplier code (blank: the company's rules) | no | Text |
+| Invoice price tolerance % | no | Number |
+| Invoice quantity tolerance % | no | Number |
+| Over-receipt tolerance % | no | Number |
+
+The list beside the form shows: Matching tolerances.
+
+### Match payments to invoices
+
+Auto-allocate matches an account's payments and credits to its invoices (exact amounts first, then oldest first; everyone: the whole ledger). Or match a payment or credit note to an invoice (in part: give the amount; blank matches as much as both have open), undo an allocation, or write back an old creditor invoice that will never be paid (the liability released to income).
+
+| Field | Required | Notes |
+| --- | --- | --- |
+| Step | yes | One of: Allocate, Auto-allocate, Auto-allocate everyone, Unallocate, Write back; default Allocate |
+| Supplier code (blank only for auto-allocate everyone) | no | Text |
 | Debit document (payment / debit note) | no | Text |
 | Invoice number | no | Text |
 | Amount (blank: as much as is open) | no | Number |
 | Date | yes | Date |
 | Allocation id (unallocate; blank: the latest on the document) | no | Number |
 | Write-back income account | no | Text |
-| Reason (write off / back) | no | Text |
+| Reason (unallocate, write off / back) | no | Text |
 | Document number (contra) | no | Text |
 
 The list beside the form shows: Open supplier items.
 
 ### Supplier payment
 
-A single payment to a supplier from the bank (several at once go through the payment run).
+A single payment to a supplier from the bank (several at once go through the payment run), or money the supplier pays back (tick Refund): banked against the supplier's account and matched to the overpayment or debit note it settles. A payment can be matched straight away to the invoices it pays (their numbers, separated by commas, in order) or to the oldest open invoices; otherwise it waits on the account for allocation. As in the payment run, a supplier on hold, blacklisted or with a bank-detail change waiting is not paid, and where payment runs need a second person's approval a single payment names the other user who approved it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Supplier | yes | Choice |
-| Payment number | yes | Text |
+| Payment / refund number | yes | Text |
 | Date | yes | Date |
 | Amount | yes | Number |
 | Bank account | yes | Text; default 1100 |
 | Currency (blank: the supplier's) | no | Text |
 | Narrative | no | Text |
+| A refund from the supplier (money in) | no | Flag; default False |
+| Overpayment / debit note the refund settles | no | Text |
+| Invoices this payment settles (numbers, comma-separated) | no | Text |
+| Match to the oldest open invoices | no | Flag; default False |
+| Approved by (user name; needed where payments need a second person's approval) | no | Text |
 
 The list beside the form shows: Open supplier items.
 
@@ -397,7 +416,7 @@ Saves a proposed payment run for review: everyone due (held suppliers left out w
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Save proposal, Set line, Approve, Cancel, Show, Require approval, Allow direct runs; default Save proposal |
+| Step | yes | One of: Save proposal, Set line, Approve, Cancel, Show, Require approval, Allow direct runs, Settlement discount account; default Save proposal |
 | Run number | no | Text |
 | Payment date | yes | Date |
 | Pay invoices due on or before | yes | Date |
@@ -411,12 +430,13 @@ Saves a proposed payment run for review: everyone due (held suppliers left out w
 | Pay this supplier | no | Flag; default True |
 | Amount (blank: all due) | no | Number |
 | Funds available (save proposal) | no | Number |
+| Email the remittance advices (approve) | no | Flag; default True |
 
 The list beside the form shows: Saved payment runs.
 
 ### Recurring purchase invoices
 
-An invoice from a supplier raised every so many months from a first date; Generate raises all that are due; Stop / restart one.
+An invoice from a supplier raised every so many months from a first date; Generate raises all that are due; Stop / restart one. Create with an existing reference changes that template's amounts, accounts, interval and narrative from its next run (its trader and next run date stay); Delete stops it (kept in history; Restart brings it back).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -520,7 +540,7 @@ The return of tax withheld from supplier payments in a period (by certificate), 
 
 ### Set a budget enforcement rule
 
-What happens when spend overruns the available budget, by department, account prefix and value band (the most specific rule wins; none: allow).
+What happens when spend overruns the available budget, by department, account prefix and value band (the most specific rule wins; none: allow). A blank department or prefix means any. Saving the same department, prefix and value band again changes its action (Edit fills it in).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -598,6 +618,7 @@ Prints the supplier debit note in the standard business document layout, or thro
 | AP54 | Purchase Day Book | Supplier invoices, credit notes and debit notes posted in the period, in transaction and base currency. |
 | AP55 | Purchase Analysis by Supplier and Item | Order lines placed in the period (cancelled orders excluded) by supplier and item: quantity, average price and value. |
 | AP56 | Cash Requirement Forecast / Payment Due Report | What must be paid to suppliers by week of due date and currency - overdue, each of the coming weeks and later - net of unallocated payments and debit notes. |
+| AP57 | Payment Run Proposal | What a payment run on the date would pay: per supplier and currency the invoices due by the cut-off, the amount due, credits applied, tax withheld, suppliers on hold or with a bank-detail change pending, and what is deferred when the funds given do not cover everything. |
 | AP58 | Payments Made | Payments to suppliers in the period (payment runs and single payments) with tax withheld. |
 | AP59 | Goods Received Not Invoiced (GRNI) | Order lines received but not yet invoiced: the GRNI accrual by order and item, with its age. |
 | AP60 | Invoice Matching Exceptions | Supplier invoices disputed against their order: reason, status and resolution. |
@@ -617,7 +638,7 @@ Prints the supplier debit note in the standard business document layout, or thro
 | PO131 | RFQ Comparison & Award | Every quote received on each RFQ, ranked by total price, with lead time and the award and its reason. |
 | PO132 | Purchase Price Variance | Each item ordered in the period at a different price from the order before it, with the variance on the quantity ordered. |
 | PO133 | Contract / Framework Agreement Utilisation | Each framework agreement: supplier, term, ceiling, orders called off and their value, how much is used and left, and whether it is live at the date. |
-| PO134 | Procurement Spend Analysis | Order value in the period by supplier and currency, with lines, items and share. |
+| PO134 | Procurement Spend Analysis | Order value in the period by month, supplier, item category and requesting department, per currency, with orders, lines, items and each row's share of the currency's spend (group by any column in the designer for the category, supplier, department or month view). |
 | PO135 | Supplier Lead Time Analysis | Per supplier: days from order to first receipt (average, fastest, slowest) and orders received by their required date. |
 | PO136 | Budget Availability at Requisition | Open requisition lines charged to a budgeted expense account: the vote's appropriation, spent and committed to date, available before the line and after it. |
 | PO137 | Approval Turnaround & SLA | Per document type and stage: decisions in the period, average and longest hours to decide, how many took longer than the stage's escalation time, and what is still waiting with the oldest wait. |

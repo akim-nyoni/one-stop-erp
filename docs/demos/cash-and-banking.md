@@ -4,7 +4,7 @@ Goal: show that bank accounts and reconciliation, cheques, transfers and standin
 
 ## Bank accounts
 1. Open **Bank reconciliation**. Tick the bank statement off against your cash book.
-2. Open **Import a bank statement**. Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account's unreconciled lines, or sign the reconciliation off as at a date: it must balance, and once signed the period's matched items are locked against change. Fill in: Step, Bank account code, File format, Sign off as at. Press OK and point out the result line and the list on the right.
+2. Open **Import a bank statement**. Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account's unreconciled lines, or sign the reconciliation off as at a date: the statement's closing balance must equal the imported lines' running balance and the books must reconcile to it, and once signed the period's matched items are locked against change. Fill in: Step, Bank account code, File format, Sign off as at (statement date). Press OK and point out the result line and the list on the right.
 3. Open **Bank rules**. Rules that match bank statement lines automatically.
 
 ## Cheques

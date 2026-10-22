@@ -10,7 +10,7 @@ Open the module from the Explorer on the left; each group below is a heading in 
 
 ### Capture a lead
 
-A prospective customer with an e-mail or phone and where they came from; an earlier lead with the same e-mail or phone is flagged.
+A prospective customer with an e-mail or phone and where they came from; an earlier lead with the same e-mail or phone is flagged. With a lead id (Edit fills it in) the lead's name, organisation, e-mail and phone change (its source and status stay); Delete disqualifies a lead not yet converted (kept in history).
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -19,6 +19,7 @@ A prospective customer with an e-mail or phone and where they came from; an earl
 | E-mail | no | Text |
 | Phone | no | Text |
 | Source | yes | Text; default web |
+| Lead id (change) | no | Number |
 
 The list beside the form shows: Leads.
 
@@ -48,7 +49,7 @@ Move an opportunity through the pipeline (lead, qualified, proposal, negotiation
 | Opportunity id | no | Number |
 | Stage | yes | One of: Lead, Qualified, Proposal, Negotiation, Won, Lost; default Lead |
 | Probability % (blank: the stage's) | no | Number |
-| Expected close (yyyy-MM-dd) | no | Text |
+| Expected close | no | Date |
 | Why lost | no | Text |
 | Sales order number | no | Text |
 | Lines ITEM:qty[:price]; … | no | Text |
@@ -78,7 +79,8 @@ A call, e-mail, meeting, task or note against a lead, opportunity or customer; g
 | Type | yes | One of: Call, Email, Meeting, Task, Note; default Call |
 | Subject | yes | Text |
 | Notes | no | Text |
-| Due (yyyy-MM-dd HH:mm) | no | Text |
+| Due date | no | Date |
+| Due time (HH:mm, blank: 09:00) | no | Text |
 | Lead id | no | Number |
 | Opportunity id | no | Number |
 | Customer | no | Choice |

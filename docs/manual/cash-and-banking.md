@@ -14,7 +14,7 @@ Tick the bank statement off against your cash book.
 
 ### Import a bank statement
 
-Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account's unreconciled lines, or sign the reconciliation off as at a date: it must balance, and once signed the period's matched items are locked against change.
+Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account's unreconciled lines, or sign the reconciliation off as at a date: the statement's closing balance must equal the imported lines' running balance and the books must reconcile to it, and once signed the period's matched items are locked against change. Unpresented items over 90 days old are flagged.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -22,7 +22,8 @@ Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account'
 | Bank account code | yes | Text |
 | Statement file (full path) | no | Text |
 | File format | yes | One of: Csv, Mt940, Camt053, Ofx; default Csv |
-| Sign off as at | yes | Date |
+| Sign off as at (statement date) | yes | Date |
+| Statement closing balance (sign off) | no | Number |
 
 The list beside the form shows: Bank accounts.
 
@@ -48,18 +49,19 @@ Moves money from one bank account to another, through a clearing account when it
 
 ### Cash-flow forecast
 
-Week by week from the bank balances: receivables and payables by due date, saved payment runs on their dates, open sales and purchase orders on delivery plus terms, standing orders, payroll (repeating the last regular run) and flows keyed in by hand (once or monthly). Weeks where cash would fall below the minimum are marked.
+Week by week from the bank balances: receivables and payables by due date, saved payment runs on their dates, open sales and purchase orders on delivery plus terms, standing orders, payroll (repeating the last regular run) and flows keyed in by hand (once or monthly). Weeks where cash would fall below the minimum are marked. With a currency, the forecast is of the cash held in that currency, in it (its bank accounts, documents, orders and runs).
 
 | Field | Required | Notes |
 | --- | --- | --- |
 | Step | yes | One of: Forecast, Add a flow, Remove a flow; default Forecast |
+| Currency (blank: everything in base) | no | Text |
 | From | yes | Date |
 | Weeks | yes | Number; default 13 |
 | Minimum cash to hold | yes | Number; default 0 |
 | Show every flow | no | Flag; default False |
 | Flow amount (+ in, − out) | yes | Number; default 0 |
 | Flow description | no | Text |
-| Repeat monthly until (yyyy-mm-dd) | no | Text |
+| Repeat monthly until | no | Date |
 | Flow id (remove) | no | Number |
 
 The list beside the form shows: Bank accounts.
@@ -123,7 +125,7 @@ The list beside the form shows: Cheque register (latest 100).
 
 ### Set up a standing order
 
-A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both.
+A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) or to a GL account. Give a supplier or an account, not both. Its terms cannot change once set up: Delete stops it (it stays in the list), then set up a new one.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -132,7 +134,7 @@ A fixed payment out of the bank on a schedule: to a supplier (purchase ledger) o
 | Amount | yes | Number |
 | Frequency | yes | One of: Weekly, Monthly, Quarterly, Annually; default Weekly |
 | First payment | yes | Date |
-| Last date (yyyy-MM-dd, optional) | no | Text |
+| Last date (optional) | no | Date |
 | Supplier | no | Choice |
 | GL account | no | Text |
 | What it is for | no | Text |
@@ -141,7 +143,7 @@ The list beside the form shows: Standing orders and direct debits.
 
 ### Set up a direct debit mandate
 
-The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped).
+The customer's authority to collect on a schedule: a fixed amount, or what they owe (optionally capped). Its terms cannot change once set up: Delete stops it (it stays in the list), then set up a new one.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -151,7 +153,7 @@ The customer's authority to collect on a schedule: a fixed amount, or what they 
 | Collect into bank account | yes | Text; default 1100 |
 | Frequency | yes | One of: Weekly, Monthly, Quarterly, Annually; default Weekly |
 | First collection | yes | Date |
-| Last date (yyyy-MM-dd, optional) | no | Text |
+| Last date (optional) | no | Date |
 | Fixed amount (blank: what is owed) | no | Number |
 | Most per collection | no | Number |
 

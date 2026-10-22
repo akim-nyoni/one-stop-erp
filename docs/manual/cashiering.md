@@ -105,20 +105,22 @@ The list beside the form shows: Cash deposits.
 
 ### Arrangements, dishonours and refunds
 
-A payment arrangement on a debtor's account (total and monthly instalment from a start date); a dishonoured cheque or reversed transfer, with an optional penalty charged; money held in suspense allocated to an account; and a credit balance refunded to the debtor (approved by the user doing it).
+A payment arrangement on a debtor's account (total and monthly instalment from a start date); a dishonoured cheque or reversed transfer, with an optional penalty charged; money held in a suspense control account allocated to an account (naming the unidentified receipt it came in on, where there is one); and a credit balance refunded to the debtor in one currency from a bank account in that currency - asked for by one user, paid only when another with the receipts approval right approves it.
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Arrangement, Dishonour, Allocate from suspense, Refund credit; default Arrangement |
+| Step | yes | One of: Arrangement, Dishonour, Allocate from suspense, Request credit refund, Approve credit refund, Reject credit refund; default Arrangement |
 | Customer code or stand number | no | Text |
 | Amount / total | yes | Number; default 0 |
 | Monthly instalment (arrangement) | yes | Number; default 0 |
-| Receipt number (dishonour) | no | Text |
+| Receipt number (dishonour, or the unidentified receipt for suspense) | no | Text |
 | Penalty (dishonour) | yes | Number; default 0 |
 | Penalty income account | no | Text |
 | Suspense account | no | Text |
 | Allocate to | yes | One of: OldestFirst, NewestFirst, LargestFirst, UserDirected; default OldestFirst |
-| Bank account (refund) | no | Text |
+| Currency of the credit refunded (blank: base) | no | Choice |
+| Bank account (refund, in that currency) | no | Text |
+| Refund request id (approve / reject) | no | Number |
 | Reason | no | Text |
 | Date | yes | Date |
 
@@ -145,7 +147,7 @@ The list beside the form shows: Stations and collectors.
 
 ### Collection agents
 
-Third-party agents who collect from customers for a commission: register one, record a collection (allocated to the customer's debt, owed by the agent) and take the agent's remittance (commission kept, the net banked).
+Third-party agents who collect from customers for a commission: register one, record a collection (allocated to the customer's debt, owed by the agent) and take the agent's remittance (commission kept, the net banked). Register with an existing code changes the agent's name and commission (for later remittances); Delete takes an agent out of use once it has remitted everything it collected.
 
 | Field | Required | Notes |
 | --- | --- | --- |
@@ -208,17 +210,16 @@ The list beside the form shows: Import batches.
 
 ### Matching rules for imported payments
 
-Your own rules for matching imported payments: when the reference or the payer's name contains, starts with or equals the text (or fits a regular expression), the payment goes to the account. E.g. payer name contains "MINISTRY OF HEALTH" → the employer's account.
+Your own rules for matching imported payments: when the reference or the payer's name contains, starts with or equals the text (or fits a regular expression), the payment goes to the account. E.g. payer name contains "MINISTRY OF HEALTH" → the employer's account. Add with an existing rule id changes that rule (Edit fills it in); Delete takes a rule away (payments it matched stay where they went).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Add, Remove; default Add |
 | Look in | yes | One of: Reference, PayerName; default Reference |
 | When it | yes | One of: Contains, StartsWith, Equals, Pattern; default Contains |
 | Text or pattern | no | Text |
 | Account (customer code) | no | Text |
 | Priority (lowest first) | yes | Number; default 100 |
-| Rule id (remove) | no | Number |
+| Rule id (blank: a new rule) | no | Number |
 
 The list beside the form shows: Matching rules (tried first, lowest priority first).
 
