@@ -576,6 +576,7 @@ internal sealed class DetailChangeRequestConfiguration : IEntityTypeConfiguratio
         b.Property(x => x.Status).HasConversion<int>();
         b.Property(x => x.Note).HasMaxLength(200);
         b.HasIndex(x => new { x.CompanyId, x.Status });
+        b.HasIndex(x => new { x.CompanyId, x.EmployeeId, x.Field });
     }
 }
 

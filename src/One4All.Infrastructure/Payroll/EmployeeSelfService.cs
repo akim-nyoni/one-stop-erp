@@ -218,7 +218,7 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
             return Error.Validation("Ess.Value", "The new value is required.");
         }
 
-        DetailChangeRequest request = new(me.Value.CompanyId, me.Value.Id, name, Read(me.Value, name), newValue.Trim());
+        DetailChangeRequest request = new(me.Value.CompanyId, me.Value.Id, name, Read(me.Value, name), newValue.Trim()) { RequestedByUserId = userId };
         _db.DetailChangeRequests.Add(request);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return request.Id;
@@ -229,8 +229,10 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
     {
         Dictionary<long, Employee> employees = await _db.Employees.AsNoTracking().Where(e => e.CompanyId == companyId).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
         List<LeaveApplication> leave = await _db.LeaveApplications.AsNoTracking().Where(a => a.CompanyId == companyId && a.Status == SelfServiceStatus.Pending).OrderBy(a => a.Id).ToListAsync(ct).ConfigureAwait(false);
-        List<DetailChangeRequest> changes = await _db.DetailChangeRequests.AsNoTracking().Where(r => r.CompanyId == companyId && r.Status == SelfServiceStatus.Pending).OrderBy(r => r.Id).ToListAsync(ct)
-            .ConfigureAwait(false);
+        // Salary and payment-method changes are pay, decided under Bank detail change by someone who may see it; they are not listed here.
+        List<string> pay = [.. PayrollSetupService.PayFields];
+        List<DetailChangeRequest> changes = await _db.DetailChangeRequests.AsNoTracking().Where(r => r.CompanyId == companyId && r.Status == SelfServiceStatus.Pending && !pay.Contains(r.Field))
+            .OrderBy(r => r.Id).ToListAsync(ct).ConfigureAwait(false);
         return [.. leave.Select(a => new SelfServiceRequest("Leave", a.Id, employees[a.EmployeeId].EmployeeNumber, employees[a.EmployeeId].FullName,
                 $"{a.Days:0.##} day(s) {a.LeaveType} {a.FromDate:yyyy-MM-dd} to {a.ToDate:yyyy-MM-dd}")),
             .. changes.Select(r => new SelfServiceRequest("Detail", r.Id, employees[r.EmployeeId].EmployeeNumber, employees[r.EmployeeId].FullName, $"{r.Field}: {r.OldValue ?? "(none)"} -> {r.NewValue}"))];
@@ -244,7 +246,7 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
     public async Task<Result<SelfServiceStatus>> DecideDetailChangeAsync(long companyId, long requestId, bool approve, long deciderUserId, string? note, CancellationToken ct = default)
     {
         DetailChangeRequest? request = await _db.DetailChangeRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId, ct).ConfigureAwait(false);
-        if (request is null || request.Status != SelfServiceStatus.Pending)
+        if (request is null || request.Status != SelfServiceStatus.Pending || PayrollSetupService.PayFields.Contains(request.Field))
         {
             return Error.NotFound("Ess.RequestNotFound", $"No pending detail change {requestId}.");
         }
@@ -255,12 +257,14 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
             return Error.Rule("Ess.OwnRequest", "Nobody can decide their own self-service request.");
         }
 
-        if (approve)
+        // The same decision as under Bank detail change: whoever asked cannot approve it, and the change (bank details, a split, a salary or a payment
+        // method) is applied as it is there.
+        Result decided = await PayrollSetupService.DecideAsync(_db, request, approve, deciderUserId, note, ct).ConfigureAwait(false);
+        if (decided.IsFailure)
         {
-            Write(employee, request.Field, request.NewValue);
+            return decided.Error;
         }
 
-        request.Decide(approve, deciderUserId, note);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return request.Status;
     }
@@ -329,25 +333,6 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
         "MobileMoneyNumber" => e.MobileMoneyNumber,
         _ => null,
     };
-
-    private static void Write(Employee e, string field, string value)
-    {
-        switch (field)
-        {
-            case "BankName":
-                e.BankName = value;
-                break;
-            case "BankBranch":
-                e.BankBranch = value;
-                break;
-            case "BankAccountNumber":
-                e.BankAccountNumber = value;
-                break;
-            case "MobileMoneyNumber":
-                e.MobileMoneyNumber = value;
-                break;
-        }
-    }
 }
 
 /// <summary>Concludes a leave application's approval workflow: approval takes the leave, anything else declines it.</summary>

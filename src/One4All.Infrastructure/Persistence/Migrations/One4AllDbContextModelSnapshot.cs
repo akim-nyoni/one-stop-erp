@@ -19912,6 +19912,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<DateOnly?>("AppliedOn")
+                        .HasColumnType("date")
+                        .HasColumnName("applied_on");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -19927,6 +19931,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<long?>("DecidedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("decided_by_user_id");
+
+                    b.Property<DateOnly?>("EffectiveFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("effective_from");
 
                     b.Property<long>("EmployeeId")
                         .HasColumnType("bigint")
@@ -19983,6 +19991,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("CompanyId", "Status")
                         .HasDatabaseName("ix_detail_change_request_company_id_status");
+
+                    b.HasIndex("CompanyId", "EmployeeId", "Field")
+                        .HasDatabaseName("ix_detail_change_request_company_id_employee_id_field");
 
                     b.ToTable("detail_change_request", "hr");
                 });

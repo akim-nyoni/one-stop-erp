@@ -16,7 +16,8 @@ namespace One4All.Server;
 /// The REST API's employee, payroll run and stand history endpoints (brief §11): engage, change and read an employee; list the payroll runs; read
 /// an employee's payslip; read a stand's status history and lineage. Each step runs through the same application service the desktop uses.
 /// Pay is sensitive (brief §4.15.10): pay fields leave the JSON for a user without Payroll › View Salary, a payslip is refused to them, and setting
-/// a salary needs the same right. Bank details are set at engagement only; later changes go through an approved request.
+/// a salary needs the same right. Bank details are set at engagement only; later changes go through an approved request. Where the company's payroll
+/// needs approval, bank details given at engagement and a change of salary or payment method wait for another user's approval (202 on a change).
 /// </summary>
 internal static class PayrollApiEndpoints
 {
@@ -61,7 +62,8 @@ internal static class PayrollApiEndpoints
                 return Value(mapped);
             }
 
-            Result<long> created = await setup.CreateEmployeeAsync(companyId, mapped.Value, ct).ConfigureAwait(false);
+            // Where payroll needs approval, bank details given here wait for another user (the record is created without them).
+            Result<long> created = await setup.CreateEmployeeAsync(companyId, mapped.Value with { RequestedByUserId = userId }, ct).ConfigureAwait(false);
             if (created.IsFailure)
             {
                 return Value(created);
@@ -86,15 +88,19 @@ internal static class PayrollApiEndpoints
                 return Value(mapped);
             }
 
-            Result updated = await setup.UpdateEmployeeAsync(companyId, number, mapped.Value, ct).ConfigureAwait(false);
+            Result updated = await setup.UpdateEmployeeAsync(companyId, number, mapped.Value with { RequestedByUserId = userId }, ct).ConfigureAwait(false);
             if (updated.IsFailure)
             {
                 return Action(updated);
             }
 
+            // A salary or payment-method change not yet in force (waiting for another user's approval, or dated later) answers 202 with the record as it is.
             string key = OrdersApiMapping.Key(number);
             Employee employee = await db.Employees.AsNoTracking().FirstAsync(e => e.CompanyId == companyId && e.EmployeeNumber.ToUpper() == key, ct).ConfigureAwait(false);
-            return Results.Ok(await ViewAsync(db, employee, ct).ConfigureAwait(false));
+            bool waiting = (mapped.Value.BasicSalary is decimal salary && salary != employee.BasicSalary)
+                || (mapped.Value.PaymentMethod is PayMethod method && method != employee.PaymentMethod);
+            EmployeeViewApi view = await ViewAsync(db, employee, ct).ConfigureAwait(false);
+            return waiting ? Results.Accepted($"/api/hr/employees/{employee.EmployeeNumber}", view) : Results.Ok(view);
         }).RequireAuthorization().WithName("ApiUpdateEmployee");
     }
 

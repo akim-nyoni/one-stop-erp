@@ -347,7 +347,8 @@ public sealed partial class PayrollService
         }
 
         Employee employee = await _db.Set<Employee>().FirstAsync(e => e.Id == request.EmployeeId, ct).ConfigureAwait(false);
-        employee.BasicSalary = request.NewBasicSalary;
+        PayrollSetupService.SetDecidedSalary(_db, employee, request.NewBasicSalary, request.EffectiveFrom, request.RequestedByUserId == 0 ? null : request.RequestedByUserId,
+            request.ApprovedByUserId, $"Backpay {document}");
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return run;
     }

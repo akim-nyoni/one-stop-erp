@@ -241,7 +241,7 @@ public static class NavigationMap
         [
             G("Employees",
                 O("HR & Attendance: Employee record", "Add or change an employee"), O("HR & Attendance: Employee contacts, photo and dependants"), O("HR & Attendance: File an employee document"),
-                O("HR & Attendance: Bank detail change"), O("HR & Attendance: Set an employee's pay group"), O("HR & Attendance: Appoint to act"),
+                O("HR & Attendance: Bank detail change"), O("HR & Attendance: Pay change history"), O("HR & Attendance: Set an employee's pay group"), O("HR & Attendance: Appoint to act"),
                 O("HR & Attendance: Termination and final pay", "An employee leaves (final pay)"), O("HR & Attendance: HR expiry alerts")),
             G("Records",
                 O("HR & Attendance: Record a disciplinary action"), O("HR & Attendance: Record training"), O("HR & Attendance: Record an appraisal"),

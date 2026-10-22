@@ -246,8 +246,10 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Employee record", ListTitle = "Employees", KeyColumn = "Number",
             Description = "Engage an employee, or update one (blank fields stay as they are); an existing employee number always updates that employee. Bank details are set at "
-                + "engagement; later changes go through 'Bank detail change' and a second person's approval. Delete removes only an employee never paid, with no loans or leave "
-                + "on record; anyone else leaves through 'Termination and final pay'.",
+                + "engagement; later changes go through 'Bank detail change' and a second person's approval. Where payroll needs approval ('Set payroll approval'), the bank "
+                + "details given at engagement and any change of basic salary or payment method also wait there for another user; a salary or payment change dated later "
+                + "takes effect from the first payroll run paid on or after that date ('Pay change history' keeps every one). Delete removes only an employee never paid, with "
+                + "no loans or leave on record; anyone else leaves through 'Termination and final pay'.",
             Delete = async (c, number) =>
             {
                 Employee employee = await ExistingAsync<Employee>(c, number, x => x.EmployeeNumber).ConfigureAwait(true) ?? throw new OperationException($"No employee {number}.");
@@ -267,11 +269,14 @@ public static partial class OperationCatalogue
                 Pick("Frequency", "Paid", Enum.GetNames<PayFrequency>()), Opt("WorkBranch", "Works at branch (code)"), Opt("Project", "Charged to project"), Opt("Fund", "Charged to fund"),
                 Opt("ReportsTo", "Reports to (employee number)"), Pick("Marital", "Marital status", Enum.GetNames<MaritalStatus>()), Opt("Nationality", "Nationality"),
                 Opt("SocialSecurity", "Social security number"), Opt("Union", "Trade union"), Opt("KinName", "Next of kin"), Opt("KinPhone", "Next of kin's phone"),
-                Opt("KinRelationship", "Next of kin is (relationship)"), Opt("Tenancy", "Housing tenancy number (update; rent recovered from pay; '-' clears)")],
+                Opt("KinRelationship", "Next of kin is (relationship)"), Opt("Tenancy", "Housing tenancy number (update; rent recovered from pay; '-' clears)"),
+                OptDate("PayEffective", "Salary / payment-method change effective from (update; blank: today)")],
             Run = async (c, i) =>
             {
                 IPayrollSetupService setup = c.Get<IPayrollSetupService>();
                 DateOnly? contractEnd = i.Optional("ContractEnd") is string end ? DateOnly.ParseExact(end, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+                DateOnly? payEffective = i.Optional("PayEffective") is string from ? DateOnly.ParseExact(from, "yyyy-MM-dd", CultureInfo.InvariantCulture) : null;
+                long lastRequest = await c.Db.DetailChangeRequests.Where(r => r.CompanyId == c.CompanyId).MaxAsync(r => (long?)r.Id).ConfigureAwait(true) ?? 0;
                 EmploymentType type = Enum.Parse<EmploymentType>(i.Text("Type"));
                 PayMethod method = Enum.Parse<PayMethod>(i.Text("Method"));
                 if (i.Text("Step") == "Update" || await ExistingAsync<Employee>(c, i.Text("Number"), x => x.EmployeeNumber).ConfigureAwait(true) is not null)
@@ -285,8 +290,9 @@ public static partial class OperationCatalogue
                         Nationality = i.Optional("Nationality"), SocialSecurityNumber = i.Optional("SocialSecurity"), UnionMembership = i.Optional("Union"), NextOfKinName = i.Optional("KinName"),
                         NextOfKinPhone = i.Optional("KinPhone"), NextOfKinRelationship = i.Optional("KinRelationship"),
                         HousingTenancyNumber = i.Optional("Tenancy") is string tenancy ? (tenancy.Trim() == "-" ? string.Empty : tenancy) : null,
+                        RequestedByUserId = c.UserId, EffectiveFrom = payEffective,
                     }).ConfigureAwait(true), string.Empty);
-                    return $"Employee {i.Text("Number").ToUpperInvariant()} updated.";
+                    return $"Employee {i.Text("Number").ToUpperInvariant()} updated." + await HeldPayChangesAsync(c, lastRequest).ConfigureAwait(true);
                 }
 
                 long id = Check(await setup.CreateEmployeeAsync(c.CompanyId, new NewEmployee(i.Text("Number"), i.Optional("Name") ?? string.Empty, i.OptionalNumber("Basic") ?? 0m, i.Date("Engaged"))
@@ -297,9 +303,9 @@ public static partial class OperationCatalogue
                     PayFrequency = Enum.Parse<PayFrequency>(i.Text("Frequency")), Branch = i.Optional("WorkBranch"), Project = i.Optional("Project"), Fund = i.Optional("Fund"),
                     ReportsTo = i.Optional("ReportsTo"), MaritalStatus = Enum.Parse<MaritalStatus>(i.Text("Marital")), Nationality = i.Optional("Nationality"),
                     SocialSecurityNumber = i.Optional("SocialSecurity"), UnionMembership = i.Optional("Union"), NextOfKinName = i.Optional("KinName"), NextOfKinPhone = i.Optional("KinPhone"),
-                    NextOfKinRelationship = i.Optional("KinRelationship"),
+                    NextOfKinRelationship = i.Optional("KinRelationship"), RequestedByUserId = c.UserId,
                 }).ConfigureAwait(true));
-                return $"Employee {i.Text("Number").ToUpperInvariant()} engaged (id {id}).";
+                return $"Employee {i.Text("Number").ToUpperInvariant()} engaged (id {id})." + await HeldPayChangesAsync(c, lastRequest).ConfigureAwait(true);
             },
             List = async c => Table(await c.Db.Employees.AsNoTracking().Where(e => e.CompanyId == c.CompanyId).OrderBy(e => e.EmployeeNumber).Page(c, 500).ToListAsync().ConfigureAwait(true),
                 ("Number", e => e.EmployeeNumber), ("Name", e => e.FullName), ("Department", e => e.Department ?? string.Empty), ("Cost centre", e => e.CostCentre ?? string.Empty),
@@ -423,8 +429,10 @@ public static partial class OperationCatalogue
         };
         yield return new Operation
         {
-            Module = module, Title = "Bank detail change", ListTitle = "Bank changes awaiting approval",
-            Description = "Ask for a change of an employee's bank or mobile-money details; a different person approves or rejects it before it takes effect (blank fields are left as they are).",
+            Module = module, Title = "Bank detail change", ListTitle = "Bank and pay changes awaiting approval",
+            Description = "Ask for a change of an employee's bank or mobile-money details; a different person approves or rejects it before it takes effect (blank fields are left as they are). "
+                + "Net-pay splits, and - where payroll needs approval - salary and payment-method changes made on the employee record, wait in the same list and are approved or rejected here "
+                + "by someone other than whoever asked (and not by the employee themselves).",
             Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject"]), Opt("Number", "Employee number"), Opt("Bank", "Bank"), Opt("Branch", "Branch"), Opt("Account", "Account number"),
                 Opt("Mobile", "Mobile money number"), OptNum("Id", "Request id (approve / reject)"), Opt("Note", "Note")],
             Run = async (c, i) =>
@@ -448,8 +456,44 @@ public static partial class OperationCatalogue
                 IReadOnlyList<long> ids = Check(await setup.RequestBankChangeAsync(c.CompanyId, i.Optional("Number") ?? string.Empty, changes, c.UserId).ConfigureAwait(true));
                 return $"Change requested ({string.Join(", ", ids)}); someone else must approve it.";
             },
-            List = async c => Table(await c.Get<IPayrollSetupService>().PendingBankChangesAsync(c.CompanyId).ConfigureAwait(true),
-                ("Id", r => r.RequestId), ("Employee", r => r.EmployeeNumber), ("Field", r => r.Field), ("From", r => r.OldValue ?? string.Empty), ("To", r => r.NewValue)),
+            List = async c =>
+            {
+                bool hidden = await SalaryHiddenAsync(c).ConfigureAwait(true);
+                string Shown(string field, string? value) => hidden && field == "BasicSalary" ? "(hidden)" : value ?? string.Empty;
+                return Table(await c.Get<IPayrollSetupService>().PendingBankChangesAsync(c.CompanyId).ConfigureAwait(true),
+                    ("Id", r => r.RequestId), ("Employee", r => r.EmployeeNumber), ("Field", r => r.Field), ("From", r => Shown(r.Field, r.OldValue)), ("To", r => Shown(r.Field, r.NewValue)),
+                    ("Effective from", r => r.EffectiveFrom is DateOnly d ? D(d) : string.Empty));
+            },
+        };
+        yield return new Operation
+        {
+            Module = module, Title = "Pay change history", ListTitle = "Salary and payment-method changes",
+            Description = "Every change of an employee's basic salary or payment method: who asked and when, from what to what, from when, who approved or rejected it, and when it was "
+                + "applied. Pick an employee for their history; the list shows the company's.",
+            Fields = [EmployeePick("Employee", "Employee")],
+            Run = async (c, i) =>
+            {
+                bool hidden = await SalaryHiddenAsync(c).ConfigureAwait(true);
+                IReadOnlyList<PayChangeRecord> changes = await c.Get<IPayrollSetupService>().PayChangeHistoryAsync(c.CompanyId, i.Text("Employee")).ConfigureAwait(true);
+                Dictionary<long, string> users = await UserNamesAsync(c, changes).ConfigureAwait(true);
+                return changes.Count == 0 ? $"No salary or payment-method changes for {i.Text("Employee").ToUpperInvariant()}."
+                    : string.Join(Environment.NewLine, changes.Select(r => $"{(r.EffectiveFrom is DateOnly d ? D(d) : "-")} {r.Field}: "
+                        + (hidden && r.Field == "BasicSalary" ? "(hidden)" : $"{r.OldValue ?? "(none)"} -> {r.NewValue}")
+                        + $" - {r.Status}, asked by {Who(users, r.RequestedByUserId)} on {D(DateOnly.FromDateTime(r.RequestedOnUtc.UtcDateTime))}"
+                        + (r.Status == SelfServiceStatus.Pending ? string.Empty : $", decided by {Who(users, r.DecidedByUserId)}")
+                        + (r.AppliedOn is DateOnly applied ? $", applied {D(applied)}" : string.Empty)));
+            },
+            List = async c =>
+            {
+                bool hidden = await SalaryHiddenAsync(c).ConfigureAwait(true);
+                IReadOnlyList<PayChangeRecord> changes = await c.Get<IPayrollSetupService>().PayChangeHistoryAsync(c.CompanyId, null).ConfigureAwait(true);
+                Dictionary<long, string> users = await UserNamesAsync(c, changes).ConfigureAwait(true);
+                string Shown(PayChangeRecord r, string? value) => hidden && r.Field == "BasicSalary" ? "(hidden)" : value ?? string.Empty;
+                return Table(changes, ("Id", r => r.RequestId), ("Employee", r => r.EmployeeNumber), ("Change", r => r.Field), ("From", r => Shown(r, r.OldValue)), ("To", r => Shown(r, r.NewValue)),
+                    ("Effective from", r => r.EffectiveFrom is DateOnly d ? D(d) : string.Empty), ("Status", r => r.Status), ("Asked by", r => Who(users, r.RequestedByUserId)),
+                    ("Asked on", r => D(DateOnly.FromDateTime(r.RequestedOnUtc.UtcDateTime))), ("Decided by", r => r.Status == SelfServiceStatus.Pending ? string.Empty : Who(users, r.DecidedByUserId)),
+                    ("Applied", r => r.AppliedOn is DateOnly a ? D(a) : string.Empty), ("Note", r => r.Note ?? string.Empty));
+            },
         };
         yield return new Operation
         {
@@ -1145,6 +1189,36 @@ public static partial class OperationCatalogue
             ("Run", d => d.DocumentNumber), ("Group", d => d.PayGroup.Length == 0 ? "Default" : d.PayGroup), ("Period", d => d.PeriodLabel), ("Status", d => d.Status), ("Net", d => M(d.Net)),
             ("Calculated by", d => User(d.CalculatedByUserId)), ("Approved by", d => string.Join(" + ", new[] { User(d.FirstApproverUserId), User(d.SecondApproverUserId) }.Where(x => x.Length > 0))),
             ("Journal", d => d.JournalNumber ?? string.Empty));
+    }
+
+    // Whether the user may not see pay (Payroll > View Salary): salary amounts in pay-change lists are then shown as hidden.
+    private static async Task<bool> SalaryHiddenAsync(OperationContext c)
+        => Application.Security.FieldSensitivity.HiddenFor(await c.Get<One4All.Application.Abstractions.Security.IPermissionService>().ResolveAsync(c.UserId).ConfigureAwait(true))
+            .Contains(Application.Security.SensitiveField.Salary);
+
+    private static async Task<Dictionary<long, string>> UserNamesAsync(OperationContext c, IEnumerable<PayChangeRecord> changes)
+    {
+        List<long> ids = [.. changes.SelectMany(r => new[] { r.RequestedByUserId, r.DecidedByUserId }).OfType<long>().Distinct()];
+        return await c.Db.Users.AsNoTracking().Where(u => ids.Contains(u.Id)).ToDictionaryAsync(u => u.Id, u => u.Username).ConfigureAwait(true);
+    }
+
+    private static string Who(Dictionary<long, string> users, long? id) => id is long u ? users.GetValueOrDefault(u, $"user {u}") : "(not recorded)";
+
+    // What the employee record left waiting for a second person (requests raised after the one numbered lastRequest), and what that means for pay.
+    private static async Task<string> HeldPayChangesAsync(OperationContext c, long lastRequest)
+    {
+        List<string> held = await c.Db.DetailChangeRequests.AsNoTracking().Where(r => r.CompanyId == c.CompanyId && r.Id > lastRequest && r.Status == SelfServiceStatus.Pending)
+            .OrderBy(r => r.Id).Select(r => r.Field).ToListAsync().ConfigureAwait(true);
+        if (held.Count == 0)
+        {
+            return string.Empty;
+        }
+
+        bool bank = held.Exists(f => !Infrastructure.Payroll.PayrollSetupService.PayFields.Contains(f));
+        return $" Waiting for another user's approval under 'Bank detail change': {string.Join(", ", held)}."
+            + (bank ? " Until the bank details are approved the employee is paid like anyone with none on file: the run still calculates their pay, its exception report lists them, "
+                + "the bank file will not pay them and their net pay stays owing in the net-pay account." : string.Empty)
+            + (held.Exists(Infrastructure.Payroll.PayrollSetupService.PayFields.Contains) ? " The salary and payment method stay as they were until then." : string.Empty);
     }
 
     // A payroll run still in approval, picked by its run number (with its period, group and net), for the step that comes next.

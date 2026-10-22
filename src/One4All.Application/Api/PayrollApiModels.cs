@@ -118,6 +118,12 @@ public sealed record EmployeeApi
 
     /// <summary>The housing tenancy their rent is recovered from (changing only; empty clears it).</summary>
     public string? HousingTenancyNumber { get; init; }
+
+    /// <summary>
+    /// When a change of basic salary or payment method takes effect (changing only; left out: today). Where the company's payroll needs approval the
+    /// change waits for another user and the response is 202 Accepted with the record as it still is.
+    /// </summary>
+    public DateOnly? EffectiveFrom { get; init; }
 }
 
 /// <summary>An employee's record as the REST API reads it. The pay fields are removed for a user without Payroll › View Salary; bank details are not shown.</summary>
@@ -220,9 +226,9 @@ public static class PayrollApiMapping
             return Error.Validation("Api.EngagementDate", "Give the engagement date.");
         }
 
-        if (api.HousingTenancyNumber is not null || api.WorkPermitExpiry is not null)
+        if (api.HousingTenancyNumber is not null || api.WorkPermitExpiry is not null || api.EffectiveFrom is not null)
         {
-            return Error.Validation("Api.EngageOnly", "The housing tenancy and work permit are set with a change (PUT) once the employee is engaged.");
+            return Error.Validation("Api.EngageOnly", "The housing tenancy, work permit and a pay change's effective date are set with a change (PUT) once the employee is engaged.");
         }
 
         Result<Enums> enums = Parse(api);
@@ -282,7 +288,7 @@ public static class PayrollApiMapping
             ProbationEndDate = api.ProbationEndDate, WorkPermitExpiry = api.WorkPermitExpiry, PaymentMethod = enums.Value.PaymentMethod, Email = api.Email,
             PayFrequency = enums.Value.PayFrequency, Branch = api.Branch, Project = api.Project, Fund = api.Fund, NextOfKinName = api.NextOfKinName, NextOfKinPhone = api.NextOfKinPhone,
             NextOfKinRelationship = api.NextOfKinRelationship, MaritalStatus = enums.Value.MaritalStatus, Nationality = api.Nationality, SocialSecurityNumber = api.SocialSecurityNumber,
-            UnionMembership = api.UnionMembership, ReportsTo = api.ReportsTo, HousingTenancyNumber = api.HousingTenancyNumber,
+            UnionMembership = api.UnionMembership, ReportsTo = api.ReportsTo, HousingTenancyNumber = api.HousingTenancyNumber, EffectiveFrom = api.EffectiveFrom,
         };
     }
 

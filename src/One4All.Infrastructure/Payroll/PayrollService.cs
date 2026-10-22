@@ -165,6 +165,9 @@ public sealed partial class PayrollService : IPayrollService, IPayrollAdjustment
             return Error.Conflict("Payroll.PeriodAlreadyRun", payGroup.Length == 0 ? $"Payroll for period {periodLabel} has already been run." : $"The {payGroup} payroll for period {periodLabel} has already been run.");
         }
 
+        // Approved salary and payment-method changes dated on or before the pay date take effect now (saved with the run or the draft).
+        _ = await PayrollSetupService.ApplyDuePayChangesAsync(_db, companyId, payDate, ct).ConfigureAwait(false);
+
         Dictionary<long, PayElement> elements = await LoadElementsAsync(companyId, ct).ConfigureAwait(false);
         List<Employee> employees = [.. (await _db.Set<Employee>().Include(e => e.PayElements)
             .Where(e => e.CompanyId == companyId && e.Status == EmployeeStatus.Active)

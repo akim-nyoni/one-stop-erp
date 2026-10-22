@@ -96,9 +96,14 @@ public sealed record NewEmployee(string EmployeeNumber, string FullName, decimal
 
     /// <summary>The employee number of whom they report to.</summary>
     public string? ReportsTo { get; init; }
+
+    /// <summary>
+    /// Who engages them. Where the company's payroll needs approval, the bank and mobile-money details given here are held as requests a
+    /// different user approves (under Bank detail change) before pay goes to them.
+    /// </summary>
+    public long? RequestedByUserId { get; init; }
 }
 
-/// <summary>Changes to an employee's record (a null leaves the field as it is). Bank details are not here: they change through an approved request.</summary>
 /// <summary>An element's options (see <see cref="NewPayElement"/> for each).</summary>
 /// <param name="Recovers">What the deduction recovers.</param>
 /// <param name="BenefitCategory">The taxable-benefit category, or null.</param>
@@ -110,8 +115,18 @@ public sealed record NewEmployee(string EmployeeNumber, string FullName, decimal
 public sealed record PayElementOptions(PayRecovery Recovers = PayRecovery.None, string? BenefitCategory = null, string? PaidInCurrency = null, bool CumulativeTax = false, bool SplitCurrencyTax = false,
     bool IsAnnualPayment = false, bool AmountsInPaidCurrency = false);
 
+/// <summary>
+/// Changes to an employee's record (a null leaves the field as it is). Bank details are not here: they change through an approved request. Where
+/// the company's payroll needs approval, a new basic salary or payment method is held as a request a different user approves.
+/// </summary>
 public sealed record EmployeeUpdate
 {
+    /// <summary>Who makes the change; where a second person must approve a salary or payment-method change, they cannot approve it.</summary>
+    public long? RequestedByUserId { get; init; }
+
+    /// <summary>The date a salary or payment-method change takes effect (null: today); a later date is applied by the first payroll run paid on or after it.</summary>
+    public DateOnly? EffectiveFrom { get; init; }
+
     /// <summary>The employee's council / employer housing tenancy by its number (rent is recovered from pay); empty string clears it.</summary>
     public string? HousingTenancyNumber { get; init; }
 
@@ -294,8 +309,31 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
 /// <summary>One band of a tax table: taxed at the rate from <paramref name="From"/> up to <paramref name="To"/> (open-ended when null).</summary>
 public sealed record TaxBandInput(decimal From, decimal? To, decimal RatePercent);
 
-/// <summary>A request to change an employee's bank or mobile-money details, waiting for a second person.</summary>
-public sealed record BankChangeRequest(long RequestId, string EmployeeNumber, string Field, string? OldValue, string NewValue, long? RequestedByUserId);
+/// <summary>A request to change an employee's bank or mobile-money details, net-pay split, salary or payment method, waiting for a second person.</summary>
+/// <param name="RequestId">The request.</param>
+/// <param name="EmployeeNumber">The employee.</param>
+/// <param name="Field">What changes (a bank field, PaymentSplit, BasicSalary or PaymentMethod).</param>
+/// <param name="OldValue">The value when asked.</param>
+/// <param name="NewValue">The value asked for.</param>
+/// <param name="RequestedByUserId">Who asked; they cannot approve it.</param>
+/// <param name="EffectiveFrom">When a salary or payment-method change takes effect (null for bank details).</param>
+public sealed record BankChangeRequest(long RequestId, string EmployeeNumber, string Field, string? OldValue, string NewValue, long? RequestedByUserId, DateOnly? EffectiveFrom = null);
+
+/// <summary>One salary or payment-method change in an employee's history: who asked and when, from what to what, from when, and who decided it.</summary>
+/// <param name="RequestId">The request.</param>
+/// <param name="EmployeeNumber">The employee.</param>
+/// <param name="Field">BasicSalary or PaymentMethod.</param>
+/// <param name="OldValue">The value before.</param>
+/// <param name="NewValue">The value after.</param>
+/// <param name="EffectiveFrom">When it takes effect.</param>
+/// <param name="Status">Pending, approved or rejected.</param>
+/// <param name="RequestedByUserId">Who asked.</param>
+/// <param name="RequestedOnUtc">When they asked.</param>
+/// <param name="DecidedByUserId">Who approved or rejected it (the requester where the company needs no second approver).</param>
+/// <param name="AppliedOn">When it was written onto the employee (null: not yet).</param>
+/// <param name="Note">The decision note.</param>
+public sealed record PayChangeRecord(long RequestId, string EmployeeNumber, string Field, string? OldValue, string NewValue, DateOnly? EffectiveFrom, SelfServiceStatus Status,
+    long? RequestedByUserId, DateTimeOffset RequestedOnUtc, long? DecidedByUserId, DateOnly? AppliedOn, string? Note);
 
 /// <summary>A split of net pay to add, change or take off, asked for and approved like any other bank-detail change (brief §4.15.1).</summary>
 /// <param name="Method">How that part is paid.</param>
@@ -314,11 +352,26 @@ public sealed record PaymentSplitChange(PayMethod Method, string Destination, de
 /// </summary>
 public interface IPayrollSetupService
 {
-    /// <summary>Engages an employee.</summary>
+    /// <summary>
+    /// Engages an employee. Where the company's payroll needs approval, bank and mobile-money details are not written onto the record but held as
+    /// requests a different user approves; until then the employee is like one with no bank details on file: the run still calculates and posts their
+    /// pay, its exception report lists them, the bank file refuses to pay them, and their net pay stays owing in the net-pay account.
+    /// </summary>
     Task<Result<long>> CreateEmployeeAsync(long companyId, NewEmployee employee, CancellationToken ct = default);
 
-    /// <summary>Changes an employee's record (not bank details).</summary>
+    /// <summary>
+    /// Changes an employee's record (not bank details). A new basic salary or payment method is kept as a dated change (the salary history); where the
+    /// company's payroll needs approval it waits for a different user to approve it under Bank detail change, otherwise it applies at once (or, dated
+    /// later, from the first payroll run paid on or after its date).
+    /// </summary>
     Task<Result> UpdateEmployeeAsync(long companyId, string employeeNumber, EmployeeUpdate update, CancellationToken ct = default);
+
+    /// <summary>An employee's salary and payment-method changes, newest first, or the company's when no employee is given.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="employeeNumber">The employee, or null for everyone.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The changes.</returns>
+    Task<IReadOnlyList<PayChangeRecord>> PayChangeHistoryAsync(long companyId, string? employeeNumber, CancellationToken ct = default);
 
     /// <summary>Creates a pay element.</summary>
     Task<Result<long>> CreatePayElementAsync(long companyId, NewPayElement element, CancellationToken ct = default);
@@ -406,7 +459,7 @@ public interface IPayrollSetupService
     /// <summary>Asks for a change of an employee's bank or mobile-money details (BankName, BankBranch, BankAccountNumber, MobileMoneyNumber).</summary>
     Task<Result<IReadOnlyList<long>>> RequestBankChangeAsync(long companyId, string employeeNumber, IReadOnlyDictionary<string, string> changes, long requestedByUserId, CancellationToken ct = default);
 
-    /// <summary>Bank-detail changes waiting for approval.</summary>
+    /// <summary>Bank-detail, net-pay split, salary and payment-method changes waiting for approval.</summary>
     Task<IReadOnlyList<BankChangeRequest>> PendingBankChangesAsync(long companyId, CancellationToken ct = default);
 
     /// <summary>
@@ -421,7 +474,10 @@ public interface IPayrollSetupService
     /// <returns>The request id, or why not.</returns>
     Task<Result<long>> RequestPaymentSplitAsync(long companyId, string employeeNumber, PaymentSplitChange change, long requestedByUserId, CancellationToken ct = default);
 
-    /// <summary>Approves (applies) or rejects a bank-detail change; the person who asked cannot decide it.</summary>
+    /// <summary>
+    /// Approves (applies) or rejects a bank-detail, split, salary or payment-method change; neither the person who asked nor the employee themselves can
+    /// decide it. An approved salary or payment-method change dated later is applied by the first payroll run paid on or after its date.
+    /// </summary>
     Task<Result> DecideBankChangeAsync(long companyId, long requestId, bool approve, long decidedByUserId, string? note, CancellationToken ct = default);
 }
 

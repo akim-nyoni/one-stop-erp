@@ -60,22 +60,60 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return post;
         }
 
+        // Where payroll needs a second person, the payment details given at engagement wait for one too: the record is created without them and each is
+        // held as a bank-detail request. Until approved the employee is paid like anyone with no details on file (see CreateEmployeeAsync's contract).
+        bool approval = await PayrollApprovalRequiredAsync(companyId, ct).ConfigureAwait(false);
+        Dictionary<string, string> payment = new(StringComparer.Ordinal);
+        foreach ((string field, string? value) in new[] { ("BankName", employee.BankName), ("BankBranch", employee.BankBranch), ("BankAccountNumber", employee.BankAccountNumber),
+                     ("MobileMoneyNumber", employee.MobileMoneyNumber) })
+        {
+            if (Clean(value) is string given)
+            {
+                payment[field] = given;
+            }
+        }
+
         Employee created = new(companyId, number, employee.FullName.Trim(), employee.BasicSalary, employee.EngagementDate)
         {
             EmploymentType = employee.EmploymentType, Department = Clean(employee.Department), CostCentre = Clean(employee.CostCentre), PayGroup = Clean(employee.PayGroup),
             Grade = Clean(employee.Grade), Notch = employee.Notch, NationalIdNumber = Clean(employee.NationalIdNumber), TaxNumber = Clean(employee.TaxNumber), Gender = employee.Gender,
             DateOfBirth = employee.DateOfBirth, ContractEndDate = employee.ContractEndDate, ProbationEndDate = employee.ProbationEndDate, PaymentMethod = employee.PaymentMethod,
-            BankName = Clean(employee.BankName), BankBranch = Clean(employee.BankBranch), BankAccountNumber = Clean(employee.BankAccountNumber),
-            MobileMoneyNumber = Clean(employee.MobileMoneyNumber), Email = Clean(employee.Email), PayFrequency = employee.PayFrequency ?? PayFrequency.Monthly,
+            Email = Clean(employee.Email), PayFrequency = employee.PayFrequency ?? PayFrequency.Monthly,
             BranchId = placement.Value.BranchId, Project = placement.Value.Project, Fund = placement.Value.Fund, ReportsToEmployeeId = placement.Value.ReportsToId,
             NextOfKinName = Clean(employee.NextOfKinName), NextOfKinPhone = Clean(employee.NextOfKinPhone), NextOfKinRelationship = Clean(employee.NextOfKinRelationship),
             MaritalStatus = employee.MaritalStatus ?? MaritalStatus.NotRecorded, Nationality = Clean(employee.Nationality), SocialSecurityNumber = Clean(employee.SocialSecurityNumber),
             UnionMembership = Clean(employee.UnionMembership),
         };
-        _db.Employees.Add(created);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return created.Id;
+        if (!approval)
+        {
+            payment.ToList().ForEach(p => Apply(created, p.Key, p.Value));
+        }
+
+        return await _db.AtomicAsync(async () =>
+        {
+            _db.Employees.Add(created);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            if (approval && payment.Count > 0)
+            {
+                _db.DetailChangeRequests.AddRange(payment.Select(p => new DetailChangeRequest(companyId, created.Id, p.Key, null, p.Value) { RequestedByUserId = employee.RequestedByUserId }));
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+
+            return Result<long>.Success(created.Id);
+        }, ct).ConfigureAwait(false);
     }
+
+    /// <summary>The change-request field a new basic salary travels under.</summary>
+    public const string SalaryField = "BasicSalary";
+
+    /// <summary>The change-request field a new payment method travels under.</summary>
+    public const string PaymentMethodField = "PaymentMethod";
+
+    /// <summary>The pay changes kept as dated requests (the salary history), approved by a second person where the company's payroll needs approval.</summary>
+    public static readonly IReadOnlySet<string> PayFields = new HashSet<string>(StringComparer.Ordinal) { SalaryField, PaymentMethodField };
+
+    private Task<bool> PayrollApprovalRequiredAsync(long companyId, CancellationToken ct)
+        => _db.Companies.Where(c => c.Id == companyId).Select(c => c.PayrollApprovalRequired).FirstOrDefaultAsync(ct);
 
     /// <inheritdoc />
     public async Task<Result> UpdateEmployeeAsync(long companyId, string employeeNumber, EmployeeUpdate update, CancellationToken ct = default)
@@ -100,7 +138,6 @@ public sealed class PayrollSetupService : IPayrollSetupService
             employee.FullName = name.Trim();
         }
 
-        employee.BasicSalary = update.BasicSalary ?? employee.BasicSalary;
         employee.EmploymentType = update.EmploymentType ?? employee.EmploymentType;
         employee.Department = update.Department is null ? employee.Department : Clean(update.Department);
         employee.CostCentre = update.CostCentre is null ? employee.CostCentre : Clean(update.CostCentre);
@@ -131,7 +168,6 @@ public sealed class PayrollSetupService : IPayrollSetupService
         employee.ContractEndDate = update.ContractEndDate ?? employee.ContractEndDate;
         employee.ProbationEndDate = update.ProbationEndDate ?? employee.ProbationEndDate;
         employee.WorkPermitExpiry = update.WorkPermitExpiry ?? employee.WorkPermitExpiry;
-        employee.PaymentMethod = update.PaymentMethod ?? employee.PaymentMethod;
         employee.Email = update.Email is null ? employee.Email : Clean(update.Email);
         Result<Placement> placement = await PlacementAsync(companyId, update.Branch, update.Project, update.Fund, update.ReportsTo, employee.Id, ct).ConfigureAwait(false);
         if (placement.IsFailure)
@@ -166,8 +202,162 @@ public sealed class PayrollSetupService : IPayrollSetupService
             return Result.Failure(post);
         }
 
+        if (await PayChangesAsync(companyId, employee, update, ct).ConfigureAwait(false) is Error held)
+        {
+            return Result.Failure(held);
+        }
+
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
+    }
+
+    // A new basic salary or payment method becomes a dated request - the salary history. Where payroll needs a second person it waits for one (and a
+    // second change of the same kind waits behind it); otherwise it is approved by whoever made it and applied today, or by the run from its date.
+    private async Task<Error?> PayChangesAsync(long companyId, Employee employee, EmployeeUpdate update, CancellationToken ct)
+    {
+        List<(string Field, string Old, string New)> changes = [];
+        if (update.BasicSalary is decimal salary && salary != employee.BasicSalary)
+        {
+            changes.Add((SalaryField, Invariant(employee.BasicSalary), Invariant(salary)));
+        }
+
+        if (update.PaymentMethod is PayMethod method && method != employee.PaymentMethod)
+        {
+            changes.Add((PaymentMethodField, employee.PaymentMethod.ToString(), method.ToString()));
+        }
+
+        if (changes.Count == 0)
+        {
+            return null;
+        }
+
+        DateOnly today = Today;
+        DateOnly effective = update.EffectiveFrom ?? today;
+        bool approval = await PayrollApprovalRequiredAsync(companyId, ct).ConfigureAwait(false);
+        List<string> fields = [.. changes.Select(c => c.Field)];
+        if (approval && await _db.DetailChangeRequests.Where(r => r.CompanyId == companyId && r.EmployeeId == employee.Id && r.Status == SelfServiceStatus.Pending && fields.Contains(r.Field))
+                .Select(r => r.Field).FirstOrDefaultAsync(ct).ConfigureAwait(false) is string waiting)
+        {
+            return Error.Conflict("Payroll.PayChangePending",
+                $"{employee.EmployeeNumber} already has a {Describe(waiting)} change waiting for approval; have it approved or rejected under Bank detail change first.");
+        }
+
+        foreach ((string field, string old, string value) in changes)
+        {
+            DetailChangeRequest request = new(companyId, employee.Id, field, old, value) { RequestedByUserId = update.RequestedByUserId, EffectiveFrom = effective };
+            if (!approval)
+            {
+                request.ApproveWithoutSecondPerson("Payroll approval is not required: made by one person.");
+                if (effective <= today)
+                {
+                    ApplyPay(employee, request, today);
+                }
+            }
+
+            _db.DetailChangeRequests.Add(request);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Sets a new basic salary that another controlled step has already decided (a backpay run, the annual increment on the approved salary scale) and
+    /// keeps it in the salary history as an approved, applied change. Nothing is recorded when the salary does not move.
+    /// </summary>
+    /// <param name="db">The database context (the caller saves).</param>
+    /// <param name="employee">The employee (tracked).</param>
+    /// <param name="newSalary">The new basic salary.</param>
+    /// <param name="effectiveFrom">When it takes effect.</param>
+    /// <param name="requestedByUserId">Who asked for it, if a user did.</param>
+    /// <param name="decidedByUserId">Who approved it (null: whoever asked).</param>
+    /// <param name="note">What decided it.</param>
+    internal static void SetDecidedSalary(One4AllDbContext db, Employee employee, decimal newSalary, DateOnly effectiveFrom, long? requestedByUserId, long? decidedByUserId, string note)
+    {
+        if (newSalary == employee.BasicSalary)
+        {
+            return;
+        }
+
+        DetailChangeRequest change = new(employee.CompanyId, employee.Id, SalaryField, Invariant(employee.BasicSalary), Invariant(newSalary))
+        {
+            RequestedByUserId = requestedByUserId, EffectiveFrom = effectiveFrom,
+        };
+        if (decidedByUserId is long decider)
+        {
+            change.Decide(true, decider, note);
+        }
+        else
+        {
+            change.ApproveWithoutSecondPerson(note);
+        }
+
+        ApplyPay(employee, change, Today);
+        db.DetailChangeRequests.Add(change);
+    }
+
+    private static string Describe(string payField) => payField == SalaryField ? "salary" : "payment-method";
+
+    private static string Invariant(decimal amount) => amount.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static DateOnly Today => DateOnly.FromDateTime(DateTime.UtcNow);
+
+    // An approved salary or payment-method change written onto the employee.
+    private static void ApplyPay(Employee employee, DetailChangeRequest request, DateOnly on)
+    {
+        if (request.Field == SalaryField)
+        {
+            employee.BasicSalary = decimal.Parse(request.NewValue, System.Globalization.CultureInfo.InvariantCulture);
+        }
+        else
+        {
+            employee.PaymentMethod = Enum.Parse<PayMethod>(request.NewValue);
+        }
+
+        request.MarkApplied(on);
+    }
+
+    /// <summary>
+    /// Writes onto the employees the approved salary and payment-method changes that have come into effect by <paramref name="asOf"/> (the payroll run
+    /// calls it with its pay date), oldest first. The changes are tracked; the caller saves them.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="asOf">The date they must be effective by.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>How many were applied.</returns>
+    internal static async Task<int> ApplyDuePayChangesAsync(One4AllDbContext db, long companyId, DateOnly asOf, CancellationToken ct)
+    {
+        List<string> fields = [SalaryField, PaymentMethodField];
+        List<DetailChangeRequest> due = await db.DetailChangeRequests.Where(r => r.CompanyId == companyId && r.Status == SelfServiceStatus.Approved && r.AppliedOn == null
+                && fields.Contains(r.Field) && r.EffectiveFrom != null && r.EffectiveFrom <= asOf)
+            .OrderBy(r => r.EffectiveFrom).ThenBy(r => r.Id).ToListAsync(ct).ConfigureAwait(false);
+        if (due.Count == 0)
+        {
+            return 0;
+        }
+
+        List<long> ids = [.. due.Select(r => r.EmployeeId).Distinct()];
+        Dictionary<long, Employee> employees = await db.Employees.Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct).ConfigureAwait(false);
+        foreach (DetailChangeRequest request in due)
+        {
+            ApplyPay(employees[request.EmployeeId], request, Today);
+        }
+
+        return due.Count;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PayChangeRecord>> PayChangeHistoryAsync(long companyId, string? employeeNumber, CancellationToken ct = default)
+    {
+        string? number = Clean(employeeNumber)?.ToUpperInvariant();
+        List<string> fields = [SalaryField, PaymentMethodField];
+        var rows = await (from r in _db.DetailChangeRequests.AsNoTracking()
+                          join e in _db.Employees.AsNoTracking() on r.EmployeeId equals e.Id
+                          where r.CompanyId == companyId && fields.Contains(r.Field) && (number == null || e.EmployeeNumber.ToUpper() == number)
+                          select new { r, e.EmployeeNumber }).ToListAsync(ct).ConfigureAwait(false);
+        return [.. rows.OrderByDescending(x => x.r.EffectiveFrom).ThenByDescending(x => x.r.Id)
+            .Select(x => new PayChangeRecord(x.r.Id, x.EmployeeNumber, x.r.Field, x.r.OldValue, x.r.NewValue, x.r.EffectiveFrom, x.r.Status, x.r.RequestedByUserId, x.r.CreatedOnUtc,
+                x.r.DecidedByUserId, x.r.AppliedOn, x.r.Note))];
     }
 
     // Where the employee sits: their branch, project and fund (each the company's, and open), and whom they report to (another of the company's
@@ -765,13 +955,13 @@ public sealed class PayrollSetupService : IPayrollSetupService
     }
 
     // An approved split request applied: the split to that destination replaced, or taken off.
-    private async Task ApplySplitAsync(long companyId, long employeeId, string json, CancellationToken ct)
+    private static async Task ApplySplitAsync(One4AllDbContext db, long companyId, long employeeId, string json, CancellationToken ct)
     {
         PaymentSplitChange change = System.Text.Json.JsonSerializer.Deserialize<PaymentSplitChange>(json) ?? throw new InvalidOperationException("Unreadable split request.");
-        _db.PaymentSplits.RemoveRange(await _db.PaymentSplits.Where(s => s.EmployeeId == employeeId && s.Method == change.Method && s.Destination == change.Destination).ToListAsync(ct).ConfigureAwait(false));
+        db.PaymentSplits.RemoveRange(await db.PaymentSplits.Where(s => s.EmployeeId == employeeId && s.Method == change.Method && s.Destination == change.Destination).ToListAsync(ct).ConfigureAwait(false));
         if (!change.Remove)
         {
-            _db.PaymentSplits.Add(new EmployeePaymentSplit(companyId, employeeId, change.Method, change.Destination, change.Amount ?? 0m, change.Percent)
+            db.PaymentSplits.Add(new EmployeePaymentSplit(companyId, employeeId, change.Method, change.Destination, change.Amount ?? 0m, change.Percent)
             {
                 BankName = change.BankName, BankBranch = change.BankBranch, Currency = change.Currency is string currency ? CurrencyCode.Parse(currency) : null,
             });
@@ -795,12 +985,12 @@ public sealed class PayrollSetupService : IPayrollSetupService
     /// <inheritdoc />
     public async Task<IReadOnlyList<BankChangeRequest>> PendingBankChangesAsync(long companyId, CancellationToken ct = default)
     {
-        List<string> fields = [.. BankFields, PaymentSplitField];
+        List<string> fields = [.. BankFields, PaymentSplitField, .. PayFields];
         List<BankChangeRequest> pending = await (from r in _db.DetailChangeRequests.AsNoTracking()
                       join e in _db.Employees.AsNoTracking() on r.EmployeeId equals e.Id
                       where r.CompanyId == companyId && r.Status == SelfServiceStatus.Pending && fields.Contains(r.Field)
                       orderby r.Id
-                      select new BankChangeRequest(r.Id, e.EmployeeNumber, r.Field, r.OldValue, r.NewValue, r.RequestedByUserId)).ToListAsync(ct).ConfigureAwait(false);
+                      select new BankChangeRequest(r.Id, e.EmployeeNumber, r.Field, r.OldValue, r.NewValue, r.RequestedByUserId, r.EffectiveFrom)).ToListAsync(ct).ConfigureAwait(false);
         return [.. pending.Select(r => r.Field == PaymentSplitField ? r with { NewValue = DescribeSplitRequest(r.NewValue) } : r)];
     }
 
@@ -808,28 +998,71 @@ public sealed class PayrollSetupService : IPayrollSetupService
     public async Task<Result> DecideBankChangeAsync(long companyId, long requestId, bool approve, long decidedByUserId, string? note, CancellationToken ct = default)
     {
         DetailChangeRequest? request = await _db.DetailChangeRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId, ct).ConfigureAwait(false);
-        if (request is null || request.Status != SelfServiceStatus.Pending || !(BankFields.Contains(request.Field) || request.Field == PaymentSplitField))
+        if (request is null || request.Status != SelfServiceStatus.Pending || !(BankFields.Contains(request.Field) || request.Field == PaymentSplitField || PayFields.Contains(request.Field)))
         {
             return Result.Failure(Error.NotFound("Payroll.ChangeNotPending", $"No pending bank-detail change {requestId}."));
         }
 
-        if (request.RequestedByUserId == decidedByUserId)
+        Result decided = await DecideAsync(_db, request, approve, decidedByUserId, note, ct).ConfigureAwait(false);
+        if (decided.IsFailure)
         {
-            return Result.Failure(Error.Rule("Payroll.SelfApproval", "The person who asked for a bank-detail change cannot approve it."));
-        }
-
-        request.Decide(approve, decidedByUserId, note);
-        if (approve && request.Field == PaymentSplitField)
-        {
-            await ApplySplitAsync(companyId, request.EmployeeId, request.NewValue, ct).ConfigureAwait(false);
-        }
-        else if (approve)
-        {
-            Employee employee = await _db.Employees.SingleAsync(e => e.Id == request.EmployeeId, ct).ConfigureAwait(false);
-            Apply(employee, request.Field, request.NewValue);
+            return decided;
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Decides a pending change request of any kind and, when approved, applies it (tracked; the caller saves): bank and mobile-money details, a net-pay
+    /// split, or a salary or payment-method change (at once when it is already effective, otherwise by the first payroll run paid on or after its date).
+    /// Neither whoever asked nor the employee themselves may decide it.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="request">The pending request.</param>
+    /// <param name="approve">True to approve.</param>
+    /// <param name="decidedByUserId">Who decides.</param>
+    /// <param name="note">Their note.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why they cannot decide it.</returns>
+    internal static async Task<Result> DecideAsync(One4AllDbContext db, DetailChangeRequest request, bool approve, long decidedByUserId, string? note, CancellationToken ct)
+    {
+        bool pay = PayFields.Contains(request.Field);
+        if (request.RequestedByUserId == decidedByUserId)
+        {
+            return Result.Failure(Error.Rule("Payroll.SelfApproval", pay
+                ? $"The person who asked for a {Describe(request.Field)} change cannot approve it."
+                : "The person who asked for a bank-detail change cannot approve it."));
+        }
+
+        Employee employee = await db.Employees.SingleAsync(e => e.Id == request.EmployeeId, ct).ConfigureAwait(false);
+        if (employee.UserId == decidedByUserId)
+        {
+            return Result.Failure(Error.Rule("Payroll.OwnChange", $"{employee.EmployeeNumber} is your own employee record; someone else must decide a change to it."));
+        }
+
+        request.Decide(approve, decidedByUserId, note);
+        if (!approve)
+        {
+            return Result.Success();
+        }
+
+        if (request.Field == PaymentSplitField)
+        {
+            await ApplySplitAsync(db, request.CompanyId, request.EmployeeId, request.NewValue, ct).ConfigureAwait(false);
+        }
+        else if (pay)
+        {
+            if (request.EffectiveFrom is not DateOnly from || from <= Today)
+            {
+                ApplyPay(employee, request, Today);
+            }
+        }
+        else
+        {
+            Apply(employee, request.Field, request.NewValue);
+        }
+
         return Result.Success();
     }
 

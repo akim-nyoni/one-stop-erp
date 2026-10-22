@@ -83,8 +83,9 @@ public sealed class LeaveApplication : AuditableEntity, ICompanyScoped
 }
 
 /// <summary>
-/// A change to an employee's own details asked for through self-service (<c>hr.detail_change_request</c>) - bank or wallet details,
-/// mostly - applied only when HR approves it, so a payment destination is never changed by one person alone.
+/// A change to an employee's details waiting for a second person (<c>hr.detail_change_request</c>): bank or wallet details asked for through
+/// self-service or by HR, a net-pay split, and - when the company requires payroll approval - a salary or payment-method change. It is
+/// applied only when someone other than the requester approves it, so neither pay nor its destination is changed by one person alone.
 /// </summary>
 public sealed class DetailChangeRequest : AuditableEntity, ICompanyScoped
 {
@@ -137,6 +138,19 @@ public sealed class DetailChangeRequest : AuditableEntity, ICompanyScoped
     /// <summary>Who asked for the change (the employee through self-service, or an HR officer); they cannot approve it.</summary>
     public long? RequestedByUserId { get; set; }
 
+    /// <summary>
+    /// The date a salary or payment-method change takes effect (null for bank details, which apply when approved). With the requester
+    /// (<see cref="RequestedByUserId"/>, <see cref="AuditableEntity.CreatedOnUtc"/>), the old and new values and the approver, the
+    /// decided requests are the employee's dated salary history.
+    /// </summary>
+    public DateOnly? EffectiveFrom { get; set; }
+
+    /// <summary>
+    /// The day an approved salary or payment-method change was written onto the employee; null while it waits for approval or for its
+    /// <see cref="EffectiveFrom"/> date (the payroll run applies it then), and for bank details, which apply when approved.
+    /// </summary>
+    public DateOnly? AppliedOn { get; private set; }
+
     /// <summary>Records the decision.</summary>
     /// <param name="approved">Whether approved.</param>
     /// <param name="userId">Who decided.</param>
@@ -147,4 +161,20 @@ public sealed class DetailChangeRequest : AuditableEntity, ICompanyScoped
         DecidedByUserId = userId;
         Note = note;
     }
+
+    /// <summary>
+    /// Records a change the company lets one person make (its payroll does not need a second approver): approved by whoever asked, kept so the
+    /// salary history stays complete.
+    /// </summary>
+    /// <param name="note">Why no second person decided.</param>
+    public void ApproveWithoutSecondPerson(string note)
+    {
+        Status = SelfServiceStatus.Approved;
+        DecidedByUserId = RequestedByUserId;
+        Note = note;
+    }
+
+    /// <summary>Records that the approved change has been written onto the employee.</summary>
+    /// <param name="on">The day it was applied.</param>
+    public void MarkApplied(DateOnly on) => AppliedOn = on;
 }

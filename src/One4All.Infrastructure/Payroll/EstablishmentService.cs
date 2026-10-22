@@ -112,7 +112,7 @@ public sealed class EstablishmentService : IEstablishmentService
             }
 
             employee.Notch = to;
-            employee.BasicSalary = salary;
+            PayrollSetupService.SetDecidedSalary(_db, employee, salary, effectiveDate, null, null, $"Annual increment to notch {to}");
             employee.LastIncrementOn = effectiveDate;
             moved.Add((employee.EmployeeNumber, from, to, salary));
         }
