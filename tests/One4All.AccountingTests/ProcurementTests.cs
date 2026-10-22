@@ -131,7 +131,8 @@ public sealed class ProcurementTests
 
             IInventoryService inv = scope.ServiceProvider.GetRequiredService<IInventoryService>();
             var valuation = await inv.StockValuationAsync(companyId);
-            valuation.Should().Contain(l => l.ItemCode == "BOLT" && l.Quantity == 110m && l.Value == 220m); // 100 on PO-1 plus 10 on PO-2, both at 2.00
+            // 100 on PO-1 plus 10 on PO-2, both received at 2.00; SINV-WIDE's 1.00 more on the 10 received (all still in stock) goes onto the stock's value.
+            valuation.Should().Contain(l => l.ItemCode == "BOLT" && l.Quantity == 110m && l.Value == 230m);
         }
     }
 }

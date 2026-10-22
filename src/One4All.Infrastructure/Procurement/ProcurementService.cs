@@ -53,7 +53,7 @@ public sealed class ProcurementService : IProcurementService
     private async Task<Result<PurchaseOrderResult>> CreatePurchaseOrderCoreAsync(CreatePurchaseOrderRequest request, CancellationToken ct)
     {
         var supplier = await _db.Suppliers.Where(s => s.Id == request.SupplierId && s.CompanyId == request.CompanyId)
-            .Select(s => new { s.Code, s.IsBlacklisted }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            .Select(s => new { s.Code, s.IsBlacklisted, s.DefaultTaxCode }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
         if (supplier is null)
         {
             return Error.NotFound("Pop.SupplierNotFound", $"Supplier {request.SupplierId} not found.");
@@ -128,6 +128,19 @@ public sealed class ProcurementService : IProcurementService
             }
         }
 
+        // Each line's tax code: the one given, else the item's, else the supplier's default (a default that is not an active code is left off).
+        List<long> itemIds = [.. request.Lines.Select(l => l.ItemId).Distinct()];
+        Dictionary<long, string?> itemTaxCodes = await _db.Set<Core.Inventory.Item>().AsNoTracking().Where(i => i.CompanyId == request.CompanyId && itemIds.Contains(i.Id))
+            .ToDictionaryAsync(i => i.Id, i => i.TaxCode, ct).ConfigureAwait(false);
+        HashSet<string> activeTaxCodes = [.. await _db.TaxCodes.AsNoTracking().Where(t => t.CompanyId == request.CompanyId && t.IsActive).Select(t => t.Code).ToListAsync(ct).ConfigureAwait(false)];
+        if (request.Lines.Select(l => Dimension(l.TaxCode)).FirstOrDefault(c => c is not null && !activeTaxCodes.Contains(c)) is string unknownTax)
+        {
+            return Error.NotFound("Tax.CodeNotFound", $"No active tax code {unknownTax}.");
+        }
+
+        string? LineTaxCode(PurchaseOrderLineRequest line)
+            => Dimension(line.TaxCode) ?? new[] { Dimension(itemTaxCodes.GetValueOrDefault(line.ItemId)), Dimension(supplier.DefaultTaxCode) }.FirstOrDefault(c => c is not null && activeTaxCodes.Contains(c));
+
         PurchaseOrder order = new(request.CompanyId, request.SupplierId, orderNumber, request.OrderDate, request.Currency)
         {
             RequiredBy = request.RequiredBy, FrameworkAgreementId = request.FrameworkAgreementId,
@@ -147,6 +160,7 @@ public sealed class ProcurementService : IProcurementService
             added.ExpenseAccountCode = string.IsNullOrWhiteSpace(line.ExpenseAccountCode) ? null : line.ExpenseAccountCode.Trim().ToUpperInvariant();
             added.JobContractId = line.JobContractId;
             added.JobCostHead = line.JobContractId is null ? null : string.IsNullOrWhiteSpace(line.JobCostHead) ? "Materials" : line.JobCostHead.Trim();
+            added.TaxCode = LineTaxCode(line);
         }
 
         _db.Set<PurchaseOrder>().Add(order);
@@ -274,6 +288,13 @@ public sealed class ProcurementService : IProcurementService
             }
         }
 
+        // A foreign-currency order comes into stock (and GRNI) in base currency at the receipt date's rate.
+        Result<decimal> grnRate = await OrderRateAsync(request.CompanyId, order.Currency, "GoodsReceived", request.Date, ct).ConfigureAwait(false);
+        if (grnRate.IsFailure)
+        {
+            return grnRate.Error;
+        }
+
         GoodsReceivedNote grn = new(request.CompanyId, order.SupplierId, order.Id, request.GrnNumber, request.Date)
         {
             OverReceiptAuthorisedByUserId = over.Count > 0 ? request.OverReceiptAuthorisedByUserId : null,
@@ -288,7 +309,8 @@ public sealed class ProcurementService : IProcurementService
                 return Error.NotFound("Pop.LineNotFound", $"PO line {received.PurchaseOrderLineId} not found.");
             }
 
-            // Receive into stock: Dr stock control, Cr GRNI (accrual), at the PO price.
+            // Receive into stock: Dr stock control, Cr GRNI (accrual), at the PO price in base currency.
+            decimal baseUnitCost = grnRate.Value == 1m ? line.UnitPrice : decimal.Round(line.UnitPrice * grnRate.Value, 6, MidpointRounding.ToEven);
             Result<StockMovementResult> receipt = await _inventory.ReceiveAsync(new ReceiveStockRequest
             {
                 CompanyId = request.CompanyId,
@@ -296,7 +318,7 @@ public sealed class ProcurementService : IProcurementService
                 WarehouseId = request.WarehouseId,
                 Date = request.Date,
                 Quantity = received.Quantity,
-                UnitCost = line.UnitPrice,
+                UnitCost = baseUnitCost,
                 CreditAccountCode = grniCode,
                 Reference = request.GrnNumber,
                 Lots = received.Lots ?? [],
@@ -330,9 +352,10 @@ public sealed class ProcurementService : IProcurementService
                     $"{request.GrnNumber} {line.Description}", ct).ConfigureAwait(false);
             }
 
-            line.Receive(received.Quantity);
+            decimal lineAccrued = decimal.Round(received.Quantity * baseUnitCost, 4, MidpointRounding.ToEven); // what the stock receipt credited to GRNI
+            line.Receive(received.Quantity, lineAccrued);
             grn.AddLine(line.Id, line.ItemId, received.Quantity, line.UnitPrice);
-            accrued += decimal.Round(received.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            accrued += lineAccrued;
         }
 
         order.RecomputeStatus();
@@ -340,6 +363,20 @@ public sealed class ProcurementService : IProcurementService
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
 
         return new GrnResult(grn.Id, accrued);
+    }
+
+    // The rate (base per unit) a document in the order's currency converts at on the date: 1 for the base currency, else the company's rate policy for the
+    // document type (the daily rate by default).
+    private async Task<Result<decimal>> OrderRateAsync(long companyId, CurrencyCode currency, string documentType, DateOnly date, CancellationToken ct)
+    {
+        CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        if (currency == baseCurrency)
+        {
+            return 1m;
+        }
+
+        decimal? rate = await Accounting.ExchangeRateResolver.PolicyRateAsync(_db, companyId, currency, baseCurrency, documentType, "POP", date, ct).ConfigureAwait(false);
+        return rate is > 0m ? rate.Value : Error.Rule("Pop.NoExchangeRate", $"No {currency} to {baseCurrency} exchange rate on or before {date:yyyy-MM-dd}.");
     }
 
     private static string? Dimension(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
@@ -402,10 +439,25 @@ public sealed class ProcurementService : IProcurementService
             priceTolerance = asked;
         }
 
+        // A foreign-currency invoice is owed at the invoice date's rate; the accrual it clears was made at each receipt's rate.
+        Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
+        bool foreign = order.Currency != company.BaseCurrency;
+        Result<decimal> rateResult = await OrderRateAsync(request.CompanyId, order.Currency, "SupplierInvoice", request.Date, ct).ConfigureAwait(false);
+        if (rateResult.IsFailure)
+        {
+            return rateResult.Error;
+        }
+
+        decimal rate = rateResult.Value;
+        decimal ToBase(decimal amount) => foreign ? decimal.Round(amount * rate, 2, MidpointRounding.AwayFromZero) : amount;
+
         decimal invoiceValue = 0m;
         decimal accruedValue = 0m;
+        decimal grniCleared = 0m;
         List<(string Account, decimal Committed, decimal Invoiced)> spent = [];
         List<(PurchaseOrderLine Line, decimal Difference)> jobDifferences = [];
+        List<(PurchaseOrderLine Line, decimal Quantity, decimal Invoiced, decimal Difference)> stockDifferences = [];
+        Dictionary<string, (decimal Net, string? CostAccount)> taxable = new(StringComparer.Ordinal);
         foreach (InvoiceMatchLine invLine in request.Lines)
         {
             PurchaseOrderLine? line = order.Lines.FirstOrDefault(l => l.Id == invLine.PurchaseOrderLineId);
@@ -430,18 +482,34 @@ public sealed class ProcurementService : IProcurementService
                     $"PO line {line.Id}: invoice price {invLine.UnitPrice} is outside {priceTolerance}% of PO price {line.UnitPrice}.");
             }
 
-            invoiceValue += decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven);
-            accruedValue += decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            decimal lineNet = decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven);
+            decimal lineAccrued = decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven);
+            invoiceValue += lineNet;
+            accruedValue += lineAccrued;
             if (line.JobContractId is not null && invLine.UnitPrice != line.UnitPrice)
             {
-                jobDifferences.Add((line, decimal.Round(invLine.Quantity * invLine.UnitPrice, 4, MidpointRounding.ToEven) - decimal.Round(invLine.Quantity * line.UnitPrice, 4, MidpointRounding.ToEven)));
+                jobDifferences.Add((line, lineNet - lineAccrued));
             }
+            else if (invLine.UnitPrice != line.UnitPrice)
+            {
+                stockDifferences.Add((line, Math.Max(0m, Math.Min(invLine.Quantity, availableToInvoice)), invLine.Quantity, lineNet - lineAccrued));
+            }
+
             if (line.ExpenseAccountCode is not null)
             {
                 spent.Add((line.ExpenseAccountCode, invLine.Quantity * line.UnitPrice, invLine.Quantity * invLine.UnitPrice));
             }
 
-            line.Invoice(invLine.Quantity);
+            if (line.TaxCode is string lineTax)
+            {
+                (decimal net, string? costAccount) = taxable.GetValueOrDefault(lineTax);
+                taxable[lineTax] = (net + lineNet, costAccount ?? line.ExpenseAccountCode);
+            }
+
+            // GRNI clears at what the receipts accrued (in base): the order price at each receipt's rate.
+            decimal cleared = foreign ? line.AccrualToClear(invLine.Quantity, line.UnitPrice * rate) : lineAccrued;
+            grniCleared += cleared;
+            line.Invoice(invLine.Quantity, cleared);
             _db.Set<InvoicedOrderLine>().Add(new InvoicedOrderLine(request.CompanyId, order.SupplierId, line.Id, request.InvoiceNumber.Trim(), request.Date, invLine.Quantity, line.UnitPrice,
                 invLine.UnitPrice));
         }
@@ -466,17 +534,49 @@ public sealed class ProcurementService : IProcurementService
             return Error.Rule("Pop.NoPriceVarianceAccount", "The invoice is priced differently from the order: give a purchase price variance account.");
         }
 
+        // The input tax on the lines' tax codes (brief §3.5), as a purchase invoice posts it: the recoverable share claimed, the rest a cost, and a
+        // reverse-charge or deemed code self-assessed (charged as output, never owed to the supplier). A supplier holding an exemption certificate charges none.
+        Result<(List<JournalLineRequest> Lines, decimal Owed)> taxed = await MatchTaxLinesAsync(request, supplier.Id, taxable, rate, foreign, ToBase, ct).ConfigureAwait(false);
+        if (taxed.IsFailure)
+        {
+            return taxed.Error;
+        }
+
+        decimal gross = invoiceValue + taxed.Value.Owed;
+        decimal apBase = ToBase(gross);
         List<JournalLineRequest> matchLines =
         [
-            new JournalLineRequest { AccountCode = grniCode, Side = JournalSide.Debit, TransactionAmount = accruedValue },
-            new JournalLineRequest { AccountCode = apCode, Side = JournalSide.Credit, TransactionAmount = invoiceValue },
+            new JournalLineRequest { AccountCode = grniCode, Side = JournalSide.Debit, TransactionAmount = grniCleared, Currency = company.BaseCurrency },
+            new JournalLineRequest { AccountCode = apCode, Side = JournalSide.Credit, TransactionAmount = gross, ExchangeRate = rate, BaseAmount = foreign ? apBase : null },
+            .. taxed.Value.Lines,
         ];
-        if (variance != 0m)
+
+        // The price variance (in base, at the invoice rate): on a weighted-average item the share still in stock goes onto its value, the rest to the variance account.
+        Result<(string? StockCode, List<(Core.Inventory.StockBalance Balance, decimal Amount)> Revalued)> stocked =
+            await PriceDifferenceOnStockAsync(request.CompanyId, order.Id, stockDifferences, rate, ct).ConfigureAwait(false);
+        if (stocked.IsFailure)
+        {
+            return stocked.Error;
+        }
+
+        List<(Core.Inventory.StockBalance Balance, decimal Amount)> revalued = stocked.Value.Revalued;
+        decimal toStockTotal = revalued.Sum(r => r.Amount);
+        if (toStockTotal != 0m)
         {
             matchLines.Add(new JournalLineRequest
             {
-                AccountCode = request.PriceVarianceAccountCode!.Trim(), Side = variance > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(variance),
-                CostCentre = order.CostCentre, Department = order.Department, Project = order.Project,
+                AccountCode = stocked.Value.StockCode!, Side = toStockTotal > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(toStockTotal), Currency = company.BaseCurrency,
+                Narrative = "Price difference on goods still in stock",
+            });
+        }
+
+        decimal varianceBase = ToBase(variance) - toStockTotal;
+        if (varianceBase != 0m)
+        {
+            matchLines.Add(new JournalLineRequest
+            {
+                AccountCode = request.PriceVarianceAccountCode!.Trim(), Side = varianceBase > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(varianceBase),
+                Currency = company.BaseCurrency, CostCentre = order.CostCentre, Department = order.Department, Project = order.Project,
             });
         }
 
@@ -485,7 +585,28 @@ public sealed class ProcurementService : IProcurementService
             matchLines.Add(new JournalLineRequest
             {
                 AccountCode = line.ExpenseAccountCode!, Side = difference > 0m ? JournalSide.Debit : JournalSide.Credit, TransactionAmount = Math.Abs(difference),
+                ExchangeRate = rate, BaseAmount = foreign ? ToBase(Math.Abs(difference)) : null,
                 Narrative = $"Price difference to job ({line.Description})", CostCentre = order.CostCentre, Department = order.Department, Project = order.Project,
+            });
+        }
+
+        // What GRNI accrued at the receipts' rates and what the goods cost at the invoice's rate differ by an exchange difference, kept apart from the
+        // price variance: a gain (the currency weakened since the receipt) to the FX gain account, a loss to the FX loss one.
+        decimal exchange = foreign ? matchLines.Sum(l => (l.Side == JournalSide.Debit ? 1m : -1m) * (l.BaseAmount ?? l.TransactionAmount)) : 0m;
+        if (exchange != 0m)
+        {
+            ControlAccountType fxType = exchange > 0m ? ControlAccountType.FxGain : ControlAccountType.FxLoss;
+            string? fxCode = await ControlCodeAsync(request.CompanyId, fxType, ct).ConfigureAwait(false);
+            if (fxCode is null)
+            {
+                return Error.Rule("Pop.NoFxAccount", $"The invoice at {rate} against goods received at other rates gives an exchange {(exchange > 0m ? "gain" : "loss")} of {Math.Abs(exchange):N2}; "
+                    + $"set up an {fxType} control account first.");
+            }
+
+            matchLines.Add(new JournalLineRequest
+            {
+                AccountCode = fxCode, Side = exchange > 0m ? JournalSide.Credit : JournalSide.Debit, TransactionAmount = Math.Abs(exchange), Currency = company.BaseCurrency,
+                Narrative = $"Exchange difference on {order.OrderNumber}",
             });
         }
 
@@ -507,12 +628,19 @@ public sealed class ProcurementService : IProcurementService
             return posting.Error;
         }
 
-        Company company = await _db.Companies.FirstAsync(c => c.Id == request.CompanyId, ct).ConfigureAwait(false);
-        decimal rate = order.Currency == company.BaseCurrency ? 1m : 1m; // same-currency match; FX match is a refinement
-        decimal baseValue = decimal.Round(invoiceValue * rate, 4, MidpointRounding.ToEven);
+        // The stock's own value takes its share (a value-only movement, so the stock valuation still ties to the stock control account).
+        foreach ((Core.Inventory.StockBalance balance, decimal amount) in revalued)
+        {
+            balance.AddValue(amount);
+            _db.StockMovements.Add(new Core.Inventory.StockMovement(request.CompanyId, balance.ItemId, balance.WarehouseId, request.Date, Core.Inventory.StockMovementType.Adjustment, 0m, 0m,
+                amount, request.InvoiceNumber.Trim())
+            {
+                JournalEntryId = posting.Value.JournalId,
+            });
+        }
 
         OpenItem openItem = new(request.CompanyId, TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice, LedgerSign.Credit,
-            request.InvoiceNumber, request.Date, supplier.DueDateFor(request.Date), order.Currency, rate, invoiceValue, baseValue)
+            request.InvoiceNumber, request.Date, supplier.DueDateFor(request.Date), order.Currency, rate, gross, apBase)
         {
             JournalEntryId = posting.Value.JournalId,
             Narrative = $"Matched to {order.OrderNumber}",
@@ -538,7 +666,139 @@ public sealed class ProcurementService : IProcurementService
             }
         }
 
-        return new MatchInvoiceResult(openItem.Id, posting.Value.JournalNumber, invoiceValue);
+        return new MatchInvoiceResult(openItem.Id, posting.Value.JournalNumber, gross);
+    }
+
+    // The tax lines of a matched invoice, one tax code at a time at its rate on the invoice date, and the tax owed to the supplier (in the order's currency).
+    private async Task<Result<(List<JournalLineRequest> Lines, decimal Owed)>> MatchTaxLinesAsync(MatchInvoiceRequest request, long supplierId,
+        Dictionary<string, (decimal Net, string? CostAccount)> taxable, decimal rate, bool foreign, Func<decimal, decimal> toBase, CancellationToken ct)
+    {
+        List<JournalLineRequest> lines = [];
+        if (taxable.Count == 0
+            || await Trading.TraderCertificates.HoldsAsync(_db, request.CompanyId, TradingLedger.AccountsPayable, supplierId, CertificatePurpose.TaxExemption, request.Date, ct).ConfigureAwait(false))
+        {
+            return (lines, 0m);
+        }
+
+        List<string> codes = [.. taxable.Keys];
+        Dictionary<string, TaxCode> defined = await _db.TaxCodes.AsNoTracking().Include(t => t.Rates).Where(t => t.CompanyId == request.CompanyId && codes.Contains(t.Code))
+            .ToDictionaryAsync(t => t.Code, ct).ConfigureAwait(false);
+        decimal owed = 0m;
+        foreach ((string code, (decimal net, string? costAccount)) in taxable.OrderBy(t => t.Key, StringComparer.Ordinal))
+        {
+            if (!defined.TryGetValue(code, out TaxCode? taxCode))
+            {
+                return Error.NotFound("Tax.CodeNotFound", $"No tax code {code}.");
+            }
+
+            decimal tax = decimal.Round(net * taxCode.RateOn(request.Date) / 100m, 2, MidpointRounding.AwayFromZero);
+            if (tax == 0m)
+            {
+                continue;
+            }
+
+            bool selfAssessed = taxCode.Type is TaxType.ReverseCharge or TaxType.Deemed;
+            decimal recoverablePercent = Math.Clamp(taxCode.RecoverablePercent, 0m, 100m);
+            decimal recoverable = decimal.Round(tax * recoverablePercent / 100m, 2, MidpointRounding.AwayFromZero);
+            decimal taxBase = toBase(tax);
+            decimal recoverableBase = recoverable == tax ? taxBase : toBase(recoverable);
+            if (recoverable != 0m)
+            {
+                string? input = taxCode.InputAccountCode ?? await ControlCodeAsync(request.CompanyId, ControlAccountType.VatInput, ct).ConfigureAwait(false);
+                if (input is null)
+                {
+                    return Error.Validation("Tax.InputAccount", "The invoice carries tax but there is no input tax account to claim it on.");
+                }
+
+                lines.Add(new JournalLineRequest
+                {
+                    AccountCode = input, Side = JournalSide.Debit, TransactionAmount = recoverable, ExchangeRate = rate, BaseAmount = foreign ? recoverableBase : null, TaxCode = code,
+                });
+            }
+
+            if (tax - recoverable != 0m)
+            {
+                // The irrecoverable part is part of what the purchase cost: the line's expense account, else the price variance account.
+                string? cost = costAccount ?? (string.IsNullOrWhiteSpace(request.PriceVarianceAccountCode) ? null : request.PriceVarianceAccountCode.Trim());
+                if (cost is null)
+                {
+                    return Error.Validation("Tax.IrrecoverableAccount", $"Part of the {code} tax cannot be claimed: give a price variance account to charge it to.");
+                }
+
+                lines.Add(new JournalLineRequest
+                {
+                    AccountCode = cost, Side = JournalSide.Debit, TransactionAmount = tax - recoverable, ExchangeRate = rate, BaseAmount = foreign ? taxBase - recoverableBase : null, TaxCode = code,
+                    Narrative = $"Irrecoverable tax ({100m - recoverablePercent:0.##}%)",
+                });
+            }
+
+            if (selfAssessed)
+            {
+                string? output = taxCode.OutputAccountCode ?? await ControlCodeAsync(request.CompanyId, ControlAccountType.VatOutput, ct).ConfigureAwait(false);
+                if (output is null)
+                {
+                    return Error.Validation("Tax.OutputAccount", $"Tax code {code} is self-assessed but there is no output tax account to charge it to.");
+                }
+
+                lines.Add(new JournalLineRequest
+                {
+                    AccountCode = output, Side = JournalSide.Credit, TransactionAmount = tax, ExchangeRate = rate, BaseAmount = foreign ? taxBase : null, TaxCode = code,
+                });
+            }
+            else
+            {
+                owed += tax;
+            }
+        }
+
+        return (lines, owed);
+    }
+
+    // The share of an invoice's price difference that belongs on stock still held: for a weighted-average item, the part of the invoiced quantity the
+    // warehouses its receipts went into still hold (in base, at the invoice rate), spread over those warehouses by quantity. The rest stays a variance.
+    private async Task<Result<(string? StockCode, List<(Core.Inventory.StockBalance Balance, decimal Amount)> Revalued)>> PriceDifferenceOnStockAsync(long companyId, long orderId,
+        List<(PurchaseOrderLine Line, decimal Quantity, decimal Invoiced, decimal Difference)> differences, decimal rate, CancellationToken ct)
+    {
+        List<(Core.Inventory.StockBalance Balance, decimal Amount)> revalued = [];
+        string? stockCode = differences.Count == 0 ? null : await ControlCodeAsync(companyId, ControlAccountType.Stock, ct).ConfigureAwait(false);
+        if (stockCode is null)
+        {
+            return ((string?)null, revalued);
+        }
+
+        List<string> grnNumbers = await _db.Set<GoodsReceivedNote>().Where(g => g.CompanyId == companyId && g.PurchaseOrderId == orderId).Select(g => g.GrnNumber)
+            .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<long, decimal> onHandLeft = [];
+        foreach ((PurchaseOrderLine line, decimal quantity, decimal invoiced, decimal difference) in differences)
+        {
+            Core.Inventory.CostingMethod? costing = await _db.Set<Core.Inventory.Item>().Where(i => i.Id == line.ItemId).Select(i => (Core.Inventory.CostingMethod?)i.CostingMethod)
+                .FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            if (costing != Core.Inventory.CostingMethod.WeightedAverage || quantity <= 0m || invoiced <= 0m || difference == 0m)
+            {
+                continue;
+            }
+
+            List<long> warehouses = await _db.StockMovements.Where(m => m.CompanyId == companyId && m.ItemId == line.ItemId && m.Type == Core.Inventory.StockMovementType.Receipt
+                    && m.Reference != null && grnNumbers.Contains(m.Reference))
+                .Select(m => m.WarehouseId).Distinct().ToListAsync(ct).ConfigureAwait(false);
+            List<Core.Inventory.StockBalance> balances = await _db.StockBalances.Where(b => b.CompanyId == companyId && b.ItemId == line.ItemId && warehouses.Contains(b.WarehouseId)
+                    && b.QuantityOnHand > 0m)
+                .OrderBy(b => b.WarehouseId).ToListAsync(ct).ConfigureAwait(false);
+            decimal held = balances.Sum(b => b.QuantityOnHand);
+            decimal onHand = onHandLeft.TryGetValue(line.ItemId, out decimal left) ? left : held;
+            decimal inStock = Math.Min(quantity, onHand);
+            onHandLeft[line.ItemId] = onHand - inStock;
+            decimal toStock = inStock <= 0m ? 0m : decimal.Round(difference * rate * inStock / invoiced, 2, MidpointRounding.AwayFromZero);
+            decimal spread = toStock;
+            for (int i = 0; i < balances.Count && toStock != 0m; i++)
+            {
+                decimal part = i == balances.Count - 1 ? spread : decimal.Round(toStock * balances[i].QuantityOnHand / held, 2, MidpointRounding.AwayFromZero);
+                revalued.Add((balances[i], part));
+                spread -= part;
+            }
+        }
+
+        return (stockCode, revalued);
     }
 
     /// <inheritdoc />

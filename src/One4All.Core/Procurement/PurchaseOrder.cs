@@ -274,6 +274,20 @@ public sealed class PurchaseOrderLine : Entity
     /// <summary>Gets or sets the expense account the line is budgeted (and committed) against, if any.</summary>
     public string? ExpenseAccountCode { get; set; }
 
+    /// <summary>
+    /// Gets or sets the tax code the supplier's invoice for the line is taxed at (input VAT at the invoice match); null for a line bought without tax.
+    /// </summary>
+    public string? TaxCode { get; set; }
+
+    /// <summary>
+    /// The base-currency value accrued to goods received not invoiced for what has been received so far: each receipt at the order price converted at
+    /// its own date's rate.
+    /// </summary>
+    public decimal ReceivedBaseValue { get; private set; }
+
+    /// <summary>The base-currency value of that accrual already cleared by matched invoices.</summary>
+    public decimal InvoicedBaseValue { get; private set; }
+
     /// <summary>The job the line is bought for (received straight to the job's WIP account and charged to it).</summary>
     public long? JobContractId { get; set; }
 
@@ -301,13 +315,44 @@ public sealed class PurchaseOrderLine : Entity
         UnitFactor = factor <= 0m ? 1m : factor;
     }
 
-    /// <summary>Records a received quantity.</summary>
+    /// <summary>Records a received quantity and the base value it accrued.</summary>
     /// <param name="quantity">The quantity received.</param>
-    public void Receive(decimal quantity) => ReceivedQuantity += quantity;
+    /// <param name="baseValue">The base-currency value accrued to goods received not invoiced.</param>
+    public void Receive(decimal quantity, decimal baseValue)
+    {
+        ReceivedQuantity += quantity;
+        ReceivedBaseValue += baseValue;
+    }
 
-    /// <summary>Records an invoiced quantity.</summary>
+    /// <summary>
+    /// The base value of the accrual an invoice for <paramref name="quantity"/> clears: the average of what is received and not yet invoiced, and
+    /// beyond that (an invoice over the receipt within tolerance) the same average.
+    /// </summary>
     /// <param name="quantity">The quantity invoiced.</param>
-    public void Invoice(decimal quantity) => InvoicedQuantity += quantity;
+    /// <param name="fallbackUnitBase">The base value of one unit when nothing is waiting to be invoiced.</param>
+    /// <returns>The base value cleared, at four decimals.</returns>
+    public decimal AccrualToClear(decimal quantity, decimal fallbackUnitBase)
+    {
+        decimal waitingQuantity = ReceivedQuantity - InvoicedQuantity;
+        decimal waitingValue = ReceivedBaseValue - InvoicedBaseValue;
+        if (waitingQuantity <= 0m)
+        {
+            return decimal.Round(quantity * fallbackUnitBase, 4, MidpointRounding.ToEven);
+        }
+
+        return quantity >= waitingQuantity
+            ? waitingValue + decimal.Round((quantity - waitingQuantity) * waitingValue / waitingQuantity, 4, MidpointRounding.ToEven)
+            : decimal.Round(waitingValue * quantity / waitingQuantity, 4, MidpointRounding.ToEven);
+    }
+
+    /// <summary>Records an invoiced quantity and the base value of the accrual it cleared.</summary>
+    /// <param name="quantity">The quantity invoiced.</param>
+    /// <param name="clearedBaseValue">The base value cleared from goods received not invoiced.</param>
+    public void Invoice(decimal quantity, decimal clearedBaseValue)
+    {
+        InvoicedQuantity += quantity;
+        InvoicedBaseValue += clearedBaseValue;
+    }
 
     /// <summary>Changes the ordered quantity and price (through <see cref="PurchaseOrder.AmendLine"/>).</summary>
     /// <param name="quantity">The new quantity.</param>

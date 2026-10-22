@@ -515,11 +515,17 @@ public sealed class InventoryService : IInventoryService
     /// <inheritdoc />
     public Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, string? reasonCode = null,
         CancellationToken ct = default)
-        => _db.AtomicAsync(() => AdjustCoreAsync(companyId, itemId, warehouseId, date, countedQuantity, adjustmentAccountCode, reference, reasonCode, ct), ct);
+        => _db.AtomicAsync(() => AdjustCoreAsync(companyId, itemId, warehouseId, date, countedQuantity, adjustmentAccountCode, reference, reasonCode, null, ct), ct);
 
-    // One unit of work, retried if another posting changes the same stock balance at the same moment.
+    /// <inheritdoc />
+    public Task<Result<decimal>> AdjustCountAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, decimal snapshotQuantity, string adjustmentAccountCode,
+        string? reference = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AdjustCoreAsync(companyId, itemId, warehouseId, date, countedQuantity, adjustmentAccountCode, reference, null, snapshotQuantity, ct), ct);
+
+    // One unit of work, retried if another posting changes the same stock balance at the same moment. With a snapshot the count is a difference from it
+    // (applied to the current balance); without one the counted quantity is the new on-hand.
     private async Task<Result<decimal>> AdjustCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference, string? reasonCode,
-        CancellationToken ct)
+        decimal? snapshotQuantity, CancellationToken ct)
     {
         reasonCode = string.IsNullOrWhiteSpace(reasonCode) ? null : reasonCode.Trim().ToUpperInvariant();
         if (reasonCode != null && !await _db.StockReasonCodes.AnyAsync(r => r.CompanyId == companyId && r.Code == reasonCode && r.IsActive, ct).ConfigureAwait(false))
@@ -545,10 +551,16 @@ public sealed class InventoryService : IInventoryService
 
         (Item item, string stockCode, CurrencyCode currency) = setup.Value;
         StockBalance balance = await LoadOrCreateBalanceAsync(companyId, itemId, warehouseId, ct).ConfigureAwait(false);
-        decimal variance = countedQuantity - balance.QuantityOnHand;
+        decimal variance = countedQuantity - (snapshotQuantity ?? balance.QuantityOnHand);
         if (variance == 0m)
         {
             return 0m;
+        }
+
+        if (snapshotQuantity is not null && balance.QuantityOnHand + variance < 0m)
+        {
+            return Error.Rule("Inv.CountBelowMovements",
+                $"Item '{item.Code}' was counted {Math.Abs(variance):0.###} short of the {snapshotQuantity:0.###} frozen, but only {balance.QuantityOnHand:0.###} is now on hand; recount it.");
         }
 
         decimal unitCost = balance.AverageCost;

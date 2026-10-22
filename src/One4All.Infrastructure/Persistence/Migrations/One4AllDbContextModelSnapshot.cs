@@ -25538,6 +25538,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(8)")
                         .HasColumnName("expense_account_code");
 
+                    b.Property<decimal>("InvoicedBaseValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("invoiced_base_value");
+
                     b.Property<decimal>("InvoicedQuantity")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -25565,6 +25570,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("purchase_order_id");
 
+                    b.Property<decimal>("ReceivedBaseValue")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("received_base_value");
+
                     b.Property<decimal>("ReceivedQuantity")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -25575,6 +25585,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("xid")
                         .HasColumnName("xmin");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("tax_code");
 
                     b.Property<string>("UnitCode")
                         .HasMaxLength(10)

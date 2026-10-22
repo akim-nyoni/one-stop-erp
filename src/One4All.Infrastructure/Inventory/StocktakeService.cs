@@ -9,8 +9,9 @@ namespace One4All.Infrastructure.Inventory;
 
 /// <summary>
 /// Runs physical stocktakes: freezes the warehouse's on-hand quantities into a session, captures counts,
-/// and on posting adjusts each counted line's variance into stock through the inventory service (so the
-/// moving-average valuation and the GL stay consistent with a single-item adjustment).
+/// and on posting adjusts each counted line's variance (the count less the frozen quantity) into stock through the
+/// inventory service, against the balance as it stands then (so the moving-average valuation and the GL stay
+/// consistent with a single-item adjustment, and movements since the freeze are kept).
 /// </summary>
 public sealed class StocktakeService : IStocktakeService
 {
@@ -230,8 +231,10 @@ public sealed class StocktakeService : IStocktakeService
         decimal totalVariance = 0m;
         foreach (StocktakeLine line in session.Lines.Where(l => l.IsCounted))
         {
-            Result<decimal> adjustment = await _inventory.AdjustAsync(
-                companyId, line.ItemId, session.WarehouseId, date, line.CountedQuantity!.Value, adjustmentAccountCode, session.Reference, ct: ct)
+            // The count is against the quantity frozen when the stocktake started: only that difference is adjusted, against the balance as it now stands,
+            // so what moved since (a sale between the count and the posting) stays and is not taken for shrinkage.
+            Result<decimal> adjustment = await _inventory.AdjustCountAsync(
+                companyId, line.ItemId, session.WarehouseId, date, line.CountedQuantity!.Value, line.SystemQuantity, adjustmentAccountCode, session.Reference, ct)
                 .ConfigureAwait(false);
             if (adjustment.IsFailure)
             {

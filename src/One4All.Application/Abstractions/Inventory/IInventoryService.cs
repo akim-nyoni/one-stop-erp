@@ -173,6 +173,24 @@ public interface IInventoryService
     Task<Result<decimal>> AdjustAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, string adjustmentAccountCode, string? reference = null, string? reasonCode = null,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Posts a stocktake count taken against a snapshot of the on-hand quantity: only the difference between the count and the snapshot is adjusted, against
+    /// the balance as it now stands, so stock moved since the snapshot (a sale between the count and the posting, say) is not mistaken for a variance.
+    /// Refused when the difference would take the balance below zero. Returns the signed variance value as <see cref="AdjustAsync"/> does.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="itemId">The item.</param>
+    /// <param name="warehouseId">The warehouse counted.</param>
+    /// <param name="date">The posting date.</param>
+    /// <param name="countedQuantity">The physically counted quantity.</param>
+    /// <param name="snapshotQuantity">The on-hand quantity the count was taken against (the stocktake's frozen system quantity).</param>
+    /// <param name="adjustmentAccountCode">The stock-adjustment / shrinkage account for the variance.</param>
+    /// <param name="reference">An optional reference (e.g. the stocktake number).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The signed variance value (+ surplus, - shortage), or an error.</returns>
+    Task<Result<decimal>> AdjustCountAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal countedQuantity, decimal snapshotQuantity, string adjustmentAccountCode,
+        string? reference = null, CancellationToken ct = default);
+
     /// <summary>Produces the stock valuation for a company (optionally a single warehouse).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="warehouseId">Optional warehouse filter.</param>

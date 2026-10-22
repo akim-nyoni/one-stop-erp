@@ -10,7 +10,7 @@ namespace One4All.Desktop.Operations;
 /// <content>Purchase-to-pay: requisitions, purchase orders, goods received and the supplier invoice matched to the order.</content>
 public static partial class OperationCatalogue
 {
-    private const string LinesHelp = "Lines: ITEM:quantity@price; ITEM:quantity@price";
+    private const string LinesHelp = "Lines: ITEM:quantity@price; ITEM:quantity@price (add #TAXCODE after the price for a tax code other than the item's or supplier's)";
 
     private static IEnumerable<Operation> PurchaseOrders()
     {
@@ -85,7 +85,8 @@ public static partial class OperationCatalogue
                     List<PurchaseOrderLineRequest> lines = [];
                     foreach (OrderLineText line in await OrderLinesAsync(c, i.Text("Lines")).ConfigureAwait(true))
                     {
-                        lines.Add(new PurchaseOrderLineRequest(line.Item, line.Description, line.Quantity, line.Price, job is null ? null : i.Optional("JobAccount"), job, i.Optional("JobHead"), line.Unit));
+                        lines.Add(new PurchaseOrderLineRequest(line.Item, line.Description, line.Quantity, line.Price, job is null ? null : i.Optional("JobAccount"), job, i.Optional("JobHead"), line.Unit,
+                            line.TaxCode));
                     }
 
                     PurchaseOrderResult created = Check(await procurement.CreatePurchaseOrderAsync(new CreatePurchaseOrderRequest
@@ -134,7 +135,7 @@ public static partial class OperationCatalogue
                     string supplier = i.Optional("Supplier") ?? throw new OperationException("Pick the order, or give the supplier for goods that came without one.");
                     string given = i.Optional("Lines") ?? throw new OperationException("Give the lines received as ITEM:quantity@price.");
                     List<PurchaseOrderLineRequest> ordered = [.. (await OrderLinesAsync(c, given).ConfigureAwait(true))
-                        .Select(l => new PurchaseOrderLineRequest(l.Item, l.Description, l.Quantity, l.Price, null, null, null, l.Unit))];
+                        .Select(l => new PurchaseOrderLineRequest(l.Item, l.Description, l.Quantity, l.Price, null, null, null, l.Unit, l.TaxCode))];
                     long supplierId = await SupplierAsync(c, supplier).ConfigureAwait(true);
                     CurrencyCode currency = await c.Db.Suppliers.Where(s => s.Id == supplierId).Select(s => s.Currency).SingleAsync().ConfigureAwait(true);
                     string number = Check(await c.Get<Application.Abstractions.Numbering.INumberSequenceService>().AllocateAsync(c.CompanyId, "PO", i.Date("Date")).ConfigureAwait(true));
@@ -469,12 +470,15 @@ public static partial class OperationCatalogue
         List<OrderLineText> lines = [];
         foreach (string part in text.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            string[] codeRest = part.Split(':', 2, StringSplitOptions.TrimEntries);
+            // An optional tax code after the price: ITEM:quantity@price#TAXCODE.
+            string[] lineTax = part.Split('#', 2, StringSplitOptions.TrimEntries);
+            string? taxCode = lineTax.Length == 2 && lineTax[1].Length > 0 ? lineTax[1].ToUpperInvariant() : null;
+            string[] codeRest = lineTax[0].Split(':', 2, StringSplitOptions.TrimEntries);
             string[] qtyPrice = codeRest.Length == 2 ? codeRest[1].Split('@', StringSplitOptions.TrimEntries) : [];
             (decimal Quantity, string? Unit)? parsed = qtyPrice.Length == 2 ? QuantityInUnit(qtyPrice[0]) : null;
             if (parsed is null || !decimal.TryParse(qtyPrice[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal price))
             {
-                throw new OperationException($"\"{part}\" should be ITEM:quantity[ UNIT]@price.");
+                throw new OperationException($"\"{part}\" should be ITEM:quantity[ UNIT]@price[#TAXCODE].");
             }
 
             (decimal quantity, string? unit) = parsed.Value;
@@ -488,7 +492,7 @@ public static partial class OperationCatalogue
                     .FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException($"{codeRest[0]} has no unit {unit}.");
             }
 
-            lines.Add(new OrderLineText(item, found.Description, quantity, price, factor == 1m ? null : unit, factor));
+            lines.Add(new OrderLineText(item, found.Description, quantity, price, factor == 1m ? null : unit, factor, taxCode));
         }
 
         return lines.Count > 0 ? lines : throw new OperationException("Give at least one line.");
@@ -508,8 +512,8 @@ public static partial class OperationCatalogue
         return decimal.TryParse(trimmed[..split], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal quantity) ? (quantity, unit.Length == 0 ? null : unit) : null;
     }
 
-    /// <summary>A keyed order line: Quantity and Price as keyed (in Unit when given), Factor of the item's own units in one Unit.</summary>
-    private sealed record OrderLineText(long Item, string Description, decimal Quantity, decimal Price, string? Unit, decimal Factor)
+    /// <summary>A keyed order line: Quantity and Price as keyed (in Unit when given), Factor of the item's own units in one Unit, and any tax code keyed after the price.</summary>
+    private sealed record OrderLineText(long Item, string Description, decimal Quantity, decimal Price, string? Unit, decimal Factor, string? TaxCode = null)
     {
         /// <summary>Gets the quantity in the item's own unit.</summary>
         public decimal BaseQuantity => Quantity * Factor;

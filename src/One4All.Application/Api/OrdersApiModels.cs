@@ -61,7 +61,9 @@ public sealed record SalesOrderInvoiceApi(DateOnly Date, IReadOnlyList<OrderLine
 /// <param name="Description">The description (blank: the item's).</param>
 /// <param name="ExpenseAccountCode">The expense account, for a non-stock line.</param>
 /// <param name="UnitCode">The unit the quantity and price are in (blank: the item's own unit).</param>
-public sealed record PurchaseOrderLineApi(string ItemCode, decimal Quantity, decimal UnitPrice, string? Description = null, string? ExpenseAccountCode = null, string? UnitCode = null);
+/// <param name="TaxCode">The tax code the line is bought at (blank: the item's, else the supplier's default).</param>
+public sealed record PurchaseOrderLineApi(string ItemCode, decimal Quantity, decimal UnitPrice, string? Description = null, string? ExpenseAccountCode = null, string? UnitCode = null,
+    string? TaxCode = null);
 
 /// <summary>A purchase order as the REST API creates it.</summary>
 /// <param name="SupplierCode">The supplier code.</param>
@@ -378,7 +380,8 @@ public static class OrdersApiMapping
                 return Error.Validation("Api.Quantity", $"The quantity of {Key(line.ItemCode)} must be more than zero and its price not negative.");
             }
 
-            lines.Add(new PurchaseOrderLineRequest(item.Id, Clean(line.Description) ?? item.Description, line.Quantity, line.UnitPrice, Clean(line.ExpenseAccountCode), UnitCode: Upper(line.UnitCode)));
+            lines.Add(new PurchaseOrderLineRequest(item.Id, Clean(line.Description) ?? item.Description, line.Quantity, line.UnitPrice, Clean(line.ExpenseAccountCode), UnitCode: Upper(line.UnitCode),
+                TaxCode: Upper(line.TaxCode)));
         }
 
         return new CreatePurchaseOrderRequest

@@ -8,8 +8,9 @@ namespace One4All.Application.Abstractions.Procurement;
 /// <param name="Quantity">The quantity.</param>
 /// <param name="UnitPrice">The unit price.</param>
 /// <param name="UnitCode">The unit the quantity and price are in (blank: the item's own unit), from the item's unit list.</param>
+/// <param name="TaxCode">The tax code the line is bought at (blank: the item's tax code, else the supplier's default; none when neither has one).</param>
 public readonly record struct PurchaseOrderLineRequest(long ItemId, string Description, decimal Quantity, decimal UnitPrice, string? ExpenseAccountCode = null, long? JobContractId = null,
-    string? JobCostHead = null, string? UnitCode = null);
+    string? JobCostHead = null, string? UnitCode = null, string? TaxCode = null);
 
 /// <summary>A request to create a purchase order.</summary>
 public sealed class CreatePurchaseOrderRequest
@@ -120,7 +121,8 @@ public sealed class MatchInvoiceRequest
 
     /// <summary>
     /// Where the difference between the invoice and order prices goes (purchase price variance). Required when the
-    /// invoice is priced differently from the order: GRNI clears at the order price and AP takes the invoice price.
+    /// invoice is priced differently from the order: GRNI clears at the order price and AP takes the invoice price. For a weighted-average item the
+    /// part of the difference on goods still in stock goes to the stock value instead.
     /// </summary>
     public string? PriceVarianceAccountCode { get; init; }
 
@@ -135,13 +137,13 @@ public readonly record struct PurchaseOrderResult(long PurchaseOrderId, string O
 
 /// <summary>The result of receiving goods.</summary>
 /// <param name="GrnId">The created GRN id.</param>
-/// <param name="AccruedValue">The value accrued to GRNI.</param>
+/// <param name="AccruedValue">The value accrued to GRNI (in base currency: the order price at the receipt date's rate).</param>
 public readonly record struct GrnResult(long GrnId, decimal AccruedValue);
 
 /// <summary>The result of a three-way match.</summary>
 /// <param name="OpenItemId">The created AP open item id.</param>
 /// <param name="JournalNumber">The GL journal number.</param>
-/// <param name="InvoiceValue">The invoice value posted to AP.</param>
+/// <param name="InvoiceValue">The invoice value owed to the supplier (gross of any input tax the supplier charges), in the order's currency.</param>
 public readonly record struct MatchInvoiceResult(long OpenItemId, string JournalNumber, decimal InvoiceValue);
 
 /// <summary>The result of a goods return to a supplier.</summary>

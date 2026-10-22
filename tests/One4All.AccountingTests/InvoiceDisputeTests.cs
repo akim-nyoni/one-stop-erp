@@ -86,6 +86,8 @@ public sealed class InvoiceDisputeTests
         ConsolidatedTrialBalance tb = (await scope.ServiceProvider.GetRequiredService<IConsolidationService>().ConsolidatedTrialBalanceAsync([companyId], new DateOnly(2026, 3, 31))).Value;
         tb.IsBalanced.Should().BeTrue();
         tb.Rows.Should().NotContain(r => r.AccountCode == "2150" && (r.Debit != 0m || r.Credit != 0m));
-        tb.Rows.Single(r => r.AccountCode == "5190").Debit.Should().Be(7m);
+        // Both price differences (5 on INV-DEAR, 2 on INV-2PC) are on goods still in stock, so they go onto the stock's value, not the variance account.
+        tb.Rows.Should().NotContain(r => r.AccountCode == "5190" && (r.Debit != 0m || r.Credit != 0m));
+        tb.Rows.Single(r => r.AccountCode == "1400").Debit.Should().Be(157m);
     }
 }
