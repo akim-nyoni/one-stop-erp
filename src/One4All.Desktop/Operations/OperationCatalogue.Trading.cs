@@ -491,11 +491,13 @@ public static partial class OperationCatalogue
             Module = "Suppliers", Title = "Supplier payment", ListTitle = "Open supplier items",
             Description = "A single payment to a supplier from the bank (several at once go through the payment run), or money the supplier pays back (tick Refund): banked "
                 + "against the supplier's account and matched to the overpayment or debit note it settles. A payment can be matched straight away to the invoices it pays "
-                + "(their numbers, separated by commas, in order) or to the oldest open invoices; otherwise it waits on the account for allocation.",
+                + "(their numbers, separated by commas, in order) or to the oldest open invoices; otherwise it waits on the account for allocation. As in the payment run, a "
+                + "supplier on hold, blacklisted or with a bank-detail change waiting is not paid, and where payment runs need a second person's approval a single payment "
+                + "names the other user who approved it.",
             Fields = [SupplierPick("Supplier", "Supplier"), Req("Number", "Payment / refund number"), Today("Date", "Date"), Num("Amount", "Amount"), Req("Bank", "Bank account", "1100"),
                 Opt("Currency", "Currency (blank: the supplier's)"), Opt("Narrative", "Narrative"), Tick("Refund", "A refund from the supplier (money in)"),
                 Opt("Against", "Overpayment / debit note the refund settles"), Opt("Invoices", "Invoices this payment settles (numbers, comma-separated)"),
-                Tick("Oldest", "Match to the oldest open invoices", false)],
+                Tick("Oldest", "Match to the oldest open invoices", false), Opt("ApprovedBy", "Approved by (user name; needed where payments need a second person's approval)")],
             Run = async (c, i) =>
             {
                 long supplier = await SupplierAsync(c, i.Text("Supplier")).ConfigureAwait(true);
@@ -508,10 +510,18 @@ public static partial class OperationCatalogue
                     return $"Refund {i.Text("Number")} banked: {M(refund.BaseAmount)} base (journal {refund.JournalNumber}).";
                 }
 
+                long? approver = null;
+                if (i.Optional("ApprovedBy") is string approvedBy)
+                {
+                    string name = approvedBy.Trim().ToUpperInvariant();
+                    approver = await c.Db.Users.AsNoTracking().Where(u => u.NormalizedUsername == name).Select(u => (long?)u.Id).FirstOrDefaultAsync().ConfigureAwait(true)
+                        ?? throw new OperationException($"No user {approvedBy.Trim()} to have approved the payment.");
+                }
+
                 TradingPostingResult posted = Check(await c.Get<IPurchaseLedgerService>().PostPaymentAsync(new PaymentRequest
                 {
                     CompanyId = c.CompanyId, SupplierId = supplier, DocumentNumber = i.Text("Number"), PaymentDate = i.Date("Date"), Currency = currency, Amount = i.Number("Amount"),
-                    BankAccountCode = i.Text("Bank"), Narrative = i.Optional("Narrative"),
+                    BankAccountCode = i.Text("Bank"), Narrative = i.Optional("Narrative"), EnteredByUserId = c.UserId, ApprovedByUserId = approver,
                 }).ConfigureAwait(true));
                 string paid = $"Payment {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
                 return paid + await AllocatePaymentAsync(c, supplier, i.Text("Number"), i.Optional("Invoices"), i.Flag("Oldest"), i.Date("Date")).ConfigureAwait(true);

@@ -329,6 +329,17 @@ public sealed class PaymentRequest
     /// the net and the tax is owed on the code's output (WHT payable) account. Ignored for a cleared supplier.
     /// </summary>
     public string? WithholdingTaxCode { get; init; }
+
+    /// <summary>
+    /// The user who keys a single payment (the desktop's Supplier payment, the REST API): it is then held to the payment run's controls - refused for a
+    /// supplier on hold or blacklisted or with a bank-detail change pending, and, where the company requires payment approval, it needs
+    /// <see cref="ApprovedByUserId"/>. Null for payments posted from documents already controlled elsewhere (the payment run, a contra, a write-back,
+    /// a bank statement line already paid, a standing order).
+    /// </summary>
+    public long? EnteredByUserId { get; init; }
+
+    /// <summary>The user who approved a keyed single payment; where the company requires payment approval it must be someone other than <see cref="EnteredByUserId"/>.</summary>
+    public long? ApprovedByUserId { get; init; }
 }
 
 /// <summary>

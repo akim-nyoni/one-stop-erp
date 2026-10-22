@@ -1214,6 +1214,11 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ap.SupplierNotFound", $"Supplier {request.SupplierId} not found.");
         }
 
+        if (request.EnteredByUserId is long payer && await KeyedPaymentProblemAsync(request, supplier, payer, ct).ConfigureAwait(false) is Error refused)
+        {
+            return refused;
+        }
+
         Result<string> controlResult = await ControlCodeAsync(request.CompanyId, ControlAccountType.AccountsPayable, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
@@ -1269,6 +1274,36 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         return posted.Value with { WithheldBase = withheldBase };
     }
 
+    // A single payment a user keys meets the payment run's controls: not to a supplier on hold, blacklisted or with bank details changing, and - where
+    // the company requires payment approval - approved by a user other than whoever keys it.
+    private async Task<Error?> KeyedPaymentProblemAsync(PaymentRequest request, Supplier supplier, long payer, CancellationToken ct)
+    {
+        bool bankChanging = (await PaymentRunService.BankChangingAsync(_db, request.CompanyId, supplier.Id, ct).ConfigureAwait(false)).Count > 0;
+        if (PaymentRunService.Held(supplier, bankChanging) is Error held)
+        {
+            return held;
+        }
+
+        if (!await _db.Companies.AnyAsync(c => c.Id == request.CompanyId && c.PaymentRunApprovalRequired, ct).ConfigureAwait(false))
+        {
+            return null;
+        }
+
+        if (request.ApprovedByUserId is not long approver)
+        {
+            return Error.Rule("Ap.PaymentApprovalRequired", "Supplier payments must be approved by a second person: give who approved this payment.");
+        }
+
+        if (approver == payer)
+        {
+            return Error.Rule("Ap.PaymentSelfApproval", "A supplier payment must be approved by someone other than whoever enters it.");
+        }
+
+        return await _db.Users.AnyAsync(u => u.Id == approver && u.IsActive, ct).ConfigureAwait(false)
+            ? null
+            : Error.Validation("Ap.ApproverNotFound", "The approver is not an active user.");
+    }
+
     /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
         string documentNumber, string? taxAccountCode = null, CancellationToken ct = default)
@@ -1297,6 +1332,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         if (cashAmount + discountAmount > invoice.OutstandingTransaction)
         {
             return Error.Rule("Ap.SettlementExceedsOutstanding", $"The cash {cashAmount:0.00} plus discount {discountAmount:0.00} exceeds the outstanding {invoice.OutstandingTransaction:0.00}.");
+        }
+
+        // Money leaves the bank here as in any keyed payment: not to a supplier on hold, blacklisted or with bank details changing.
+        Supplier payee = await _db.Suppliers.SingleAsync(s => s.Id == invoice.TraderId, ct).ConfigureAwait(false);
+        if (PaymentRunService.Held(payee, (await PaymentRunService.BankChangingAsync(_db, companyId, payee.Id, ct).ConfigureAwait(false)).Count > 0) is Error held)
+        {
+            return held;
         }
 
         // Cash payment: Dr AP control / Cr bank.

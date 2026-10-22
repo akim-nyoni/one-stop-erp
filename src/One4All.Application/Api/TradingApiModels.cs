@@ -105,8 +105,9 @@ public sealed record PurchaseDocumentApi(long SupplierId, string DocumentNumber,
 /// <param name="ExchangeRate">A keyed rate, when allowed.</param>
 /// <param name="Narrative">The narrative.</param>
 /// <param name="WithholdingTaxCode">The withholding tax code, when tax is withheld.</param>
+/// <param name="ApprovedBy">The user name of whoever approved the payment: needed, and not the caller, where the company requires payment approval.</param>
 public sealed record SupplierPaymentApi(long SupplierId, string DocumentNumber, DateOnly PaymentDate, string Currency, decimal Amount, string BankAccountCode, decimal? ExchangeRate = null, string? Narrative = null,
-    string? WithholdingTaxCode = null);
+    string? WithholdingTaxCode = null, string? ApprovedBy = null);
 
 /// <summary>A line of a till sale as the REST API posts it.</summary>
 /// <param name="ItemId">The item.</param>
@@ -234,15 +235,17 @@ public static class TradingApiMapping
     /// <summary>A supplier payment request.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="api">The payment as posted.</param>
+    /// <param name="enteredByUserId">The signed-in user, who keys the payment (it is then held to the payment controls; null for callers inside the server).</param>
+    /// <param name="approvedByUserId">The user <see cref="SupplierPaymentApi.ApprovedBy"/> names, if any.</param>
     /// <returns>The request, or a validation error.</returns>
-    public static Result<PaymentRequest> SupplierPayment(long companyId, SupplierPaymentApi api)
+    public static Result<PaymentRequest> SupplierPayment(long companyId, SupplierPaymentApi api, long? enteredByUserId = null, long? approvedByUserId = null)
     {
         ArgumentNullException.ThrowIfNull(api);
         Result<CurrencyCode> currency = Currency(api.Currency);
         return currency.IsFailure ? currency.Error : new PaymentRequest
         {
             CompanyId = companyId, SupplierId = api.SupplierId, DocumentNumber = api.DocumentNumber, PaymentDate = api.PaymentDate, Currency = currency.Value, Amount = api.Amount, BankAccountCode = api.BankAccountCode,
-            ExchangeRate = api.ExchangeRate, Narrative = api.Narrative, WithholdingTaxCode = api.WithholdingTaxCode,
+            ExchangeRate = api.ExchangeRate, Narrative = api.Narrative, WithholdingTaxCode = api.WithholdingTaxCode, EnteredByUserId = enteredByUserId, ApprovedByUserId = approvedByUserId,
         };
     }
 

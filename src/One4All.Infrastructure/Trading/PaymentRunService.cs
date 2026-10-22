@@ -95,7 +95,7 @@ public sealed class PaymentRunService : IPaymentRunService
 
         // A mobile-money run pays wallets: every supplier it would pay needs one.
         if (request.Method == Core.Trading.PaymentRunMethod.MobileMoney
-            && dueInvoices.Select(i => i.TraderId).Distinct().Where(id => suppliers.TryGetValue(id, out Supplier? s) && !s.OnHold && !bankChanging.Contains(id)
+            && dueInvoices.Select(i => i.TraderId).Distinct().Where(id => suppliers.TryGetValue(id, out Supplier? s) && Held(s, bankChanging.Contains(id)) is null
                 && (approved is null || approved.Any(a => a.Key.SupplierId == id && a.Value > 0m)))
                 .Select(id => suppliers[id]).FirstOrDefault(s => string.IsNullOrWhiteSpace(s.MobileMoneyNumber)) is Supplier walletless)
         {
@@ -116,8 +116,8 @@ public sealed class PaymentRunService : IPaymentRunService
         foreach (IGrouping<(long SupplierId, string Currency), OpenItem> group in dueInvoices
             .GroupBy(i => (i.TraderId, i.Currency.Value)))
         {
-            // Held: on hold, or bank details changing (paying to details about to change is how payment fraud works).
-            if (!suppliers.TryGetValue(group.Key.SupplierId, out Supplier? supplier) || supplier.OnHold || bankChanging.Contains(supplier.Id))
+            // Held: on hold or blacklisted, or bank details changing (paying to details about to change is how payment fraud works).
+            if (!suppliers.TryGetValue(group.Key.SupplierId, out Supplier? supplier) || Held(supplier, bankChanging.Contains(supplier.Id)) is not null)
             {
                 continue;
             }
@@ -297,7 +297,7 @@ public sealed class PaymentRunService : IPaymentRunService
             decimal available = credits.Where(c => c.TraderId == supplier.Id && c.Currency.Value == group.Key.Currency).Sum(c => c.OutstandingTransaction);
 
             // Exactly what the run does: credits are set against the invoices up to what is due; the rest is paid.
-            bool held = supplier.OnHold || bankChanging.Contains(supplier.Id);
+            bool held = Held(supplier, bankChanging.Contains(supplier.Id)) is not null;
             decimal apply = held ? 0m : Math.Min(available, due);
             decimal toPay = held ? 0m : due - apply;
             decimal withholding = toPay > 0m ? await WithholdingOnAsync(request, supplier, toPay, ct).ConfigureAwait(false) : 0m;
@@ -510,9 +510,31 @@ public sealed class PaymentRunService : IPaymentRunService
         => new(batch.Number, batch.Status, batch.PaymentDate, [.. batch.Lines.OrderBy(l => l.SupplierCode, StringComparer.Ordinal)
             .Select(l => new SavedPaymentLine(l.SupplierCode, l.Currency, l.Due, l.Amount, l.Included, l.Note, l.PaymentNumber))]);
 
-    private async Task<HashSet<long>> BankChangingAsync(long companyId, CancellationToken ct)
-        => [.. await _db.Set<SupplierBankChange>().Where(c => c.CompanyId == companyId && c.Status == BankChangeStatus.Pending)
+    private Task<HashSet<long>> BankChangingAsync(long companyId, CancellationToken ct) => BankChangingAsync(_db, companyId, null, ct);
+
+    /// <summary>The suppliers with a bank-detail change waiting for approval (all of the company's, or just the one given).</summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="companyId">The company.</param>
+    /// <param name="supplierId">One supplier, or null for all.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Their ids.</returns>
+    internal static async Task<HashSet<long>> BankChangingAsync(One4AllDbContext db, long companyId, long? supplierId, CancellationToken ct)
+        => [.. await db.Set<SupplierBankChange>().Where(c => c.CompanyId == companyId && c.Status == BankChangeStatus.Pending && (supplierId == null || c.SupplierId == supplierId))
             .Select(c => c.SupplierId).ToListAsync(ct).ConfigureAwait(false)];
+
+    /// <summary>
+    /// Why a supplier must not be paid now, or null: on hold or blacklisted, or with a bank-detail change waiting for approval (paying to details about to
+    /// change is how payment fraud works). The payment run leaves such a supplier out; a single payment a user enters is refused with this error.
+    /// </summary>
+    /// <param name="supplier">The supplier.</param>
+    /// <param name="bankChanging">Whether a bank-detail change is pending for it.</param>
+    /// <returns>The reason, or null.</returns>
+    internal static Error? Held(Supplier supplier, bool bankChanging)
+        => supplier.IsBlacklisted || supplier.OnHold
+            ? Error.Rule("Ap.SupplierHeld", $"Supplier {supplier.Code} is {(supplier.IsBlacklisted ? "blacklisted" : "on hold")}; it cannot be paid.")
+            : bankChanging
+                ? Error.Rule("Ap.BankChangePending", $"Supplier {supplier.Code} has a bank-detail change waiting for approval; pay it once the change is approved or rejected.")
+                : null;
 
     private async Task<(List<OpenItem> DueInvoices, List<OpenItem> Credits, Dictionary<long, Supplier> Suppliers)> SelectAsync(PaymentRunRequest request, CancellationToken ct)
     {

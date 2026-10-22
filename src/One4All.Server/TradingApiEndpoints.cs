@@ -263,9 +263,24 @@ internal static class TradingApiEndpoints
             return mapped.IsFailure ? Value(mapped) : Value(await purchases.PostCreditNoteAsync(mapped.Value, ct).ConfigureAwait(false));
         }).RequireAuthorization().WithName("PostPurchaseCreditNote");
 
-        api.MapPost("/api/trading/supplier-payments", async (long companyId, SupplierPaymentApi request, IPurchaseLedgerService purchases, CancellationToken ct) =>
+        // The payer is whoever the token belongs to; the payment is held to the payment run's controls (supplier held or bank details changing; a second
+        // person's approval, named by user name, where the company requires it).
+        api.MapPost("/api/trading/supplier-payments", async (long companyId, long userId, SupplierPaymentApi request, IPurchaseLedgerService purchases, One4AllDbContext db,
+            CancellationToken ct) =>
         {
-            Result<PaymentRequest> mapped = TradingApiMapping.SupplierPayment(companyId, request);
+            ArgumentNullException.ThrowIfNull(request);
+            long? approver = null;
+            if (!string.IsNullOrWhiteSpace(request.ApprovedBy))
+            {
+                string name = request.ApprovedBy.Trim().ToUpperInvariant();
+                approver = await db.Users.AsNoTracking().Where(u => u.NormalizedUsername == name).Select(u => (long?)u.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+                if (approver is null)
+                {
+                    return Value(Result<bool>.Failure(Error.Validation("Ap.ApproverNotFound", $"No user {request.ApprovedBy.Trim()} to have approved the payment.")));
+                }
+            }
+
+            Result<PaymentRequest> mapped = TradingApiMapping.SupplierPayment(companyId, request, userId, approver);
             return mapped.IsFailure ? Value(mapped) : Value(await purchases.PostPaymentAsync(mapped.Value, ct).ConfigureAwait(false));
         }).RequireAuthorization().WithName("PostSupplierPayment");
 
