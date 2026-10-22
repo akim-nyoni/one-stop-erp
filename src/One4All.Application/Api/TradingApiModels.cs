@@ -1,7 +1,9 @@
+using One4All.Application.Abstractions.MasterData;
 using One4All.Application.Abstractions.Pos;
 using One4All.Application.Abstractions.Trading;
 using One4All.Core.Accounting;
 using One4All.Core.Common;
+using One4All.Core.Inventory;
 using One4All.Core.Pos;
 
 namespace One4All.Application.Api;
@@ -157,6 +159,24 @@ public static class TradingApiMapping
     /// <returns>The currency, or a validation error.</returns>
     public static Result<CurrencyCode> Currency(string? text)
         => CurrencyCode.TryParse(text, out CurrencyCode code) ? code : Error.Validation("Api.Currency", $"'{text}' is not an ISO currency code.");
+
+    /// <summary>
+    /// An item change as the master-data service applies it (so its rules hold for the API too, e.g. a standard cost on stock on hand changes
+    /// only by revaluation): what the request leaves out keeps the item's current value, codes are trimmed and upper-cased.
+    /// </summary>
+    /// <param name="item">The item as it stands.</param>
+    /// <param name="api">The change as sent.</param>
+    /// <returns>The update.</returns>
+    public static ItemUpdate ItemChange(Item item, ItemApi api)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        ArgumentNullException.ThrowIfNull(api);
+        return new ItemUpdate(item.Code, string.IsNullOrWhiteSpace(api.Description) ? item.Description : api.Description.Trim(),
+            Upper(api.RevenueAccountCode) ?? item.RevenueAccountCode, Upper(api.CostOfSalesAccountCode) ?? item.CostOfSalesAccountCode, api.StandardCost ?? item.StandardCost,
+            Upper(api.PriceVarianceAccountCode) ?? item.PriceVarianceAccountCode, item.UsageVarianceAccountCode, Upper(api.Category) ?? item.Category);
+
+        static string? Upper(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim().ToUpperInvariant();
+    }
 
     /// <summary>A sales invoice request.</summary>
     /// <param name="companyId">The company.</param>

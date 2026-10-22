@@ -1,7 +1,9 @@
 using FluentAssertions;
+using One4All.Application.Abstractions.MasterData;
 using One4All.Application.Abstractions.Pos;
 using One4All.Application.Abstractions.Trading;
 using One4All.Application.Api;
+using One4All.Core.Inventory;
 using One4All.Core.Pos;
 using Xunit;
 
@@ -53,5 +55,22 @@ public sealed class TradingApiMappingTests
 
         TradingApiMapping.PosSale(3, sale with { Tenders = [new PosTenderApi("beads", "USD", 1m, "1000")] }).Error.Code.Should().Be("Api.TenderType");
         TradingApiMapping.PosSale(3, sale with { Lines = [] }).Error.Code.Should().Be("Api.Sale");
+    }
+
+    [Fact]
+    public void An_item_change_goes_through_the_master_data_update_keeping_what_it_leaves_out()
+    {
+        Item item = new(3, "BOLT", "Bolt", ItemType.Stock, CostingMethod.Standard)
+        {
+            StandardCost = 2m, RevenueAccountCode = "4000", CostOfSalesAccountCode = "5000", PriceVarianceAccountCode = "6000", UsageVarianceAccountCode = "6100", Category = "HARDWARE",
+        };
+
+        ItemUpdate kept = TradingApiMapping.ItemChange(item, new ItemApi("ignored", " "));
+        kept.Should().Be(new ItemUpdate("BOLT", "Bolt", "4000", "5000", 2m, "6000", "6100", "HARDWARE"), "what the request leaves out keeps the item's value");
+
+        ItemUpdate changed = TradingApiMapping.ItemChange(item, new ItemApi("ignored", " Bolt M8 ", RevenueAccountCode: " 4100 ", Category: "fixings", StandardCost: 3m,
+            PriceVarianceAccountCode: "6050"));
+        changed.Should().Be(new ItemUpdate("BOLT", "Bolt M8", "4100", "5000", 3m, "6050", "6100", "FIXINGS"),
+            "the standard cost reaches the service, whose revaluation rule then decides whether it may change");
     }
 }

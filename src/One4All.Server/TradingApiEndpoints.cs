@@ -194,7 +194,7 @@ internal static class TradingApiEndpoints
             return Results.Created($"/api/master/items/{item.Id}", ItemView(item));
         }).RequireAuthorization().WithName("CreateItem");
 
-        api.MapPut("/api/master/items/{itemId:long}", async (long itemId, long companyId, ItemApi request, One4AllDbContext db, CancellationToken ct) =>
+        api.MapPut("/api/master/items/{itemId:long}", async (long itemId, long companyId, ItemApi request, IMasterDataService master, One4AllDbContext db, CancellationToken ct) =>
         {
             Item? item = await db.Items.FirstOrDefaultAsync(i => i.Id == itemId && i.CompanyId == companyId, ct).ConfigureAwait(false);
             if (item is null)
@@ -202,19 +202,12 @@ internal static class TradingApiEndpoints
                 return NotFound($"Item {itemId} not found.");
             }
 
-            if (!string.IsNullOrWhiteSpace(request.Description))
-            {
-                item.Description = request.Description.Trim();
-            }
-
-            item.RevenueAccountCode = Clean(request.RevenueAccountCode) ?? item.RevenueAccountCode;
-            item.CostOfSalesAccountCode = Clean(request.CostOfSalesAccountCode) ?? item.CostOfSalesAccountCode;
-            item.Category = Clean(request.Category) ?? item.Category;
+            // The tax code and active flag ride on the tracked item; the rest goes through the master-data service, so its rules hold here too (a
+            // standard cost on stock on hand changes only by revaluation). The service saves them all in one SaveChanges, or nothing when it refuses.
             item.TaxCode = Clean(request.TaxCode) ?? item.TaxCode;
-            item.StandardCost = request.StandardCost ?? item.StandardCost;
             item.IsActive = request.IsActive;
-            await db.SaveChangesAsync(ct).ConfigureAwait(false);
-            return Results.Ok(ItemView(item));
+            Result updated = await master.UpdateItemAsync(companyId, TradingApiMapping.ItemChange(item, request), ct).ConfigureAwait(false);
+            return updated.IsFailure ? Action(updated) : Results.Ok(ItemView(item));
         }).RequireAuthorization().WithName("UpdateItem");
 
         api.MapDelete("/api/master/items/{itemId:long}", async (long itemId, long companyId, One4AllDbContext db, CancellationToken ct) =>

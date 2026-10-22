@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Inventory;
 using One4All.Application.Abstractions.MasterData;
+using One4All.Application.Api;
 using One4All.Core.Accounting;
 using One4All.Core.Inventory;
 using One4All.Infrastructure.Persistence;
@@ -69,5 +70,14 @@ public sealed class ItemTradeDetailsTests
         (await master.UpdateItemAsync(companyId, update with { StandardCost = 3m })).Error.Code.Should().Be("Master.StandardCostRevalue");
         (await master.UpdateItemAsync(companyId, update with { Description = "Standard bolt M8 zinc" })).IsSuccess.Should().BeTrue("the standard cost is unchanged");
         (await master.UpdateItemAsync(companyId, update with { Code = "NONE" })).Error.Code.Should().Be("Master.ItemNotFound");
+
+        // The REST API's PUT /api/master/items/{id} maps its request through TradingApiMapping.ItemChange into the same update, so the rule holds there too.
+        Item current = await db.Items.AsNoTracking().SingleAsync(i => i.Id == std.Id);
+        (await master.UpdateItemAsync(companyId, TradingApiMapping.ItemChange(current, new ItemApi(current.Code, string.Empty, StandardCost: 3m)))).Error.Code
+            .Should().Be("Master.StandardCostRevalue", "the API cannot set a standard cost on stock on hand directly either");
+        (await master.UpdateItemAsync(companyId, TradingApiMapping.ItemChange(current, new ItemApi(current.Code, "Standard bolt M8 API")))).IsSuccess
+            .Should().BeTrue("an API change that leaves the standard cost alone still applies");
+        Item afterApi = await db.Items.AsNoTracking().SingleAsync(i => i.Id == std.Id);
+        (afterApi.Description, afterApi.StandardCost, afterApi.PriceVarianceAccountCode).Should().Be(("Standard bolt M8 API", (decimal?)2.5m, (string?)"6000"));
     }
 }
