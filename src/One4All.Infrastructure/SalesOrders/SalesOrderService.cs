@@ -435,7 +435,13 @@ public sealed class SalesOrderService : ISalesOrderService
     }
 
     /// <inheritdoc />
-    public async Task<Result<decimal>> ReturnDespatchAsync(long companyId, long salesOrderId, long salesOrderLineId, long warehouseId, DateOnly date, decimal quantity, string reason, CancellationToken ct = default)
+    public Task<Result<decimal>> ReturnDespatchAsync(long companyId, long salesOrderId, long salesOrderLineId, long warehouseId, DateOnly date, decimal quantity, string reason,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReturnDespatchCoreAsync(companyId, salesOrderId, salesOrderLineId, warehouseId, date, quantity, reason, ct), ct);
+
+    // One unit of work: a kit's later component failing leaves none of the earlier components received back.
+    private async Task<Result<decimal>> ReturnDespatchCoreAsync(long companyId, long salesOrderId, long salesOrderLineId, long warehouseId, DateOnly date, decimal quantity, string reason,
+        CancellationToken ct)
     {
         if (quantity <= 0m)
         {
@@ -466,13 +472,20 @@ public sealed class SalesOrderService : ISalesOrderService
             return Error.Rule("Sop.NotReturnable", $"Order line {line.Id}: cannot return {quantity}; only {returnable} despatched and uninvoiced.");
         }
 
+        // The goods (a kit's components) come back at what they cost when this order line was despatched - the average of the issues on the
+        // deliveries that carried it - reversing the cost of sales booked then, not at today's average (and never at nil for an emptied balance).
+        List<string> deliveries = await _db.SalesDeliveries.Where(d => d.CompanyId == companyId && d.SalesOrderId == order.Id && d.Lines.Any(l => l.SalesOrderLineId == line.Id))
+            .Select(d => d.Reference).ToListAsync(ct).ConfigureAwait(false);
         decimal returnedValue = 0m;
         foreach ((Item item, decimal returned) in await Inventory.KitExplosion.StockLinesAsync(_db, companyId, line.ItemId, quantity, ct).ConfigureAwait(false))
         {
-            // Return the goods (a kit's components) to stock at the current average cost, reversing cost of sales.
-            decimal averageCost = await _db.Set<StockBalance>()
-                .Where(b => b.CompanyId == companyId && b.ItemId == item.Id && b.WarehouseId == warehouseId)
-                .Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            var issued = await _db.Set<StockMovement>().Where(m => m.CompanyId == companyId && m.ItemId == item.Id && m.Type == StockMovementType.Issue && !m.IsReversed
+                    && m.Reference != null && deliveries.Contains(m.Reference))
+                .GroupBy(m => 1).Select(g => new { Quantity = g.Sum(m => Math.Abs(m.Quantity)), Value = g.Sum(m => Math.Abs(m.Value)) }).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            decimal unitCost = issued is { Quantity: > 0m }
+                ? decimal.Round(issued.Value / issued.Quantity, 4, MidpointRounding.ToEven)
+                : await _db.Set<StockBalance>().Where(b => b.CompanyId == companyId && b.ItemId == item.Id && b.WarehouseId == warehouseId)
+                    .Select(b => b.AverageCost).FirstOrDefaultAsync(ct).ConfigureAwait(false);
 
             Result<StockMovementResult> receipt = await _inventory.ReceiveAsync(new ReceiveStockRequest
             {
@@ -481,7 +494,7 @@ public sealed class SalesOrderService : ISalesOrderService
                 WarehouseId = warehouseId,
                 Date = date,
                 Quantity = returned,
-                UnitCost = averageCost,
+                UnitCost = unitCost,
                 CreditAccountCode = item.CostOfSalesAccountCode!,
                 Reference = $"RET:{order.OrderNumber}",
             }, ct).ConfigureAwait(false);
