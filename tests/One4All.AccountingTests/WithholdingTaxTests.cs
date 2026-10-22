@@ -24,6 +24,30 @@ public sealed class WithholdingTaxTests
     public WithholdingTaxTests(AccountingFixture fixture) => _fixture = fixture;
 
     [SkippableFact]
+    public async Task Nothing_is_withheld_where_no_cash_leaves()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.Add(new LedgerAccount(companyId, "2495", "Withholding Tax Payable", AccountType.Liability));
+        TaxCode wht = new(companyId, "WHT30", "Withholding 30%", TaxType.Withholding) { OutputAccountCode = "2495", IsActive = true };
+        wht.AddRate(new DateOnly(2026, 1, 1), 30m);
+        db.TaxCodes.Add(wht);
+        Supplier uncleared = new(companyId, "WHT-N", "Contra Partner Ltd", Scenario.Usd);
+        db.Suppliers.Add(uncleared);
+        await db.SaveChangesAsync();
+
+        // A contra or a creditor write-back moves no money to the supplier: even an uncleared supplier has nothing withheld (found with sixteenth audit #26).
+        (await scope.ServiceProvider.GetRequiredService<IPurchaseLedgerService>().PostPaymentAsync(new PaymentRequest
+        {
+            CompanyId = companyId, SupplierId = uncleared.Id, DocumentNumber = "WHT-NC", PaymentDate = new DateOnly(2026, 3, 20), Currency = Scenario.Usd, Amount = 2_000m,
+            BankAccountCode = "1100", WithholdingTaxCode = "WHT30", NoCashPaid = true,
+        })).Value.WithheldBase.Should().Be(0m);
+    }
+
+    [SkippableFact]
     public async Task Payments_to_uncleared_suppliers_withhold_tax_that_is_then_remitted()
     {
         Skip.IfNot(_fixture.Available, _fixture.SkipReason);

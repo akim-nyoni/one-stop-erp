@@ -343,6 +343,12 @@ public sealed class PaymentRequest
     public string? WithholdingTaxCode { get; init; }
 
     /// <summary>
+    /// Set when no money leaves the business (a contra settled through the clearing account, a creditor write-back to income): nothing is withheld,
+    /// since withholding tax is on cash paid to the supplier and holding it back would leave the clearing or income account short.
+    /// </summary>
+    public bool NoCashPaid { get; init; }
+
+    /// <summary>
     /// The user who keys a single payment (the desktop's Supplier payment, the REST API): it is then held to the payment run's controls - refused for a
     /// supplier on hold or blacklisted or with a bank-detail change pending, and, where the company requires payment approval, it needs
     /// <see cref="ApprovedByUserId"/>. Null for payments posted from documents already controlled elsewhere (the payment run, a contra, a write-back,

@@ -480,7 +480,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         Result<TradingPostingResult> apPayment = await PostPaymentAsync(new PaymentRequest
         {
             CompanyId = companyId, SupplierId = supplierId, DocumentNumber = documentNumber, PaymentDate = date,
-            Currency = apItem.Currency, Amount = amount, BankAccountCode = contraClearingAccountCode, Narrative = "Contra settlement",
+            Currency = apItem.Currency, Amount = amount, BankAccountCode = contraClearingAccountCode, Narrative = "Contra settlement", NoCashPaid = true,
         }, ct).ConfigureAwait(false);
         if (apPayment.IsFailure)
         {
@@ -672,6 +672,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             BankAccountCode = writeBackAccountCode,
             ExchangeRate = item.ExchangeRate,
             Narrative = $"Creditor write-back of {item.DocumentNumber}: {reason}",
+            NoCashPaid = true,
         }, ct).ConfigureAwait(false);
 
         if (writeBack.IsFailure)
@@ -1401,7 +1402,8 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         // Withholding tax applies to a supplier without a valid tax clearance on the payment date (the code asked for, else the company's default)
         // once the year's payments to it, with this one, reach the company's threshold.
         TaxCode? withholding = null;
-        if (await TraderCertificates.WithholdingCodeForPaymentAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, baseAmount, ct).ConfigureAwait(false) is string code)
+        if (!request.NoCashPaid
+            && await TraderCertificates.WithholdingCodeForPaymentAsync(_db, request.CompanyId, supplier, request.PaymentDate, request.WithholdingTaxCode, baseAmount, ct).ConfigureAwait(false) is string code)
         {
             withholding = await _db.TaxCodes.Include(t => t.Rates)
                 .FirstOrDefaultAsync(t => t.CompanyId == request.CompanyId && t.Code == code && t.IsActive, ct).ConfigureAwait(false);
