@@ -52,7 +52,7 @@ public sealed class FiscalisationExtrasTests
         DateOnly day = new(2026, 6, 2);
         Task<Result<CompleteSaleResult>> Sell(string number) => pos.CompleteSaleAsync(new CompleteSaleRequest
         {
-            CompanyId = companyId, TerminalId = terminal.Id, TillSessionId = session, CashierUserId = 1, SaleNumber = number, SaleDate = day, WarehouseId = shop.Id, TaxAccountCode = "2200",
+            CompanyId = companyId, TerminalId = terminal.Id, TillSessionId = session, CashierUserId = 900_001, SaleNumber = number, SaleDate = day, WarehouseId = shop.Id, TaxAccountCode = "2200",
             Lines = [new PosSaleLineRequest(soap.Id, "Soap", 2m, 5m, 10m, 1.5m, "4000")],
             Tenders = [new PosTenderRequest(TenderType.Cash, Scenario.Usd, 11.5m, "1000", IsChange: false)],
         });
@@ -64,7 +64,7 @@ public sealed class FiscalisationExtrasTests
         long supervisor = await Scenario.UserWithAsync(db, "fx-supervisor", "Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel1);
         var refunded = await events.RefundAsync(new PosRefundRequest
         {
-            CompanyId = companyId, SaleId = first.SaleId, TerminalId = terminal.Id, CashierUserId = 1, AuthorisedByUserId = supervisor, Date = day, RefundAccountCode = "1000", TaxAccountCode = "2200",
+            CompanyId = companyId, SaleId = first.SaleId, TerminalId = terminal.Id, CashierUserId = 900_001, AuthorisedByUserId = supervisor, Date = day, RefundAccountCode = "1000", TaxAccountCode = "2200",
             Reason = "Damaged", Lines = [new PosRefundLine(sold.Lines[0].Id, 1m)], TillSessionId = session,
         });
         refunded.IsSuccess.Should().BeTrue(refunded.IsFailure ? refunded.Error.Message : null);
