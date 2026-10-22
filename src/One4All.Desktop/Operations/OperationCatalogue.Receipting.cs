@@ -54,10 +54,15 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Arrangements, dishonours and refunds", ListTitle = "Payment arrangements",
             Description = "A payment arrangement on a debtor's account (total and monthly instalment from a start date); a dishonoured cheque or reversed transfer, with an "
-                + "optional penalty charged; money held in suspense allocated to an account; and a credit balance refunded to the debtor (approved by the user doing it).",
-            Fields = [Pick("Step", "Step", ["Arrangement", "Dishonour", "Allocate from suspense", "Refund credit"]), Opt("Payer", "Customer code or stand number"), Num("Amount", "Amount / total", "0"),
-                Num("Instalment", "Monthly instalment (arrangement)", "0"), Opt("Receipt", "Receipt number (dishonour)"), Num("Penalty", "Penalty (dishonour)", "0"), Opt("PenaltyAccount", "Penalty income account"),
-                Opt("Suspense", "Suspense account"), Pick("Strategy", "Allocate to", Enum.GetNames<ReceiptAllocationStrategy>()), Opt("Bank", "Bank account (refund)"), Opt("Reason", "Reason"), Today()],
+                + "optional penalty charged; money held in a suspense control account allocated to an account (naming the unidentified receipt it came in on, where there is one); "
+                + "and a credit balance refunded to the debtor in one currency from a bank account in that currency - asked for by one user, paid only when another with the "
+                + "receipts approval right approves it.",
+            Fields = [Pick("Step", "Step", ["Arrangement", "Dishonour", "Allocate from suspense", "Request credit refund", "Approve credit refund", "Reject credit refund"]),
+                Opt("Payer", "Customer code or stand number"), Num("Amount", "Amount / total", "0"),
+                Num("Instalment", "Monthly instalment (arrangement)", "0"), Opt("Receipt", "Receipt number (dishonour, or the unidentified receipt for suspense)"), Num("Penalty", "Penalty (dishonour)", "0"),
+                Opt("PenaltyAccount", "Penalty income account"), Opt("Suspense", "Suspense account"), Pick("Strategy", "Allocate to", Enum.GetNames<ReceiptAllocationStrategy>()),
+                CurrencyPick("Currency", "Currency of the credit refunded (blank: base)"), Opt("Bank", "Bank account (refund, in that currency)"), OptNum("Request", "Refund request id (approve / reject)"),
+                Opt("Reason", "Reason"), Today()],
             Run = async (c, i) =>
             {
                 IReceiptingService receipting = c.Get<IReceiptingService>();
@@ -73,13 +78,22 @@ public static partial class OperationCatalogue
                             penalty > 0m ? $"{number}-DH" : null, c.UserId, reason).ConfigureAwait(true), $"Receipt {number} dishonoured" + (penalty > 0m ? $"; penalty {M(penalty)} charged." : "."));
                     case "Allocate from suspense":
                         ReceiptResult moved = Check(await receipting.AllocateFromSuspenseAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
-                            i.Date("Date"), i.Optional("Suspense") ?? throw new OperationException("Give the suspense account."), Enum.Parse<ReceiptAllocationStrategy>(i.Text("Strategy")), reason)
-                            .ConfigureAwait(true));
+                            i.Date("Date"), i.Optional("Suspense") ?? throw new OperationException("Give the suspense account."), Enum.Parse<ReceiptAllocationStrategy>(i.Text("Strategy")), reason,
+                            c.UserId, i.Optional("Receipt")).ConfigureAwait(true));
                         return $"Receipt {moved.ReceiptNumber}: {M(moved.AllocatedToDebt)} to the account, {M(moved.CreditOnAccount)} credit on account.";
-                    case "Refund credit":
-                        RefundResult refunded = Check(await receipting.RefundCreditAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
-                            i.Date("Date"), i.Optional("Bank") ?? throw new OperationException("Give the bank account."), c.UserId, reason).ConfigureAwait(true));
+                    case "Request credit refund":
+                        CurrencyCode currency = i.Optional("Currency") is string picked ? CurrencyCode.Parse(picked)
+                            : await c.Db.Companies.AsNoTracking().Where(x => x.Id == c.CompanyId).Select(x => x.BaseCurrency).FirstAsync().ConfigureAwait(true);
+                        long requested = Check(await receipting.RequestCreditRefundAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), currency,
+                            i.Number("Amount"), i.Date("Date"), i.Optional("Bank") ?? throw new OperationException("Give the bank account."), c.UserId, reason).ConfigureAwait(true));
+                        return $"Refund request {requested} of {currency.Value} {M(i.Number("Amount"))} awaits another user's approval.";
+                    case "Approve credit refund":
+                        RefundResult refunded = Check(await receipting.ApproveCreditRefundAsync(c.CompanyId, (long)(i.OptionalNumber("Request") ?? throw new OperationException("Give the refund request id.")),
+                            c.UserId).ConfigureAwait(true));
                         return $"Refunded {M(refunded.Amount)} (journal {refunded.JournalNumber}).";
+                    case "Reject credit refund":
+                        return Check(await receipting.RejectCreditRefundAsync(c.CompanyId, (long)(i.OptionalNumber("Request") ?? throw new OperationException("Give the refund request id.")), c.UserId,
+                            reason).ConfigureAwait(true), "Refund request turned down.");
                     default:
                         long arrangement = Check(await receipting.CaptureArrangementAsync(c.CompanyId, await PayerAsync(c, i.Optional("Payer") ?? string.Empty).ConfigureAwait(true), i.Number("Amount"),
                             i.Number("Instalment"), i.Date("Date")).ConfigureAwait(true));

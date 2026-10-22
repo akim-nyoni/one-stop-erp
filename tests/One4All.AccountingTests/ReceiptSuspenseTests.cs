@@ -1,8 +1,10 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Receipting;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Application.Abstractions.Trading;
+using One4All.Core.Accounting;
 using One4All.Core.Receipting;
 using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
@@ -15,6 +17,7 @@ namespace One4All.AccountingTests;
 public sealed class ReceiptSuspenseTests
 {
     private const long Cashier = 8001;
+    private const long Allocator = 8002;
 
     private readonly AccountingFixture _fixture;
 
@@ -29,12 +32,14 @@ public sealed class ReceiptSuspenseTests
         long companyId;
         long customerId;
         long stationId;
+        string suspenseReceipt;
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
             Customer resident = new(companyId, "RES-S", "S. Resident", Scenario.Usd);
             db.Customers.Add(resident);
+            (await db.Accounts.SingleAsync(a => a.CompanyId == companyId && a.AccountCode == "2600")).MakeControlAccount(ControlAccountType.Suspense);
             CashierStation station = new(companyId, "TILL-S", "Counter S", "RS");
             db.Set<CashierStation>().Add(station);
             await db.SaveChangesAsync();
@@ -62,6 +67,7 @@ public sealed class ReceiptSuspenseTests
                 Tenders = [new ReceiptTenderRequest(TenderType.BankTransfer, 300m, "ZX99")],
             });
             suspense.IsSuccess.Should().BeTrue(suspense.IsFailure ? suspense.Error.ToString() : null);
+            suspenseReceipt = suspense.Value.ReceiptNumber;
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
@@ -75,13 +81,29 @@ public sealed class ReceiptSuspenseTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IReceiptingService rcp = scope.ServiceProvider.GetRequiredService<IReceiptingService>();
-            var moved = await rcp.AllocateFromSuspenseAsync(companyId, customerId, 300m, new DateOnly(2026, 1, 26), "2600", ReceiptAllocationStrategy.OldestFirst, "Identified as SB-1 payment");
+            DateOnly day = new(2026, 1, 26);
+
+            // Only a suspense control account, and no more than it holds unallocated.
+            (await rcp.AllocateFromSuspenseAsync(companyId, customerId, 50m, day, "1100", ReceiptAllocationStrategy.OldestFirst, "Not suspense", Allocator)).Error.Code.Should().Be("Rcp.NotSuspense");
+            (await rcp.AllocateFromSuspenseAsync(companyId, customerId, 350m, day, "2600", ReceiptAllocationStrategy.OldestFirst, "Too much", Allocator)).Error.Code.Should().Be("Rcp.SuspenseBalance");
+            (await rcp.AllocateFromSuspenseAsync(companyId, customerId, 50m, day, "2600", ReceiptAllocationStrategy.OldestFirst, "No such receipt", Allocator, "NOPE-1")).Error.Code
+                .Should().Be("Rcp.ReceiptNotFound");
+
+            var moved = await rcp.AllocateFromSuspenseAsync(companyId, customerId, 300m, day, "2600", ReceiptAllocationStrategy.OldestFirst, "Identified as SB-1 payment", Allocator, suspenseReceipt);
             moved.IsSuccess.Should().BeTrue(moved.IsFailure ? moved.Error.ToString() : null);
             moved.Value.AllocatedToDebt.Should().Be(300m);
 
-            var noReason = await rcp.AllocateFromSuspenseAsync(companyId, customerId, 50m, new DateOnly(2026, 1, 26), "2600", ReceiptAllocationStrategy.OldestFirst, "  ");
+            var noReason = await rcp.AllocateFromSuspenseAsync(companyId, customerId, 50m, day, "2600", ReceiptAllocationStrategy.OldestFirst, "  ", Allocator);
             noReason.IsFailure.Should().BeTrue();
             noReason.Error.Code.Should().Be("Rcp.ReasonRequired");
+        }
+
+        // The allocation records who made it and the unidentified receipt it cleared.
+        await using (AsyncServiceScope scope = provider.CreateAsyncScope())
+        {
+            One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+            SuspenseAllocation logged = await db.SuspenseAllocations.AsNoTracking().SingleAsync(a => a.CompanyId == companyId);
+            (logged.AllocatedByUserId, logged.ReceiptNumber, logged.Amount).Should().Be(((long?)Allocator, (string?)suspenseReceipt, 300m));
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

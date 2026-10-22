@@ -32,10 +32,12 @@ public sealed class RefundAndBankingTests
         long companyId;
         long customerId;
         long stationId;
+        long approver;
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
+            approver = await Scenario.UserWithAsync(db, "rf-approver", "Sales.Receipt", Core.Security.OperationFlags.Approve);
             Customer c = new(companyId, "OVR-1", "Overpayer", Scenario.Usd);
             db.Customers.Add(c);
             CashierStation station = new(companyId, "TILL-O", "Counter O", "RO");
@@ -65,13 +67,21 @@ public sealed class RefundAndBankingTests
             IReceiptingService rcp = scope.ServiceProvider.GetRequiredService<IReceiptingService>();
 
             // Cannot refund more than the available credit.
-            var tooMuch = await rcp.RefundCreditAsync(companyId, customerId, 250m, new DateOnly(2026, 1, 15), "1100", Approver, "duplicate payment");
+            var tooMuch = await rcp.RequestCreditRefundAsync(companyId, customerId, Scenario.Usd, 250m, new DateOnly(2026, 1, 15), "1100", Cashier, "duplicate payment");
             tooMuch.IsFailure.Should().BeTrue();
             tooMuch.Error.Code.Should().Be("Rcp.InsufficientCredit");
 
-            var refund = await rcp.RefundCreditAsync(companyId, customerId, 200m, new DateOnly(2026, 1, 15), "1100", Approver, "duplicate payment");
+            // Asking pays nothing; the one who asked cannot approve it, nor can a user without the approval right.
+            long request = (await rcp.RequestCreditRefundAsync(companyId, customerId, Scenario.Usd, 200m, new DateOnly(2026, 1, 15), "1100", Cashier, "duplicate payment")).Value;
+            (await rcp.RequestCreditRefundAsync(companyId, customerId, Scenario.Usd, 1m, new DateOnly(2026, 1, 15), "1100", Cashier, "again")).Error.Code
+                .Should().Be("Rcp.InsufficientCredit", "the credit is promised to the pending request");
+            (await rcp.ApproveCreditRefundAsync(companyId, request, Cashier)).Error.Code.Should().Be("Rcp.SelfApproval");
+            (await rcp.ApproveCreditRefundAsync(companyId, request, 987_654_321)).Error.Code.Should().Be("Rcp.RefundApprover");
+
+            var refund = await rcp.ApproveCreditRefundAsync(companyId, request, approver);
             refund.IsSuccess.Should().BeTrue(refund.IsFailure ? refund.Error.ToString() : null);
             refund.Value.Amount.Should().Be(200m);
+            (await rcp.ApproveCreditRefundAsync(companyId, request, approver)).Error.Code.Should().Be("Rcp.RefundNotPending");
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
@@ -90,6 +100,57 @@ public sealed class RefundAndBankingTests
             tb.Rows.Should().Contain(r => r.AccountCode == "1000" && r.Debit == 200m);
             tb.Rows.Should().Contain(r => r.AccountCode == "1100" && r.Credit == 200m);
         }
+    }
+
+    [SkippableFact]
+    public async Task A_credit_is_refunded_in_its_own_currency_from_an_account_in_that_currency()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        long approver = await Scenario.UserWithAsync(db, "rf-fx-approver", "Sales.Receipt", Core.Security.OperationFlags.Approve);
+        Customer payer = new(companyId, "OVR-FX", "Two-currency overpayer", Scenario.Usd);
+        db.Customers.Add(payer);
+        await db.SaveChangesAsync();
+
+        // Nothing owed: 100 dollars and 200 euros paid in sit as credits in their own currencies.
+        ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<ISalesLedgerService>();
+        DateOnly day = new(2026, 3, 10);
+        (await ar.PostReceiptAsync(new Application.Abstractions.Trading.ReceiptRequest
+        {
+            CompanyId = companyId, CustomerId = payer.Id, DocumentNumber = "FX-R1", ReceiptDate = day, Currency = Scenario.Usd, Amount = 100m, BankAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+        var euros = await ar.PostReceiptAsync(new Application.Abstractions.Trading.ReceiptRequest
+        {
+            CompanyId = companyId, CustomerId = payer.Id, DocumentNumber = "FX-R2", ReceiptDate = day, Currency = Scenario.Eur, Amount = 200m, BankAccountCode = "1150",
+        });
+        euros.IsSuccess.Should().BeTrue(euros.IsFailure ? euros.Error.ToString() : null);
+
+        IReceiptingService rcp = scope.ServiceProvider.GetRequiredService<IReceiptingService>();
+        DateOnly paid = new(2026, 3, 12);
+
+        // The euros do not make up a dollar refund, and euros are not paid from the dollar bank.
+        (await rcp.RequestCreditRefundAsync(companyId, payer.Id, Scenario.Usd, 150m, paid, "1100", Cashier, "Overpaid")).Error.Code.Should().Be("Rcp.InsufficientCredit");
+        (await rcp.RequestCreditRefundAsync(companyId, payer.Id, Scenario.Eur, 200m, paid, "1100", Cashier, "Overpaid")).Error.Code.Should().Be("Rcp.RefundAccountCurrency");
+
+        long request = (await rcp.RequestCreditRefundAsync(companyId, payer.Id, Scenario.Eur, 200m, paid, "1150", Cashier, "Overpaid")).Value;
+        var refund = await rcp.ApproveCreditRefundAsync(companyId, request, approver);
+        refund.IsSuccess.Should().BeTrue(refund.IsFailure ? refund.Error.ToString() : null);
+
+        var journal = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.JournalNumber == refund.Value.JournalNumber);
+        journal.Lines.Single(l => l.AccountCode == "1150").Should().Match<Core.Accounting.JournalLine>(l => l.TransactionCurrency == Scenario.Eur && l.TransactionCredit == 200m);
+        List<OpenItem> credits = await db.OpenItems.AsNoTracking().Where(i => i.CompanyId == companyId && i.TraderId == payer.Id && i.Sign == LedgerSign.Credit).ToListAsync();
+        credits.Where(i => i.Currency == Scenario.Eur).Sum(i => i.OutstandingTransaction).Should().Be(0m, "the euro credit is refunded");
+        credits.Where(i => i.Currency == Scenario.Usd).Sum(i => i.OutstandingTransaction).Should().Be(100m, "the dollar credit is untouched");
+        ReceiptRefundRequest approved = await db.ReceiptRefundRequests.AsNoTracking().SingleAsync(r => r.Id == request);
+        (approved.Status, approved.RequestedByUserId, approved.DecidedByUserId).Should().Be((ReceiptRefundRequestStatus.Approved, Cashier, (long?)approver));
+
+        // A request can be turned down instead; nothing is paid.
+        long declined = (await rcp.RequestCreditRefundAsync(companyId, payer.Id, Scenario.Usd, 100m, paid, "1100", Cashier, "Overpaid")).Value;
+        (await rcp.RejectCreditRefundAsync(companyId, declined, approver, "Customer wants it kept on account")).IsSuccess.Should().BeTrue();
+        (await rcp.ApproveCreditRefundAsync(companyId, declined, approver)).Error.Code.Should().Be("Rcp.RefundNotPending");
     }
 
     [SkippableFact]

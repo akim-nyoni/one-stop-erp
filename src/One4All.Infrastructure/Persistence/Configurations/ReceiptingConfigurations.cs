@@ -170,7 +170,26 @@ internal sealed class SuspenseAllocationConfiguration : IEntityTypeConfiguration
         b.HasKey(x => x.Id);
         b.Property(x => x.Reason).HasMaxLength(300);
         b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.ReceiptNumber).HasMaxLength(30);
         b.HasIndex(x => new { x.CompanyId, x.Date });
+        b.HasIndex(x => new { x.CompanyId, x.ReceiptNumber });
+    }
+}
+
+internal sealed class ReceiptRefundRequestConfiguration : IEntityTypeConfiguration<ReceiptRefundRequest>
+{
+    public void Configure(EntityTypeBuilder<ReceiptRefundRequest> b)
+    {
+        b.ToTable("receipt_refund_request", Schemas.Receipting);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Currency).HasMaxLength(3);
+        b.Property(x => x.Amount).HasPrecision(19, 4);
+        b.Property(x => x.BankAccountCode).HasMaxLength(20);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.RejectionReason).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(30);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.CompanyId, x.CustomerId, x.Status });
     }
 }
 

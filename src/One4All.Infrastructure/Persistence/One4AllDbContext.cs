@@ -681,6 +681,9 @@ public class One4AllDbContext : DbContext
     /// <summary>Suspense allocation log.</summary>
     public DbSet<Core.Receipting.SuspenseAllocation> SuspenseAllocations => Set<Core.Receipting.SuspenseAllocation>();
 
+    /// <summary>Credit-balance refunds asked for and awaiting (or given) a second user's approval.</summary>
+    public DbSet<Core.Receipting.ReceiptRefundRequest> ReceiptRefundRequests => Set<Core.Receipting.ReceiptRefundRequest>();
+
     /// <summary>Dishonoured cheques / reversed payments.</summary>
     public DbSet<Core.Receipting.DishonouredPayment> DishonouredPayments => Set<Core.Receipting.DishonouredPayment>();
 

@@ -26,6 +26,7 @@ public sealed class ReceiptingService : IReceiptingService
     private readonly ISalesLedgerService _salesLedger;
     private readonly IAllocationService _allocation;
     private readonly Application.Abstractions.Security.IAuditService? _audit;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -33,9 +34,11 @@ public sealed class ReceiptingService : IReceiptingService
     /// <param name="salesLedger">The AR ledger (debtor receipts).</param>
     /// <param name="allocation">The allocation service (match receipt to invoices).</param>
     /// <param name="audit">Logs a refused receipt against a cashier's own or related account.</param>
+    /// <param name="permissions">Checks a credit refund's approver holds the receipts approval right.</param>
     public ReceiptingService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger, IAllocationService allocation,
-        Application.Abstractions.Security.IAuditService? audit = null)
+        Application.Abstractions.Security.IAuditService? audit = null, Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _audit = audit;
         _db = db;
         _posting = posting;
@@ -389,11 +392,8 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public Task<Result<RefundResult>> RefundCreditAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct = default)
-        => _db.AtomicAsync(() => RefundCreditCoreAsync(companyId, customerId, amount, date, bankAccountCode, approverUserId, reason, ct), ct);
-
-    // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<RefundResult>> RefundCreditCoreAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct)
+    public async Task<Result<long>> RequestCreditRefundAsync(long companyId, long customerId, CurrencyCode currency, decimal amount, DateOnly date, string bankAccountCode, long requestedByUserId,
+        string reason, CancellationToken ct = default)
     {
         if (amount <= 0m)
         {
@@ -405,32 +405,82 @@ public sealed class ReceiptingService : IReceiptingService
             return Error.Validation("Rcp.ReasonRequired", "A refund requires a reason.");
         }
 
-        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
-        if (company is null)
+        if (!await _db.Set<Customer>().AnyAsync(c => c.Id == customerId && c.CompanyId == companyId, ct).ConfigureAwait(false))
         {
-            return Error.NotFound("Rcp.CompanyNotFound", $"Company {companyId} not found.");
+            return Error.NotFound("Rcp.PayerNotFound", $"Customer {customerId} not found.");
         }
 
-        List<OpenItem> credits = await _db.Set<OpenItem>()
-            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId && i.Sign == LedgerSign.Credit && i.OutstandingTransaction > 0m)
-            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
-            .ToListAsync(ct).ConfigureAwait(false);
+        if (await RefundAccountErrorAsync(companyId, currency, bankAccountCode, ct).ConfigureAwait(false) is Error badAccount)
+        {
+            return badAccount;
+        }
 
-        decimal available = credits.Sum(i => i.OutstandingTransaction);
+        // Credit already promised to another pending request is not available twice.
+        decimal pending = await _db.ReceiptRefundRequests
+            .Where(r => r.CompanyId == companyId && r.CustomerId == customerId && r.Currency == currency && r.Status == ReceiptRefundRequestStatus.Pending)
+            .SumAsync(r => r.Amount, ct).ConfigureAwait(false);
+        decimal available = (await CreditsInAsync(companyId, customerId, currency, ct).ConfigureAwait(false)).Sum(i => i.OutstandingTransaction) - pending;
         if (amount > available + 0.0001m)
         {
-            return Error.Rule("Rcp.InsufficientCredit", $"Refund {amount} exceeds the available credit {available} on the account.");
+            return Error.Rule("Rcp.InsufficientCredit", $"Refund {amount} exceeds the available {currency.Value} credit {available} on the account.");
         }
 
-        // Dr AR control / Cr bank (paid from the bank/safe), creating a debit adjustment.
-        Result<TradingPostingResult> reversal = await _salesLedger.PostReceiptReversalAsync(companyId, customerId, $"REFUND-{customerId}-{date:yyyyMMdd}", date, company.BaseCurrency, amount, bankAccountCode, ct: ct).ConfigureAwait(false);
+        ReceiptRefundRequest request = new(companyId, customerId, currency, amount, date, bankAccountCode.Trim(), reason.Trim(), requestedByUserId);
+        _db.ReceiptRefundRequests.Add(request);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return request.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<RefundResult>> ApproveCreditRefundAsync(long companyId, long requestId, long approverUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ApproveCreditRefundCoreAsync(companyId, requestId, approverUserId, ct), ct);
+
+    // One unit of work: the refund's posting, the clearing of the credits, the register entry and the request's approval commit together or not at all.
+    private async Task<Result<RefundResult>> ApproveCreditRefundCoreAsync(long companyId, long requestId, long approverUserId, CancellationToken ct)
+    {
+        ReceiptRefundRequest? request = await _db.ReceiptRefundRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (request is null)
+        {
+            return Error.NotFound("Rcp.RefundRequestNotFound", $"Refund request {requestId} not found.");
+        }
+
+        if (request.Status != ReceiptRefundRequestStatus.Pending)
+        {
+            return Error.Rule("Rcp.RefundNotPending", $"Refund request {requestId} is already {request.Status}.");
+        }
+
+        if (approverUserId == request.RequestedByUserId)
+        {
+            return Error.Forbidden("Rcp.SelfApproval", "The user who asked for a refund cannot approve it.");
+        }
+
+        if (_permissions is null || !(await _permissions.ResolveAsync(approverUserId, ct).ConfigureAwait(false)).Has("Sales.Receipt", Core.Security.OperationFlags.Approve))
+        {
+            return Error.Forbidden("Rcp.RefundApprover", $"User {approverUserId} may not approve refunds.");
+        }
+
+        if (await RefundAccountErrorAsync(companyId, request.Currency, request.BankAccountCode, ct).ConfigureAwait(false) is Error badAccount)
+        {
+            return badAccount;
+        }
+
+        List<OpenItem> credits = await CreditsInAsync(companyId, request.CustomerId, request.Currency, ct).ConfigureAwait(false);
+        decimal available = credits.Sum(i => i.OutstandingTransaction);
+        if (request.Amount > available + 0.0001m)
+        {
+            return Error.Rule("Rcp.InsufficientCredit", $"Refund {request.Amount} exceeds the available {request.Currency.Value} credit {available} on the account.");
+        }
+
+        // Dr AR control / Cr bank (paid from the bank/safe) in the credit's own currency, creating a debit adjustment.
+        Result<TradingPostingResult> reversal = await _salesLedger.PostReceiptReversalAsync(companyId, request.CustomerId, $"REFUND-{request.CustomerId}-{request.Date:yyyyMMdd}-{request.Id}",
+            request.Date, request.Currency, request.Amount, request.BankAccountCode, ct: ct).ConfigureAwait(false);
         if (reversal.IsFailure)
         {
             return reversal.Error;
         }
 
-        // Clear the payer's credit items against the refund debit (oldest first).
-        decimal remaining = amount;
+        // Clear the payer's credit items in that currency against the refund debit (oldest first).
+        decimal remaining = request.Amount;
         foreach (OpenItem credit in credits)
         {
             if (remaining <= 0m)
@@ -439,7 +489,7 @@ public sealed class ReceiptingService : IReceiptingService
             }
 
             decimal take = Math.Min(remaining, credit.OutstandingTransaction);
-            Result<AllocationResult> alloc = await _allocation.AllocateAsync(companyId, TradingLedger.AccountsReceivable, reversal.Value.OpenItemId, credit.Id, take, date, ct).ConfigureAwait(false);
+            Result<AllocationResult> alloc = await _allocation.AllocateAsync(companyId, TradingLedger.AccountsReceivable, reversal.Value.OpenItemId, credit.Id, take, request.Date, ct).ConfigureAwait(false);
             if (alloc.IsFailure)
             {
                 return alloc.Error;
@@ -448,10 +498,59 @@ public sealed class ReceiptingService : IReceiptingService
             remaining -= take;
         }
 
-        string payerName = await _db.Set<Customer>().Where(c => c.Id == customerId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? $"#{customerId}";
-        _db.Set<RefundRecord>().Add(new RefundRecord(companyId, RefundType.CreditBalance, payerName, amount, date, reason, approverUserId, reversal.Value.JournalNumber));
+        string payerName = await _db.Set<Customer>().Where(c => c.Id == request.CustomerId).Select(c => c.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? $"#{request.CustomerId}";
+        _db.Set<RefundRecord>().Add(new RefundRecord(companyId, RefundType.CreditBalance, payerName, request.Amount, request.Date, request.Reason, approverUserId, reversal.Value.JournalNumber));
+        request.Approve(approverUserId, reversal.Value.JournalNumber);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new RefundResult(amount, reversal.Value.JournalNumber);
+        return new RefundResult(request.Amount, reversal.Value.JournalNumber);
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> RejectCreditRefundAsync(long companyId, long requestId, long userId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Rcp.ReasonRequired", "Turning a refund down requires a reason."));
+        }
+
+        ReceiptRefundRequest? request = await _db.ReceiptRefundRequests.FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (request is null)
+        {
+            return Result.Failure(Error.NotFound("Rcp.RefundRequestNotFound", $"Refund request {requestId} not found."));
+        }
+
+        if (request.Status != ReceiptRefundRequestStatus.Pending)
+        {
+            return Result.Failure(Error.Rule("Rcp.RefundNotPending", $"Refund request {requestId} is already {request.Status}."));
+        }
+
+        request.Reject(userId, reason.Trim());
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    // The payer's open credit items in one currency, oldest first.
+    private Task<List<OpenItem>> CreditsInAsync(long companyId, long customerId, CurrencyCode currency, CancellationToken ct)
+        => _db.Set<OpenItem>()
+            .Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId && i.Sign == LedgerSign.Credit && i.Currency == currency
+                && i.OutstandingTransaction > 0m)
+            .OrderBy(i => i.DocumentDate).ThenBy(i => i.Id)
+            .ToListAsync(ct);
+
+    // A credit is refunded from an account kept in its currency: a base-currency refund from an account not restricted to another currency,
+    // a foreign one only from an account restricted to that currency.
+    private async Task<Error?> RefundAccountErrorAsync(long companyId, CurrencyCode currency, string bankAccountCode, CancellationToken ct)
+    {
+        string code = (bankAccountCode ?? string.Empty).Trim();
+        LedgerAccount? account = await _db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == companyId && a.AccountCode == code, ct).ConfigureAwait(false);
+        if (account is null)
+        {
+            return Error.NotFound("Rcp.RefundAccount", $"Account {code} not found; give the bank account the refund is paid from.");
+        }
+
+        CurrencyCode baseCurrency = await _db.Set<Company>().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        bool fits = currency == baseCurrency ? account.CurrencyRestriction is null || account.CurrencyRestriction == baseCurrency : account.CurrencyRestriction == currency;
+        return fits ? null : Error.Rule("Rcp.RefundAccountCurrency", $"A {currency.Value} credit is refunded from a bank account kept in {currency.Value}; {code} is not.");
     }
 
     /// <inheritdoc />
@@ -524,11 +623,13 @@ public sealed class ReceiptingService : IReceiptingService
     }
 
     /// <inheritdoc />
-    public Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default)
-        => _db.AtomicAsync(() => AllocateFromSuspenseCoreAsync(companyId, customerId, amount, date, suspenseAccountCode, strategy, reason, ct), ct);
+    public Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason,
+        long userId, string? receiptNumber = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => AllocateFromSuspenseCoreAsync(companyId, customerId, amount, date, suspenseAccountCode, strategy, reason, userId, receiptNumber, ct), ct);
 
     // One unit of work: its postings and record changes commit together or not at all.
-    private async Task<Result<ReceiptResult>> AllocateFromSuspenseCoreAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct)
+    private async Task<Result<ReceiptResult>> AllocateFromSuspenseCoreAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy,
+        string reason, long userId, string? receiptNumber, CancellationToken ct)
     {
         if (amount <= 0m)
         {
@@ -546,6 +647,45 @@ public sealed class ReceiptingService : IReceiptingService
             return Error.NotFound("Rcp.CompanyNotFound", $"Company {companyId} not found.");
         }
 
+        // Only money held in suspense comes out this way: the account must be a suspense control account holding at least the amount unallocated.
+        string code = (suspenseAccountCode ?? string.Empty).Trim();
+        LedgerAccount? suspense = await _db.Accounts.AsNoTracking().FirstOrDefaultAsync(a => a.CompanyId == companyId && a.AccountCode == code, ct).ConfigureAwait(false);
+        if (suspense is null || suspense.ControlAccountType != ControlAccountType.Suspense)
+        {
+            return Error.Rule("Rcp.NotSuspense", $"Account {code} is not a suspense control account; only money held in suspense can be allocated from it.");
+        }
+
+        decimal held = await _db.Journals.Where(j => j.CompanyId == companyId && (j.Status == JournalStatus.Posted || j.Status == JournalStatus.Reversed) && j.PostingDate <= date)
+            .SelectMany(j => j.Lines).Where(l => l.AccountCode == code).SumAsync(l => l.BaseCredit - l.BaseDebit, ct).ConfigureAwait(false);
+        if (amount > held + 0.0001m)
+        {
+            return Error.Rule("Rcp.SuspenseBalance", $"Suspense account {code} holds {held:N2} unallocated on {date:yyyy-MM-dd}; {amount:N2} cannot be moved out of it.");
+        }
+
+        // Money that came in on an unidentified receipt is allocated against that receipt, and no more than it left in suspense.
+        string? linked = null;
+        if (!string.IsNullOrWhiteSpace(receiptNumber))
+        {
+            linked = receiptNumber.Trim();
+            Receipt? receipt = await _db.Receipts.AsNoTracking().Include(r => r.Lines).FirstOrDefaultAsync(r => r.CompanyId == companyId && r.ReceiptNumber == linked, ct).ConfigureAwait(false);
+            if (receipt is null)
+            {
+                return Error.NotFound("Rcp.ReceiptNotFound", $"Receipt {linked} not found.");
+            }
+
+            if (receipt.Status == ReceiptStatus.Cancelled)
+            {
+                return Error.Rule("Rcp.ReceiptCancelled", $"Receipt {linked} has been reversed; nothing of it is left in suspense.");
+            }
+
+            decimal onReceipt = receipt.Lines.Where(l => l.Type == ReceiptLineType.Suspense && (l.AccountCode == null || l.AccountCode == code)).Sum(l => l.Amount);
+            decimal taken = await _db.SuspenseAllocations.Where(a => a.CompanyId == companyId && a.ReceiptNumber == linked).SumAsync(a => a.Amount, ct).ConfigureAwait(false);
+            if (amount > onReceipt - taken + 0.0001m)
+            {
+                return Error.Rule("Rcp.SuspenseReceipt", $"Receipt {linked} left {onReceipt - taken:N2} in suspense account {code}; {amount:N2} cannot be allocated from it.");
+            }
+        }
+
         // Dr suspense control / Cr AR control (via the AR ledger), then apply to the account's charges.
         Result<TradingPostingResult> posting = await _salesLedger.PostReceiptAsync(new TradingReceiptRequest
         {
@@ -555,8 +695,8 @@ public sealed class ReceiptingService : IReceiptingService
             ReceiptDate = date,
             Currency = company.BaseCurrency,
             Amount = amount,
-            BankAccountCode = suspenseAccountCode,
-            Narrative = $"Suspense allocation: {reason}",
+            BankAccountCode = code,
+            Narrative = linked is null ? $"Suspense allocation: {reason}" : $"Suspense allocation of receipt {linked}: {reason}",
         }, ct).ConfigureAwait(false);
 
         if (posting.IsFailure)
@@ -565,7 +705,7 @@ public sealed class ReceiptingService : IReceiptingService
         }
 
         (decimal allocated, decimal remainder) = await AllocateAsync(companyId, customerId, posting.Value.OpenItemId, amount, date, strategy, [], ct).ConfigureAwait(false);
-        _db.Set<SuspenseAllocation>().Add(new SuspenseAllocation(companyId, customerId, amount, date, reason, posting.Value.JournalNumber));
+        _db.Set<SuspenseAllocation>().Add(new SuspenseAllocation(companyId, customerId, amount, date, reason, posting.Value.JournalNumber, userId, linked));
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new ReceiptResult(0, posting.Value.JournalNumber, amount, allocated, remainder);
     }

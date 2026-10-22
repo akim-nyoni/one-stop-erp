@@ -19,8 +19,12 @@ public sealed class SuspenseAllocation : AuditableEntity, ICompanyScoped
     /// <param name="date">The allocation date.</param>
     /// <param name="reason">The mandatory reason.</param>
     /// <param name="journalNumber">The GL journal number.</param>
-    public SuspenseAllocation(long companyId, long customerId, decimal amount, DateOnly date, string reason, string journalNumber)
+    /// <param name="allocatedByUserId">Who moved the money out of suspense.</param>
+    /// <param name="receiptNumber">The unidentified receipt the money came in on, where one exists.</param>
+    public SuspenseAllocation(long companyId, long customerId, decimal amount, DateOnly date, string reason, string journalNumber, long? allocatedByUserId = null, string? receiptNumber = null)
     {
+        AllocatedByUserId = allocatedByUserId;
+        ReceiptNumber = receiptNumber;
         CompanyId = companyId;
         CustomerId = customerId;
         Amount = amount;
@@ -46,4 +50,10 @@ public sealed class SuspenseAllocation : AuditableEntity, ICompanyScoped
 
     /// <summary>The GL journal number.</summary>
     public string JournalNumber { get; private set; } = string.Empty;
+
+    /// <summary>Who moved the money out of suspense (null on entries logged before it was recorded).</summary>
+    public long? AllocatedByUserId { get; private set; }
+
+    /// <summary>The unidentified receipt the money came in on, where one exists (a bank-import line has none).</summary>
+    public string? ReceiptNumber { get; private set; }
 }

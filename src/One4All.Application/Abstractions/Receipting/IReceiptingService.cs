@@ -210,7 +210,9 @@ public interface IReceiptingService
     /// <summary>
     /// Allocates money out of the suspense/unallocated control to a debtor account (brief §RCP-6 suspense
     /// workbench): Dr suspense control, Cr debtor control, then applies it to the account's outstanding
-    /// items by strategy. Never guesses income. A permissioned, audited act with a mandatory reason.
+    /// items by strategy. Never guesses income. A permissioned, audited act with a mandatory reason: the account must be a suspense control
+    /// account (<c>Rcp.NotSuspense</c>) whose unallocated balance covers the amount (<c>Rcp.SuspenseBalance</c>); when the money came in on
+    /// an unidentified receipt, the allocation names it and cannot take more than that receipt left in suspense.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="customerId">The debtor account the money belongs to.</param>
@@ -219,9 +221,12 @@ public interface IReceiptingService
     /// <param name="suspenseAccountCode">The suspense/unallocated control account (debited).</param>
     /// <param name="strategy">The allocation strategy.</param>
     /// <param name="reason">The mandatory reason.</param>
+    /// <param name="userId">The user moving the money out of suspense (recorded on the allocation).</param>
+    /// <param name="receiptNumber">The unidentified receipt the money came in on, where there is one (null for a bank-import line).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The amounts allocated to debt and left on account.</returns>
-    Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason, CancellationToken ct = default);
+    Task<Result<ReceiptResult>> AllocateFromSuspenseAsync(long companyId, long customerId, decimal amount, DateOnly date, string suspenseAccountCode, ReceiptAllocationStrategy strategy, string reason,
+        long userId, string? receiptNumber = null, CancellationToken ct = default);
 
     /// <summary>
     /// Closes a session with a blind cash-up: computes expected cash (float + cash tenders) per currency,
@@ -253,20 +258,44 @@ public interface IReceiptingService
     Task<Result<ReceiptReversalResult>> ReverseReceiptAsync(long companyId, long receiptId, DateOnly date, long reverserUserId, string reason, CancellationToken ct = default);
 
     /// <summary>
-    /// Refunds a payer's credit balance (overpayment / credit on account, brief §RCP-9): Dr debtor control,
-    /// Cr bank - paid through the bank/safe, never the till drawer - then clears the payer's outstanding
-    /// credit items. Refuses to refund more than the available credit. An approved act with a reason.
+    /// Asks for a payer's credit balance (overpayment / credit on account, brief §RCP-9) to be refunded, in one currency: only the payer's
+    /// credits in that currency count (<c>Rcp.InsufficientCredit</c>), and the bank account it is paid from must be kept in that currency
+    /// (<c>Rcp.RefundAccountCurrency</c>). Nothing is paid until another user approves it with <see cref="ApproveCreditRefundAsync"/>.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="customerId">The payer whose credit is refunded.</param>
-    /// <param name="amount">The amount to refund.</param>
+    /// <param name="currency">The currency of the credit refunded and of the payment.</param>
+    /// <param name="amount">The amount to refund, in that currency.</param>
     /// <param name="date">The refund date.</param>
     /// <param name="bankAccountCode">The bank/safe account the refund is paid from (credited).</param>
-    /// <param name="approverUserId">The approving user.</param>
+    /// <param name="requestedByUserId">The user asking for it.</param>
     /// <param name="reason">The mandatory reason.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <returns>The request id.</returns>
+    Task<Result<long>> RequestCreditRefundAsync(long companyId, long customerId, CurrencyCode currency, decimal amount, DateOnly date, string bankAccountCode, long requestedByUserId, string reason,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Approves and pays a pending credit refund: the approver must be someone other than who asked (<c>Rcp.SelfApproval</c>) and hold the
+    /// receipts approval right, Sales.Receipt Approve (<c>Rcp.RefundApprover</c>). Posts Dr debtor control, Cr bank in the request's currency
+    /// - paid through the bank/safe, never the till drawer - and clears the payer's credit items in that currency, oldest first; refused if
+    /// the credit has since fallen below the amount.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="requestId">The pending request.</param>
+    /// <param name="approverUserId">The approving user.</param>
+    /// <param name="ct">Cancellation token.</param>
     /// <returns>The refund result.</returns>
-    Task<Result<RefundResult>> RefundCreditAsync(long companyId, long customerId, decimal amount, DateOnly date, string bankAccountCode, long approverUserId, string reason, CancellationToken ct = default);
+    Task<Result<RefundResult>> ApproveCreditRefundAsync(long companyId, long requestId, long approverUserId, CancellationToken ct = default);
+
+    /// <summary>Turns down a pending credit refund, with the reason; nothing is paid.</summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="requestId">The pending request.</param>
+    /// <param name="userId">The user turning it down.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it could not be turned down.</returns>
+    Task<Result> RejectCreditRefundAsync(long companyId, long requestId, long userId, string reason, CancellationToken ct = default);
 
     /// <summary>
     /// Refunds a deposit (brief §RCP-9): Dr deposit liability for the full amount, Cr bank for the net, and
