@@ -2289,7 +2289,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 
         string saleNumber = $"POS{_terminalId}-{DateTime.Now:yyMMddHHmmss}-{++_saleSequence}";
         PosChangeQuote? quote = await ChangeQuoteAsync().ConfigureAwait(true);
-        PosSaleContext context = SaleContext(saleNumber) with { CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true), Change = quote, SalesRepId = await SalesRepIdAsync().ConfigureAwait(true) };
+        PosSaleContext context = SaleContext(saleNumber) with
+        {
+            CustomerId = await AccountCustomerIdAsync().ConfigureAwait(true), Change = quote, SalesRepId = await SalesRepIdAsync().ConfigureAwait(true),
+            LoyaltyMemberNumber = NullIfBlank(LoyaltyMember), // the points are earned with the sale itself, in its unit of work
+        };
         Result<CompleteSaleRequest> build = _ticket.BuildSale(context);
         if (build.IsFailure)
         {
@@ -2482,12 +2486,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
                 return;
             }
 
+            // The member's points were earned by the sale itself (CompleteSaleRequest.LoyaltyMemberNumber), never by a second call here.
             string loyalty = string.Empty;
-            if (NullIfBlank(LoyaltyMember) is string member)
+            if (request.LoyaltyMemberNumber is string member && result.Value.Loyalty is LoyaltyEarned earned)
             {
-                Result<LoyaltyEarned> earned = await scope.ServiceProvider.GetRequiredService<ILoyaltyService>()
-                    .EarnAsync(request.CompanyId, member, result.Value.TotalGross, request.SaleDate, saleNumber).ConfigureAwait(true);
-                loyalty = earned.IsSuccess ? $" {member} earned {earned.Value.Points:0.##} point(s), balance {earned.Value.Balance:0.##}." : $" Loyalty not earned: {earned.Error.Message}";
+                loyalty = $" {member} earned {earned.Points:0.##} point(s), balance {earned.Balance:0.##}.";
                 LoyaltyMember = string.Empty;
             }
 

@@ -139,9 +139,18 @@ public enum LoyaltyMovementKind
 
     /// <summary>Points that passed their expiry unused.</summary>
     Expire = 3,
+
+    /// <summary>Points earned on a sale taken back because the sale was voided or refunded (negative).</summary>
+    EarnReversed = 4,
+
+    /// <summary>Points redeemed on a sale given back because the sale was voided or refunded (positive).</summary>
+    RedeemReversed = 5,
 }
 
-/// <summary>A movement on a member's points (<c>pos.loyalty_movement</c>): earn (positive), redeem and expire (negative).</summary>
+/// <summary>
+/// A movement on a member's points (<c>pos.loyalty_movement</c>): earn and a given-back redemption (positive), redeem, expire and a taken-back
+/// earning (negative).
+/// </summary>
 public sealed class LoyaltyMovement : Entity, ICompanyScoped
 {
     /// <summary>Parameterless constructor for ORM materialization.</summary>

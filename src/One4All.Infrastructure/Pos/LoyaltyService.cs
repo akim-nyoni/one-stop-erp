@@ -97,6 +97,11 @@ public sealed class LoyaltyService : ILoyaltyService
     }
 
     /// <inheritdoc />
+    public Task<Result<(decimal TakenBack, decimal GivenBack)>> ReverseSaleAsync(long companyId, string saleNumber, decimal earnedShare, decimal redeemedShare, DateOnly date,
+        string documentNumber, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseSaleCoreAsync(companyId, saleNumber, earnedShare, redeemedShare, date, documentNumber, ct), ct);
+
+    /// <inheritdoc />
     public Task<Result<(int Members, decimal Points, decimal Value)>> ExpireAsync(long companyId, DateOnly asAt, string documentNumber, CancellationToken ct = default)
         => _db.AtomicAsync(() => ExpireCoreAsync(companyId, asAt, documentNumber, ct), ct);
 
@@ -147,6 +152,80 @@ public sealed class LoyaltyService : ILoyaltyService
         return new LoyaltyEarned(points, tier, movements.Sum(m => m.Points) + points);
     }
 
+    // A sale's earned points carry the sale number as their reference and its redeemed points "POS sale {number}"; what was already undone by an earlier
+    // refund is netted off, so the shares can never undo more than the sale earned or redeemed.
+    private async Task<Result<(decimal TakenBack, decimal GivenBack)>> ReverseSaleCoreAsync(long companyId, string saleNumber, decimal earnedShare, decimal redeemedShare, DateOnly date,
+        string documentNumber, CancellationToken ct)
+    {
+        if (earnedShare is < 0m or > 1m || redeemedShare is < 0m or > 1m)
+        {
+            return Error.Validation("Loyalty.ReverseShare", "The share of a sale's points to undo is between none and all of them.");
+        }
+
+        LoyaltyScheme? scheme = await _db.LoyaltySchemes.AsNoTracking().FirstOrDefaultAsync(s => s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (scheme is null || (earnedShare == 0m && redeemedShare == 0m))
+        {
+            return (0m, 0m);
+        }
+
+        string sale = (saleNumber ?? string.Empty).Trim();
+        string redeemReference = $"POS sale {sale}";
+        List<LoyaltyMovement> movements = await _db.LoyaltyMovements.AsNoTracking()
+            .Where(m => m.CompanyId == companyId && ((m.Reference == sale && (m.Kind == LoyaltyMovementKind.Earn || m.Kind == LoyaltyMovementKind.EarnReversed))
+                || (m.Reference == redeemReference && (m.Kind == LoyaltyMovementKind.Redeem || m.Kind == LoyaltyMovementKind.RedeemReversed))))
+            .ToListAsync(ct).ConfigureAwait(false);
+        decimal takenBack = 0m, takenValue = 0m, givenBack = 0m;
+        foreach (IGrouping<long, LoyaltyMovement> member in movements.GroupBy(m => m.MemberId))
+        {
+            (decimal points, decimal value) earned = Total(member, LoyaltyMovementKind.Earn), undone = Total(member, LoyaltyMovementKind.EarnReversed);
+            (decimal points, decimal value) take = Share(earned, (-undone.points, -undone.value), earnedShare);
+            if (take.points > 0m)
+            {
+                _db.LoyaltyMovements.Add(new LoyaltyMovement(companyId, member.Key, LoyaltyMovementKind.EarnReversed, date, -take.points, -take.value, sale, null));
+                takenBack += take.points;
+                takenValue += take.value;
+            }
+
+            (decimal points, decimal value) redeemed = Total(member, LoyaltyMovementKind.Redeem), returned = Total(member, LoyaltyMovementKind.RedeemReversed);
+            (decimal points, decimal value) give = Share((-redeemed.points, -redeemed.value), returned, redeemedShare);
+            if (give.points > 0m)
+            {
+                _db.LoyaltyMovements.Add(new LoyaltyMovement(companyId, member.Key, LoyaltyMovementKind.RedeemReversed, date, give.points, give.value, redeemReference, null));
+                givenBack += give.points;
+            }
+        }
+
+        if (takenValue > 0m)
+        {
+            Result<PostingReceipt> posted = await PostAsync(companyId, date, $"LOY-{(documentNumber ?? string.Empty).Trim()}", $"Points taken back on sale {sale}", scheme.LiabilityAccountCode,
+                scheme.ExpenseAccountCode, takenValue, ct).ConfigureAwait(false);
+            if (posted.IsFailure)
+            {
+                return posted.Error;
+            }
+        }
+
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return (takenBack, givenBack);
+
+        static (decimal Points, decimal Value) Total(IEnumerable<LoyaltyMovement> movements, LoyaltyMovementKind kind)
+            => (movements.Where(m => m.Kind == kind).Sum(m => m.Points), movements.Where(m => m.Kind == kind).Sum(m => m.Value));
+
+        // The share of the whole, never past what is left of it; the last of it carries the rounding.
+        static (decimal Points, decimal Value) Share((decimal Points, decimal Value) whole, (decimal Points, decimal Value) done, decimal share)
+        {
+            decimal leftPoints = whole.Points - done.Points, leftValue = whole.Value - done.Value;
+            decimal points = Math.Min(decimal.Round(whole.Points * share, 4, MidpointRounding.AwayFromZero), leftPoints);
+            if (points <= 0m)
+            {
+                return (0m, 0m);
+            }
+
+            decimal value = points == leftPoints ? leftValue : Math.Min(decimal.Round(whole.Value * points / whole.Points, 2, MidpointRounding.AwayFromZero), leftValue);
+            return (points, Math.Max(value, 0m));
+        }
+    }
+
     private async Task<Result<(int Members, decimal Points, decimal Value)>> ExpireCoreAsync(long companyId, DateOnly asAt, string documentNumber, CancellationToken ct)
     {
         LoyaltyScheme? scheme = await _db.LoyaltySchemes.AsNoTracking().FirstOrDefaultAsync(s => s.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -183,7 +262,7 @@ public sealed class LoyaltyService : ILoyaltyService
     }
 
     private static (string? Tier, decimal Multiplier) TierOf(LoyaltyScheme scheme, IEnumerable<LoyaltyMovement> movements, DateOnly asAt)
-        => LoyaltyRules.Tier(movements.Where(m => m.Kind == LoyaltyMovementKind.Earn && m.Date > asAt.AddMonths(-12) && m.Date <= asAt).Sum(m => m.Points),
+        => LoyaltyRules.Tier(movements.Where(m => (m.Kind is LoyaltyMovementKind.Earn or LoyaltyMovementKind.EarnReversed) && m.Date > asAt.AddMonths(-12) && m.Date <= asAt).Sum(m => m.Points),
             scheme.Tiers.Select(t => (t.Name, t.MinPoints, t.Multiplier)));
 
     private async Task<decimal> BalanceAsync(long memberId, CancellationToken ct)

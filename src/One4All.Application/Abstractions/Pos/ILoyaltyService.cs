@@ -75,6 +75,23 @@ public interface ILoyaltyService
     /// <returns>The value redeemed.</returns>
     Task<Result<decimal>> RedeemAsync(long companyId, string memberNumber, decimal points, DateOnly date, string reference, CancellationToken ct = default);
 
+    /// <summary>
+    /// Undoes a sale's points, in whole (a void) or in part (a refund): the given share of the points earned on it is taken back, releasing
+    /// their liability (Dr liability, Cr loyalty cost), and the given share of the points redeemed on it is given back to the member (their
+    /// value goes back to the liability on the void or refund journal, through the points tender). Never more than the sale earned or
+    /// redeemed is undone, however many refunds there are.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="saleNumber">The sale.</param>
+    /// <param name="earnedShare">The share (0 to 1) of the points earned on the sale to take back.</param>
+    /// <param name="redeemedShare">The share (0 to 1) of the points redeemed on the sale to give back.</param>
+    /// <param name="date">The date.</param>
+    /// <param name="documentNumber">The void or refund document the taken-back points are journalled under.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The points taken back and the points given back.</returns>
+    Task<Result<(decimal TakenBack, decimal GivenBack)>> ReverseSaleAsync(long companyId, string saleNumber, decimal earnedShare, decimal redeemedShare, DateOnly date, string documentNumber,
+        CancellationToken ct = default);
+
     /// <summary>Expires every member's points past their expiry, oldest first, releasing the liability (Dr liability, Cr loyalty cost).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="asAt">The date.</param>

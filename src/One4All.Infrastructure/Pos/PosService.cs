@@ -237,6 +237,7 @@ public sealed class PosService : IPosService
             SaleDate = request.SaleDate, WarehouseId = request.WarehouseId, CustomerId = request.CustomerId, SalesRepId = request.SalesRepId, TaxAccountCode = request.TaxAccountCode,
             Lines = lines, AgeVerified = request.AgeVerified, PrescriptionReference = request.PrescriptionReference, Tenders = request.Tenders, Tip = request.Tip,
             TipsAccountCode = request.TipsAccountCode, PriceOverrideAuthorisedByUserId = request.PriceOverrideAuthorisedByUserId, OfflineReplay = request.OfflineReplay,
+            LoyaltyMemberNumber = request.LoyaltyMemberNumber,
         };
     }
 
@@ -704,6 +705,25 @@ public sealed class PosService : IPosService
             }
         }
 
+        // The member's points are earned inside the sale's unit of work: a sale that does not post earns nothing, and points cannot be earned twice.
+        Application.Abstractions.Pos.LoyaltyEarned? earned = null;
+        if (!string.IsNullOrWhiteSpace(request.LoyaltyMemberNumber))
+        {
+            if (_loyalty is null)
+            {
+                return Error.Rule("Loyalty.NoScheme", "No loyalty scheme is set up to earn points on.");
+            }
+
+            Result<Application.Abstractions.Pos.LoyaltyEarned> points = await _loyalty.EarnAsync(request.CompanyId, request.LoyaltyMemberNumber, sale.TotalGross, request.SaleDate,
+                request.SaleNumber, ct).ConfigureAwait(false);
+            if (points.IsFailure)
+            {
+                return points.Error;
+            }
+
+            earned = points.Value;
+        }
+
         // The receipt is signed by the fiscal device; an unreachable or refusing device queues it (the sale stands) for the retry task.
         if (_fiscal is { IsEnabled: true })
         {
@@ -718,7 +738,7 @@ public sealed class PosService : IPosService
             }, ct).ConfigureAwait(false);
         }
 
-        return new CompleteSaleResult(sale.Id, posting.Value.JournalNumber, sale.TotalGross);
+        return new CompleteSaleResult(sale.Id, posting.Value.JournalNumber, sale.TotalGross) { Loyalty = earned };
     }
 
     /// <inheritdoc />
@@ -767,6 +787,7 @@ public sealed class PosService : IPosService
                 CompanyId = basket.CompanyId, TerminalId = basket.TerminalId, TillSessionId = basket.TillSessionId, CashierUserId = basket.CashierUserId,
                 SaleNumber = $"{basket.SaleNumber}-{i + 1}", SaleDate = basket.SaleDate, WarehouseId = basket.WarehouseId, TaxAccountCode = basket.TaxAccountCode,
                 Lines = plan.Value[i], AgeVerified = basket.AgeVerified, PrescriptionReference = basket.PrescriptionReference, Tenders = request.Tenders[i],
+                LoyaltyMemberNumber = basket.LoyaltyMemberNumber,
             }, ct).ConfigureAwait(false);
             if (part.IsFailure)
             {
@@ -925,6 +946,17 @@ public sealed class PosService : IPosService
             if (reversed.IsFailure)
             {
                 return reversed.Error;
+            }
+        }
+
+        // The member's points: those earned on the sale are taken back and those it redeemed given back (their value already returns to the liability
+        // through the points tender on the void journal).
+        if (_loyalty is not null)
+        {
+            Result<(decimal TakenBack, decimal GivenBack)> points = await _loyalty.ReverseSaleAsync(companyId, sale.SaleNumber, 1m, 1m, date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
+            if (points.IsFailure)
+            {
+                return points.Error;
             }
         }
 

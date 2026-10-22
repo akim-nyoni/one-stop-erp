@@ -99,13 +99,23 @@ public sealed class CompleteSaleRequest
     /// that does not agree with the server is recorded as a till event for review rather than refused.
     /// </summary>
     public bool OfflineReplay { get; init; }
+
+    /// <summary>
+    /// Gets the loyalty member who earns points on the sale: earned in the sale's own unit of work (on its gross total), so the sale and its points
+    /// stand or fall together; a member the scheme does not know refuses the sale.
+    /// </summary>
+    public string? LoyaltyMemberNumber { get; init; }
 }
 
 /// <summary>The result of completing a sale.</summary>
 /// <param name="SaleId">The sale id.</param>
 /// <param name="JournalNumber">The sale GL journal number.</param>
 /// <param name="TotalGross">The gross total.</param>
-public readonly record struct CompleteSaleResult(long SaleId, string JournalNumber, decimal TotalGross);
+public readonly record struct CompleteSaleResult(long SaleId, string JournalNumber, decimal TotalGross)
+{
+    /// <summary>Gets the points the sale's loyalty member earned, when it named one.</summary>
+    public LoyaltyEarned? Loyalty { get; init; }
+}
 
 /// <summary>A currency the till can take, with the units of base currency one unit of it buys today.</summary>
 /// <param name="Code">The currency.</param>

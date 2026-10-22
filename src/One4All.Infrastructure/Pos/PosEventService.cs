@@ -25,6 +25,7 @@ public sealed class PosEventService : IPosEventService
     private readonly IClock _clock;
     private readonly IFiscalDeviceProvider? _fiscal;
     private readonly Application.Abstractions.Trading.IAllocationService? _allocations;
+    private readonly ILoyaltyService? _loyalty;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -35,9 +36,12 @@ public sealed class PosEventService : IPosEventService
     /// <param name="permissions">Checks the authoriser's refund authority.</param>
     /// <param name="fiscal">Signs refund receipts.</param>
     /// <param name="allocations">Sets an on-account refund's credit against the sale's invoice.</param>
+    /// <param name="loyalty">Takes back the refunded share of the points the sale earned and gives back the share of those it redeemed.</param>
     public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, IPosService? pos = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null,
+        ILoyaltyService? loyalty = null)
     {
+        _loyalty = loyalty;
         _allocations = allocations;
         _fiscal = fiscal;
         _permissions = permissions;
@@ -235,6 +239,21 @@ public sealed class PosEventService : IPosEventService
         if (settled.IsFailure)
         {
             return settled.Error;
+        }
+
+        // Points: the refunded share of what the sale earned is taken back (so buying, earning and refunding earns nothing), and the share of the
+        // points tender paid back through it is given back to the member (its value returns to the liability on the refund journal).
+        if (_loyalty is not null)
+        {
+            decimal pointsTendered = sale.Tenders.Where(t => t.TenderType == TenderType.Loyalty && !t.IsChange).Sum(t => t.BaseAmount);
+            decimal earnedShare = sale.TotalGross > 0m ? Math.Min(1m, gross / sale.TotalGross) : 0m;
+            decimal redeemedShare = pointsTendered > 0m ? Math.Min(1m, legs.Value.Where(l => l.Type == TenderType.Loyalty).Sum(l => l.Base) / pointsTendered) : 0m;
+            Result<(decimal TakenBack, decimal GivenBack)> points = await _loyalty.ReverseSaleAsync(request.CompanyId, sale.SaleNumber, earnedShare, redeemedShare, request.Date,
+                posting.Value.JournalNumber, ct).ConfigureAwait(false);
+            if (points.IsFailure)
+            {
+                return points.Error;
+            }
         }
 
         DateTimeOffset now = _clock.UtcNow;

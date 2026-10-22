@@ -21,6 +21,14 @@ namespace One4All.Application.Pos;
 /// <param name="TaxAccountCode">The output-tax account (required when the ticket carries tax).</param>
 /// <param name="ChangeAccountCode">The cash account change is given from.</param>
 /// <param name="TenderAccounts">The GL account each tender type posts to.</param>
+/// <param name="AgeVerified">Whether the cashier checked the buyer's age.</param>
+/// <param name="PrescriptionReference">The prescription prescription-only items are sold against.</param>
+/// <param name="DiscountAccountCode">The account a line discount is posted to.</param>
+/// <param name="CustomerId">The customer an on-account tender is charged to.</param>
+/// <param name="Change">Change given in another currency.</param>
+/// <param name="TipsAccountCode">The tips-payable account.</param>
+/// <param name="SalesRepId">The sales rep credited with the sale.</param>
+/// <param name="LoyaltyMemberNumber">The loyalty member who earns points on the sale (earned with the sale itself).</param>
 public sealed record PosSaleContext(
     long CompanyId,
     long TerminalId,
@@ -39,7 +47,8 @@ public sealed record PosSaleContext(
     long? CustomerId = null,
     PosChangeQuote? Change = null,
     string? TipsAccountCode = null,
-    long? SalesRepId = null);
+    long? SalesRepId = null,
+    string? LoyaltyMemberNumber = null);
 
 /// <summary>Change given in another currency, rounded to what can be handed over (brief §4.1).</summary>
 /// <param name="Currency">The change currency.</param>
@@ -669,6 +678,7 @@ public sealed class PosTicket
             PrescriptionReference = sale.PrescriptionReference, CustomerId = sale.CustomerId, Lines = sale.Lines, Tenders = tenders,
             PriceOverrideAuthorisedByUserId = sale.PriceOverrideAuthorisedByUserId,
             Tip = Tip, TipsAccountCode = Tip > 0m ? context.TipsAccountCode!.Trim() : null,
+            LoyaltyMemberNumber = string.IsNullOrWhiteSpace(context.LoyaltyMemberNumber) ? null : context.LoyaltyMemberNumber.Trim(),
         };
     }
 
