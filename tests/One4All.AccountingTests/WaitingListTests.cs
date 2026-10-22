@@ -89,7 +89,7 @@ public sealed class WaitingListTests
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
-        TestClock clock = (TestClock)scope.ServiceProvider.GetRequiredService<One4All.Licensing.Core.IClock>();
+        TestClock clock = scope.ServiceProvider.GetRequiredService<TestClock>();
         DateOnly today = new(2026, 5, 10);
         clock.Today = today;
 

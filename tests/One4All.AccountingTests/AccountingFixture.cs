@@ -38,7 +38,11 @@ public sealed class AccountingFixture : IAsyncLifetime
         ArgumentNullException.ThrowIfNull(configure);
         ServiceCollection services = new();
         services.AddOne4AllInfrastructure(ConnectionString);
-        services.AddSingleton<One4All.Licensing.Core.IClock, TestClock>();
+        // The test clock reaches only the waiting-list service (a registration is dated the day it is captured): everything else, the audit trail
+        // included, keeps the real clock, so a history captured on old days leaves no old audit entries behind.
+        services.AddSingleton<TestClock>();
+        services.AddScoped<One4All.Application.Abstractions.Housing.IWaitingListService>(sp => new One4All.Infrastructure.Housing.WaitingListService(
+            sp.GetRequiredService<One4AllDbContext>(), sp.GetRequiredService<One4All.Application.Abstractions.Numbering.INumberSequenceService>(), sp.GetRequiredService<TestClock>()));
         configure(services);
         return services.BuildServiceProvider();
     }

@@ -24,7 +24,7 @@ public sealed class TestClock : IClock
     public static async Task<Result<WaitingListRegistration>> RegisterCapturedAsync(IServiceProvider services, WaitingListApplication application)
     {
         ArgumentNullException.ThrowIfNull(application);
-        TestClock clock = (TestClock)services.GetRequiredService<IClock>();
+        TestClock clock = services.GetRequiredService<TestClock>();
         clock.Today = application.RegistrationDate;
         try
         {
