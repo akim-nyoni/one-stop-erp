@@ -2743,7 +2743,10 @@ public sealed partial class PosTerminalViewModel : ObservableObject
         return supervisor.UserId;
     }
 
-    /// <summary>Refunds a completed sale in full (its number typed in the scan box) in cash, with a supervisor's authority.</summary>
+    /// <summary>
+    /// Refunds a completed sale in full (its number typed in the scan box) through its own tenders - the cash part out of this till's open
+    /// session, card back to the card, on account as a credit to the customer, gift card back onto the card - with a supervisor's authority.
+    /// </summary>
     [RelayCommand]
     private async Task RefundSaleAsync()
     {
@@ -2769,9 +2772,9 @@ public sealed partial class PosTerminalViewModel : ObservableObject
             {
                 CompanyId = _companyId, SaleId = sale.Id, TerminalId = _terminalId, CashierUserId = _cashierUserId, AuthorisedByUserId = supervisor, Date = DateOnly.FromDateTime(DateTime.Today),
                 RefundAccountCode = CashAccountCode, TaxAccountCode = TaxAccountCode.Length > 0 ? TaxAccountCode : null, Reason = "Refund at the till",
-                Lines = [.. sale.Lines.Select(l => new PosRefundLine(l.Id, l.Quantity))],
+                Lines = [.. sale.Lines.Select(l => new PosRefundLine(l.Id, l.Quantity))], TillSessionId = TillSessionId == 0 ? null : TillSessionId,
             }).ConfigureAwait(true);
-            StatusMessage = refunded.IsSuccess ? $"Sale {sale.SaleNumber} refunded: {refunded.Value.Gross:N2} paid out in cash." : refunded.Error.Message;
+            StatusMessage = refunded.IsSuccess ? $"Sale {sale.SaleNumber} refunded: {refunded.Value.Gross:N2} back through the tenders it was paid with." : refunded.Error.Message;
             ScanEntry = string.Empty;
         }
         catch (Exception ex) when (OfflineDetection.IsConnectivityError(ex))

@@ -19,6 +19,9 @@ namespace One4All.AccountingTests;
 [Collection(AccountingCollection.Name)]
 public sealed class TillExchangeTests
 {
+    // A cashier id no user created by the test can be given, so a supervisor is never the cashier by accident.
+    private const long Cashier = 900_005;
+
     private readonly AccountingFixture _fixture;
 
     public TillExchangeTests(AccountingFixture fixture) => _fixture = fixture;
@@ -46,26 +49,27 @@ public sealed class TillExchangeTests
         IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
         IPosEventService events = scope.ServiceProvider.GetRequiredService<IPosEventService>();
         DateOnly day = new(2026, 3, 2);
-        long session = (await pos.OpenTillAsync(companyId, till.Id, cashierUserId: 5, openingFloat: 100m)).Value;
+        long session = (await pos.OpenTillAsync(companyId, till.Id, cashierUserId: Cashier, openingFloat: 100m)).Value;
         async Task<long> Sell(string number, decimal quantity) => (await pos.CompleteSaleAsync(new CompleteSaleRequest
         {
-            CompanyId = companyId, TerminalId = till.Id, TillSessionId = session, CashierUserId = 5, SaleNumber = number, SaleDate = day, WarehouseId = wh.Id, TaxAccountCode = "2200",
+            CompanyId = companyId, TerminalId = till.Id, TillSessionId = session, CashierUserId = Cashier, SaleNumber = number, SaleDate = day, WarehouseId = wh.Id, TaxAccountCode = "2200",
             Lines = [new PosSaleLineRequest(soda.Id, "Soda", quantity, 10m, quantity * 10m, 0m, "4000")],
             Tenders = [new PosTenderRequest(TenderType.Cash, Scenario.Usd, quantity * 10m, "1000", IsChange: false)],
         })).Value.SaleId;
+        long supervisor = await Scenario.UserWithAsync(db, "ex-supervisor", "Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel1);
         long first = await Sell("EX-1", 2m);
         long firstLine = await db.Set<SaleLine>().Where(l => l.SaleId == first).Select(l => l.Id).SingleAsync();
 
         // A cash refund of one soda out of the drawer.
         (await events.RefundAsync(new PosRefundRequest
         {
-            CompanyId = companyId, SaleId = first, TerminalId = till.Id, CashierUserId = 5, AuthorisedByUserId = 9, Date = day, RefundAccountCode = "1000", Reason = "Flat",
+            CompanyId = companyId, SaleId = first, TerminalId = till.Id, CashierUserId = Cashier, AuthorisedByUserId = supervisor, Date = day, RefundAccountCode = "1000", Reason = "Flat",
             Lines = [new PosRefundLine(firstLine, 1m)], TillSessionId = session,
         })).Value.Gross.Should().Be(10m);
 
         PosExchangeRequest Exchange(long saleId, long lineId, decimal back, string number, decimal chipsPrice) => new()
         {
-            CompanyId = companyId, OriginalSaleId = saleId, TerminalId = till.Id, TillSessionId = session, CashierUserId = 5, AuthorisedByUserId = 9, Date = day, Reason = "Wrong flavour",
+            CompanyId = companyId, OriginalSaleId = saleId, TerminalId = till.Id, TillSessionId = session, CashierUserId = Cashier, AuthorisedByUserId = supervisor, Date = day, Reason = "Wrong flavour",
             Returns = [new PosRefundLine(lineId, back)], Restock = false, CashAccountCode = "1000", TaxAccountCode = "2200", NewSaleNumber = number, WarehouseId = wh.Id,
             NewLines = [new PosSaleLineRequest(chips.Id, "Chips", 1m, chipsPrice, chipsPrice, 0m, "4000")],
         };
@@ -87,7 +91,7 @@ public sealed class TillExchangeTests
         IReadOnlyList<CurrencyCashUp> position = (await pos.ExpectedCashAsync(session)).Value;
         position.Single().Expected.Should().Be(150m);
 
-        (await scope.ServiceProvider.GetRequiredService<ITillCashService>().RecordAsync(new TillCashRequest(session, TillCashKind.Refund, 5m, "1000", "4000", "Keyed refund", 5, 9, day)))
+        (await scope.ServiceProvider.GetRequiredService<ITillCashService>().RecordAsync(new TillCashRequest(session, TillCashKind.Refund, 5m, "1000", "4000", "Keyed refund", Cashier, 9, day)))
             .Error.Code.Should().Be("Pos.RefundThroughService");
     }
 }

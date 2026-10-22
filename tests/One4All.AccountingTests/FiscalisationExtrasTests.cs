@@ -61,9 +61,10 @@ public sealed class FiscalisationExtrasTests
 
         // A refund is a signed refund receipt referencing the sale; so is a void.
         Sale sold = await db.Set<Sale>().AsNoTracking().Include(s => s.Lines).SingleAsync(s => s.Id == first.SaleId);
+        long supervisor = await Scenario.UserWithAsync(db, "fx-supervisor", "Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel1);
         var refunded = await events.RefundAsync(new PosRefundRequest
         {
-            CompanyId = companyId, SaleId = first.SaleId, TerminalId = terminal.Id, CashierUserId = 1, AuthorisedByUserId = 2, Date = day, RefundAccountCode = "1000", TaxAccountCode = "2200",
+            CompanyId = companyId, SaleId = first.SaleId, TerminalId = terminal.Id, CashierUserId = 1, AuthorisedByUserId = supervisor, Date = day, RefundAccountCode = "1000", TaxAccountCode = "2200",
             Reason = "Damaged", Lines = [new PosRefundLine(sold.Lines[0].Id, 1m)], TillSessionId = session,
         });
         refunded.IsSuccess.Should().BeTrue(refunded.IsFailure ? refunded.Error.Message : null);

@@ -65,16 +65,19 @@ public sealed class PosEventsTests
 
         IPosEventService events = scope.ServiceProvider.GetRequiredService<IPosEventService>();
         long lineId = (await db.Sales.AsNoTracking().Include(s => s.Lines).SingleAsync(s => s.Id == saleId)).Lines[0].Id;
-        PosRefundRequest Refund(decimal quantity, long? authoriser = 2) => new()
+        long supervisor = await Scenario.UserWithAsync(db, "es-supervisor", "Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel1);
+        PosRefundRequest Refund(decimal quantity, long? authoriser) => new()
         {
             CompanyId = companyId, SaleId = saleId, TerminalId = terminal.Id, CashierUserId = 1, AuthorisedByUserId = authoriser, Date = new DateOnly(2026, 3, 3), RefundAccountCode = "1000",
-            TaxAccountCode = "2200", Reason = "Damaged", Lines = [new PosRefundLine(lineId, quantity)], Restock = true,
+            TaxAccountCode = "2200", Reason = "Damaged", Lines = [new PosRefundLine(lineId, quantity)], Restock = true, TillSessionId = session,
         };
         (await events.RefundAsync(Refund(3m, authoriser: null))).Error.Code.Should().Be("Pos.AuthorisationRequired");
         (await events.RefundAsync(Refund(3m, authoriser: 1))).Error.Code.Should().Be("Pos.SelfAuthorised");
-        PosRefundResult refund = (await events.RefundAsync(Refund(3m))).Value;
+        long clerk = await Scenario.UserWithAsync(db, "es-clerk", "Pos.Sale", Core.Security.OperationFlags.View | Core.Security.OperationFlags.Create);
+        (await events.RefundAsync(Refund(3m, clerk))).Error.Code.Should().Be("Pos.RefundAuthority", "another user without the refund right cannot authorise it");
+        PosRefundResult refund = (await events.RefundAsync(Refund(3m, supervisor))).Value;
         refund.Gross.Should().Be(6.90m);
-        (await events.RefundAsync(Refund(8m))).Error.Code.Should().Be("Pos.RefundExceedsSale"); // 7 left
+        (await events.RefundAsync(Refund(8m, supervisor))).Error.Code.Should().Be("Pos.RefundExceedsSale"); // 7 left
 
         var journal = await db.Journals.AsNoTracking().Include(j => j.Lines).SingleAsync(j => j.CompanyId == companyId && j.JournalNumber == refund.JournalNumber);
         journal.Lines.Select(l => (l.AccountCode, l.BaseDebit, l.BaseCredit)).Should().BeEquivalentTo([("4000", 6.00m, 0m), ("2200", 0.90m, 0m), ("1000", 0m, 6.90m)]);

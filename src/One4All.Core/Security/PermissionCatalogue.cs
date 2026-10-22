@@ -131,7 +131,8 @@ public static class PermissionCatalogue
         // ---- Point of Sale ----
         const string pos = "Pos";
         Add(pos, LicenceModules.PointOfSale, "Sale", "Process Sale", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.Print | OperationFlags.OverridePrice | OperationFlags.OverrideDiscount);
-        Add(pos, LicenceModules.PointOfSale, "Refund", "Refunds / Returns", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.AuthoriseLevel1 | OperationFlags.AuthoriseLevel2);
+        Add(pos, LicenceModules.PointOfSale, "Refund", "Refunds / Returns (authorise 1 = a refund, 2 = past the refund window, 3 = paid back by another method than the sale)",
+            OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.AuthoriseLevel1 | OperationFlags.AuthoriseLevel2 | OperationFlags.AuthoriseLevel3);
         Add(pos, LicenceModules.PointOfSale, "Void", "Void Sale", OperationFlags.View | OperationFlags.VoidReverse | OperationFlags.AuthoriseLevel1);
         Add(pos, LicenceModules.PointOfSale, "NoSale", "No-Sale / Drawer Open", OperationFlags.View | OperationFlags.Create);
         Add(pos, LicenceModules.PointOfSale, "TillSession", "Till Sessions (X/Z Read)", OperationFlags.View | OperationFlags.Create | OperationFlags.Post | OperationFlags.Print | OperationFlags.Reprint);

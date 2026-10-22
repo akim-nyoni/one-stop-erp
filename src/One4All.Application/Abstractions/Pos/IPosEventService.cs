@@ -81,8 +81,18 @@ public sealed class PosRefundRequest
     /// <summary>Gets the refund date.</summary>
     public DateOnly Date { get; init; }
 
-    /// <summary>Gets the account the money leaves from (till cash, card clearing).</summary>
+    /// <summary>
+    /// Gets the account the money leaves from when it is paid in cash or by <see cref="RefundTender"/>: the till's cash account for the cash part
+    /// of a refund through the original tenders (blank: the sale's own cash account), or the account of the other method chosen.
+    /// </summary>
     public string RefundAccountCode { get; init; } = string.Empty;
+
+    /// <summary>
+    /// Gets the method the refund is paid by when not through the sale's own tenders (null, the default: each tender gets its share back - cash
+    /// to the drawer, card to the card's account, on account as a credit to the customer, gift card back onto the card). Paying by a method the
+    /// sale was not paid by (cash for a card sale) needs an authoriser with the third-level refund authority (Pos.Refund, AuthoriseLevel3).
+    /// </summary>
+    public TenderType? RefundTender { get; init; }
 
     /// <summary>Gets the output-tax account, needed when the refunded lines carried tax.</summary>
     public string? TaxAccountCode { get; init; }
@@ -96,7 +106,7 @@ public sealed class PosRefundRequest
     /// <summary>Gets a value indicating whether the goods go back on the shelf (reversing cost of sales at the original cost).</summary>
     public bool Restock { get; init; }
 
-    /// <summary>Gets the open till session the cash is paid out of (null when not paid from a drawer, e.g. back to a card).</summary>
+    /// <summary>Gets the open till session of this till the cash is paid out of; required whenever any of the refund is paid in cash.</summary>
     public long? TillSessionId { get; init; }
 }
 

@@ -16,7 +16,6 @@ namespace One4All.AccountingTests;
 public sealed class RefundRegisterReportTests
 {
     private const long Cashier = 9501;
-    private const long Approver = 9502;
 
     private readonly AccountingFixture _fixture;
 
@@ -31,10 +30,12 @@ public sealed class RefundRegisterReportTests
         long companyId;
         long customerId;
         long stationId;
+        long approver;
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
+            approver = await Scenario.UserWithAsync(db, "rf-register-approver", "Sales.Receipt", Core.Security.OperationFlags.Approve);
             await scope.ServiceProvider.GetRequiredService<ReportCatalogueSeeder>().SeedAsync();
             Customer c = new(companyId, "REFC", "Refund Customer", Scenario.Usd);
             db.Customers.Add(c);
@@ -57,7 +58,8 @@ public sealed class RefundRegisterReportTests
                 Tenders = [new ReceiptTenderRequest(TenderType.Cash, 150m)],
             })).IsSuccess.Should().BeTrue();
 
-            var refund = await rcp.RefundCreditAsync(companyId, customerId, 150m, new DateOnly(2026, 2, 5), "1100", Approver, "Duplicate payment");
+            long request = (await rcp.RequestCreditRefundAsync(companyId, customerId, Scenario.Usd, 150m, new DateOnly(2026, 2, 5), "1100", Cashier, "Duplicate payment")).Value;
+            var refund = await rcp.ApproveCreditRefundAsync(companyId, request, approver);
             refund.IsSuccess.Should().BeTrue(refund.IsFailure ? refund.Error.ToString() : null);
         }
 

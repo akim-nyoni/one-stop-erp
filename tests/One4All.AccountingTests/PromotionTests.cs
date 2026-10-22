@@ -91,10 +91,11 @@ public sealed class PromotionTests
 
         // Refunding one bag of crisps returns its share of both.
         long crispsLine = (await db.Sales.AsNoTracking().Include(s => s.Lines).SingleAsync(s => s.Id == sale.Value.SaleId)).Lines.Single(l => l.ItemId == crisps.Id).Id;
+        long supervisor = await Scenario.UserWithAsync(db, "pr-supervisor", "Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel1);
         (await scope.ServiceProvider.GetRequiredService<IPosEventService>().RefundAsync(new PosRefundRequest
         {
-            CompanyId = companyId, SaleId = sale.Value.SaleId, TerminalId = terminal.Id, CashierUserId = 1, AuthorisedByUserId = 2, Date = new DateOnly(2026, 6, 2), RefundAccountCode = "1000",
-            Reason = "Damaged", Lines = [new PosRefundLine(crispsLine, 1m)],
+            CompanyId = companyId, SaleId = sale.Value.SaleId, TerminalId = terminal.Id, CashierUserId = 1, AuthorisedByUserId = supervisor, Date = new DateOnly(2026, 6, 2), RefundAccountCode = "1000",
+            Reason = "Damaged", Lines = [new PosRefundLine(crispsLine, 1m)], TillSessionId = session,
         })).IsSuccess.Should().BeTrue();
         tb = await gl.TrialBalanceAsync(companyId, new DateOnly(2026, 6, 30));
         tb.Rows.Where(r => r.AccountCode == "4000").Sum(r => r.Credit - r.Debit).Should().Be(8m);

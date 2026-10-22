@@ -8,6 +8,7 @@ using One4All.Core.Common;
 using One4All.Core.Inventory;
 using One4All.Core.Pos;
 using One4All.Core.System;
+using One4All.Core.Trading;
 using One4All.Infrastructure.Persistence;
 using One4All.Licensing.Core;
 
@@ -23,15 +24,21 @@ public sealed class PosEventService : IPosEventService
     private readonly IInventoryService _inventory;
     private readonly IClock _clock;
     private readonly IFiscalDeviceProvider? _fiscal;
+    private readonly Application.Abstractions.Trading.IAllocationService? _allocations;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="postingEngine">Posts the refund journal.</param>
     /// <param name="inventory">Returns restocked goods.</param>
     /// <param name="clock">Stamps the events.</param>
+    /// <param name="pos">Rings up the new sale of an exchange.</param>
+    /// <param name="permissions">Checks the authoriser's refund authority.</param>
+    /// <param name="fiscal">Signs refund receipts.</param>
+    /// <param name="allocations">Sets an on-account refund's credit against the sale's invoice.</param>
     public PosEventService(One4AllDbContext db, IPostingEngine postingEngine, IInventoryService inventory, IClock clock, IPosService? pos = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null, IFiscalDeviceProvider? fiscal = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, IFiscalDeviceProvider? fiscal = null, Application.Abstractions.Trading.IAllocationService? allocations = null)
     {
+        _allocations = allocations;
         _fiscal = fiscal;
         _permissions = permissions;
         _pos = pos;
@@ -78,10 +85,12 @@ public sealed class PosEventService : IPosEventService
 
     /// <inheritdoc />
     public Task<Result<PosRefundResult>> RefundAsync(PosRefundRequest request, CancellationToken ct = default)
-        => _db.AtomicAsync(() => RefundCoreAsync(request, ct), ct);
+        => _db.AtomicAsync(() => RefundCoreAsync(request, exchange: false, ct), ct);
 
-    // One unit of work: the refund journal, stock returns and refund events commit together or not at all.
-    private async Task<Result<PosRefundResult>> RefundCoreAsync(PosRefundRequest request, CancellationToken ct)
+    // One unit of work: the refund journal, stock returns, the customer's credit, gift cards and refund events commit together or not at all.
+    // An exchange's return pays straight into the new sale through the till's cash account, so it is not split over the original tenders
+    // (ExchangeAsync checks any excess handed back in cash).
+    private async Task<Result<PosRefundResult>> RefundCoreAsync(PosRefundRequest request, bool exchange, CancellationToken ct)
     {
         if (PosEventRules.Validate(PosEventKind.Refund, 0m, null, request.Reason, request.CashierUserId, request.AuthorisedByUserId, null) is { } invalid)
         {
@@ -93,12 +102,7 @@ public sealed class PosEventService : IPosEventService
             return Error.Validation("Pos.RefundLines", "A refund needs at least one line with a positive quantity.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.RefundAccountCode))
-        {
-            return Error.Validation("Pos.RefundAccount", "A refund needs the account the money is paid from.");
-        }
-
-        Sale? sale = await _db.Set<Sale>().Include(s => s.Lines).FirstOrDefaultAsync(s => s.Id == request.SaleId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
+        Sale? sale = await _db.Set<Sale>().Include(s => s.Lines).Include(s => s.Tenders).FirstOrDefaultAsync(s => s.Id == request.SaleId && s.CompanyId == request.CompanyId, ct).ConfigureAwait(false);
         if (sale is null)
         {
             return Error.NotFound("Pos.SaleNotFound", $"Sale {request.SaleId} not found.");
@@ -109,11 +113,16 @@ public sealed class PosEventService : IPosEventService
             return Error.Rule("Pos.SaleNotCompleted", "Only a completed sale can be refunded.");
         }
 
-        // Past the refund window, only an authoriser with the second-level refund authority (Pos.Refund, AuthoriseLevel2) may approve it.
+        // Every refund is authorised by a supervisor holding the refund authority (Pos.Refund at any level), not merely by another user;
+        // past the refund window only the second level (AuthoriseLevel2) may approve it.
+        Core.Security.EffectivePermissions rights = await AuthorityAsync(request.AuthorisedByUserId, ct).ConfigureAwait(false);
+        if (!RefundLevels.Any(level => rights.Has("Pos.Refund", level)))
+        {
+            return Error.Forbidden("Pos.RefundAuthority", $"User {request.AuthorisedByUserId} may not authorise a refund.");
+        }
+
         int? window = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.RefundWindowDays).FirstOrDefaultAsync(ct).ConfigureAwait(false);
-        if (window is int days && request.Date > sale.SaleDate.AddDays(days)
-            && (request.AuthorisedByUserId is not long authoriser || _permissions is null
-                || !(await _permissions.ResolveAsync(authoriser, ct).ConfigureAwait(false)).Has("Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel2)))
+        if (window is int days && request.Date > sale.SaleDate.AddDays(days) && !rights.Has("Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel2))
         {
             return Error.Rule("Pos.RefundWindow", $"Sale {sale.SaleNumber} is more than {days} days old: the refund needs a supervisor with late-refund authority.");
         }
@@ -160,7 +169,29 @@ public sealed class PosEventService : IPosEventService
             lines.Add(new JournalLineRequest { AccountCode = request.TaxAccountCode!, Side = JournalSide.Debit, TransactionAmount = tax });
         }
 
-        lines.Add(new JournalLineRequest { AccountCode = request.RefundAccountCode, Side = JournalSide.Credit, TransactionAmount = gross });
+        // The money goes back the way it came (or by the one method chosen); cash comes out of an open session of this till.
+        Result<List<RefundLeg>> legs = PaymentLegs(sale, request, gross, exchange, rights);
+        if (legs.IsFailure)
+        {
+            return legs.Error;
+        }
+
+        RefundLeg? cash = legs.Value.FirstOrDefault(l => l.Type == TenderType.Cash);
+        if (cash is not null && await DrawerSessionAsync(request.CompanyId, request.TerminalId, request.TillSessionId, ct).ConfigureAwait(false) is Error noDrawer)
+        {
+            return noDrawer;
+        }
+
+        foreach (RefundLeg leg in legs.Value)
+        {
+            lines.Add(leg.Currency == sale.BaseCurrency || leg.Rate <= 0m
+                ? new JournalLineRequest { AccountCode = leg.AccountCode, Side = JournalSide.Credit, TransactionAmount = leg.Base }
+                : new JournalLineRequest
+                {
+                    AccountCode = leg.AccountCode, Side = JournalSide.Credit, Currency = leg.Currency, TransactionAmount = leg.InCurrency, ExchangeRate = leg.Rate, BaseAmount = leg.Base,
+                });
+        }
+
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
             CompanyId = request.CompanyId,
@@ -200,6 +231,12 @@ public sealed class PosEventService : IPosEventService
             }
         }
 
+        Result settled = await SettleLegsAsync(sale, request, legs.Value, posting.Value, ct).ConfigureAwait(false);
+        if (settled.IsFailure)
+        {
+            return settled.Error;
+        }
+
         DateTimeOffset now = _clock.UtcNow;
         List<PosEvent> events = [.. refunded.Select(r => new PosEvent(request.CompanyId, request.TerminalId, request.CashierUserId, PosEventKind.Refund, now, request.Date, r.Line.Description, r.Net + r.Tax)
         {
@@ -216,15 +253,169 @@ public sealed class PosEventService : IPosEventService
         }
 
         _db.PosEvents.AddRange(events);
-        Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, gross, request.RefundAccountCode, $"Refund on {sale.SaleNumber}", request.CashierUserId,
-            request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
-        if (drawer.IsFailure)
+        if (cash is not null)
         {
-            return drawer.Error;
+            Result drawer = await PaidFromDrawerAsync(request.CompanyId, request.TillSessionId, cash.Base, cash.AccountCode, $"Refund on {sale.SaleNumber}", request.CashierUserId,
+                request.AuthorisedByUserId, request.Date, posting.Value.JournalNumber, ct).ConfigureAwait(false);
+            if (drawer.IsFailure)
+            {
+                return drawer.Error;
+            }
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new PosRefundResult(events[0].Id, posting.Value.JournalNumber, gross);
+    }
+
+    // The refund authority levels: any of them lets a supervisor authorise a refund inside the window.
+    private static readonly Core.Security.OperationFlags[] RefundLevels =
+        [Core.Security.OperationFlags.AuthoriseLevel1, Core.Security.OperationFlags.AuthoriseLevel2, Core.Security.OperationFlags.AuthoriseLevel3];
+
+    // One way the refund is paid back: the method, the account it leaves from, its currency and rate, and its share of the refund in base.
+    private sealed record RefundLeg(TenderType Type, string AccountCode, CurrencyCode Currency, decimal Rate, decimal Base, string? VoucherNumber, bool OnAccount)
+    {
+        // The share in the leg's own currency.
+        public decimal InCurrency => Rate > 0m ? Math.Round(Base / Rate, 2, MidpointRounding.AwayFromZero) : Base;
+    }
+
+    private async Task<Core.Security.EffectivePermissions> AuthorityAsync(long? userId, CancellationToken ct)
+        => _permissions is null || userId is not long id ? Core.Security.EffectivePermissions.None : await _permissions.ResolveAsync(id, ct).ConfigureAwait(false);
+
+    // By default the refund goes back through the sale's own tenders, each getting its share in proportion to what it paid (net of change):
+    // cash to the till's cash account, card and other tenders to their own accounts, on account to the customer, a gift card back onto the card.
+    // Paying it all by one method the sale was not paid by (cash for a card sale) needs the third-level refund authority.
+    private static Result<List<RefundLeg>> PaymentLegs(Sale sale, PosRefundRequest request, decimal gross, bool exchange, Core.Security.EffectivePermissions rights)
+    {
+        string? given = string.IsNullOrWhiteSpace(request.RefundAccountCode) ? null : request.RefundAccountCode.Trim();
+        var paid = sale.Tenders
+            .GroupBy(t => t.TenderType == TenderType.Cash
+                ? new { Type = TenderType.Cash, Account = string.Empty, Currency = sale.BaseCurrency, Voucher = (string?)null, OnAccount = false }
+                : new { Type = t.TenderType, Account = t.AccountCode, t.Currency, Voucher = t.VoucherNumber, OnAccount = t.TenderType == TenderType.Credit && t.StaffEmployeeId is null })
+            .Select(g => new { g.Key, Rate = g.Key.Type == TenderType.Cash ? 1m : g.First().ExchangeRate, Base = g.Sum(t => t.IsChange ? -t.BaseAmount : t.BaseAmount) })
+            .Where(p => p.Base > 0m)
+            .OrderBy(p => p.Base)
+            .ToList();
+
+        if (exchange || request.RefundTender is not null)
+        {
+            TenderType method = exchange ? TenderType.Cash : request.RefundTender!.Value;
+            if (method is not (TenderType.Cash or TenderType.Card or TenderType.MobileMoney or TenderType.BankTransfer or TenderType.Cheque))
+            {
+                return Error.Validation("Pos.RefundTender",
+                    "A refund by another method is paid in cash, by card, mobile money, bank transfer or cheque; on account, gift cards and points take back their own tenders.");
+            }
+
+            if (given is null)
+            {
+                return Error.Validation("Pos.RefundAccount", $"A refund by {method} needs the account the money is paid from.");
+            }
+
+            bool same = paid.All(p => p.Key.Type == method && (method == TenderType.Cash || p.Key.Account == given));
+            if (!exchange && !same && !rights.Has("Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel3))
+            {
+                return Error.Forbidden("Pos.RefundMethod",
+                    $"Sale {sale.SaleNumber} was not paid wholly by {method} from {given}: refunding it that way needs a supervisor with the authority to refund by another method.");
+            }
+
+            return new List<RefundLeg> { new(method, given, sale.BaseCurrency, 1m, gross, null, false) };
+        }
+
+        if (paid.Count == 0)
+        {
+            return Error.Rule("Pos.RefundTenders", $"Sale {sale.SaleNumber} has no tenders to refund through; choose the method to pay it back by.");
+        }
+
+        string? cashAccount = given ?? sale.Tenders.Where(t => t.TenderType == TenderType.Cash && t.Currency == sale.BaseCurrency).Select(t => t.AccountCode).FirstOrDefault();
+        decimal total = paid.Sum(p => p.Base), left = gross;
+        List<RefundLeg> legs = [];
+        for (int i = 0; i < paid.Count; i++)
+        {
+            var tender = paid[i];
+            decimal share = i == paid.Count - 1 ? left : Math.Round(gross * tender.Base / total, 2, MidpointRounding.AwayFromZero);
+            left -= share;
+            if (share <= 0m)
+            {
+                continue;
+            }
+
+            string? account = tender.Key.Type == TenderType.Cash ? cashAccount : tender.Key.Account;
+            if (string.IsNullOrWhiteSpace(account))
+            {
+                return Error.Validation("Pos.RefundAccount", "The cash part of the refund needs the till's cash account it is paid from.");
+            }
+
+            legs.Add(new RefundLeg(tender.Key.Type, account, tender.Key.Currency, tender.Rate, share, tender.Key.Voucher, tender.Key.OnAccount));
+        }
+
+        return legs;
+    }
+
+    // A cash refund comes out of an open session of this till - the rule a sale is rung up under - so the drawer's expected cash falls with it.
+    private async Task<Error?> DrawerSessionAsync(long companyId, long terminalId, long? tillSessionId, CancellationToken ct)
+    {
+        if (tillSessionId is not long sessionId)
+        {
+            return Error.Rule("Pos.SessionRequired", "A refund paid in cash comes out of an open session of this till.");
+        }
+
+        TillSession? session = await _db.Set<TillSession>().AsNoTracking().FirstOrDefaultAsync(s => s.Id == sessionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (session is null || session.TerminalId != terminalId)
+        {
+            return Error.Rule("Pos.SessionNotFound", $"Till session {sessionId} is not a session of this till.");
+        }
+
+        return session.Status != TillSessionStatus.Open
+            ? Error.Rule("Pos.SessionClosed", $"Till session {sessionId} has been cashed up; the cash must be paid out of an open session.")
+            : null;
+    }
+
+    // What was charged on account comes back as a credit note on the customer's account, set against the sale's invoice; a gift card gets its share back.
+    private async Task<Result> SettleLegsAsync(Sale sale, PosRefundRequest request, IReadOnlyList<RefundLeg> legs, PostingReceipt posting, CancellationToken ct)
+    {
+        decimal onAccount = legs.Where(l => l.OnAccount).Sum(l => l.Base);
+        if (onAccount > 0m)
+        {
+            if (sale.CustomerId is not long customerId)
+            {
+                return Result.Failure(Error.Rule("Pos.AccountCustomer", $"Sale {sale.SaleNumber} was charged on account but carries no customer to credit."));
+            }
+
+            OpenItem credit = new(request.CompanyId, TradingLedger.AccountsReceivable, customerId, OpenItemType.CreditNote, LedgerSign.Credit, posting.JournalNumber, request.Date, request.Date,
+                sale.BaseCurrency, 1m, onAccount, onAccount)
+            {
+                JournalEntryId = posting.JournalId, Narrative = $"Refund on POS sale {sale.SaleNumber}: {request.Reason.Trim()}",
+            };
+            _db.OpenItems.Add(credit);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            OpenItem? invoice = await _db.OpenItems.FirstOrDefaultAsync(i => i.CompanyId == request.CompanyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == customerId
+                && i.DocumentNumber == sale.SaleNumber && i.ItemType == OpenItemType.Invoice, ct).ConfigureAwait(false);
+            if (invoice is not null && _allocations is not null && invoice.OutstandingBase > 0m)
+            {
+                Result<Application.Abstractions.Trading.AllocationResult> matched = await _allocations.AllocateAsync(request.CompanyId, TradingLedger.AccountsReceivable, invoice.Id, credit.Id,
+                    Math.Min(invoice.OutstandingTransaction, onAccount), request.Date, ct).ConfigureAwait(false);
+                if (matched.IsFailure)
+                {
+                    return Result.Failure(matched.Error);
+                }
+            }
+        }
+
+        foreach (RefundLeg leg in legs.Where(l => l.Type == TenderType.Voucher && l.VoucherNumber is not null))
+        {
+            Core.Vouchers.GiftCard? card = await _db.Set<Core.Vouchers.GiftCard>().FirstOrDefaultAsync(g => g.CompanyId == request.CompanyId && g.CardNumber == leg.VoucherNumber, ct)
+                .ConfigureAwait(false);
+            if (card is null)
+            {
+                return Result.Failure(Error.NotFound("Voucher.NotFound", $"Gift card {leg.VoucherNumber} not found."));
+            }
+
+            decimal amount = leg.Currency == sale.BaseCurrency ? leg.Base : leg.InCurrency;
+            card.Reinstate(amount);
+            _db.Set<Core.Vouchers.GiftCardTransaction>().Add(new Core.Vouchers.GiftCardTransaction(request.CompanyId, card.Id, request.Date, Core.Vouchers.GiftCardEvent.Reinstated, amount,
+                card.Balance, $"Refund on POS sale {sale.SaleNumber}"));
+        }
+
+        return Result.Success();
     }
 
     /// <inheritdoc />
@@ -247,7 +438,7 @@ public sealed class PosEventService : IPosEventService
                 CompanyId = request.CompanyId, SaleId = request.OriginalSaleId, TerminalId = request.TerminalId, CashierUserId = request.CashierUserId, AuthorisedByUserId = request.AuthorisedByUserId,
                 Date = request.Date, RefundAccountCode = request.CashAccountCode, TaxAccountCode = request.TaxAccountCode, Reason = $"Exchange: {request.Reason}".Trim(), Lines = request.Returns,
                 Restock = request.Restock, TillSessionId = request.TillSessionId,
-            }, ct).ConfigureAwait(false);
+            }, exchange: true, ct).ConfigureAwait(false);
             if (returned.IsFailure)
             {
                 return returned.Error;
@@ -255,6 +446,15 @@ public sealed class PosEventService : IPosEventService
 
             decimal value = returned.Value.Gross;
             decimal newGross = request.NewLines.Sum(l => l.LineNet + l.TaxAmount);
+
+            // Handing back in cash more than the new goods cost, on a sale not paid in cash, is a refund by another method.
+            if (value > newGross
+                && await _db.Set<Sale>().Where(s => s.Id == request.OriginalSaleId).SelectMany(s => s.Tenders).AnyAsync(t => t.TenderType != TenderType.Cash, ct).ConfigureAwait(false)
+                && !(await AuthorityAsync(request.AuthorisedByUserId, ct).ConfigureAwait(false)).Has("Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel3))
+            {
+                return Error.Forbidden("Pos.RefundMethod",
+                    "The original sale was not paid in cash: handing the excess back in cash needs a supervisor with the authority to refund by another method.");
+            }
             CurrencyCode currency = await _db.Companies.Where(c => c.Id == request.CompanyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
             List<PosTenderRequest> tenders = [new PosTenderRequest(TenderType.Cash, currency, value, request.CashAccountCode, IsChange: false)];
             if (value >= newGross)

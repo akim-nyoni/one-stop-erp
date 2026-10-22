@@ -194,4 +194,24 @@ public static class Scenario
 
         await db.SaveChangesAsync();
     }
+
+    /// <summary>Adds an active user holding one permission at the given operations (a supervisor, authoriser or approver).</summary>
+    /// <param name="db">The context.</param>
+    /// <param name="name">A name for the user and its role (made unique).</param>
+    /// <param name="permission">The permission code, e.g. <c>Pos.Refund</c>.</param>
+    /// <param name="flags">The operations granted.</param>
+    /// <returns>The user id.</returns>
+    public static async Task<long> UserWithAsync(One4AllDbContext db, string name, string permission, Core.Security.OperationFlags flags)
+    {
+        string key = $"{name}-{Guid.NewGuid():N}"[..Math.Min(name.Length + 13, 60)];
+        Core.Security.Role role = new($"Role {key}");
+        role.Grant(permission, flags);
+        db.Roles.Add(role);
+        Core.Security.User user = new($"u-{key}", name);
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+        user.AssignRole(role.Id);
+        await db.SaveChangesAsync();
+        return user.Id;
+    }
 }

@@ -187,6 +187,7 @@ public sealed class PosOfflineSyncTests
             CompanyId = companyId, ItemId = item.Id, WarehouseId = wh.Id, Date = new DateOnly(2026, 3, 1), Quantity = 10m, UnitCost = 1m, CreditAccountCode = "1100",
         })).IsSuccess.Should().BeTrue();
 
+        long supervisor = await Scenario.UserWithAsync(db, "off-supervisor", "Pos.Refund", Core.Security.OperationFlags.AuthoriseLevel1);
         string key = $"OFF2-{companyId}";
         DateOnly day = new(2026, 3, 2);
         DateTimeOffset opened = new(2026, 3, 2, 7, 0, 0, TimeSpan.Zero);
@@ -205,7 +206,7 @@ public sealed class PosOfflineSyncTests
         await Enqueue(PosSaleEnvelope.Kind, SaleOf(voided), 2);
         await Enqueue(PosSaleEnvelope.Kind, SaleOf(refunded), 3);
         await Enqueue(PosVoidEnvelope.Kind, new PosVoidEnvelope(companyId, voided, day, "Voided at till (offline)", "2200", 2), 4);
-        await Enqueue(PosRefundEnvelope.Kind, new PosRefundEnvelope(companyId, refunded, terminal.Id, 1, 2, day, "1000", "2200", reason, 0, key), 5);
+        await Enqueue(PosRefundEnvelope.Kind, new PosRefundEnvelope(companyId, refunded, terminal.Id, 1, supervisor, day, "1000", "2200", reason, 0, key), 5);
         await Enqueue(PosCashUpEnvelope.Kind, new PosCashUpEnvelope(companyId, 0, key, [new PosCashCountEnvelope("USD", 56m)], 1, day, "1000", "6900"), 6);
 
         OfflineSyncReport first = await sync.SyncPendingAsync();
@@ -225,7 +226,7 @@ public sealed class PosOfflineSyncTests
 
         // Redelivered, each is a no-op: no second void, refund or close.
         await Enqueue(PosVoidEnvelope.Kind, new PosVoidEnvelope(companyId, voided, day, "Voided at till (offline)", "2200", 2), 7);
-        await Enqueue(PosRefundEnvelope.Kind, new PosRefundEnvelope(companyId, refunded, terminal.Id, 1, 2, day, "1000", "2200", reason, 0, key), 8);
+        await Enqueue(PosRefundEnvelope.Kind, new PosRefundEnvelope(companyId, refunded, terminal.Id, 1, supervisor, day, "1000", "2200", reason, 0, key), 8);
         await Enqueue(PosCashUpEnvelope.Kind, new PosCashUpEnvelope(companyId, 0, key, [new PosCashCountEnvelope("USD", 56m)], 1, day, "1000", "6900"), 9);
         (await sync.SyncPendingAsync()).Synced.Should().Be(3);
         (await db.PosEvents.AsNoTracking().CountAsync(e => e.CompanyId == companyId && e.SaleNumber == refunded && e.Kind == PosEventKind.Refund)).Should().Be(1);

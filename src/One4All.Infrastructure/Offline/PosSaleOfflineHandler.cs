@@ -173,8 +173,11 @@ public sealed class PosRefundOfflineHandler : IOfflineOperationHandler
             }
         }
 
+        // The cashier paid the refund out of the drawer while offline, so it replays as a cash refund: on a sale not paid in cash that needs the
+        // supervisor's authority to refund by another method, and is refused at sync without it.
         Result<PosRefundResult> refunded = await _events.RefundAsync(new PosRefundRequest
         {
+            RefundTender = TenderType.Cash,
             CompanyId = envelope.CompanyId, SaleId = sale.Id, TerminalId = envelope.TerminalId, CashierUserId = envelope.CashierUserId, AuthorisedByUserId = envelope.AuthorisedByUserId,
             Date = envelope.Date, RefundAccountCode = envelope.RefundAccountCode, TaxAccountCode = envelope.TaxAccountCode, Reason = envelope.Reason,
             Lines = [.. sale.Lines.Select(l => new PosRefundLine(l.Id, l.Quantity))], TillSessionId = session == 0 ? null : session,

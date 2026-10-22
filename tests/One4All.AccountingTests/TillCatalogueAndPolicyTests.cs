@@ -92,11 +92,11 @@ public sealed class TillCatalogueAndPolicyTests
         await db.SaveChangesAsync();
 
         IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
-        long session = (await pos.OpenTillAsync(companyId, till.Id, cashierUserId: 5, openingFloat: 100m)).Value;
+        long session = (await pos.OpenTillAsync(companyId, till.Id, cashierUserId: 900_005, openingFloat: 100m)).Value;
         DateOnly sold = new(2026, 3, 2);
         long sale = (await pos.CompleteSaleAsync(new CompleteSaleRequest
         {
-            CompanyId = companyId, TerminalId = till.Id, TillSessionId = session, CashierUserId = 5, SaleNumber = "RW-1", SaleDate = sold, WarehouseId = wh.Id, TaxAccountCode = "2200",
+            CompanyId = companyId, TerminalId = till.Id, TillSessionId = session, CashierUserId = 900_005, SaleNumber = "RW-1", SaleDate = sold, WarehouseId = wh.Id, TaxAccountCode = "2200",
             Lines = [new PosSaleLineRequest(soda.Id, "Soda", 3m, 10m, 30m, 0m, "4000")],
             Tenders = [new PosTenderRequest(TenderType.Cash, Scenario.Usd, 30m, "1000", IsChange: false)],
         })).Value.SaleId;
@@ -104,7 +104,7 @@ public sealed class TillCatalogueAndPolicyTests
         IPosEventService events = scope.ServiceProvider.GetRequiredService<IPosEventService>();
         PosRefundRequest Refund(DateOnly date, long? supervisor) => new()
         {
-            CompanyId = companyId, SaleId = sale, TerminalId = till.Id, CashierUserId = 5, AuthorisedByUserId = supervisor, Date = date, RefundAccountCode = "1000", Reason = "Flat",
+            CompanyId = companyId, SaleId = sale, TerminalId = till.Id, CashierUserId = 900_005, AuthorisedByUserId = supervisor, Date = date, RefundAccountCode = "1000", Reason = "Flat",
             Lines = [new PosRefundLine(line, 1m)], TillSessionId = session,
         };
 

@@ -428,8 +428,12 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Refund sale lines", ListTitle = "Recent till events",
-            Description = "Refunds units of a completed sale's line (by item code): revenue and tax back, money out of the refund account, goods back on the shelf if ticked. Needs a supervisor other than you.",
-            Fields = [Req("Sale", "Sale number"), ItemPick("Item", "Product"), Num("Quantity", "Quantity"), Req("Terminal", "Till code"), Today(), Req("RefundAccount", "Refund paid from (account)", "1000"),
+            Description = "Refunds units of a completed sale's line (by item code): revenue and tax back, goods back on the shelf if ticked. The money goes back the way the sale was paid "
+                + "(cash out of the till session, card to the card, on account as a credit to the customer, gift card back onto the card) unless another method is chosen, which needs "
+                + "third-level refund authority. Needs a supervisor with refund authority other than you.",
+            Fields = [Req("Sale", "Sale number"), ItemPick("Item", "Product"), Num("Quantity", "Quantity"), Req("Terminal", "Till code"), Today(),
+                Pick("Method", "Paid back by", "Original tenders", "Cash", "Card", "MobileMoney", "BankTransfer", "Cheque"),
+                Opt("RefundAccount", "Cash (or other method) paid from (account)", "1000"),
                 Opt("TaxAccount", "Output tax account", "2200"), Req("Reason", "Reason"), Req("AuthorisedBy", "Authorised by (user name)"), Tick("Restock", "Put the goods back in stock", true),
                 OptNum("Session", "Paid from till session (cash out of the drawer)")],
             Run = async (c, i) =>
@@ -442,7 +446,8 @@ public static partial class OperationCatalogue
                 PosRefundResult refund = Check(await c.Get<IPosEventService>().RefundAsync(new PosRefundRequest
                 {
                     CompanyId = c.CompanyId, SaleId = sale.Id, TerminalId = terminal, CashierUserId = c.UserId, AuthorisedByUserId = await UserAsync(c, i.Text("AuthorisedBy")).ConfigureAwait(true),
-                    Date = i.Date("Date"), RefundAccountCode = i.Text("RefundAccount"), TaxAccountCode = i.Optional("TaxAccount"), Reason = i.Text("Reason"),
+                    Date = i.Date("Date"), RefundAccountCode = i.Optional("RefundAccount") ?? string.Empty, TaxAccountCode = i.Optional("TaxAccount"), Reason = i.Text("Reason"),
+                    RefundTender = Enum.TryParse(i.Optional("Method"), out TenderType method) ? method : null,
                     Lines = [new PosRefundLine(line.Id, i.Number("Quantity"))], Restock = i.Flag("Restock"),
                     TillSessionId = i.OptionalNumber("Session") is decimal session ? (long)session : null,
                 }).ConfigureAwait(true));
