@@ -53,7 +53,7 @@ public sealed class BudgetGateTests
         long overrideRole = (await admin.CreateRoleAsync($"Budget override {tag}", null)).Value;
         db.Roles.Single(r => r.Id == overrideRole).Grant("Budget.OverrideBlock", OperationFlags.View);
         await db.SaveChangesAsync();
-        (await admin.AssignRoleAsync(controller, overrideRole)).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(controller, overrideRole, 900_001)).IsSuccess.Should().BeTrue();
 
         IPurchaseRequisitionService requisitions = scope.ServiceProvider.GetRequiredService<IPurchaseRequisitionService>();
         async Task<long> Raise(string number, decimal amount) => (await requisitions.CreateAsync(companyId, supplier.Id, number, new DateOnly(2026, 3, 1), Scenario.Usd,

@@ -39,7 +39,7 @@ public sealed class AuditEventTests
 
         long userId = (await admin.CreateUserAsync($"ae.{tag}", "Audited", null, "Audit2026a")).Value;
         long role = (await admin.CreateRoleAsync($"Audited role {tag}", null)).Value;
-        (await admin.AssignRoleAsync(userId, role)).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(userId, role, 900_001)).IsSuccess.Should().BeTrue();
         (await admin.ResetPasswordAsync(userId, "Audit2026b")).IsSuccess.Should().BeTrue();
         AuthenticationResult signedIn = await auth.AuthenticateAsync($"ae.{tag}", "Audit2026b", "TEST-PC");
         await auth.EndSessionAsync(signedIn.SessionId!);

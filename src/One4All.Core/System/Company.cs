@@ -196,6 +196,18 @@ public sealed class Company : SoftDeletableEntity
     /// </summary>
     public int? BackDateAllowanceDays { get; set; }
 
+    /// <summary>
+    /// How many months before the adjustment date a supplementary valuation may take effect (null: no earlier than the start of the financial
+    /// year the adjustment falls in), so a revaluation cannot re-rate bills from years back.
+    /// </summary>
+    public int? ValuationBackdateMonths { get; set; }
+
+    /// <summary>
+    /// The rates credit a valuation change may post at once (supplementary valuation or objection upheld); a larger credit goes through the
+    /// credit-note approval workflow. Null: every valuation credit goes through it.
+    /// </summary>
+    public decimal? ValuationCreditApprovalThreshold { get; set; }
+
     /// <summary>Whether a rate keyed on a customer or supplier document needs the rate-override permission and is recorded (brief §3.3).</summary>
     public bool RateOverrideControl { get; set; }
 

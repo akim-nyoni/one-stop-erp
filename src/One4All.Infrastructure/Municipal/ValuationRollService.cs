@@ -61,16 +61,19 @@ public sealed class ValuationRollService : IValuationRollService
     private readonly One4AllDbContext _db;
     private readonly INumberSequenceService _numbers;
     private readonly ISalesLedgerService _ar;
+    private readonly ICreditNoteApprovalService? _credits;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
     /// <param name="ar">The receivables ledger.</param>
-    public ValuationRollService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar)
+    /// <param name="credits">Holds a rates credit above the council's threshold for approval.</param>
+    public ValuationRollService(One4AllDbContext db, INumberSequenceService numbers, ISalesLedgerService ar, ICreditNoteApprovalService? credits = null)
     {
         _db = db;
         _numbers = numbers;
         _ar = ar;
+        _credits = credits;
     }
 
     /// <inheritdoc />
@@ -120,10 +123,12 @@ public sealed class ValuationRollService : IValuationRollService
     }
 
     /// <inheritdoc />
-    public Task<Result<ValuationAdjustment>> RecordSupplementaryAsync(long companyId, long propertyId, DateOnly effectiveFrom, decimal value, string reason, DateOnly adjustmentDate, CancellationToken ct = default)
-        => _db.AtomicAsync(() => SupplementaryCoreAsync(companyId, propertyId, effectiveFrom, value, reason, adjustmentDate, ct), ct);
+    public Task<Result<ValuationAdjustment>> RecordSupplementaryAsync(long companyId, long propertyId, DateOnly effectiveFrom, decimal value, string reason, DateOnly adjustmentDate, long userId,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(() => SupplementaryCoreAsync(companyId, propertyId, effectiveFrom, value, reason, adjustmentDate, userId, ct), ct);
 
-    private async Task<Result<ValuationAdjustment>> SupplementaryCoreAsync(long companyId, long propertyId, DateOnly effectiveFrom, decimal value, string reason, DateOnly adjustmentDate, CancellationToken ct)
+    private async Task<Result<ValuationAdjustment>> SupplementaryCoreAsync(long companyId, long propertyId, DateOnly effectiveFrom, decimal value, string reason, DateOnly adjustmentDate, long userId,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -141,14 +146,22 @@ public sealed class ValuationRollService : IValuationRollService
             return Error.NotFound("Mun.PropertyNotFound", $"Property {propertyId} not found.");
         }
 
+        // A revaluation re-rates bills only so far back: the council's limit, by default the start of the financial year.
+        DateOnly earliest = await EarliestEffectiveAsync(companyId, adjustmentDate, ct).ConfigureAwait(false);
+        if (effectiveFrom < earliest)
+        {
+            return Error.Rule("Mun.BackdateLimit",
+                $"A supplementary valuation adjusted on {adjustmentDate:yyyy-MM-dd} may take effect from {earliest:yyyy-MM-dd} at the earliest; older changes go on the next general roll.");
+        }
+
         Result<string> number = await _numbers.AllocateAsync(companyId, "SV", adjustmentDate, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
             return number.Error;
         }
 
-        PropertyValuation record = new(companyId, propertyId, effectiveFrom, value, ValuationKind.Supplementary, number.Value, reason.Trim());
-        return await ApplyAsync(property, record, adjustmentDate, $"Supplementary valuation {number.Value}: {reason.Trim()}", ct).ConfigureAwait(false);
+        PropertyValuation record = new(companyId, propertyId, effectiveFrom, value, ValuationKind.Supplementary, number.Value, reason.Trim(), userId);
+        return await ApplyAsync(property, record, adjustmentDate, $"Supplementary valuation {number.Value}: {reason.Trim()}", userId, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -207,10 +220,30 @@ public sealed class ValuationRollService : IValuationRollService
     }
 
     /// <inheritdoc />
-    public Task<Result<ValuationAdjustment>> DecideObjectionAsync(long companyId, string objectionNumber, DateOnly decidedOn, decimal? revisedValue, string notes, CancellationToken ct = default)
-        => _db.AtomicAsync(() => DecideCoreAsync(companyId, objectionNumber, decidedOn, revisedValue, notes, ct), ct);
+    public Task<Result<ValuationAdjustment>> DecideObjectionAsync(long companyId, string objectionNumber, DateOnly decidedOn, decimal? revisedValue, string notes, long userId,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(() => DecideCoreAsync(companyId, objectionNumber, decidedOn, revisedValue, notes, userId, ct), ct);
 
-    private async Task<Result<ValuationAdjustment>> DecideCoreAsync(long companyId, string objectionNumber, DateOnly decidedOn, decimal? revisedValue, string notes, CancellationToken ct)
+    /// <inheritdoc />
+    public async Task<Result> SetPolicyAsync(long companyId, int? backdateMonths, decimal? creditApprovalThreshold, CancellationToken ct = default)
+    {
+        if (backdateMonths < 0 || creditApprovalThreshold < 0m)
+        {
+            return Result.Failure(Error.Validation("Mun.ValuationPolicy", "The back-dating limit and the credit approval threshold cannot be negative."));
+        }
+
+        Company? company = await _db.Set<Company>().FirstOrDefaultAsync(c => c.Id == companyId, ct).ConfigureAwait(false);
+        if (company is null)
+        {
+            return Result.Failure(Error.NotFound("Mun.CompanyNotFound", $"Company {companyId} not found."));
+        }
+
+        (company.ValuationBackdateMonths, company.ValuationCreditApprovalThreshold) = (backdateMonths, creditApprovalThreshold);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    private async Task<Result<ValuationAdjustment>> DecideCoreAsync(long companyId, string objectionNumber, DateOnly decidedOn, decimal? revisedValue, string notes, long userId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(notes))
         {
@@ -235,16 +268,16 @@ public sealed class ValuationRollService : IValuationRollService
 
         if (revisedValue is not decimal value)
         {
-            objection.Dismiss(decidedOn, notes.Trim());
+            objection.Dismiss(decidedOn, notes.Trim(), userId);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return new ValuationAdjustment(0, 0m, null);
         }
 
-        objection.Uphold(decidedOn, value, notes.Trim());
+        objection.Uphold(decidedOn, value, notes.Trim(), userId);
         DateOnly effectiveFrom = await _db.Set<PropertyValuation>().Where(v => v.Id == objection.ObjectedValuationId).Select(v => v.EffectiveFrom).FirstAsync(ct).ConfigureAwait(false);
         Property property = await _db.Properties.Include(p => p.Services).FirstAsync(p => p.Id == objection.PropertyId, ct).ConfigureAwait(false);
-        PropertyValuation record = new(companyId, property.Id, effectiveFrom, value, ValuationKind.Objection, objectionNumber, null);
-        return await ApplyAsync(property, record, decidedOn, $"Valuation objection {objectionNumber} upheld", ct).ConfigureAwait(false);
+        PropertyValuation record = new(companyId, property.Id, effectiveFrom, value, ValuationKind.Objection, objectionNumber, null, userId);
+        return await ApplyAsync(property, record, decidedOn, $"Valuation objection {objectionNumber} upheld", userId, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -276,8 +309,23 @@ public sealed class ValuationRollService : IValuationRollService
         return history;
     }
 
-    // Adds the record, then invoices or credits the difference on rates bills raised from its date up to the given date.
-    private async Task<Result<ValuationAdjustment>> ApplyAsync(Property property, PropertyValuation record, DateOnly adjustmentDate, string narrative, CancellationToken ct)
+    // The earliest date a supplementary valuation adjusted on a date may take effect from: so many months back, or the start of the financial year.
+    private async Task<DateOnly> EarliestEffectiveAsync(long companyId, DateOnly adjustmentDate, CancellationToken ct)
+    {
+        int? months = await _db.Set<Company>().Where(c => c.Id == companyId).Select(c => c.ValuationBackdateMonths).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (months is int back)
+        {
+            return adjustmentDate.AddMonths(-back);
+        }
+
+        DateOnly? yearStart = await _db.FiscalYears.Where(y => y.CompanyId == companyId && y.StartDate <= adjustmentDate && y.EndDate >= adjustmentDate)
+            .Select(y => (DateOnly?)y.StartDate).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        return yearStart ?? new DateOnly(adjustmentDate.Year, 1, 1);
+    }
+
+    // Adds the record, then invoices or credits the difference on rates bills raised from its date up to the given date. A credit above the
+    // council's threshold goes through the credit-note approval workflow (held when the council has one) instead of posting at once.
+    private async Task<Result<ValuationAdjustment>> ApplyAsync(Property property, PropertyValuation record, DateOnly adjustmentDate, string narrative, long userId, CancellationToken ct)
     {
         List<DatedValue> before = await EnsureOpeningAsync(property, ct).ConfigureAwait(false);
         List<DatedValue> after = [.. before, new DatedValue(record.EffectiveFrom, record.Value)];
@@ -310,17 +358,30 @@ public sealed class ValuationRollService : IValuationRollService
 
         Company company = await _db.Set<Company>().AsNoTracking().FirstAsync(c => c.Id == property.CompanyId, ct).ConfigureAwait(false);
         string document = $"{record.Reference}-ADJ";
+        SalesCreditNoteRequest credit = new()
+        {
+            CompanyId = property.CompanyId, CustomerId = property.RatepayerCustomerId, DocumentNumber = document, DocumentDate = adjustmentDate,
+            Currency = company.BaseCurrency, NetAmount = -amount, SalesAccountCode = revenueAccount, Narrative = $"{narrative}, stand {property.StandNumber}",
+        };
+        if (amount < 0m && _credits is not null && (company.ValuationCreditApprovalThreshold is not decimal limit || -amount > limit))
+        {
+            Result<CreditNoteSubmission> submitted = await _credits.SubmitAsync(credit, userId, ct).ConfigureAwait(false);
+            if (submitted.IsFailure)
+            {
+                return submitted.Error;
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return new ValuationAdjustment(billDates.Count, amount, document) { HeldForApproval = !submitted.Value.Posted };
+        }
+
         Result<TradingPostingResult> posted = amount > 0m
             ? await _ar.PostInvoiceAsync(new SalesInvoiceRequest
             {
                 CompanyId = property.CompanyId, CustomerId = property.RatepayerCustomerId, DocumentNumber = document, DocumentDate = adjustmentDate,
                 Currency = company.BaseCurrency, NetAmount = amount, SalesAccountCode = revenueAccount, Narrative = $"{narrative}, stand {property.StandNumber}",
             }, ct).ConfigureAwait(false)
-            : await _ar.PostCreditNoteAsync(new SalesCreditNoteRequest
-            {
-                CompanyId = property.CompanyId, CustomerId = property.RatepayerCustomerId, DocumentNumber = document, DocumentDate = adjustmentDate,
-                Currency = company.BaseCurrency, NetAmount = -amount, SalesAccountCode = revenueAccount, Narrative = $"{narrative}, stand {property.StandNumber}",
-            }, ct).ConfigureAwait(false);
+            : await _ar.PostCreditNoteAsync(credit, ct).ConfigureAwait(false);
         if (posted.IsFailure)
         {
             return posted.Error;

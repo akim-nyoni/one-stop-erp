@@ -3,9 +3,25 @@ using One4All.Core.Security;
 
 namespace One4All.Application.Abstractions.Security;
 
+/// <summary>The outcome of assigning a role.</summary>
+/// <param name="Granted">Whether the role was assigned now.</param>
+/// <param name="RequestId">The held grant awaiting a second administrator, when it was not.</param>
+/// <param name="Conflicts">The segregation-of-duties rules the user breaks (when held: the ones the grant would newly break).</param>
+public sealed record RoleAssignment(bool Granted, long? RequestId, IReadOnlyList<string> Conflicts);
+
+/// <summary>A role grant waiting for a second administrator.</summary>
+/// <param name="RequestId">The held grant.</param>
+/// <param name="Username">The user the role is for.</param>
+/// <param name="RoleName">The role.</param>
+/// <param name="Scopes">The scopes, or null for unrestricted.</param>
+/// <param name="Conflicts">The rules the grant would newly break.</param>
+/// <param name="RequestedBy">The administrator who asked.</param>
+/// <param name="RequestedOnUtc">When.</param>
+public sealed record PendingRoleGrant(long RequestId, string Username, string RoleName, string? Scopes, string Conflicts, string RequestedBy, DateTimeOffset RequestedOnUtc);
+
 /// <summary>
 /// User, role and group administration (brief §4.17, §5): accounts with policy-checked passwords, roles, groups, and role assignments
-/// restricted by data scopes. Assignments report any segregation-of-duties conflicts they create.
+/// restricted by data scopes. A role assignment that would create a segregation-of-duties conflict waits for a second administrator.
 /// </summary>
 public interface IUserAdminService
 {
@@ -47,22 +63,45 @@ public interface IUserAdminService
     Task<Result<long>> CreateRoleAsync(string name, string? description, long? copyFromRoleId = null, CancellationToken ct = default);
 
     /// <summary>
-    /// Assigns a role to a user, restricted by data scopes (company, branch, warehouse… codes or ids); an existing assignment's scopes are
-    /// replaced. Returns the names of segregation-of-duties rules the user now breaks, as warnings.
+    /// Assigns a role to a user, restricted by data scopes (company, branch, warehouse... codes or ids); an existing assignment's scopes are
+    /// replaced, in one unit. Nobody grants a role to themselves. When the role would break a segregation-of-duties rule the user does
+    /// not already break, it is not granted: it is held as a <see cref="RoleGrantRequest"/> for a second administrator to approve.
     /// </summary>
     /// <param name="userId">The user.</param>
     /// <param name="roleId">The role.</param>
+    /// <param name="actingUserId">The administrator making the change (recorded and audited).</param>
     /// <param name="scopes">The scopes, by dimension.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>Any SoD conflicts.</returns>
-    Task<Result<IReadOnlyList<string>>> AssignRoleAsync(long userId, long roleId, IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes = null, CancellationToken ct = default);
+    /// <returns>Whether it was granted or held, with the conflicts it breaks.</returns>
+    Task<Result<RoleAssignment>> AssignRoleAsync(long userId, long roleId, long actingUserId, IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes = null, CancellationToken ct = default);
 
-    /// <summary>Removes a role from a user.</summary>
+    /// <summary>
+    /// Removes a role from a user. An administrator cannot remove from themselves the last role that gives them the user-administration
+    /// right (<c>Security.Role</c> edit), so nobody locks themselves out of user administration by mistake.
+    /// </summary>
     /// <param name="userId">The user.</param>
     /// <param name="roleId">The role.</param>
+    /// <param name="actingUserId">The administrator making the change (audited).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or why not.</returns>
-    Task<Result> RemoveRoleAsync(long userId, long roleId, CancellationToken ct = default);
+    Task<Result> RemoveRoleAsync(long userId, long roleId, long actingUserId, CancellationToken ct = default);
+
+    /// <summary>The role grants held for a second administrator, oldest first.</summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The pending grants.</returns>
+    Task<IReadOnlyList<PendingRoleGrant>> PendingRoleGrantsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Approves (the role is assigned with its scopes) or rejects a held role grant, in one unit. The decider must hold the
+    /// user-administration right and be neither the administrator who asked nor the user the role is for.
+    /// </summary>
+    /// <param name="requestId">The held grant.</param>
+    /// <param name="approve">Approve or reject.</param>
+    /// <param name="actingUserId">The deciding administrator.</param>
+    /// <param name="note">A note (required to reject).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success or why not.</returns>
+    Task<Result> DecideRoleGrantAsync(long requestId, bool approve, long actingUserId, string? note, CancellationToken ct = default);
 
     /// <summary>Creates a group (a set of roles users inherit by joining).</summary>
     /// <param name="name">The name (unique).</param>

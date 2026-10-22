@@ -55,9 +55,9 @@ public sealed class ReportSecurityTests
         long clerk = (await admin.CreateUserAsync($"clerk.{tag}", "Clerk", null, "Reports2026x")).Value;
         long financeHr = (await admin.CreateUserAsync($"finhr.{tag}", "Finance HR", null, "Reports2026x")).Value;
         long headHr = (await admin.CreateUserAsync($"headhr.{tag}", "Head of HR", null, "Reports2026x")).Value;
-        (await admin.AssignRoleAsync(clerk, readers, new Dictionary<ScopeDimension, IReadOnlyList<string>>())).IsSuccess.Should().BeTrue();
-        (await admin.AssignRoleAsync(financeHr, payroll, new Dictionary<ScopeDimension, IReadOnlyList<string>> { [ScopeDimension.Department] = ["FIN"] })).IsSuccess.Should().BeTrue();
-        (await admin.AssignRoleAsync(headHr, payroll, new Dictionary<ScopeDimension, IReadOnlyList<string>>())).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(clerk, readers, 900_001, new Dictionary<ScopeDimension, IReadOnlyList<string>>())).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(financeHr, payroll, 900_001, new Dictionary<ScopeDimension, IReadOnlyList<string>> { [ScopeDimension.Department] = ["FIN"] })).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(headHr, payroll, 900_001, new Dictionary<ScopeDimension, IReadOnlyList<string>>())).IsSuccess.Should().BeTrue();
 
         IAuditedReportRunner reports = scope.ServiceProvider.GetRequiredService<IAuditedReportRunner>();
         Dictionary<string, object?> parameters = new() { ["AsAtDate"] = new DateOnly(2026, 6, 30) };

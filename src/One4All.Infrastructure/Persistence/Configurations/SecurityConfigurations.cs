@@ -242,6 +242,20 @@ internal sealed class PasswordHistoryConfiguration : IEntityTypeConfiguration<Pa
     }
 }
 
+internal sealed class RoleGrantRequestConfiguration : IEntityTypeConfiguration<RoleGrantRequest>
+{
+    public void Configure(EntityTypeBuilder<RoleGrantRequest> b)
+    {
+        b.ToTable("role_grant_request", Schemas.Security);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Scopes).HasMaxLength(2000);
+        b.Property(x => x.Conflicts).HasMaxLength(2000);
+        b.Property(x => x.DecisionNote).HasMaxLength(500);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasIndex(x => new { x.Status, x.UserId });
+    }
+}
+
 internal sealed class SodRuleSettingConfiguration : IEntityTypeConfiguration<SodRuleSetting>
 {
     public void Configure(EntityTypeBuilder<SodRuleSetting> b)

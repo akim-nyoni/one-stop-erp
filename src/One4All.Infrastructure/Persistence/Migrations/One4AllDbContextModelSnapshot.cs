@@ -18837,6 +18837,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
 
+                    b.Property<long?>("RecordedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("recorded_by_user_id");
+
                     b.Property<string>("Reference")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -19658,6 +19662,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedOnUtc")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
 
                     b.Property<DateOnly?>("DecidedOn")
                         .HasColumnType("date")
@@ -32086,6 +32094,88 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("role", "sec");
                 });
 
+            modelBuilder.Entity("One4All.Core.Security.RoleGrantRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Conflicts")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("conflicts");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<DateTimeOffset?>("DecidedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("decided_on_utc");
+
+                    b.Property<string>("DecisionNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("decision_note");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<DateTimeOffset>("RequestedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("requested_on_utc");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("role_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<string>("Scopes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("scopes");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<long>("UserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_role_grant_request");
+
+                    b.HasIndex("Status", "UserId")
+                        .HasDatabaseName("ix_role_grant_request_status_user_id");
+
+                    b.ToTable("role_grant_request", "sec");
+                });
+
             modelBuilder.Entity("One4All.Core.Security.RolePermission", b =>
                 {
                     b.Property<long>("Id")
@@ -33128,6 +33218,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("unreceipted_refund_limit");
+
+                    b.Property<int?>("ValuationBackdateMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("valuation_backdate_months");
+
+                    b.Property<decimal?>("ValuationCreditApprovalThreshold")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("valuation_credit_approval_threshold");
 
                     b.Property<decimal>("WithholdingThreshold")
                         .HasPrecision(19, 4)

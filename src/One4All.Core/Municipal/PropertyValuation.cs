@@ -48,8 +48,10 @@ public sealed class PropertyValuation : AuditableEntity, ICompanyScoped
     /// <param name="kind">Where it came from.</param>
     /// <param name="reference">The roll name, supplementary number or objection number.</param>
     /// <param name="reason">Why, for a supplementary valuation.</param>
-    public PropertyValuation(long companyId, long propertyId, DateOnly effectiveFrom, decimal value, ValuationKind kind, string reference, string? reason)
+    /// <param name="recordedByUserId">The user who recorded it (a supplementary valuation or an objection decision).</param>
+    public PropertyValuation(long companyId, long propertyId, DateOnly effectiveFrom, decimal value, ValuationKind kind, string reference, string? reason, long? recordedByUserId = null)
     {
+        RecordedByUserId = recordedByUserId;
         CompanyId = companyId;
         PropertyId = propertyId;
         EffectiveFrom = effectiveFrom;
@@ -79,6 +81,9 @@ public sealed class PropertyValuation : AuditableEntity, ICompanyScoped
 
     /// <summary>Why, for a supplementary valuation.</summary>
     public string? Reason { get; private set; }
+
+    /// <summary>The user who recorded it (a supplementary valuation or an objection decision).</summary>
+    public long? RecordedByUserId { get; private set; }
 }
 
 /// <summary>
@@ -152,12 +157,17 @@ public sealed class ValuationObjection : AuditableEntity, ICompanyScoped
     /// <summary>The decision's reasons.</summary>
     public string? DecisionNotes { get; private set; }
 
+    /// <summary>The user who decided it.</summary>
+    public long? DecidedByUserId { get; private set; }
+
     /// <summary>Upholds it with a revised value.</summary>
     /// <param name="date">When.</param>
     /// <param name="value">The revised value.</param>
     /// <param name="notes">The reasons.</param>
-    public void Uphold(DateOnly date, decimal value, string notes)
+    /// <param name="userId">The user who decided it.</param>
+    public void Uphold(DateOnly date, decimal value, string notes, long userId)
     {
+        DecidedByUserId = userId;
         Status = ObjectionStatus.Upheld;
         DecidedOn = date;
         DecidedValue = value;
@@ -167,8 +177,10 @@ public sealed class ValuationObjection : AuditableEntity, ICompanyScoped
     /// <summary>Dismisses it.</summary>
     /// <param name="date">When.</param>
     /// <param name="notes">The reasons.</param>
-    public void Dismiss(DateOnly date, string notes)
+    /// <param name="userId">The user who decided it.</param>
+    public void Dismiss(DateOnly date, string notes, long userId)
     {
+        DecidedByUserId = userId;
         Status = ObjectionStatus.Dismissed;
         DecidedOn = date;
         DecisionNotes = notes;

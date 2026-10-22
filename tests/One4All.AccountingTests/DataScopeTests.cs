@@ -38,7 +38,7 @@ public sealed class DataScopeTests
         db.Roles.Single(r => r.Id == role).Grant("Inventory.Item", OperationFlags.View);
         db.Roles.Single(r => r.Id == role).Grant("Municipal.Property", OperationFlags.View);
         await db.SaveChangesAsync();
-        (await admin.AssignRoleAsync(storeman, role, new Dictionary<ScopeDimension, IReadOnlyList<string>>
+        (await admin.AssignRoleAsync(storeman, role, 900_001, new Dictionary<ScopeDimension, IReadOnlyList<string>>
         {
             [ScopeDimension.Warehouse] = ["dsc-mine"], [ScopeDimension.WardZone] = ["W7"],
         })).IsSuccess.Should().BeTrue();

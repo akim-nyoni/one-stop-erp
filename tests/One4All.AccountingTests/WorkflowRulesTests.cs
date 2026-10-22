@@ -34,7 +34,7 @@ public sealed class WorkflowRulesTests
         long manager = (await admin.CreateUserAsync($"wr.mgr.{tag}", "Manager", null, "Manager2026a")).Value;
         long auditor = (await admin.CreateUserAsync($"wr.it.{tag}", "IT head", null, "ItHead2026a")).Value;
         long itRole = (await admin.CreateRoleAsync($"IT approvers {tag}", null)).Value;
-        (await admin.AssignRoleAsync(auditor, itRole)).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(auditor, itRole, 900_001)).IsSuccess.Should().BeTrue();
         (await admin.SetManagerAsync(requester, requester)).Error.Code.Should().Be("Security.ManagerInvalid");
         (await admin.SetManagerAsync(requester, manager)).IsSuccess.Should().BeTrue();
 

@@ -355,10 +355,12 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Valuation roll", ListTitle = "Open objections",
             Description = "Import a general valuation roll (a CSV file: stand,value) effective from a date; record a supplementary valuation on one stand (bills since re-rated); "
-                + "lodge an objection and decide it (a revised value re-rates the bills); History lists a stand's valuations.",
-            Fields = [Pick("Step", "Step", ["Import roll", "Supplementary", "Objection", "Decide objection", "History"]), Opt("File", "Roll CSV file (stand,value)"), Opt("Roll", "Roll name"),
+                + "lodge an objection and decide it (a revised value re-rates the bills); History lists a stand's valuations. A supplementary value may go back no further than the "
+                + "council's limit (by default the start of the financial year); a rates credit above the council's threshold waits in the credit-note approval workflow. "
+                + "Policy sets both (blank months: start of the financial year; blank threshold: every credit is approved).",
+            Fields = [Pick("Step", "Step", ["Import roll", "Supplementary", "Objection", "Decide objection", "History", "Policy"]), Opt("File", "Roll CSV file (stand,value)"), Opt("Roll", "Roll name"),
                 Opt("Stand", "Stand number"), OptNum("Value", "Value / claimed value / revised value"), Opt("Text", "Reason / grounds / notes"), Opt("Objection", "Objection number (decide)"),
-                Today("Effective", "Effective from"), Today()],
+                Today("Effective", "Effective from"), Today(), OptNum("Months", "Back-dating limit in months (policy)"), OptNum("Threshold", "Credit approval threshold (policy)")],
             Run = async (c, i) =>
             {
                 IValuationRollService roll = c.Get<IValuationRollService>();
@@ -378,15 +380,19 @@ public static partial class OperationCatalogue
                         return $"{Check(await roll.ImportRollAsync(c.CompanyId, i.Optional("Roll") ?? string.Empty, i.Date("Effective"), entries).ConfigureAwait(true))} valuation(s) loaded.";
                     case "Supplementary":
                         ValuationAdjustment adjusted = Check(await roll.RecordSupplementaryAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Date("Effective"),
-                            i.OptionalNumber("Value") ?? 0m, i.Optional("Text") ?? string.Empty, i.Date("Date")).ConfigureAwait(true));
-                        return $"Recorded; {adjusted.BillsAdjusted} bill(s) re-rated by {M(adjusted.Amount)}{(adjusted.DocumentNumber is null ? string.Empty : $" ({adjusted.DocumentNumber})")}.";
+                            i.OptionalNumber("Value") ?? 0m, i.Optional("Text") ?? string.Empty, i.Date("Date"), c.UserId).ConfigureAwait(true));
+                        return $"Recorded; {adjusted.BillsAdjusted} bill(s) re-rated by {M(adjusted.Amount)}{(adjusted.DocumentNumber is null ? string.Empty : $" ({adjusted.DocumentNumber})")}"
+                            + (adjusted.HeldForApproval ? ", the credit note held for approval." : ".");
                     case "Objection":
                         return $"Objection {Check(await roll.LodgeObjectionAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Date("Date"),
                             i.OptionalNumber("Value") ?? 0m, i.Optional("Text") ?? string.Empty).ConfigureAwait(true))} lodged.";
                     case "Decide objection":
-                        ValuationAdjustment decided = Check(await roll.DecideObjectionAsync(c.CompanyId, i.Optional("Objection") ?? string.Empty, i.Date("Date"), i.OptionalNumber("Value"), i.Optional("Text") ?? string.Empty)
-                            .ConfigureAwait(true));
-                        return $"Decided; {decided.BillsAdjusted} bill(s) re-rated by {M(decided.Amount)}.";
+                        ValuationAdjustment decided = Check(await roll.DecideObjectionAsync(c.CompanyId, i.Optional("Objection") ?? string.Empty, i.Date("Date"), i.OptionalNumber("Value"), i.Optional("Text") ?? string.Empty,
+                            c.UserId).ConfigureAwait(true));
+                        return $"Decided; {decided.BillsAdjusted} bill(s) re-rated by {M(decided.Amount)}" + (decided.HeldForApproval ? $", credit note {decided.DocumentNumber} held for approval." : ".");
+                    case "Policy":
+                        return Check(await roll.SetPolicyAsync(c.CompanyId, i.OptionalNumber("Months") is decimal months ? (int)months : null, i.OptionalNumber("Threshold")).ConfigureAwait(true),
+                            "Valuation controls saved.");
                     default:
                         IReadOnlyList<ValuationEntry> history = await roll.HistoryAsync(c.CompanyId, await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true)).ConfigureAwait(true);
                         return string.Join(Environment.NewLine, history.Select(v => $"{v.EffectiveFrom:yyyy-MM-dd}  {M(v.Value),14}  {v.Kind,-12} {v.Reference}"));

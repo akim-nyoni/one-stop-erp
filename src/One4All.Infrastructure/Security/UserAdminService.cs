@@ -142,10 +142,21 @@ public sealed class UserAdminService : IUserAdminService
     }
 
     /// <inheritdoc />
-    public async Task<Result<IReadOnlyList<string>>> AssignRoleAsync(long userId, long roleId, IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes = null, CancellationToken ct = default)
+    public Task<Result<RoleAssignment>> AssignRoleAsync(long userId, long roleId, long actingUserId, IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes = null,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(() => AssignCoreAsync(userId, roleId, actingUserId, scopes, ct), ct);
+
+    private async Task<Result<RoleAssignment>> AssignCoreAsync(long userId, long roleId, long actingUserId, IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes,
+        CancellationToken ct)
     {
-        User? user = await _db.Users.Include(u => u.Roles).ThenInclude(r => r.Scopes).FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
-        if (user is null || !await _db.Roles.AnyAsync(r => r.Id == roleId, ct).ConfigureAwait(false))
+        if (actingUserId == userId)
+        {
+            return Error.Rule("Sec.SelfGrant", "Nobody grants a role to themselves; another administrator must assign it.");
+        }
+
+        User? user = await UserWithAccessAsync(userId, ct).ConfigureAwait(false);
+        string? roleName = await _db.Roles.Where(r => r.Id == roleId).Select(r => r.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (user is null || roleName is null)
         {
             return Error.NotFound("Security.NotFound", "No such user or role.");
         }
@@ -155,7 +166,134 @@ public sealed class UserAdminService : IUserAdminService
             return Error.Validation("Security.ScopeInvalid", "A scope lists at least one value, none blank.");
         }
 
-        // Replace the assignment so its scopes are exactly those given.
+        // A role that would break a segregation-of-duties rule the user does not already break waits for a second administrator.
+        List<long> current = [.. user.Roles.Select(r => r.RoleId)];
+        EffectivePermissions before = await EffectiveAsync(user, current, ct).ConfigureAwait(false);
+        EffectivePermissions after = await EffectiveAsync(user, current.Append(roleId), ct).ConfigureAwait(false);
+        List<string> fresh = [.. (await _permissions.SodRulesAsync(ct).ConfigureAwait(false)).Where(r => r.IsViolatedBy(after) && !r.IsViolatedBy(before)).Select(r => r.Name)];
+        if (fresh.Count > 0)
+        {
+            if (await _db.Set<RoleGrantRequest>().AnyAsync(r => r.UserId == userId && r.RoleId == roleId && r.Status == RoleGrantStatus.Pending, ct).ConfigureAwait(false))
+            {
+                return Error.Conflict("Sec.GrantPending", $"Role {roleName} for {user.Username} is already waiting for a second administrator.");
+            }
+
+            RoleGrantRequest held = new(userId, roleId, FormatScopes(scopes), string.Join("; ", fresh), actingUserId, DateTimeOffset.UtcNow);
+            _db.Set<RoleGrantRequest>().Add(held);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId,
+                $"Role {roleName} held for a second administrator (request {held.Id}): it would break {held.Conflicts}", ct, actingUserId).ConfigureAwait(false);
+            return new RoleAssignment(false, held.Id, fresh);
+        }
+
+        await GrantAsync(user, roleId, scopes, ct).ConfigureAwait(false);
+        await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"Role {roleId} assigned ({roleName}){DescribeScopes(scopes)}", ct, actingUserId).ConfigureAwait(false);
+        return new RoleAssignment(true, null, (await ConflictsAsync(userId, ct).ConfigureAwait(false)).Value);
+    }
+
+    /// <inheritdoc />
+    public Task<Result> RemoveRoleAsync(long userId, long roleId, long actingUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            User? user = await UserWithAccessAsync(userId, ct).ConfigureAwait(false);
+            if (user is null)
+            {
+                return Result.Failure(Error.NotFound("Security.UserNotFound", $"User {userId} not found."));
+            }
+
+            if (actingUserId == userId && !user.IsSystemAdministrator && user.Roles.Any(r => r.RoleId == roleId))
+            {
+                List<long> current = [.. user.Roles.Select(r => r.RoleId)];
+                bool hasRight = (await EffectiveAsync(user, current, ct).ConfigureAwait(false)).Has(UserAdministrationRight, OperationFlags.Edit);
+                bool keepsRight = (await EffectiveAsync(user, current.Where(r => r != roleId), ct).ConfigureAwait(false)).Has(UserAdministrationRight, OperationFlags.Edit);
+                if (hasRight && !keepsRight)
+                {
+                    return Result.Failure(Error.Rule("Sec.LastAdminRole",
+                        "That is your last role with the user-administration right; another administrator must remove it, so nobody locks themselves out by mistake."));
+                }
+            }
+
+            user.RemoveRole(roleId);
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"Role {roleId} removed", ct, actingUserId).ConfigureAwait(false);
+            return Result.Success();
+        }, ct);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PendingRoleGrant>> PendingRoleGrantsAsync(CancellationToken ct = default)
+        => await (
+            from r in _db.Set<RoleGrantRequest>().AsNoTracking()
+            join u in _db.Users.AsNoTracking() on r.UserId equals u.Id
+            join ro in _db.Roles.AsNoTracking() on r.RoleId equals ro.Id
+            join q in _db.Users.AsNoTracking() on r.RequestedByUserId equals q.Id into requesters
+            from q in requesters.DefaultIfEmpty()
+            where r.Status == RoleGrantStatus.Pending
+            orderby r.RequestedOnUtc, r.Id
+            select new PendingRoleGrant(r.Id, u.Username, ro.Name, r.Scopes, r.Conflicts, q == null ? string.Empty : q.Username, r.RequestedOnUtc))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public Task<Result> DecideRoleGrantAsync(long requestId, bool approve, long actingUserId, string? note, CancellationToken ct = default)
+        => _db.AtomicAsync(async () =>
+        {
+            RoleGrantRequest? request = await _db.Set<RoleGrantRequest>().FirstOrDefaultAsync(r => r.Id == requestId, ct).ConfigureAwait(false);
+            if (request is null)
+            {
+                return Result.Failure(Error.NotFound("Sec.GrantNotFound", $"Held role grant {requestId} not found."));
+            }
+
+            if (request.Status != RoleGrantStatus.Pending)
+            {
+                return Result.Failure(Error.Rule("Sec.GrantDecided", $"Held role grant {requestId} has already been decided."));
+            }
+
+            if (actingUserId == request.RequestedByUserId || actingUserId == request.UserId)
+            {
+                return Result.Failure(Error.Rule("Sec.SecondAdministrator",
+                    "A second administrator decides a held role grant: not the one who asked for it, nor the user it is for."));
+            }
+
+            if (!(await _permissions.ResolveAsync(actingUserId, ct).ConfigureAwait(false)).Has(UserAdministrationRight, OperationFlags.Edit))
+            {
+                return Result.Failure(Error.Rule("Sec.NotAdministrator", "Only a user with the user-administration right (Roles, Edit) decides a held role grant."));
+            }
+
+            if (!approve && string.IsNullOrWhiteSpace(note))
+            {
+                return Result.Failure(Error.Validation("Sec.RejectReason", "Say why the role grant is rejected."));
+            }
+
+            string? roleName = await _db.Roles.Where(r => r.Id == request.RoleId).Select(r => r.Name).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+            request.Decide(approve, actingUserId, DateTimeOffset.UtcNow, string.IsNullOrWhiteSpace(note) ? null : note.Trim());
+            if (approve)
+            {
+                User? user = await UserWithAccessAsync(request.UserId, ct).ConfigureAwait(false);
+                if (user is null || roleName is null)
+                {
+                    return Result.Failure(Error.NotFound("Security.NotFound", "The user or role of that grant no longer exists."));
+                }
+
+                await GrantAsync(user, request.RoleId, ParseScopes(request.Scopes), ct).ConfigureAwait(false);
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", request.UserId,
+                approve
+                    ? $"Role {request.RoleId} assigned ({roleName}) on approval of held grant {requestId} despite {request.Conflicts}{(request.Scopes is null ? string.Empty : " with scopes " + request.Scopes)}"
+                    : $"Held grant {requestId} of role {roleName} rejected: {request.DecisionNote}", ct, actingUserId).ConfigureAwait(false);
+            return Result.Success();
+        }, ct);
+
+    // The feature whose Edit right makes a user an administrator of users and roles.
+    private const string UserAdministrationRight = "Security.Role";
+
+    private Task<User?> UserWithAccessAsync(long userId, CancellationToken ct)
+        => _db.Users.Include(u => u.Roles).ThenInclude(r => r.Scopes).Include(u => u.Groups).Include(u => u.Overrides).AsSplitQuery()
+            .FirstOrDefaultAsync(u => u.Id == userId, ct);
+
+    // Replaces the assignment so its scopes are exactly those given (the removal is saved first so the new row does not clash with the old).
+    private async Task GrantAsync(User user, long roleId, IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes, CancellationToken ct)
+    {
         user.RemoveRole(roleId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         UserRole assignment = user.AssignRole(roleId);
@@ -165,25 +303,34 @@ public sealed class UserAdminService : IUserAdminService
         }
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"Role {roleId} assigned{(scopes is { Count: > 0 } ? " with scopes " + string.Join("; ", scopes.Select(s => $"{s.Key}: {string.Join(",", s.Value)}")) : string.Empty)}", ct)
-            .ConfigureAwait(false);
-        return await ConflictsAsync(userId, ct).ConfigureAwait(false);
     }
 
-    /// <inheritdoc />
-    public async Task<Result> RemoveRoleAsync(long userId, long roleId, CancellationToken ct = default)
+    // What a user could do holding exactly these direct roles, with their groups' roles and their overrides.
+    private async Task<EffectivePermissions> EffectiveAsync(User user, IEnumerable<long> roleIds, CancellationToken ct)
     {
-        User? user = await _db.Users.Include(u => u.Roles).FirstOrDefaultAsync(u => u.Id == userId, ct).ConfigureAwait(false);
-        if (user is null)
+        HashSet<long> ids = [.. roleIds];
+        long[] groupIds = [.. user.Groups.Select(g => g.GroupId)];
+        if (groupIds.Length > 0)
         {
-            return Result.Failure(Error.NotFound("Security.UserNotFound", $"User {userId} not found."));
+            ids.UnionWith(await _db.Set<GroupRole>().Where(g => groupIds.Contains(g.GroupId)).Select(g => g.RoleId).ToListAsync(ct).ConfigureAwait(false));
         }
 
-        user.RemoveRole(roleId);
-        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        await RecordAsync(Core.Audit.AuditAction.PermissionChange, "User", userId, $"Role {roleId} removed", ct).ConfigureAwait(false);
-        return Result.Success();
+        List<PermissionGrant> grants = ids.Count == 0 ? []
+            : await _db.Set<RolePermission>().Where(p => ids.Contains(p.RoleId)).Select(p => new PermissionGrant(p.PermissionCode, p.Operations)).ToListAsync(ct).ConfigureAwait(false);
+        return PermissionResolution.Resolve(grants, user.Overrides.Select(o => o.ToOverride()), user.IsSystemAdministrator);
     }
+
+    private static string DescribeScopes(IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes)
+        => FormatScopes(scopes) is string text ? " with scopes " + text : string.Empty;
+
+    // Scopes as Dimension:value,value;Dimension:value - the form the desktop takes them in.
+    private static string? FormatScopes(IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>? scopes)
+        => scopes is { Count: > 0 } ? string.Join(";", scopes.Select(s => $"{s.Key}:{string.Join(",", s.Value.Select(v => v.Trim()))}")) : null;
+
+    private static Dictionary<ScopeDimension, IReadOnlyList<string>>? ParseScopes(string? text)
+        => string.IsNullOrWhiteSpace(text) ? null
+            : text.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(part => part.Split(':', 2))
+                .ToDictionary(bits => Enum.Parse<ScopeDimension>(bits[0]), bits => (IReadOnlyList<string>)[.. bits[1].Split(',', StringSplitOptions.RemoveEmptyEntries)]);
 
     /// <inheritdoc />
     public async Task<Result<long>> CreateGroupAsync(string name, string? description, CancellationToken ct = default)
@@ -366,12 +513,16 @@ public sealed class UserAdminService : IUserAdminService
         return Result.Success();
     }
 
-    // A permission or account change in the change log, by whoever is signed in.
-    private async Task RecordAsync(Core.Audit.AuditAction action, string entityType, long entityId, string what, CancellationToken ct)
+    // A permission or account change in the change log, by the acting administrator when given, else whoever is signed in.
+    private async Task RecordAsync(Core.Audit.AuditAction action, string entityType, long entityId, string what, CancellationToken ct, long? actingUserId = null)
     {
         if (_audit is not null)
         {
-            await _audit.RecordAsync(new AuditEvent(null, _currentUser?.UserId, _currentUser?.UserName ?? "system", "Security", entityType,
+            long? who = actingUserId ?? _currentUser?.UserId;
+            string name = actingUserId is long acting && acting != _currentUser?.UserId
+                ? await _db.Users.AsNoTracking().Where(u => u.Id == acting).Select(u => u.Username).FirstOrDefaultAsync(ct).ConfigureAwait(false) ?? $"user {acting}"
+                : _currentUser?.UserName ?? "system";
+            await _audit.RecordAsync(new AuditEvent(null, who, name, "Security", entityType,
                 entityId.ToString(System.Globalization.CultureInfo.InvariantCulture), action, what), ct).ConfigureAwait(false);
         }
     }

@@ -43,7 +43,7 @@ public sealed class SalesDiscountControlTests
         long role = (await admin.CreateRoleAsync($"Discounts {tag}", null)).Value;
         db.Roles.Single(r => r.Id == role).Grant("Sales.Invoice", OperationFlags.OverrideDiscount);
         await db.SaveChangesAsync();
-        (await admin.AssignRoleAsync(manager, role)).IsSuccess.Should().BeTrue();
+        (await admin.AssignRoleAsync(manager, role, 900_001)).IsSuccess.Should().BeTrue();
 
         Customer customer = new(companyId, "SDC-C", "Discount hunter", Scenario.Usd);
         Item widget = new(companyId, "SDC-W", "Widget") { RevenueAccountCode = "4000" };

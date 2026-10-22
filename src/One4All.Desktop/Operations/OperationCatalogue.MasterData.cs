@@ -1344,15 +1344,27 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Assign a role", ListTitle = "Users and their roles",
-            Description = "Gives a user a role, limited by scopes such as Company:ACME;Branch:HO,NORTH (blank: unrestricted). Warns of segregation-of-duties conflicts.",
-            Fields = [Req("Username", "Login name"), Req("Role", "Role name"), Opt("Scopes", "Scopes (Dimension:values;...)"), Tick("Remove", "Remove the role instead")],
+            Description = "Gives a user a role, limited by scopes such as Company:ACME;Branch:HO,NORTH (blank: unrestricted). Nobody gives a role to themselves. A role that "
+                + "would break a segregation-of-duties rule is held until a second administrator (not the one who asked, nor the user) approves or rejects it here.",
+            Fields = [Pick("Step", "Step", ["Assign", "Remove", "Approve held grant", "Reject held grant"]), Req("Username", "Login name"), Req("Role", "Role name"),
+                Opt("Scopes", "Scopes (Dimension:values;...)"), Opt("Note", "Note (reject: why)")],
             Run = async (c, i) =>
             {
                 long user = await UserAsync(c, i.Text("Username")).ConfigureAwait(true);
                 long role = await RoleAsync(c, i.Text("Role")).ConfigureAwait(true);
-                if (i.Flag("Remove"))
+                IUserAdminService admin = c.Get<IUserAdminService>();
+                string step = i.Text("Step");
+                if (step == "Remove")
                 {
-                    return Check(await c.Get<IUserAdminService>().RemoveRoleAsync(user, role).ConfigureAwait(true), "Role removed.");
+                    return Check(await admin.RemoveRoleAsync(user, role, c.UserId).ConfigureAwait(true), "Role removed.");
+                }
+
+                if (step != "Assign")
+                {
+                    long request = await c.Db.Set<RoleGrantRequest>().Where(r => r.UserId == user && r.RoleId == role && r.Status == RoleGrantStatus.Pending)
+                        .Select(r => (long?)r.Id).FirstOrDefaultAsync().ConfigureAwait(true) ?? throw new OperationException("That role is not waiting for approval for that user.");
+                    bool approve = step == "Approve held grant";
+                    return Check(await admin.DecideRoleGrantAsync(request, approve, c.UserId, i.Optional("Note")).ConfigureAwait(true), approve ? "Role grant approved and assigned." : "Role grant rejected.");
                 }
 
                 Dictionary<ScopeDimension, IReadOnlyList<string>> scopes = [];
@@ -1367,8 +1379,10 @@ public static partial class OperationCatalogue
                     scopes[dimension] = [.. bits[1].Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)];
                 }
 
-                IReadOnlyList<string> conflicts = Check(await c.Get<IUserAdminService>().AssignRoleAsync(user, role, scopes).ConfigureAwait(true));
-                return conflicts.Count == 0 ? "Role assigned." : $"Role assigned. Segregation-of-duties conflicts: {string.Join("; ", conflicts)}.";
+                RoleAssignment assigned = Check(await admin.AssignRoleAsync(user, role, c.UserId, scopes).ConfigureAwait(true));
+                return !assigned.Granted
+                    ? $"Held for a second administrator: the role would break {string.Join("; ", assigned.Conflicts)}. Another administrator approves or rejects it here."
+                    : assigned.Conflicts.Count == 0 ? "Role assigned." : $"Role assigned. Segregation-of-duties conflicts the user already had: {string.Join("; ", assigned.Conflicts)}.";
             },
             List = UsersAsync,
         };
@@ -1449,10 +1463,13 @@ public static partial class OperationCatalogue
     private static async Task<DataTable> UsersAsync(OperationContext c)
     {
         Dictionary<long, string> roles = await c.Db.Roles.AsNoTracking().ToDictionaryAsync(r => r.Id, r => r.Name).ConfigureAwait(true);
+        ILookup<long, long> held = (await c.Db.Set<RoleGrantRequest>().AsNoTracking().Where(r => r.Status == RoleGrantStatus.Pending).Select(r => new { r.UserId, r.RoleId })
+            .ToListAsync().ConfigureAwait(true)).ToLookup(r => r.UserId, r => r.RoleId);
         return Table(await c.Db.Users.AsNoTracking().Include(u => u.Roles).ThenInclude(r => r.Scopes).OrderBy(u => u.Username).ToListAsync().ConfigureAwait(true),
             ("Username", u => u.Username), ("Name", u => u.DisplayName), ("Email", u => u.Email), ("Active", u => u.IsActive), ("Administrator", u => u.IsSystemAdministrator),
             ("Roles", u => string.Join("; ", u.Roles.Select(r => roles.GetValueOrDefault(r.RoleId) + (r.Scopes.Count == 0 ? string.Empty
-                : " (" + string.Join(", ", r.Scopes.Select(s => $"{s.Dimension}: {string.Join("/", s.Values)}")) + ")")))));
+                : " (" + string.Join(", ", r.Scopes.Select(s => $"{s.Dimension}: {string.Join("/", s.Values)}")) + ")")))),
+            ("Waiting approval", u => string.Join("; ", held[u.Id].Select(r => roles.GetValueOrDefault(r)))));
     }
 
     private static async Task<DataTable> OpeningReconciliationAsync(OperationContext c)
