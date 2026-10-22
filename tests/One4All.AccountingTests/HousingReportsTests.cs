@@ -50,10 +50,9 @@ public sealed class HousingReportsTests
             Counterparty = "Seller", ResolutionReference = "Res 1/2026", Date = new DateOnly(2026, 1, 5),
         });
 
-        IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
         foreach ((string id, int year) in new[] { ("HR-A", 2012), ("HR-B", 2020), ("HR-C", 2025) })
         {
-            (await list.RegisterAsync(new WaitingListApplication
+            (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, new WaitingListApplication
             {
                 CompanyId = companyId, IdNumber = $"{id}-{companyId}", FullName = id, Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1980, 1, 1),
                 ResidentSince = new DateOnly(2000, 1, 1), MonthlyIncome = 500m, Tenure = CurrentTenure.Tenant, RegistrationDate = new DateOnly(year, 6, 1),

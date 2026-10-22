@@ -486,25 +486,44 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Indigent register", ListTitle = "Reviews due in 60 days",
-            Description = "Registers a household as indigent (income under the maximum) with its subsidy % and review date; reviews it (staying on only while still under the maximum); "
-                + "applies the month's subsidies to their bills.",
-            Fields = [Pick("Step", "Step", ["Register", "Review", "Apply subsidies"]), Opt("Stand", "Stand number (register)"), OptNum("Registration", "Registration id (review)"), Num("Income", "Household income", "0"),
-                Num("Subsidy", "Subsidy %", "100"), Num("Maximum", "Maximum income to qualify", "0"), Today("Review", "Next review due"), Opt("Account", "Subsidy (expense) account"), Today()],
+            Description = "Registers a household as indigent (income at or under the council's qualifying maximum, shown below) with its subsidy % and review date. Request: you key "
+                + "the means test; another user holding the indigent approve right then approves or rejects it (with a reason). Review: stays on only while still under the "
+                + "maximum. Apply subsidies: credits the month's charges (not interest or penalties), each currency in that currency. Set threshold: the council's qualifying "
+                + "maximum household income.",
+            Fields = [Pick("Step", "Step", ["Request", "Approve", "Reject", "Review", "Apply subsidies", "Set threshold"]),
+                new OperationField("Threshold", "Council's qualifying maximum income (policy)", FieldKind.Choice, Required: false, Choices: [], ChoicesFrom: async c =>
+                    await c.Get<IIndigentRegisterService>().PolicyAsync(c.CompanyId).ConfigureAwait(true) is decimal maximum ? [M(maximum)] : ["(not set: use Set threshold)"]),
+                Lookup("Pending", "Registration awaiting approval (approve / reject)", false, async c => (await c.Get<IIndigentRegisterService>().PendingAsync(c.CompanyId).ConfigureAwait(true))
+                    .Select(r => (r.RegistrationId.ToString(CultureInfo.InvariantCulture), $"stand {r.StandNumber} - income {M(r.HouseholdIncome)} - {r.SubsidyPercent:0.##}% from {D(r.ApprovedFrom)}")).ToList()),
+                Opt("Stand", "Stand number (request)"), OptNum("Registration", "Registration id (review)"), Num("Income", "Household income", "0"),
+                Num("Subsidy", "Subsidy %", "100"), OptNum("Maximum", "New qualifying maximum income (set threshold)"), Today("Review", "Next review due"), Opt("Reason", "Reason (reject)"),
+                Opt("Account", "Subsidy (expense) account"), Today()],
             Run = async (c, i) =>
             {
                 IIndigentRegisterService register = c.Get<IIndigentRegisterService>();
+                long Pending() => long.TryParse(i.Optional("Pending"), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id
+                    : throw new OperationException("Pick the registration awaiting approval.");
                 switch (i.Text("Step"))
                 {
-                    case "Register":
-                        return Check(await register.RegisterAsync(c.CompanyId, new IndigentApplication(await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Number("Income"),
-                            i.Number("Subsidy"), i.Date("Date"), i.Date("Review"), c.UserId), i.Number("Maximum")).ConfigureAwait(true), id => $"Registered ({id}).");
+                    case "Request":
+                        return Check(await register.RequestAsync(c.CompanyId, new IndigentApplication(await PropertyAsync(c, i.Optional("Stand") ?? string.Empty).ConfigureAwait(true), i.Number("Income"),
+                            i.Number("Subsidy"), i.Date("Date"), i.Date("Review"), c.UserId)).ConfigureAwait(true), id => $"Registration {id} requested; another user approves or rejects it here.");
+                    case "Approve":
+                        return Check(await register.ApproveAsync(c.CompanyId, Pending(), c.UserId).ConfigureAwait(true), "Registration approved; the household is on the register.");
+                    case "Reject":
+                        return Check(await register.RejectAsync(c.CompanyId, Pending(), c.UserId, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), "Registration rejected.");
                     case "Review":
-                        bool stays = Check(await register.ReviewAsync(c.CompanyId, (long)(i.OptionalNumber("Registration") ?? 0m), i.Number("Income"), i.Number("Subsidy"), i.Date("Review"), i.Number("Maximum"), c.UserId)
+                        bool stays = Check(await register.ReviewAsync(c.CompanyId, (long)(i.OptionalNumber("Registration") ?? 0m), i.Number("Income"), i.Number("Subsidy"), i.Date("Review"), c.UserId)
                             .ConfigureAwait(true));
                         return stays ? "Still indigent; review date moved." : "No longer qualifies; removed from the register.";
+                    case "Set threshold":
+                        decimal maximum = i.OptionalNumber("Maximum") ?? throw new OperationException("Give the new qualifying maximum income.");
+                        return Check(await register.SetPolicyAsync(c.CompanyId, maximum).ConfigureAwait(true), $"Qualifying maximum household income set to {M(maximum)}.");
                     default:
                         IReadOnlyList<SubsidyLine> subsidies = Check(await register.ApplySubsidiesAsync(c.CompanyId, i.Date("Date"), i.Optional("Account") ?? string.Empty).ConfigureAwait(true));
-                        return $"{subsidies.Count} household(s) subsidised {M(subsidies.Sum(x => x.Subsidy))}.";
+                        return subsidies.Count == 0 ? "No household subsidised."
+                            : $"{subsidies.Select(x => x.PropertyId).Distinct().Count()} household(s) subsidised: "
+                                + string.Join(", ", subsidies.GroupBy(x => x.Currency).Select(g => $"{g.Key} {M(g.Sum(x => x.Subsidy))}")) + ".";
                 }
             },
             List = async c => Table(await c.Get<IIndigentRegisterService>().ReviewsDueAsync(c.CompanyId, DateOnly.FromDateTime(DateTime.Today), 60).ConfigureAwait(true),

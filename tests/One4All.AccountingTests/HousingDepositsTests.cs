@@ -85,9 +85,13 @@ public sealed class HousingDepositsTests
         (await deposits.TakeDepositAsync(Deposit("DP-1", 500m, new DateOnly(2026, 3, 15)))).IsSuccess.Should().BeTrue();
         (await allocations.AcceptAsync(companyId, certificate, new DateOnly(2026, 3, 16))).IsSuccess.Should().BeTrue();
         (await deposits.TakeDepositAsync(Deposit("DP-X", 100m, new DateOnly(2026, 3, 16)))).Error.Code.Should().Be("Hse.DepositHeld");
-        (await deposits.RefundDepositAsync(companyId, certificate, new DateOnly(2026, 4, 1), "1100")).IsSuccess.Should().BeTrue();
-        (await deposits.TakeDepositAsync(Deposit("DP-2", 600m, new DateOnly(2026, 4, 5)))).IsSuccess.Should().BeTrue();
-        (await deposits.ApplyDepositAsync(companyId, certificate, new DateOnly(2026, 4, 4))).Error.Code.Should().Be("Hse.DepositDate");
+
+        // The offer was accepted, so the sale goes ahead: the deposit is applied, not refunded.
+        (await deposits.RequestRefundAsync(new DepositRefundInput
+        {
+            CompanyId = companyId, CertificateNumber = certificate, Date = new DateOnly(2026, 4, 1), BankAccountCode = "1100", Reason = "Changed mind", RequestedByUserId = 71,
+        })).Error.Code.Should().Be("Hse.RefundAllocationOpen");
+        (await deposits.ApplyDepositAsync(companyId, certificate, new DateOnly(2026, 3, 14))).Error.Code.Should().Be("Hse.DepositDate");
         (await deposits.ApplyDepositAsync(companyId, certificate, new DateOnly(2026, 4, 10))).IsSuccess.Should().BeTrue();
         (await deposits.ApplyDepositAsync(companyId, certificate, new DateOnly(2026, 4, 11))).Error.Code.Should().Be("Hse.NoDepositHeld");
 
@@ -130,5 +134,85 @@ public sealed class HousingDepositsTests
         (await Render("H51", new DateOnly(2026, 3, 20))).Should().Contain($"{scheme.Code},Deposit Payer,Purchase deposit,{certificate},2026-03-15,500");
         (await Render("H51", new DateOnly(2026, 4, 30))).Should().NotContain("Purchase deposit");
         (await Render("H53", new DateOnly(2026, 4, 30))).Should().Contain($"{agreement},Cancelling Buyer,2026-04-15,\"3,132.38\",4,200.00,130.00,0.00,").And.Contain("2802.38");
+    }
+
+    /// <summary>
+    /// Audit #33: a purchase deposit is refunded only once the offer it secured is not going ahead (here declined), on a request keyed by one user
+    /// with its reason and approved by another holding Housing.DepositRefund approve; the approval pays it in one unit with the request.
+    /// </summary>
+    [SkippableFact]
+    public async Task A_deposit_refund_needs_a_declined_offer_a_reason_and_a_second_approver()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        db.Accounts.Add(new LedgerAccount(companyId, "2482", "Purchase Deposits Held", AccountType.Liability));
+        Customer payer = new(companyId, "HR-PAY", "Refund Payer", Scenario.Usd);
+        db.Customers.Add(payer);
+        HousingScheme scheme = new(companyId, $"SCH-HDR-{companyId}", "Refund Scheme", SchemeType.CouncilDelivered);
+        db.HousingSchemes.Add(scheme);
+        await db.SaveChangesAsync();
+
+        IHousingService housing = scope.ServiceProvider.GetRequiredService<IHousingService>();
+        long parcelId = (await housing.AcquireLandAsync(companyId, $"LP-HDR-{companyId}", "Parcel", 300m, 3000m, new DateOnly(2026, 1, 2), "1450", "1100", "LAND-HDR")).Value.LandParcelId;
+        (await housing.SubdivideAsync(companyId, parcelId, scheme.Id, [new NewStand("HDR-1", 300m)], ApportionMethod.Equal, new DateOnly(2026, 1, 5), "1450", "1460")).IsSuccess.Should().BeTrue();
+        HousingApplicant applicant = new(companyId, $"HDR-A-{companyId}", "Refund Applicant", new DateOnly(2015, 1, 1));
+        applicant.SetDetails(HousingCategory.HighDensity, new DateOnly(1985, 1, 1), new DateOnly(2000, 1, 1), 1, false, 300m, CurrentTenure.Lodger);
+        applicant.Register($"WL-HDR-A-{companyId}", applicant.RegistrationDate);
+        db.HousingApplicants.Add(applicant);
+        await db.SaveChangesAsync();
+        IAllocationService allocations = scope.ServiceProvider.GetRequiredService<IAllocationService>();
+        AllocationRunView run = (await allocations.ProposeAsync(new AllocationProposal
+        {
+            CompanyId = companyId, SchemeId = scheme.Id, Category = HousingCategory.HighDensity, Method = AllocationMethod.Seniority, AsAtDate = new DateOnly(2026, 3, 1), UserId = 71,
+        })).Value;
+        string certificate = (await allocations.ApproveAsync(companyId, run.RunNumber, 72, new DateOnly(2026, 3, 2), 30)).Value.Lines.Single().CertificateNumber!;
+
+        IHousingDepositService deposits = scope.ServiceProvider.GetRequiredService<IHousingDepositService>();
+        (await deposits.TakeDepositAsync(new StandDepositReceipt
+        {
+            CompanyId = companyId, CertificateNumber = certificate, CustomerId = payer.Id, Amount = 400m, Date = new DateOnly(2026, 3, 10), ReceiptReference = "DR-1", BankAccountCode = "1100",
+            LiabilityAccountCode = "2482",
+        })).IsSuccess.Should().BeTrue();
+
+        const long clerk = 900_331;
+        long approver = await Scenario.UserWithAsync(db, "dr-approver", "Housing.DepositRefund", Core.Security.OperationFlags.Approve);
+        long viewer = await Scenario.UserWithAsync(db, "dr-viewer", "Housing.DepositRefund", Core.Security.OperationFlags.View);
+        DepositRefundInput Refund(string reason, DateOnly? date = null) => new()
+        {
+            CompanyId = companyId, CertificateNumber = certificate, Date = date ?? new DateOnly(2026, 3, 25), BankAccountCode = "1100", Reason = reason, RequestedByUserId = clerk,
+        };
+
+        // The offer is still open: no refund yet.
+        (await deposits.RequestRefundAsync(Refund("Applicant withdrew"))).Error.Code.Should().Be("Hse.RefundAllocationOpen");
+        (await allocations.DeclineAsync(companyId, certificate, new DateOnly(2026, 3, 20), "Cannot afford it")).IsSuccess.Should().BeTrue();
+
+        (await deposits.RequestRefundAsync(Refund(" "))).Error.Code.Should().Be("Hse.RefundDetails");
+        (await deposits.RequestRefundAsync(Refund("Offer declined", new DateOnly(2026, 3, 5)))).Error.Code.Should().Be("Hse.DepositDate");
+        long first = (await deposits.RequestRefundAsync(Refund("Offer declined"))).Value;
+        (await deposits.RequestRefundAsync(Refund("Offer declined"))).Error.Code.Should().Be("Hse.RefundPending");
+        (await deposits.PendingRefundsAsync(companyId)).Should().Equal(new PendingDepositRefund(first, certificate, 400m, new DateOnly(2026, 3, 25), "Offer declined", clerk));
+
+        // Rejected with a reason, then asked for again and approved by a second user holding the right.
+        (await deposits.RejectRefundAsync(companyId, first, approver, "Wrong bank account")).IsSuccess.Should().BeTrue();
+        long second = (await deposits.RequestRefundAsync(Refund("Offer declined"))).Value;
+        (await deposits.ApproveRefundAsync(companyId, second, clerk)).Error.Code.Should().Be("Hse.SelfApproval");
+        (await deposits.ApproveRefundAsync(companyId, second, viewer)).Error.Code.Should().Be("Hse.RefundNotAuthorised");
+        (await db.Set<StandDeposit>().AsNoTracking().SingleAsync(d => d.CompanyId == companyId)).ClearedOn.Should().BeNull("nothing is paid before approval");
+        string journal = (await deposits.ApproveRefundAsync(companyId, second, approver)).Value;
+        (await deposits.ApproveRefundAsync(companyId, second, approver)).Error.Code.Should().Be("Hse.RefundNotPending");
+
+        StandDeposit refunded = await db.Set<StandDeposit>().AsNoTracking().SingleAsync(d => d.CompanyId == companyId);
+        (refunded.ClearedOn, refunded.Refunded, refunded.ClearingJournalNumber).Should().Be(((DateOnly?)new DateOnly(2026, 3, 25), true, journal));
+        DepositRefundRequest approved = await db.Set<DepositRefundRequest>().AsNoTracking().SingleAsync(r => r.Id == second);
+        (approved.Status, approved.RequestedByUserId, approved.DecidedByUserId, approved.JournalNumber).Should().Be((DepositRefundStatus.Approved, clerk, (long?)approver, journal));
+        (await db.Set<DepositRefundRequest>().AsNoTracking().SingleAsync(r => r.Id == first)).Status.Should().Be(DepositRefundStatus.Rejected);
+        (await deposits.RequestRefundAsync(Refund("Again"))).Error.Code.Should().Be("Hse.NoDepositHeld");
+
+        ConsolidatedTrialBalance tb = (await scope.ServiceProvider.GetRequiredService<IConsolidationService>().ConsolidatedTrialBalanceAsync([companyId], new DateOnly(2026, 12, 31))).Value;
+        tb.IsBalanced.Should().BeTrue();
+        tb.Rows.Where(r => r.AccountCode == "2482").Sum(r => r.Credit - r.Debit).Should().Be(0m);
     }
 }

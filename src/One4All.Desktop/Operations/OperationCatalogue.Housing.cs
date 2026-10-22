@@ -74,10 +74,11 @@ public static partial class OperationCatalogue
             Module = module, Title = "Register a waiting-list applicant", ListTitle = "Applicants",
             Description = "Registers an applicant (a second registration with the same national ID is refused) and gives the waiting-list number and priority score. "
                 + "Ticked, it also opens the applicant's customer account (the waiting-list number as its code, the national ID on it) unless a customer already has that "
-                + "national ID, so deposits, sales and rent can be charged without keying the customer separately.",
+                + "national ID, so deposits, sales and rent can be charged without keying the customer separately. The registration is dated today, the day it is captured; "
+                + "for an earlier date, register today and use Waiting-list control (Request date change), which a second user decides.",
             Fields = [Req("Id", "National ID"), Req("Name", "Full name"), Pick("Category", "Category", Enum.GetNames<HousingCategory>()), Req("Born", "Date of birth (yyyy-MM-dd)"),
                 Req("Resident", "Resident since (yyyy-MM-dd)"), Num("Dependants", "Dependants", "0"), Tick("Disability", "Has a disability"), Num("Income", "Monthly income", "0"),
-                Pick("Tenure", "Current tenure", Enum.GetNames<CurrentTenure>()), Today("Registered", "Registration date"),
+                Pick("Tenure", "Current tenure", Enum.GetNames<CurrentTenure>()),
                 Pick("Marital", "Marital status", Enum.GetNames<MaritalStatus>()), Pick("Regime", "Marriage regime", ["", .. Enum.GetNames<MaritalRegime>()]),
                 Opt("SpouseId", "Spouse / co-applicant national ID"), Opt("SpouseName", "Spouse / co-applicant name"),
                 Tick("Customer", "Open the applicant's customer account", true)],
@@ -89,7 +90,7 @@ public static partial class OperationCatalogue
                 {
                     CompanyId = c.CompanyId, IdNumber = i.Text("Id"), FullName = i.Text("Name"), Category = Enum.Parse<HousingCategory>(i.Text("Category")), DateOfBirth = Day(i.Text("Born")),
                     ResidentSince = Day(i.Text("Resident")), Dependants = i.Whole("Dependants"), HasDisability = i.Flag("Disability"), MonthlyIncome = i.Number("Income"),
-                    Tenure = Enum.Parse<CurrentTenure>(i.Text("Tenure")), RegistrationDate = i.Date("Registered"),
+                    Tenure = Enum.Parse<CurrentTenure>(i.Text("Tenure")),
                     MaritalStatus = Enum.Parse<MaritalStatus>(i.Optional("Marital") ?? nameof(MaritalStatus.Single)),
                     MaritalRegime = i.Optional("Regime") is string regime ? Enum.Parse<MaritalRegime>(regime) : null,
                     SpouseIdNumber = i.Optional("SpouseId"), SpouseName = i.Optional("SpouseName"),
@@ -1291,16 +1292,23 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Stand deposits and cancellations", ListTitle = "Allocation certificates",
-            Description = "Take a deposit against an allocation (held as a liability), apply it when the sale goes ahead or refund it; cancel an instalment agreement at the buyer's "
-                + "request (requested by you, approved by another user): what was paid less occupation rental, the admin charge and arrears is refunded and the stand repossessed.",
-            Fields = [Pick("Step", "Step", ["Take deposit", "Apply deposit", "Refund deposit", "Cancel agreement"]), Opt("Certificate", "Allocation certificate (deposit)"),
-                Opt("Agreement", "Instalment agreement (cancel)"), Opt("Customer", "Customer code (take)"), Num("Amount", "Amount (take) / current market value (cancel)", "0"), Opt("Reference", "Receipt reference / reason"),
+            Description = "Take a deposit against an allocation (held as a liability) and apply it when the sale goes ahead. Refund: once the offer is declined, lapsed or cancelled "
+                + "(or the allocation has ended), you request the refund with its reason and bank account; another user holding the deposit refund approve right then approves it "
+                + "(paying it) or rejects it with a reason. Cancel an instalment agreement at the buyer's request (requested by you, approved by another user): what was paid less "
+                + "occupation rental, the admin charge and arrears is refunded and the stand repossessed.",
+            Fields = [Pick("Step", "Step", ["Take deposit", "Apply deposit", "Request refund", "Approve refund", "Reject refund", "Cancel agreement"]), Opt("Certificate", "Allocation certificate (deposit)"),
+                Lookup("Refund", "Deposit refund awaiting approval (approve / reject)", false, async c => (await c.Get<IHousingDepositService>().PendingRefundsAsync(c.CompanyId).ConfigureAwait(true))
+                    .Select(r => (r.RequestId.ToString(CultureInfo.InvariantCulture), $"{r.CertificateNumber} - {M(r.Amount)} - {r.Reason} - {D(r.Date)}")).ToList()),
+                Opt("Agreement", "Instalment agreement (cancel)"), Opt("Customer", "Customer code (take)"), Num("Amount", "Amount (take) / current market value (cancel)", "0"),
+                Opt("Reference", "Receipt reference (take) / reason (refund, reject, cancel)"),
                 Opt("Bank", "Bank account"), Opt("Liability", "Deposit liability account (take)"), Num("Rental", "Monthly occupation rental (cancel)", "0"), Num("Admin", "Admin charge % (cancel)", "0"),
                 Opt("Approver", "Approving user name (cancel)"), Opt("Available", "Stands available account (cancel)"), Opt("GainLoss", "Gain / loss account (cancel)"), Today()],
             Run = async (c, i) =>
             {
                 IHousingDepositService deposits = c.Get<IHousingDepositService>();
                 string certificate = i.Optional("Certificate") ?? string.Empty;
+                long RefundRequest() => long.TryParse(i.Optional("Refund"), NumberStyles.None, CultureInfo.InvariantCulture, out long id) ? id
+                    : throw new OperationException("Pick the deposit refund awaiting approval.");
                 switch (i.Text("Step"))
                 {
                     case "Take deposit":
@@ -1312,8 +1320,17 @@ public static partial class OperationCatalogue
                         }).ConfigureAwait(true))}).";
                     case "Apply deposit":
                         return $"Deposit applied ({Check(await deposits.ApplyDepositAsync(c.CompanyId, certificate, i.Date("Date")).ConfigureAwait(true))}).";
-                    case "Refund deposit":
-                        return $"Deposit refunded ({Check(await deposits.RefundDepositAsync(c.CompanyId, certificate, i.Date("Date"), i.Optional("Bank") ?? string.Empty).ConfigureAwait(true))}).";
+                    case "Request refund":
+                        long requested = Check(await deposits.RequestRefundAsync(new DepositRefundInput
+                        {
+                            CompanyId = c.CompanyId, CertificateNumber = certificate, Date = i.Date("Date"), BankAccountCode = i.Optional("Bank") ?? string.Empty,
+                            Reason = i.Optional("Reference") ?? string.Empty, RequestedByUserId = c.UserId,
+                        }).ConfigureAwait(true));
+                        return $"Refund {requested} of the deposit against {certificate} requested; another user approves or rejects it here.";
+                    case "Approve refund":
+                        return $"Deposit refunded ({Check(await deposits.ApproveRefundAsync(c.CompanyId, RefundRequest(), c.UserId).ConfigureAwait(true))}).";
+                    case "Reject refund":
+                        return Check(await deposits.RejectRefundAsync(c.CompanyId, RefundRequest(), c.UserId, i.Optional("Reference") ?? string.Empty).ConfigureAwait(true), "Deposit refund rejected.");
                     default:
                         AgreementCancellationResult cancelled = Check(await deposits.CancelAgreementAsync(new AgreementCancellationRequest
                         {

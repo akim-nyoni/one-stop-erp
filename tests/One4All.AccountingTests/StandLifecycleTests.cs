@@ -88,9 +88,8 @@ public sealed class StandLifecycleTests
         (await lifecycle.MoveAsync(companyId, "LC-1", StandStatus.FullyPaid, day, 9, "Statement nil", null)).Value.Should().Be(StandStatus.FullyPaid);
 
         // Spouses: one household, one stand.
-        IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
         Task<Result<WaitingListRegistration>> Register(string id, int year, string? spouse)
-            => list.RegisterAsync(new WaitingListApplication
+            => TestClock.RegisterCapturedAsync(scope.ServiceProvider, new WaitingListApplication
             {
                 CompanyId = companyId, IdNumber = id, FullName = id, Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1980, 1, 1), ResidentSince = new DateOnly(2000, 1, 1),
                 MonthlyIncome = 500m, Tenure = CurrentTenure.Tenant, RegistrationDate = new DateOnly(year, 1, 1),

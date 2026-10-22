@@ -51,7 +51,7 @@ public sealed class QualificationRulesDbTests
             CompanyId = companyId, IdNumber = id, FullName = "Rate Payer", Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1985, 1, 1), ResidentSince = new DateOnly(2000, 1, 1),
             MonthlyIncome = income, Tenure = CurrentTenure.Lodger, RegistrationDate = new DateOnly(2026, 6, 1),
         };
-        var refused = await list.RegisterAsync(Application(900m));
+        var refused = await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Application(900m));
         refused.Error.Code.Should().Be("Hse.NotQualified");
         refused.Error.Message.Should().Contain("limit for HighDensity").And.Contain("Owes 40.00");
 
@@ -59,6 +59,6 @@ public sealed class QualificationRulesDbTests
         {
             CompanyId = companyId, CustomerId = ratepayer.Id, DocumentNumber = "QR-RCPT-1", ReceiptDate = new DateOnly(2026, 2, 1), Currency = Scenario.Usd, Amount = 40m, BankAccountCode = "1100",
         })).IsSuccess.Should().BeTrue();
-        (await list.RegisterAsync(Application(700m))).IsSuccess.Should().BeTrue("the charge is paid and the income is under the ceiling");
+        (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Application(700m))).IsSuccess.Should().BeTrue("the charge is paid and the income is under the ceiling");
     }
 }

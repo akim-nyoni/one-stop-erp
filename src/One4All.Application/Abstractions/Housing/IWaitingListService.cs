@@ -37,7 +37,7 @@ public sealed class WaitingListApplication
     /// <summary>Where the applicant lives now.</summary>
     public CurrentTenure Tenure { get; init; }
 
-    /// <summary>The registration date (it sets seniority).</summary>
+    /// <summary>The registration date (it sets seniority): leave it unset for today, the day of capture; an earlier date is refused (register today and request a registration date change).</summary>
     public DateOnly RegistrationDate { get; init; }
 
     /// <summary>The marital status.</summary>

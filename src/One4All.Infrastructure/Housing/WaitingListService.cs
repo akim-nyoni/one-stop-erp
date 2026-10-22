@@ -14,14 +14,17 @@ public sealed class WaitingListService : IWaitingListService
 {
     private readonly One4AllDbContext _db;
     private readonly INumberSequenceService _numbers;
+    private readonly One4All.Licensing.Core.IClock _clock;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="numbers">The number sequences.</param>
-    public WaitingListService(One4AllDbContext db, INumberSequenceService numbers)
+    /// <param name="clock">The clock: a registration is dated the day it is captured.</param>
+    public WaitingListService(One4AllDbContext db, INumberSequenceService numbers, One4All.Licensing.Core.IClock clock)
     {
         _db = db;
         _numbers = numbers;
+        _clock = clock;
     }
 
     /// <inheritdoc />
@@ -73,6 +76,22 @@ public sealed class WaitingListService : IWaitingListService
             return Error.Validation("Hse.Application", "An application needs a national ID, a name, and no negative dependants or income.");
         }
 
+        // Seniority runs from the day of capture: a date before it would queue the applicant ahead of those registered in between. A genuinely earlier
+        // date is registered today and then moved by the dual-authorised registration date change; legacy histories come in through the data import.
+        DateOnly today = DateOnly.FromDateTime(_clock.UtcNow.UtcDateTime);
+        DateOnly registered = application.RegistrationDate == default ? today : application.RegistrationDate;
+        if (registered < today)
+        {
+            return Error.Rule("Hse.BackdatedRegistration",
+                $"A registration is dated the day it is captured ({today:yyyy-MM-dd}), not {registered:yyyy-MM-dd}. For an earlier date, register today and request a registration date change, "
+                + "which a second user authorises.");
+        }
+
+        if (registered > today.AddDays(1))
+        {
+            return Error.Validation("Hse.RegistrationDate", $"A registration cannot be dated in the future ({registered:yyyy-MM-dd}).");
+        }
+
         HousingApplicant? existing = await _db.HousingApplicants.FirstOrDefaultAsync(a => a.CompanyId == application.CompanyId && a.IdNumber == idNumber, ct).ConfigureAwait(false);
         if (existing is not null && existing.WaitingListNumber is not null && existing.Status is ApplicantStatus.Active or ApplicantStatus.Suspended)
         {
@@ -102,11 +121,11 @@ public sealed class WaitingListService : IWaitingListService
         }
 
         WaitingListTerms terms = await TermsAsync(application.CompanyId, ct).ConfigureAwait(false);
-        ApplicantFacts facts = new(application.DateOfBirth, application.ResidentSince, application.RegistrationDate, application.Dependants, application.HasDisability, application.MonthlyIncome, application.Tenure);
+        ApplicantFacts facts = new(application.DateOfBirth, application.ResidentSince, registered, application.Dependants, application.HasDisability, application.MonthlyIncome, application.Tenure);
         bool ownsProperty = await OwnsPropertyAsync(application.CompanyId, idNumber, ct).ConfigureAwait(false)
             || (spouseId is not null && await OwnsPropertyAsync(application.CompanyId, spouseId, ct).ConfigureAwait(false));
         bool previouslyAllocated = existing?.Status == ApplicantStatus.Allocated;
-        List<string> problems = [.. WaitingListRules.Problems(facts, terms, ownsProperty, previouslyAllocated, application.RegistrationDate)];
+        List<string> problems = [.. WaitingListRules.Problems(facts, terms, ownsProperty, previouslyAllocated, registered)];
         QualificationRules rules = await QualificationRulesAsync(application.CompanyId, ct).ConfigureAwait(false);
         if (rules != QualificationRules.None)
         {
@@ -115,7 +134,7 @@ public sealed class WaitingListService : IWaitingListService
                 .Select(c => c.Id).ToListAsync(ct).ConfigureAwait(false);
             problems.AddRange(WaitingListRules.Problems(rules, new QualificationFacts(application.Category, application.MonthlyIncome,
                 await EverHeldPropertyAsync(application.CompanyId, customers, ct).ConfigureAwait(false), await ForfeitedAsync(application.CompanyId, customers, ct).ConfigureAwait(false),
-                await OverdueAsync(application.CompanyId, customers, application.RegistrationDate, ct).ConfigureAwait(false))));
+                await OverdueAsync(application.CompanyId, customers, registered, ct).ConfigureAwait(false))));
         }
 
         if (problems.Count > 0)
@@ -123,13 +142,13 @@ public sealed class WaitingListService : IWaitingListService
             return Error.Rule("Hse.NotQualified", string.Join(" ", problems));
         }
 
-        Result<string> number = await _numbers.AllocateAsync(application.CompanyId, "WL", application.RegistrationDate, ct: ct).ConfigureAwait(false);
+        Result<string> number = await _numbers.AllocateAsync(application.CompanyId, "WL", registered, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
             return number.Error;
         }
 
-        HousingApplicant applicant = existing ?? new HousingApplicant(application.CompanyId, idNumber, application.FullName.Trim(), application.RegistrationDate);
+        HousingApplicant applicant = existing ?? new HousingApplicant(application.CompanyId, idNumber, application.FullName.Trim(), registered);
         if (existing is null)
         {
             _db.HousingApplicants.Add(applicant);
@@ -138,9 +157,9 @@ public sealed class WaitingListService : IWaitingListService
         applicant.FullName = application.FullName.Trim();
         applicant.SetDetails(application.Category, application.DateOfBirth, application.ResidentSince, application.Dependants, application.HasDisability, application.MonthlyIncome, application.Tenure);
         applicant.SetSpouse(application.MaritalStatus, application.MaritalRegime, spouseId, application.SpouseName);
-        applicant.Register(number.Value, application.RegistrationDate);
+        applicant.Register(number.Value, registered);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return new WaitingListRegistration(number.Value, WaitingListRules.Score(facts, terms, application.RegistrationDate));
+        return new WaitingListRegistration(number.Value, WaitingListRules.Score(facts, terms, registered));
     }
 
     /// <inheritdoc />

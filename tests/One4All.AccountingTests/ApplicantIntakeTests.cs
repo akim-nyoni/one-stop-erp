@@ -27,9 +27,8 @@ public sealed class ApplicantIntakeTests
         await using AsyncServiceScope scope = provider.CreateAsyncScope();
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         long companyId = await Scenario.SeedAsync(db);
-        IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
         string suffix = (companyId % 1000000).ToString("000000");
-        async Task<string> Register(string id, string name, int year) => (await list.RegisterAsync(new WaitingListApplication
+        async Task<string> Register(string id, string name, int year) => (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, new WaitingListApplication
         {
             CompanyId = companyId, IdNumber = id, FullName = name, Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1980, 1, 1), ResidentSince = new DateOnly(2000, 1, 1),
             MonthlyIncome = 500m, Tenure = CurrentTenure.Lodger, RegistrationDate = new DateOnly(year, 1, 1),

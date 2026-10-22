@@ -32,7 +32,7 @@ public sealed class WaitingListControlTests
         long companyId = await Scenario.SeedAsync(db);
 
         IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
-        async Task<string> Register(string id, DateOnly registered) => (await list.RegisterAsync(new WaitingListApplication
+        async Task<string> Register(string id, DateOnly registered) => (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, new WaitingListApplication
         {
             CompanyId = companyId, IdNumber = $"{id}-{companyId}", FullName = id, Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1980, 1, 1),
             ResidentSince = new DateOnly(2000, 1, 1), MonthlyIncome = 500m, Tenure = CurrentTenure.Tenant, RegistrationDate = registered,

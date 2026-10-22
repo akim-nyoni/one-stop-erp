@@ -38,6 +38,7 @@ public sealed class AccountingFixture : IAsyncLifetime
         ArgumentNullException.ThrowIfNull(configure);
         ServiceCollection services = new();
         services.AddOne4AllInfrastructure(ConnectionString);
+        services.AddSingleton<One4All.Licensing.Core.IClock, TestClock>();
         configure(services);
         return services.BuildServiceProvider();
     }

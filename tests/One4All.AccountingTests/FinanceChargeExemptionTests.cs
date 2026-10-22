@@ -37,7 +37,9 @@ public sealed class FinanceChargeExemptionTests
         Property home = new(companyId, "901", "Ward 10", indigent.Id);
         db.Properties.Add(home);
         await db.SaveChangesAsync();
-        db.Set<IndigentRegistration>().Add(new IndigentRegistration(companyId, home.Id, 50m, 100m, new DateOnly(2025, 12, 1), new DateOnly(2026, 12, 1), 71));
+        IndigentRegistration registered = new(companyId, home.Id, 50m, 100m, new DateOnly(2025, 12, 1), new DateOnly(2026, 12, 1), 71);
+        registered.Approve(72);
+        db.Set<IndigentRegistration>().Add(registered);
         await db.SaveChangesAsync();
 
         ISalesLedgerService ar = scope.ServiceProvider.GetRequiredService<ISalesLedgerService>();

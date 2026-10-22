@@ -294,7 +294,21 @@ internal sealed class IndigentRegistrationConfiguration : IEntityTypeConfigurati
         b.Property(x => x.HouseholdIncome).HasPrecision(19, 4);
         b.Property(x => x.SubsidyPercent).HasPrecision(9, 4);
         b.Property(x => x.Status).HasConversion<int>();
-        b.HasIndex(x => x.PropertyId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_indigent_registration_one_active");
+        b.Property(x => x.RejectionReason).HasMaxLength(300);
+
+        // One live registration per property: active, or requested and awaiting approval.
+        b.HasIndex(x => x.PropertyId).IsUnique().HasFilter("status in (0, 2)").HasDatabaseName("ix_indigent_registration_one_active");
+    }
+}
+
+internal sealed class IndigentPolicyConfiguration : IEntityTypeConfiguration<IndigentPolicy>
+{
+    public void Configure(EntityTypeBuilder<IndigentPolicy> b)
+    {
+        b.ToTable("indigent_policy", Schemas.Municipal);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.MaximumIncome).HasPrecision(19, 4);
+        b.HasIndex(x => x.CompanyId).IsUnique();
     }
 }
 

@@ -159,6 +159,7 @@ public static class PermissionCatalogue
         Add(mun, LicenceModules.Municipal, "Clearance", "Rates Clearance Certificate", OperationFlags.View | OperationFlags.Create | OperationFlags.Print | OperationFlags.AuthoriseLevel1);
         Add(mun, LicenceModules.Municipal, "Licence", "Licences & Permits", master | OperationFlags.Approve);
         Add(mun, LicenceModules.Municipal, "ServiceTicket", "Service Desk / Faults", txn);
+        Add(mun, LicenceModules.Municipal, "Indigent", "Indigent Register (approve = approve a registration keyed by another user)", master | OperationFlags.Approve);
 
         AddHousing(list, master, auth);
         AddPayroll(list, master, auth, ro);
@@ -293,6 +294,7 @@ public static class PermissionCatalogue
         H("AllocationRun", "Allocation Run", OperationFlags.View | OperationFlags.Create | OperationFlags.Print);
         H("AllocationApprove", "Allocation Approval", OperationFlags.View | OperationFlags.Approve | auth);
         H("Ballot", "Ballot / Draw", OperationFlags.View | OperationFlags.Create | OperationFlags.Print);
+        H("DepositRefund", "Stand Deposit Refunds (approve = approve a refund requested by another user)", OperationFlags.View | OperationFlags.Create | OperationFlags.Approve);
         H("Offer", "Offers", txnLike());
         H("Agreement", "Agreements", master | OperationFlags.Approve | auth);
         H("InstalmentSchedule", "Instalment Schedules", OperationFlags.View | OperationFlags.Create | OperationFlags.Print);

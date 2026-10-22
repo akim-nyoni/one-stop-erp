@@ -993,13 +993,43 @@ api.MapPost("/api/stock/requisitions/{requisitionId:long}/issue", async (long re
 .RequireAuthorization()
 .WithName("IssueStoreRequisition");
 
-api.MapPost("/api/municipal/indigent", async (long companyId, decimal maximumIncome, One4All.Application.Abstractions.Municipal.IndigentApplication application, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
-    ValueResponse(await register.RegisterAsync(companyId, application, maximumIncome, ct).ConfigureAwait(false)))
+api.MapGet("/api/municipal/indigent/policy", async (long companyId, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    Results.Ok(await register.PolicyAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("IndigentPolicy");
+
+api.MapPut("/api/municipal/indigent/policy", async (long companyId, decimal maximumIncome, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    ActionResponse(await register.SetPolicyAsync(companyId, maximumIncome, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("SetIndigentPolicy");
+
+// The requester is the signed-in user; another user approves or rejects the registration by its own call.
+api.MapPost("/api/municipal/indigent", async (long companyId, One4All.Application.Abstractions.Municipal.IndigentApplication application, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ValueResponse(await register.RequestAsync(companyId, application with { RequestedByUserId = caller.UserId ?? 0 }, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RegisterIndigent");
 
-api.MapPost("/api/municipal/indigent/{registrationId:long}/review", async (long registrationId, long companyId, decimal householdIncome, decimal subsidyPercent, DateOnly reviewDue, decimal maximumIncome, long userId, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
-    ValueResponse(await register.ReviewAsync(companyId, registrationId, householdIncome, subsidyPercent, reviewDue, maximumIncome, userId, ct).ConfigureAwait(false)))
+api.MapGet("/api/municipal/indigent/pending", async (long companyId, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register, CancellationToken ct) =>
+    Results.Ok(await register.PendingAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PendingIndigentRegistrations");
+
+api.MapPost("/api/municipal/indigent/{registrationId:long}/approve", async (long registrationId, long companyId, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ActionResponse(await register.ApproveAsync(companyId, registrationId, caller.UserId ?? 0, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveIndigentRegistration");
+
+api.MapPost("/api/municipal/indigent/{registrationId:long}/reject", async (long registrationId, long companyId, string reason, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ActionResponse(await register.RejectAsync(companyId, registrationId, caller.UserId ?? 0, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectIndigentRegistration");
+
+api.MapPost("/api/municipal/indigent/{registrationId:long}/review", async (long registrationId, long companyId, decimal householdIncome, decimal subsidyPercent, DateOnly reviewDue, One4All.Application.Abstractions.Municipal.IIndigentRegisterService register,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ValueResponse(await register.ReviewAsync(companyId, registrationId, householdIncome, subsidyPercent, reviewDue, caller.UserId ?? 0, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("ReviewIndigent");
 
@@ -1877,10 +1907,32 @@ api.MapPost("/api/housing/deposits/{certificateNumber}/apply", async (string cer
 .RequireAuthorization()
 .WithName("ApplyStandDeposit");
 
-api.MapPost("/api/housing/deposits/{certificateNumber}/refund", async (string certificateNumber, long companyId, DateOnly date, string bankAccountCode, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
-    ValueResponse(await deposits.RefundDepositAsync(companyId, certificateNumber, date, bankAccountCode, ct).ConfigureAwait(false)))
+// A deposit refund is requested by the signed-in user and paid only when another user approves it by its own call.
+api.MapPost("/api/housing/deposits/{certificateNumber}/refund", async (string certificateNumber, long companyId, DateOnly date, string bankAccountCode, string reason,
+    One4All.Application.Abstractions.Housing.IHousingDepositService deposits, One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ValueResponse(await deposits.RequestRefundAsync(new One4All.Application.Abstractions.Housing.DepositRefundInput
+    {
+        CompanyId = companyId, CertificateNumber = certificateNumber, Date = date, BankAccountCode = bankAccountCode, Reason = reason, RequestedByUserId = caller.UserId ?? 0,
+    }, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("RefundStandDeposit");
+
+api.MapGet("/api/housing/deposits/refunds/pending", async (long companyId, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
+    Results.Ok(await deposits.PendingRefundsAsync(companyId, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("PendingStandDepositRefunds");
+
+api.MapPost("/api/housing/deposits/refunds/{requestId:long}/approve", async (long requestId, long companyId, One4All.Application.Abstractions.Housing.IHousingDepositService deposits,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ValueResponse(await deposits.ApproveRefundAsync(companyId, requestId, caller.UserId ?? 0, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("ApproveStandDepositRefund");
+
+api.MapPost("/api/housing/deposits/refunds/{requestId:long}/reject", async (long requestId, long companyId, string reason, One4All.Application.Abstractions.Housing.IHousingDepositService deposits,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ActionResponse(await deposits.RejectRefundAsync(companyId, requestId, caller.UserId ?? 0, reason, ct).ConfigureAwait(false)))
+.RequireAuthorization()
+.WithName("RejectStandDepositRefund");
 
 api.MapPost("/api/housing/agreements/cancel", async (One4All.Application.Abstractions.Housing.AgreementCancellationRequest request, One4All.Application.Abstractions.Housing.IHousingDepositService deposits, CancellationToken ct) =>
     ValueResponse(await deposits.CancelAgreementAsync(request, ct).ConfigureAwait(false)))

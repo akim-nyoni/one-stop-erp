@@ -30,6 +30,37 @@ public sealed record StandDepositReceipt
     public string LiabilityAccountCode { get; init; } = string.Empty;
 }
 
+/// <summary>A request to refund a held purchase deposit, keyed by one user for another to approve.</summary>
+public sealed record DepositRefundInput
+{
+    /// <summary>The council.</summary>
+    public long CompanyId { get; init; }
+
+    /// <summary>The allocation certificate the deposit secured.</summary>
+    public string CertificateNumber { get; init; } = string.Empty;
+
+    /// <summary>The refund date.</summary>
+    public DateOnly Date { get; init; }
+
+    /// <summary>The bank account the refund is paid from.</summary>
+    public string BankAccountCode { get; init; } = string.Empty;
+
+    /// <summary>Why it is refunded.</summary>
+    public string Reason { get; init; } = string.Empty;
+
+    /// <summary>Who asks for it.</summary>
+    public long RequestedByUserId { get; init; }
+}
+
+/// <summary>A deposit refund awaiting approval.</summary>
+/// <param name="RequestId">The request.</param>
+/// <param name="CertificateNumber">The allocation certificate.</param>
+/// <param name="Amount">The deposit to refund.</param>
+/// <param name="Date">The refund date.</param>
+/// <param name="Reason">Why.</param>
+/// <param name="RequestedByUserId">Who asked.</param>
+public sealed record PendingDepositRefund(long RequestId, string CertificateNumber, decimal Amount, DateOnly Date, string Reason, long RequestedByUserId);
+
 /// <summary>An instalment agreement cancelled at the buyer's request.</summary>
 public sealed record AgreementCancellationRequest
 {
@@ -82,7 +113,8 @@ public sealed record AgreementCancellationResult(decimal Paid, int MonthsOccupie
 
 /// <summary>
 /// Purchase deposits and agreement cancellations (brief §14 H51, H53): a deposit against an accepted offer is held as a
-/// liability, then applied to the buyer's account (a receipt funded from the liability) or refunded; an instalment
+/// liability, then applied to the buyer's account (a receipt funded from the liability) or, once the allocation is not going ahead, refunded on
+/// a request one user keys and another approves; an instalment
 /// agreement cancelled at the buyer's request returns the stand through repossession and refunds what was paid less
 /// occupation rental, the admin charge and arrears.
 /// </summary>
@@ -102,14 +134,40 @@ public interface IHousingDepositService
     /// <returns>The journal number.</returns>
     Task<Result<string>> ApplyDepositAsync(long companyId, string certificateNumber, DateOnly date, CancellationToken ct = default);
 
-    /// <summary>Refunds a held deposit.</summary>
-    /// <param name="companyId">The council.</param>
-    /// <param name="certificateNumber">The allocation certificate.</param>
-    /// <param name="date">When.</param>
-    /// <param name="bankAccountCode">The bank account paid from.</param>
+    /// <summary>
+    /// Requests the refund of a held deposit, with the reason: only once the allocation it secured is not going ahead (declined, lapsed,
+    /// cancelled, or ended by surrender or repossession). Nothing is paid until another user approves it.
+    /// </summary>
+    /// <param name="request">The refund request.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The journal number.</returns>
-    Task<Result<string>> RefundDepositAsync(long companyId, string certificateNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default);
+    /// <returns>The request id, or why it was refused.</returns>
+    Task<Result<long>> RequestRefundAsync(DepositRefundInput request, CancellationToken ct = default);
+
+    /// <summary>
+    /// Approves a pending refund and pays it (Dr deposits held, Cr bank) in one unit: by a user other than who asked, holding
+    /// Housing.DepositRefund approve, while the allocation is still not going ahead.
+    /// </summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="requestId">The request.</param>
+    /// <param name="approverUserId">Who approves it.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The refund journal number, or why it was refused.</returns>
+    Task<Result<string>> ApproveRefundAsync(long companyId, long requestId, long approverUserId, CancellationToken ct = default);
+
+    /// <summary>Turns a pending refund down, with the reason: by a user other than who asked, holding Housing.DepositRefund approve.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="requestId">The request.</param>
+    /// <param name="userId">Who turns it down.</param>
+    /// <param name="reason">Why.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or why it was refused.</returns>
+    Task<Result> RejectRefundAsync(long companyId, long requestId, long userId, string reason, CancellationToken ct = default);
+
+    /// <summary>The deposit refunds awaiting approval, oldest first.</summary>
+    /// <param name="companyId">The council.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The pending refunds.</returns>
+    Task<IReadOnlyList<PendingDepositRefund>> PendingRefundsAsync(long companyId, CancellationToken ct = default);
 
     /// <summary>Cancels an instalment agreement and refunds the buyer.</summary>
     /// <param name="request">The cancellation.</param>

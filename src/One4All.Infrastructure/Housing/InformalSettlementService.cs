@@ -193,11 +193,13 @@ public sealed class InformalSettlementService : IInformalSettlementService
         }
 
         EnumeratedHousehold household = found.Value;
+
+        // Seniority runs from the day the household is placed on the list, not the conversion date given (which the household record keeps).
         Result<WaitingListRegistration> registered = await _waitingList.RegisterAsync(new WaitingListApplication
         {
             CompanyId = companyId, IdNumber = household.HeadIdNumber, FullName = household.HeadName, Category = category, DateOfBirth = household.HeadDateOfBirth,
             ResidentSince = household.OccupiedSince, Dependants = household.HouseholdSize - 1, MonthlyIncome = household.MonthlyIncome,
-            Tenure = CurrentTenure.InformalSettlement, RegistrationDate = date,
+            Tenure = CurrentTenure.InformalSettlement,
         }, ct).ConfigureAwait(false);
         if (registered.IsFailure)
         {

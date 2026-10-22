@@ -62,10 +62,9 @@ public sealed class DevelopmentLevyTests
         (await levies.DefineAsync(companyId, "CONN", "Connection fee", LevyTrigger.Transfer, LevyBasis.Flat, 100m, "4400")).IsSuccess.Should().BeTrue();
 
         // Two beneficiaries offered stands at the frozen price of 10,000; only the first has a customer account.
-        IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
         foreach ((string id, int year) in new[] { (beneficiaryId, 2015), ($"LV-B-{companyId}", 2016) })
         {
-            (await list.RegisterAsync(new WaitingListApplication
+            (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, new WaitingListApplication
             {
                 CompanyId = companyId, IdNumber = id, FullName = id, Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1980, 1, 1),
                 ResidentSince = new DateOnly(2000, 1, 1), MonthlyIncome = 500m, Tenure = CurrentTenure.Tenant, RegistrationDate = new DateOnly(year, 1, 1),

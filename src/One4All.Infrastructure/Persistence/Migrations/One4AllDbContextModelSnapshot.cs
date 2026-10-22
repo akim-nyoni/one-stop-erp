@@ -7385,6 +7385,98 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.ToTable("delivery_milestone", "hse");
                 });
 
+            modelBuilder.Entity("One4All.Core.Housing.DepositRefundRequest", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("BankAccountCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("bank_account_code");
+
+                    b.Property<string>("CertificateNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("certificate_number");
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date")
+                        .HasColumnName("date");
+
+                    b.Property<long?>("DecidedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("decided_by_user_id");
+
+                    b.Property<long>("DepositId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("deposit_id");
+
+                    b.Property<string>("JournalNumber")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("journal_number");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stand_deposit_refund_request");
+
+                    b.HasIndex("DepositId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stand_deposit_refund_request_one_pending")
+                        .HasFilter("status = 0");
+
+                    b.ToTable("stand_deposit_refund_request", "hse");
+                });
+
             modelBuilder.Entity("One4All.Core.Housing.DeveloperAgreement", b =>
                 {
                     b.Property<long>("Id")
@@ -17813,6 +17905,54 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("One4All.Core.Municipal.IndigentPolicy", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("CompanyId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("company_id");
+
+                    b.Property<long>("CreatedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("created_by_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_on_utc");
+
+                    b.Property<decimal>("MaximumIncome")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("maximum_income");
+
+                    b.Property<long?>("ModifiedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("modified_by_user_id");
+
+                    b.Property<DateTimeOffset?>("ModifiedOnUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("modified_on_utc");
+
+                    b.Property<long>("RowVersion")
+                        .HasColumnType("bigint")
+                        .HasColumnName("row_version");
+
+                    b.HasKey("Id")
+                        .HasName("pk_indigent_policy");
+
+                    b.HasIndex("CompanyId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_indigent_policy_company_id");
+
+                    b.ToTable("indigent_policy", "mun");
+                });
+
             modelBuilder.Entity("One4All.Core.Municipal.IndigentRegistration", b =>
                 {
                     b.Property<long>("Id")
@@ -17822,7 +17962,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
-                    b.Property<long>("ApprovedByUserId")
+                    b.Property<long?>("ApprovedByUserId")
                         .HasColumnType("bigint")
                         .HasColumnName("approved_by_user_id");
 
@@ -17859,6 +17999,19 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("property_id");
 
+                    b.Property<long?>("RejectedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("rejected_by_user_id");
+
+                    b.Property<string>("RejectionReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("rejection_reason");
+
+                    b.Property<long>("RequestedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("requested_by_user_id");
+
                     b.Property<DateOnly>("ReviewDue")
                         .HasColumnType("date")
                         .HasColumnName("review_due");
@@ -17882,7 +18035,7 @@ namespace One4All.Infrastructure.Persistence.Migrations
                     b.HasIndex("PropertyId")
                         .IsUnique()
                         .HasDatabaseName("ix_indigent_registration_one_active")
-                        .HasFilter("status = 0");
+                        .HasFilter("status in (0, 2)");
 
                     b.ToTable("indigent_registration", "mun");
                 });
@@ -37912,6 +38065,16 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_delivery_milestone_developer_agreement_developer_agreement_");
+                });
+
+            modelBuilder.Entity("One4All.Core.Housing.DepositRefundRequest", b =>
+                {
+                    b.HasOne("One4All.Core.Housing.StandDeposit", null)
+                        .WithMany()
+                        .HasForeignKey("DepositId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stand_deposit_refund_request_stand_deposit_deposit_id");
                 });
 
             modelBuilder.Entity("One4All.Core.Housing.DeveloperAgreement", b =>

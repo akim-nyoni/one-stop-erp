@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Housing;
 using One4All.Application.Abstractions.Municipal;
@@ -53,13 +54,13 @@ public sealed class WaitingListTests
             ResidentSince = new DateOnly(residentYear, 1, 1), Dependants = dependants, MonthlyIncome = 1200m, Tenure = tenure, RegistrationDate = registered,
         };
 
-        WaitingListRegistration older = (await list.RegisterAsync(Apply("63-111 A", "Older Registrant", new DateOnly(2018, 3, 1)))).Value;
+        WaitingListRegistration older = (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Apply("63-111 A", "Older Registrant", new DateOnly(2018, 3, 1)))).Value;
         older.WaitingListNumber.Should().StartWith("WL-");
-        WaitingListRegistration needier = (await list.RegisterAsync(Apply("63-222", "Needier Registrant", new DateOnly(2023, 3, 1), dependants: 4, tenure: CurrentTenure.Homeless))).Value;
+        WaitingListRegistration needier = (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Apply("63-222", "Needier Registrant", new DateOnly(2023, 3, 1), dependants: 4, tenure: CurrentTenure.Homeless))).Value;
 
-        (await list.RegisterAsync(Apply("63-111 a", "Same Person", new DateOnly(2024, 1, 1)))).Error.Code.Should().Be("Hse.DuplicateApplicant");
-        (await list.RegisterAsync(Apply("63-333", "Newcomer", new DateOnly(2024, 1, 1), residentYear: 2022))).Error.Message.Should().Contain("5 required");
-        (await list.RegisterAsync(Apply("63-OWN-1", "Existing Owner", new DateOnly(2024, 1, 1)))).Error.Message.Should().Contain("Already owns");
+        (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Apply("63-111 a", "Same Person", new DateOnly(2024, 1, 1)))).Error.Code.Should().Be("Hse.DuplicateApplicant");
+        (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Apply("63-333", "Newcomer", new DateOnly(2024, 1, 1), residentYear: 2022))).Error.Message.Should().Contain("5 required");
+        (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, Apply("63-OWN-1", "Existing Owner", new DateOnly(2024, 1, 1)))).Error.Message.Should().Contain("Already owns");
 
         DateOnly asAt = new(2026, 6, 1);
         (await list.RankingAsync(companyId, HousingCategory.HighDensity, WaitingListOrder.Seniority, asAt)).Select(p => p.WaitingListNumber)
@@ -73,5 +74,44 @@ public sealed class WaitingListTests
         enquiry.Score.Total.Should().Be(112m);
         enquiry.Score.Lines.Single(l => l.Factor == "Housing conditions").Detail.Should().Be("Homeless");
         (await list.EnquireAsync(companyId, "NOBODY", asAt)).Error.Code.Should().Be("Hse.ApplicantNotFound");
+    }
+
+    /// <summary>
+    /// Audit #31: a registration is dated the day it is captured. An earlier date keyed at capture is refused (it would queue the applicant ahead of
+    /// those registered in between); left unset it is today; a genuinely earlier date is registered today and then moved by the dual-authorised
+    /// registration date change.
+    /// </summary>
+    [SkippableFact]
+    public async Task A_registration_is_dated_the_day_it_is_captured()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        TestClock clock = (TestClock)scope.ServiceProvider.GetRequiredService<One4All.Licensing.Core.IClock>();
+        DateOnly today = new(2026, 5, 10);
+        clock.Today = today;
+
+        IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
+        WaitingListApplication Apply(string id, DateOnly registered = default) => new()
+        {
+            CompanyId = companyId, IdNumber = $"{id}-{companyId}", FullName = $"Applicant {id}", Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1985, 1, 1),
+            ResidentSince = new DateOnly(2000, 1, 1), MonthlyIncome = 500m, Tenure = CurrentTenure.Tenant, RegistrationDate = registered,
+        };
+
+        (await list.RegisterAsync(Apply("BD-1", new DateOnly(2010, 1, 1)))).Error.Code.Should().Be("Hse.BackdatedRegistration");
+        (await list.RegisterAsync(Apply("BD-1", today.AddDays(-1)))).Error.Code.Should().Be("Hse.BackdatedRegistration");
+        (await list.RegisterAsync(Apply("BD-1", today.AddMonths(1)))).Error.Code.Should().Be("Hse.RegistrationDate");
+        string number = (await list.RegisterAsync(Apply("BD-1"))).Value.WaitingListNumber;
+        (await list.RegisterAsync(Apply("BD-2", today))).IsSuccess.Should().BeTrue();
+        (await db.HousingApplicants.AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.WaitingListNumber == number)).RegistrationDate.Should().Be(today);
+
+        // The earlier date on the paper file goes through the registration date change, which a second user decides.
+        IWaitingListControlService controls = scope.ServiceProvider.GetRequiredService<IWaitingListControlService>();
+        long request = (await controls.RequestDateChangeAsync(companyId, number, new DateOnly(2010, 1, 1), "Paper file shows 2010 lodgement", 900_311)).Value;
+        (await controls.DecideDateChangeAsync(companyId, request, approve: true, 900_311)).Error.Code.Should().Be("Hse.SelfApproval");
+        (await controls.DecideDateChangeAsync(companyId, request, approve: true, 900_312)).IsSuccess.Should().BeTrue();
+        (await db.HousingApplicants.AsNoTracking().SingleAsync(a => a.CompanyId == companyId && a.WaitingListNumber == number)).RegistrationDate.Should().Be(new DateOnly(2010, 1, 1));
     }
 }

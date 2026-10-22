@@ -61,7 +61,9 @@ public sealed class PropertyEnquiryTests
         }
 
         (await ar.PostReceiptAsync(new ReceiptRequest { CompanyId = companyId, CustomerId = owner.Id, DocumentNumber = "EQ-R1", ReceiptDate = new DateOnly(2026, 3, 28), Currency = Scenario.Usd, Amount = 30m, BankAccountCode = "1100" })).IsSuccess.Should().BeTrue();
-        db.Set<IndigentRegistration>().Add(new IndigentRegistration(companyId, stand.Id, 40m, 50m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), 71));
+        IndigentRegistration registered = new(companyId, stand.Id, 40m, 50m, new DateOnly(2026, 1, 1), new DateOnly(2026, 12, 31), 71);
+        registered.Approve(72);
+        db.Set<IndigentRegistration>().Add(registered);
         db.Set<ServiceOrder>().Add(new ServiceOrder(companyId, $"DO-EQ-{companyId}", stand.Id, ServiceType.Water, ServiceOrderKind.Disconnect, new DateOnly(2026, 3, 30), 70m));
         await db.SaveChangesAsync();
         (await scope.ServiceProvider.GetRequiredService<IReceiptingService>().CaptureArrangementAsync(companyId, owner.Id, 70m, 35m, new DateOnly(2026, 4, 10))).IsSuccess.Should().BeTrue();

@@ -1367,6 +1367,25 @@ internal sealed class StandDepositConfiguration : IEntityTypeConfiguration<Stand
     }
 }
 
+internal sealed class DepositRefundRequestConfiguration : IEntityTypeConfiguration<DepositRefundRequest>
+{
+    public void Configure(EntityTypeBuilder<DepositRefundRequest> b)
+    {
+        b.ToTable("stand_deposit_refund_request", Schemas.Housing);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.CertificateNumber).HasMaxLength(40);
+        b.Property(x => x.BankAccountCode).HasMaxLength(20);
+        b.Property(x => x.Reason).HasMaxLength(300);
+        b.Property(x => x.JournalNumber).HasMaxLength(40);
+        b.Property(x => x.RejectionReason).HasMaxLength(300);
+        b.Property(x => x.Status).HasConversion<int>();
+        b.HasOne<StandDeposit>().WithMany().HasForeignKey(x => x.DepositId).OnDelete(DeleteBehavior.Restrict);
+
+        // One open request per deposit: a second is refused until the first is decided.
+        b.HasIndex(x => x.DepositId).IsUnique().HasFilter("status = 0").HasDatabaseName("ix_stand_deposit_refund_request_one_pending");
+    }
+}
+
 internal sealed class AgreementCancellationConfiguration : IEntityTypeConfiguration<AgreementCancellation>
 {
     public void Configure(EntityTypeBuilder<AgreementCancellation> b)

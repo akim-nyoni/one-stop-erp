@@ -19,18 +19,25 @@ public sealed class HousingDepositService : IHousingDepositService
     private readonly IPostingEngine _posting;
     private readonly ISalesLedgerService _salesLedger;
     private readonly IRepossessionService _repossessions;
+    private readonly Application.Abstractions.Security.IPermissionService _permissions;
+
+    // An allocation whose deposit may be refunded: the sale is not going ahead.
+    private static readonly AllocationStatus[] RefundableStatuses = [AllocationStatus.Declined, AllocationStatus.Lapsed, AllocationStatus.Cancelled, AllocationStatus.Ended];
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="posting">The posting engine.</param>
     /// <param name="salesLedger">The sales ledger (to apply a deposit as a receipt).</param>
     /// <param name="repossessions">Repossession (to return a cancelled agreement's stand).</param>
-    public HousingDepositService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger, IRepossessionService repossessions)
+    /// <param name="permissions">Checks the authority of whoever approves a deposit refund.</param>
+    public HousingDepositService(One4AllDbContext db, IPostingEngine posting, ISalesLedgerService salesLedger, IRepossessionService repossessions,
+        Application.Abstractions.Security.IPermissionService permissions)
     {
         _db = db;
         _posting = posting;
         _salesLedger = salesLedger;
         _repossessions = repossessions;
+        _permissions = permissions;
     }
 
     /// <inheritdoc />
@@ -83,8 +90,144 @@ public sealed class HousingDepositService : IHousingDepositService
         => _db.AtomicAsync(() => ClearCoreAsync(companyId, certificateNumber, date, null, ct), ct);
 
     /// <inheritdoc />
-    public Task<Result<string>> RefundDepositAsync(long companyId, string certificateNumber, DateOnly date, string bankAccountCode, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ClearCoreAsync(companyId, certificateNumber, date, bankAccountCode, ct), ct);
+    public async Task<Result<long>> RequestRefundAsync(DepositRefundInput request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (string.IsNullOrWhiteSpace(request.Reason) || string.IsNullOrWhiteSpace(request.BankAccountCode))
+        {
+            return Error.Validation("Hse.RefundDetails", "A deposit refund needs the reason and the bank account it is paid from.");
+        }
+
+        StandAllocation? allocation = await AllocationAsync(request.CompanyId, request.CertificateNumber, ct).ConfigureAwait(false);
+        StandDeposit? deposit = allocation is null ? null
+            : await _db.Set<StandDeposit>().AsNoTracking().FirstOrDefaultAsync(d => d.AllocationId == allocation.Id && d.ClearedOn == null, ct).ConfigureAwait(false);
+        if (allocation is null || deposit is null)
+        {
+            return Error.NotFound("Hse.NoDepositHeld", $"No deposit is held against {request.CertificateNumber}.");
+        }
+
+        Result refundable = Refundable(allocation, deposit, request.Date);
+        if (refundable.IsFailure)
+        {
+            return refundable.Error;
+        }
+
+        if (await _db.Set<DepositRefundRequest>().AnyAsync(r => r.DepositId == deposit.Id && r.Status == DepositRefundStatus.Pending, ct).ConfigureAwait(false))
+        {
+            return Error.Conflict("Hse.RefundPending", $"A refund of the deposit against {allocation.CertificateNumber} is already awaiting approval.");
+        }
+
+        DepositRefundRequest refund = new(request.CompanyId, deposit.Id, allocation.CertificateNumber ?? request.CertificateNumber.Trim(), request.Date, request.BankAccountCode.Trim(), request.Reason.Trim(), request.RequestedByUserId);
+        _db.Set<DepositRefundRequest>().Add(refund);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return refund.Id;
+    }
+
+    /// <inheritdoc />
+    public Task<Result<string>> ApproveRefundAsync(long companyId, long requestId, long approverUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ApproveRefundCoreAsync(companyId, requestId, approverUserId, ct), ct);
+
+    // One unit: the refund journal, the deposit cleared and the request approved.
+    private async Task<Result<string>> ApproveRefundCoreAsync(long companyId, long requestId, long approverUserId, CancellationToken ct)
+    {
+        Result<DepositRefundRequest> pending = await DecidableRefundAsync(companyId, requestId, approverUserId, ct).ConfigureAwait(false);
+        if (pending.IsFailure)
+        {
+            return pending.Error;
+        }
+
+        DepositRefundRequest request = pending.Value;
+        StandAllocation? allocation = await AllocationAsync(companyId, request.CertificateNumber, ct).ConfigureAwait(false);
+        StandDeposit? deposit = await _db.Set<StandDeposit>().AsNoTracking().FirstOrDefaultAsync(d => d.Id == request.DepositId && d.ClearedOn == null, ct).ConfigureAwait(false);
+        if (allocation is null || deposit is null)
+        {
+            return Error.NotFound("Hse.NoDepositHeld", $"No deposit is held against {request.CertificateNumber}.");
+        }
+
+        // Checked again on approval: the allocation may have been reinstated since the request.
+        Result refundable = Refundable(allocation, deposit, request.Date);
+        if (refundable.IsFailure)
+        {
+            return refundable.Error;
+        }
+
+        Result<string> journal = await ClearCoreAsync(companyId, request.CertificateNumber, request.Date, request.BankAccountCode, ct).ConfigureAwait(false);
+        if (journal.IsFailure)
+        {
+            return journal.Error;
+        }
+
+        request.Approve(approverUserId, journal.Value);
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return journal.Value;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> RejectRefundAsync(long companyId, long requestId, long userId, string reason, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            return Result.Failure(Error.Validation("Hse.RefundReason", "Give the reason for turning the refund down."));
+        }
+
+        Result<DepositRefundRequest> pending = await DecidableRefundAsync(companyId, requestId, userId, ct).ConfigureAwait(false);
+        if (pending.IsFailure)
+        {
+            return Result.Failure(pending.Error);
+        }
+
+        pending.Value.Reject(userId, reason.Trim());
+        await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+        return Result.Success();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<PendingDepositRefund>> PendingRefundsAsync(long companyId, CancellationToken ct = default)
+        => await (
+            from r in _db.Set<DepositRefundRequest>().AsNoTracking()
+            join d in _db.Set<StandDeposit>().AsNoTracking() on r.DepositId equals d.Id
+            where r.CompanyId == companyId && r.Status == DepositRefundStatus.Pending
+            orderby r.Id
+            select new PendingDepositRefund(r.Id, r.CertificateNumber, d.Amount, r.Date, r.Reason, r.RequestedByUserId))
+            .ToListAsync(ct).ConfigureAwait(false);
+
+    // A deposit is refunded only once the sale it secured is not going ahead, and not before it was received.
+    private static Result Refundable(StandAllocation allocation, StandDeposit deposit, DateOnly date)
+    {
+        if (!RefundableStatuses.Contains(allocation.Status))
+        {
+            return Result.Failure(Error.Rule("Hse.RefundAllocationOpen",
+                $"The offer under {allocation.CertificateNumber} is {allocation.Status}; a deposit is refunded only once the offer is declined, lapsed or cancelled, or the allocation has ended. "
+                + "While the sale goes ahead the deposit is applied to the buyer's account."));
+        }
+
+        return date < deposit.ReceivedOn
+            ? Result.Failure(Error.Validation("Hse.DepositDate", "A deposit cannot be cleared before it was received."))
+            : Result.Success();
+    }
+
+    // A pending refund, decided by someone other than who asked, holding the deposit refund approve right.
+    private async Task<Result<DepositRefundRequest>> DecidableRefundAsync(long companyId, long requestId, long userId, CancellationToken ct)
+    {
+        DepositRefundRequest? request = await _db.Set<DepositRefundRequest>()
+            .FirstOrDefaultAsync(r => r.Id == requestId && r.CompanyId == companyId && r.Status == DepositRefundStatus.Pending, ct).ConfigureAwait(false);
+        if (request is null)
+        {
+            return Error.NotFound("Hse.RefundNotPending", $"Deposit refund request {requestId} is not awaiting a decision.");
+        }
+
+        if (request.RequestedByUserId == userId)
+        {
+            return Error.Forbidden("Hse.SelfApproval", "You asked for this refund; another user approves or rejects it.");
+        }
+
+        if (!(await _permissions.ResolveAsync(userId, ct).ConfigureAwait(false)).Has("Housing.DepositRefund", Core.Security.OperationFlags.Approve))
+        {
+            return Error.Forbidden("Hse.RefundNotAuthorised", $"User {userId} may not approve deposit refunds.");
+        }
+
+        return request;
+    }
 
     // Applied: a receipt on the payer's account funded from the liability. Refunded: the liability paid out of the bank.
     private async Task<Result<string>> ClearCoreAsync(long companyId, string certificateNumber, DateOnly date, string? refundBankAccountCode, CancellationToken ct)

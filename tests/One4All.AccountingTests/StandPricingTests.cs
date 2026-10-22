@@ -87,10 +87,9 @@ public sealed class StandPricingTests
         (await pricing.QuoteAsync(companyId, large.Id, new DateOnly(2026, 2, 1))).Value.BuildUp.Price.Should().Be(26740m); // 18,000 + 1,800 + 1,000 + 30% of 19,800
 
         // Allocated on 1 March: each beneficiary's price is frozen at the offer date.
-        IWaitingListService list = scope.ServiceProvider.GetRequiredService<IWaitingListService>();
         foreach ((string id, int year) in new[] { ("PR-A", 2015), ("PR-B", 2016) })
         {
-            (await list.RegisterAsync(new WaitingListApplication
+            (await TestClock.RegisterCapturedAsync(scope.ServiceProvider, new WaitingListApplication
             {
                 CompanyId = companyId, IdNumber = $"{id}-{companyId}", FullName = id, Category = HousingCategory.HighDensity, DateOfBirth = new DateOnly(1980, 1, 1),
                 ResidentSince = new DateOnly(2000, 1, 1), MonthlyIncome = 500m, Tenure = CurrentTenure.Tenant, RegistrationDate = new DateOnly(year, 1, 1),
