@@ -29,9 +29,12 @@ public sealed class WeighbridgeService : IWeighbridgeService
     /// <param name="orders">Despatches a load against its sales order.</param>
     /// <param name="pricing">Prices a load from the customer's price book when no price is given.</param>
     /// <param name="procurement">Books an inbound load received against a purchase order on a goods received note.</param>
+    /// <param name="permissions">Checks the authority of whoever authorises a price per tonne other than the order's or price book's.</param>
     public WeighbridgeService(One4AllDbContext db, IInventoryService inventory, INumberSequenceService numbers, IClock clock, ISalesLedgerService ar,
-        Application.Abstractions.SalesOrders.ISalesOrderService? orders = null, IPricingService? pricing = null, Application.Abstractions.Procurement.IProcurementService? procurement = null)
+        Application.Abstractions.SalesOrders.ISalesOrderService? orders = null, IPricingService? pricing = null, Application.Abstractions.Procurement.IProcurementService? procurement = null,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _procurement = procurement;
         _orders = orders;
         _pricing = pricing;
@@ -46,6 +49,7 @@ public sealed class WeighbridgeService : IWeighbridgeService
     private readonly Application.Abstractions.SalesOrders.ISalesOrderService? _orders;
     private readonly IPricingService? _pricing;
     private readonly Application.Abstractions.Procurement.IProcurementService? _procurement;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <inheritdoc />
     public Task<Result<WeighbridgeInvoice>> InvoiceTicketsAsync(WeighbridgeInvoiceRequest request, CancellationToken ct = default)
@@ -74,27 +78,47 @@ public sealed class WeighbridgeService : IWeighbridgeService
             return Error.Rule("Wb.NothingToInvoice", $"{customer.Name} has no completed loads to invoice up to {request.DocumentDate:yyyy-MM-dd}.");
         }
 
-        // Each load at the price given, or else its sales order's price, or else the customer's price book for the product.
+        // Each load at its sales order's price, or else the customer's price book for the product; a price per tonne given instead of that one stands only
+        // on the word of an authoriser other than the user raising the invoice, recorded on the ticket. A load with neither takes the price given.
         List<long> orderIds = [.. tickets.Where(t => t.SalesOrderId is not null).Select(t => t.SalesOrderId!.Value).Distinct()];
         List<Core.SalesOrders.SalesOrder> orders = await _db.SalesOrders.Include(o => o.Lines).Where(o => orderIds.Contains(o.Id)).ToListAsync(ct).ConfigureAwait(false);
         decimal product = 0m;
+        bool overrideAuthorised = false;
         foreach (WeighbridgeTicket t in tickets)
         {
             Core.SalesOrders.SalesOrderLine? orderLine = orders.FirstOrDefault(o => o.Id == t.SalesOrderId)?.Lines.FirstOrDefault(l => l.ItemId == t.ItemId);
-            decimal price = request.PricePerTonne;
-            if (price == 0m && orderLine is not null)
+            decimal? agreed = null;
+            if (orderLine is not null)
             {
-                price = orderLine.UnitPrice;
+                agreed = orderLine.UnitPrice;
             }
-            else if (price == 0m && _pricing is not null && t.ItemId is long itemId
+            else if (_pricing is not null && t.ItemId is long itemId
                 && await _pricing.PriceAsync(request.CompanyId, customer.Id, itemId, t.NetTonnes, t.Date, ct).ConfigureAwait(false) is { IsSuccess: true } listed && listed.Value.Currency == customer.Currency)
             {
-                price = listed.Value.UnitPrice;
+                agreed = listed.Value.UnitPrice;
             }
 
+            agreed = agreed > 0m ? agreed : null;
+            decimal price = request.PricePerTonne > 0m ? request.PricePerTonne : agreed ?? 0m;
             if (price <= 0m)
             {
                 return Error.Rule("Wb.NoPrice", $"Ticket {t.TicketNumber} has no price: give a price per tonne, or price the product for the customer or on the order.");
+            }
+
+            if (request.PricePerTonne > 0m && agreed is decimal standing && standing != request.PricePerTonne)
+            {
+                if (!overrideAuthorised)
+                {
+                    Result authorised = await PriceOverrideAuthorisedAsync(request, t.TicketNumber, standing, ct).ConfigureAwait(false);
+                    if (authorised.IsFailure)
+                    {
+                        return authorised.Error;
+                    }
+
+                    overrideAuthorised = true;
+                }
+
+                t.RecordPriceOverride(request.PricePerTonne, request.PriceOverrideAuthorisedByUserId!.Value);
             }
 
             product += decimal.Round(t.NetTonnes * price, 2, MidpointRounding.AwayFromZero);
@@ -155,6 +179,30 @@ public sealed class WeighbridgeService : IWeighbridgeService
 
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return new WeighbridgeInvoice([.. tickets.Select(t => t.TicketNumber)], tickets.Sum(t => t.NetTonnes), product, haulage, tax);
+    }
+
+    // A price per tonne other than the order's or price book's stands only on an authoriser's word: someone other than the user raising the invoice,
+    // holding Inventory.Weighbridge with the override-price right.
+    private async Task<Result> PriceOverrideAuthorisedAsync(WeighbridgeInvoiceRequest request, string ticketNumber, decimal standing, CancellationToken ct)
+    {
+        if (request.PriceOverrideAuthorisedByUserId is not long authoriser)
+        {
+            return Result.Failure(Error.Forbidden("Wb.PriceOverride",
+                $"Ticket {ticketNumber} is priced at {standing:0.00} a tonne on its order or price book; charging {request.PricePerTonne:0.00} needs an authoriser."));
+        }
+
+        if (authoriser == request.EnteredByUserId)
+        {
+            return Result.Failure(Error.Forbidden("Wb.PriceOverride", "The user raising the invoice cannot authorise their own price per tonne."));
+        }
+
+        if (_permissions is null
+            || !(await _permissions.ResolveAsync(authoriser, ct).ConfigureAwait(false)).Has("Inventory.Weighbridge", Core.Security.OperationFlags.OverridePrice))
+        {
+            return Result.Failure(Error.Forbidden("Wb.PriceOverride", $"User {authoriser} may not authorise a weighbridge price override."));
+        }
+
+        return Result.Success();
     }
 
     /// <inheritdoc />

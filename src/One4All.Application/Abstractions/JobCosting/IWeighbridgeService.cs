@@ -132,6 +132,12 @@ public sealed class WeighbridgeInvoiceRequest
 
     /// <summary>Gets the user raising the invoice.</summary>
     public long? EnteredByUserId { get; init; }
+
+    /// <summary>
+    /// Gets who authorised a price per tonne other than a load's sales order or price book price: someone other than the user raising the invoice
+    /// holding <c>Inventory.Weighbridge</c> override price. Without one such a price is refused (<c>Wb.PriceOverride</c>); it is recorded on each ticket.
+    /// </summary>
+    public long? PriceOverrideAuthorisedByUserId { get; init; }
 }
 
 /// <summary>An invoice raised from weighbridge tickets.</summary>

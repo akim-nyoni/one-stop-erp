@@ -16720,6 +16720,15 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("operator_user_id");
 
+                    b.Property<long?>("PriceOverrideAuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("price_override_authorised_by_user_id");
+
+                    b.Property<decimal?>("PriceOverridePerTonne")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("price_override_per_tonne");
+
                     b.Property<string>("Product")
                         .IsRequired()
                         .HasMaxLength(80)

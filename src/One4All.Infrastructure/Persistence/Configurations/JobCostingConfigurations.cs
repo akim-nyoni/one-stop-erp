@@ -72,6 +72,7 @@ internal sealed class WeighbridgeTicketConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.SiteName).HasMaxLength(120);
         b.Property(x => x.ManualReason).HasMaxLength(200);
         b.Property(x => x.InvoiceNumber).HasMaxLength(40);
+        b.Property(x => x.PriceOverridePerTonne).HasPrecision(19, 4);
         b.Property(x => x.DistanceKm).HasPrecision(19, 2);
         b.Property(x => x.HaulageZoneCode).HasMaxLength(20);
         b.Property(x => x.HaulageCharge).HasPrecision(19, 4);

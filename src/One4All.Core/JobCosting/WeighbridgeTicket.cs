@@ -247,6 +247,21 @@ public sealed class WeighbridgeTicket : AuditableEntity, ICompanyScoped
     /// <param name="invoiceNumber">The invoice number.</param>
     public void MarkInvoiced(string invoiceNumber) => InvoiceNumber = invoiceNumber;
 
+    /// <summary>Gets the price per tonne the load was invoiced at when it was not its order's or price book's price (null: that price stood).</summary>
+    public decimal? PriceOverridePerTonne { get; private set; }
+
+    /// <summary>Gets who authorised the overriding price per tonne (someone other than the user raising the invoice, holding the weighbridge's override-price right).</summary>
+    public long? PriceOverrideAuthorisedByUserId { get; private set; }
+
+    /// <summary>Records that the load was invoiced at a price other than its order's or price book's, and who authorised it.</summary>
+    /// <param name="pricePerTonne">The price per tonne charged.</param>
+    /// <param name="authorisedByUserId">The authoriser.</param>
+    public void RecordPriceOverride(decimal pricePerTonne, long authorisedByUserId)
+    {
+        PriceOverridePerTonne = pricePerTonne;
+        PriceOverrideAuthorisedByUserId = authorisedByUserId;
+    }
+
     /// <summary>Starts an outbound ticket: the empty vehicle is weighed first (tare), loaded second (gross).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="ticketNumber">The ticket number.</param>
