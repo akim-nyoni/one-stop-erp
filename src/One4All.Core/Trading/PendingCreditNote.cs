@@ -74,6 +74,12 @@ public sealed class PendingCreditNote : AuditableEntity, ICompanyScoped
     /// <summary>The tax account.</summary>
     public string? TaxAccountCode { get; private set; }
 
+    /// <summary>The tax code the credit's tax is tagged with (and worked out from, when no tax was keyed).</summary>
+    public string? TaxCode { get; set; }
+
+    /// <summary>The invoice the credit note reverses, when one.</summary>
+    public string? OriginalInvoiceNumber { get; set; }
+
     /// <summary>The narrative.</summary>
     public string? Narrative { get; private set; }
 

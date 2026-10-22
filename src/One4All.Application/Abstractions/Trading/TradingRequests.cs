@@ -31,7 +31,7 @@ public sealed record SalesInvoiceRequest : ITradingAnalysis
     /// <summary>The customer.</summary>
     public long CustomerId { get; init; }
 
-    /// <summary>The invoice number.</summary>
+    /// <summary>The invoice number (blank: the next number from the company's "SINV" sequence, "SDN" for a debit note). A number already used by another invoice is refused.</summary>
     public string DocumentNumber { get; init; } = string.Empty;
 
     /// <summary>The invoice date.</summary>
@@ -190,7 +190,7 @@ public sealed record PurchaseInvoiceRequest : ITradingAnalysis
 }
 
 /// <summary>A request to post a credit note to a customer (AR) - reduces the debtor balance.</summary>
-public sealed class SalesCreditNoteRequest : ITradingAnalysis
+public sealed record SalesCreditNoteRequest : ITradingAnalysis
 {
     /// <summary>Gets the cost centre the revenue or expense posts to.</summary>
     public string? CostCentre { get; init; }
@@ -210,7 +210,7 @@ public sealed class SalesCreditNoteRequest : ITradingAnalysis
     /// <summary>The customer.</summary>
     public long CustomerId { get; init; }
 
-    /// <summary>The credit-note number.</summary>
+    /// <summary>The credit-note number (blank: the next number from the company's "SCN" sequence).</summary>
     public string DocumentNumber { get; init; } = string.Empty;
 
     /// <summary>The document date.</summary>
@@ -230,6 +230,18 @@ public sealed class SalesCreditNoteRequest : ITradingAnalysis
 
     /// <summary>The output-tax account code (debited), when there is tax.</summary>
     public string? TaxAccountCode { get; init; }
+
+    /// <summary>
+    /// The tax code (e.g. "VAT15") tagged on the tax line for the VAT breakdown by code; with no tax amount the tax is worked out at the code's rate
+    /// on the document date, to the code's output account (else the VAT output control).
+    /// </summary>
+    public string? TaxCode { get; init; }
+
+    /// <summary>
+    /// The invoice being credited, when the credit note reverses one: it must be the same customer's, in the same currency, and the credit cannot take
+    /// more than the invoice's gross less the credit notes already raised against it. The credit is allocated to the invoice and the fiscal device gets it as the reference.
+    /// </summary>
+    public string? OriginalInvoiceNumber { get; init; }
 
     /// <summary>Optional explicit exchange rate.</summary>
     public decimal? ExchangeRate { get; init; }

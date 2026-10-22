@@ -14,16 +14,19 @@ public sealed class CreditNoteApprovalService : ICreditNoteApprovalService
     private readonly One4AllDbContext _db;
     private readonly ISalesLedgerService _ar;
     private readonly Lazy<IWorkflowService>? _workflow;
+    private readonly Application.Abstractions.Numbering.INumberSequenceService? _numbers;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="ar">Posts the credit note once approved.</param>
     /// <param name="workflow">The approval workflow.</param>
-    public CreditNoteApprovalService(One4AllDbContext db, ISalesLedgerService ar, Lazy<IWorkflowService>? workflow = null)
+    /// <param name="numbers">Numbers a credit note held for approval without one (the "SCN" sequence).</param>
+    public CreditNoteApprovalService(One4AllDbContext db, ISalesLedgerService ar, Lazy<IWorkflowService>? workflow = null, Application.Abstractions.Numbering.INumberSequenceService? numbers = null)
     {
         _db = db;
         _ar = ar;
         _workflow = workflow;
+        _numbers = numbers;
     }
 
     /// <inheritdoc />
@@ -33,10 +36,28 @@ public sealed class CreditNoteApprovalService : ICreditNoteApprovalService
             if (_workflow is null || !await _db.WorkflowDefinitions.AnyAsync(d => d.CompanyId == request.CompanyId && d.DocumentType == WorkflowDocumentTypes.CreditNote && d.IsActive, ct).ConfigureAwait(false))
             {
                 Result<TradingPostingResult> posted = await _ar.PostCreditNoteAsync(request, ct).ConfigureAwait(false);
-                return posted.IsFailure ? posted.Error : Result<CreditNoteSubmission>.Success(new CreditNoteSubmission(true, posted.Value.JournalNumber));
+                if (posted.IsFailure)
+                {
+                    return posted.Error;
+                }
+
+                string postedNumber = await _db.OpenItems.Where(i => i.Id == posted.Value.OpenItemId).Select(i => i.DocumentNumber).FirstAsync(ct).ConfigureAwait(false);
+                return Result<CreditNoteSubmission>.Success(new CreditNoteSubmission(true, posted.Value.JournalNumber) { DocumentNumber = postedNumber });
             }
 
             string number = (request.DocumentNumber ?? string.Empty).Trim();
+            if (number.Length == 0 && _numbers is not null && request.NetAmount > 0m)
+            {
+                // A credit note held for approval takes its serial number now: the workflow is keyed on it.
+                Result<string> allocated = await _numbers.AllocateAsync(request.CompanyId, TradingService.CreditNoteSequence, request.DocumentDate, ct: ct).ConfigureAwait(false);
+                if (allocated.IsFailure)
+                {
+                    return allocated.Error;
+                }
+
+                number = allocated.Value;
+            }
+
             if (number.Length == 0 || request.NetAmount <= 0m || string.IsNullOrWhiteSpace(request.SalesAccountCode))
             {
                 return Error.Validation("Ar.CreditNote", "A credit note needs a number, a positive amount and the revenue account it reverses.");
@@ -54,7 +75,11 @@ public sealed class CreditNoteApprovalService : ICreditNoteApprovalService
             }
 
             PendingCreditNote held = new(request.CompanyId, request.CustomerId, number, request.DocumentDate, request.Currency.Value, request.NetAmount, request.TaxAmount, request.SalesAccountCode.Trim(),
-                request.TaxAccountCode, request.Narrative, request.ReasonCode, submittedByUserId);
+                request.TaxAccountCode, request.Narrative, request.ReasonCode, submittedByUserId)
+            {
+                TaxCode = string.IsNullOrWhiteSpace(request.TaxCode) ? null : request.TaxCode.Trim().ToUpperInvariant(),
+                OriginalInvoiceNumber = string.IsNullOrWhiteSpace(request.OriginalInvoiceNumber) ? null : request.OriginalInvoiceNumber.Trim(),
+            };
             _db.Set<PendingCreditNote>().Add(held);
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             Result<bool> governed = await Workflow.WorkflowGate.StartIfDefinedAsync(_db, _workflow, request.CompanyId, WorkflowDocumentTypes.CreditNote, number, request.NetAmount + request.TaxAmount,
@@ -63,7 +88,7 @@ public sealed class CreditNoteApprovalService : ICreditNoteApprovalService
                     ("Currency", request.Currency.Value), ("Reason", request.ReasonCode),
                     ("Customer", await _db.Customers.Where(c => c.Id == request.CustomerId).Select(c => c.Code).FirstOrDefaultAsync(ct).ConfigureAwait(false)),
                 ], ct).ConfigureAwait(false);
-            return governed.IsFailure ? governed.Error : Result<CreditNoteSubmission>.Success(new CreditNoteSubmission(false, null));
+            return governed.IsFailure ? governed.Error : Result<CreditNoteSubmission>.Success(new CreditNoteSubmission(false, null) { DocumentNumber = number });
         }, ct);
 
     /// <summary>Applies the end of a credit note's workflow: approved → posted; otherwise rejected (the ledger untouched).</summary>
@@ -87,6 +112,7 @@ public sealed class CreditNoteApprovalService : ICreditNoteApprovalService
         {
             CompanyId = companyId, CustomerId = held.CustomerId, DocumentNumber = held.DocumentNumber, DocumentDate = held.DocumentDate, Currency = CurrencyCode.Parse(held.Currency),
             NetAmount = held.NetAmount, TaxAmount = held.TaxAmount, SalesAccountCode = held.SalesAccountCode, TaxAccountCode = held.TaxAccountCode, Narrative = held.Narrative, ReasonCode = held.ReasonCode,
+            TaxCode = held.TaxCode, OriginalInvoiceNumber = held.OriginalInvoiceNumber,
         }, ct).ConfigureAwait(false);
         if (posted.IsFailure)
         {

@@ -27,9 +27,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     /// <param name="webhooks">Publishes invoice and payment events.</param>
     /// <param name="permissions">Checks who may override discounts, rates and budget blocks.</param>
     /// <param name="budget">The budget gate an invoice without an order passes at posting (brief §4.18.5).</param>
+    /// <param name="fiscal">Signs sales ledger tax invoices and credit notes (e-invoicing).</param>
+    /// <param name="numbers">Gives a sales invoice, debit note or credit note keyed without a number the next serial number.</param>
     public TradingService(One4AllDbContext db, IPostingEngine postingEngine, Application.Abstractions.Integration.IWebhookService? webhooks = null,
-        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Budgeting.IBudgetGateService? budget = null, IFiscalDeviceProvider? fiscal = null)
+        Application.Abstractions.Security.IPermissionService? permissions = null, Application.Abstractions.Budgeting.IBudgetGateService? budget = null, IFiscalDeviceProvider? fiscal = null,
+        Application.Abstractions.Numbering.INumberSequenceService? numbers = null)
     {
+        _numbers = numbers;
         _fiscal = fiscal;
         _budget = budget;
         _permissions = permissions;
@@ -40,6 +44,16 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
     private readonly Application.Abstractions.Integration.IWebhookService? _webhooks;
     private readonly IFiscalDeviceProvider? _fiscal;
+    private readonly Application.Abstractions.Numbering.INumberSequenceService? _numbers;
+
+    /// <summary>The number sequence sales invoices keyed without a number are numbered from (tax invoices carry serial numbers).</summary>
+    internal const string InvoiceSequence = "SINV";
+
+    /// <summary>The number sequence sales credit notes keyed without a number are numbered from.</summary>
+    internal const string CreditNoteSequence = "SCN";
+
+    /// <summary>The number sequence sales debit notes keyed without a number are numbered from.</summary>
+    internal const string DebitNoteSequence = "SDN";
     private readonly Application.Abstractions.Budgeting.IBudgetGateService? _budget;
 
     /// <inheritdoc />
@@ -245,6 +259,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.Rule("Ar.CustomerOnHold", $"Customer {customer.Code} is on hold; no new invoices can be posted.");
         }
 
+        Result<string> number = await ArDocumentNumberAsync(request.CompanyId, itemType, request.DocumentNumber, request.DocumentDate, ct).ConfigureAwait(false);
+        if (number.IsFailure)
+        {
+            return number.Error;
+        }
+
+        request = request with { DocumentNumber = number.Value };
         request = await WithTaxDefaultsAsync(request, customer, ct).ConfigureAwait(false);
 
         // Exemption certificates: a certified customer is not charged tax, and an exempt supply needs a valid certificate.
@@ -842,6 +863,27 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return Error.NotFound("Ar.CustomerNotFound", $"Customer {request.CustomerId} not found.");
         }
 
+        Result<string> number = await ArDocumentNumberAsync(request.CompanyId, OpenItemType.CreditNote, request.DocumentNumber, request.DocumentDate, ct).ConfigureAwait(false);
+        if (number.IsFailure)
+        {
+            return number.Error;
+        }
+
+        request = request with { DocumentNumber = number.Value };
+
+        // A tax code keyed with no amount works the tax out at the code's rate (as an invoice does); the tax line carries the code either way.
+        string? taxCode = Clean(request.TaxCode);
+        if (taxCode is not null && request.TaxAmount == 0m)
+        {
+            if (!await _db.TaxCodes.AnyAsync(t => t.CompanyId == request.CompanyId && t.Code == taxCode && t.IsActive, ct).ConfigureAwait(false))
+            {
+                return Error.NotFound("Tax.CodeNotFound", $"Tax code {taxCode} is not an active tax code.");
+            }
+
+            (decimal tax, string? account) = await DefaultTaxAsync(request.CompanyId, taxCode, request.NetAmount, request.DocumentDate, ControlAccountType.VatOutput, ct).ConfigureAwait(false);
+            request = request with { TaxAmount = tax, TaxAccountCode = request.TaxAccountCode ?? (tax == 0m ? null : account) };
+        }
+
         Result<string> controlResult = await ReceivableControlAsync(request.CompanyId, customer, ct).ConfigureAwait(false);
         if (controlResult.IsFailure)
         {
@@ -860,6 +902,20 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal baseTax = Round(request.TaxAmount * rate);
         decimal baseGross = baseNet + baseTax;
 
+        // The invoice being credited: the same customer's, in the same currency, and never credited past its gross.
+        string? original = string.IsNullOrWhiteSpace(request.OriginalInvoiceNumber) ? null : request.OriginalInvoiceNumber.Trim();
+        OpenItem? invoice = null;
+        if (original is not null)
+        {
+            Result<OpenItem> credited = await CreditableInvoiceAsync(request, customer, original, gross, ct).ConfigureAwait(false);
+            if (credited.IsFailure)
+            {
+                return credited.Error;
+            }
+
+            invoice = credited.Value;
+        }
+
         // Reverse of an invoice: Dr revenue, Dr output tax, Cr AR control.
         List<JournalLineRequest> lines =
         [
@@ -868,20 +924,112 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         ];
         if (request.TaxAmount != 0m && request.TaxAccountCode is not null)
         {
-            lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax));
+            lines.Add(Line(request.TaxAccountCode, JournalSide.Debit, request.TaxAmount, rate, baseTax, taxCode));
         }
 
         Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AR", TradingLedger.AccountsReceivable, customer.Id, OpenItemType.CreditNote,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, request.DocumentDate, request.Currency, rate,
-            gross, baseGross, request.Narrative, lines, ct, request.TaxAmount).ConfigureAwait(false);
-        if (posted.IsSuccess && !string.IsNullOrWhiteSpace(request.ReasonCode))
+            gross, baseGross, request.Narrative, lines, ct, request.TaxAmount, original).ConfigureAwait(false);
+        if (posted.IsFailure)
+        {
+            return posted;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.ReasonCode))
         {
             OpenItem item = await _db.OpenItems.SingleAsync(i => i.Id == posted.Value.OpenItemId, ct).ConfigureAwait(false);
             item.ReasonCode = request.ReasonCode.Trim().ToUpperInvariant();
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
+        // The credit settles the invoice as far as it is still unpaid (against a paid invoice it stays on account, for a refund or the next invoice).
+        if (invoice is not null && invoice.OutstandingTransaction > 0m && gross > 0m)
+        {
+            Result<AllocationResult> allocated = await AllocateCoreAsync(request.CompanyId, TradingLedger.AccountsReceivable, invoice.Id, posted.Value.OpenItemId,
+                Math.Min(gross, invoice.OutstandingTransaction), request.DocumentDate, ct).ConfigureAwait(false);
+            if (allocated.IsFailure)
+            {
+                return allocated.Error;
+            }
+        }
+
         return posted;
+    }
+
+    // The invoice a credit note reverses, locked so two credits against it queue: on the customer's account, in the credit's currency, dated on or
+    // before the credit, and with room for it (its gross less the credit notes already raised against it; payments do not reduce what may be credited).
+    private async Task<Result<OpenItem>> CreditableInvoiceAsync(SalesCreditNoteRequest request, Customer customer, string original, decimal gross, CancellationToken ct)
+    {
+        OpenItem? invoice = await _db.OpenItems.FirstOrDefaultAsync(o => o.CompanyId == request.CompanyId && o.Ledger == TradingLedger.AccountsReceivable && o.TraderId == customer.Id
+            && o.ItemType == OpenItemType.Invoice && o.DocumentNumber == original, ct).ConfigureAwait(false);
+        if (invoice is null)
+        {
+            return Error.NotFound("Ar.OriginalInvoice", $"Invoice {original} is not on the account of customer {customer.Code}.");
+        }
+
+        if (invoice.Currency != request.Currency)
+        {
+            return Error.Validation("Ar.OriginalInvoiceCurrency", $"Invoice {original} is in {invoice.Currency}: credit it in {invoice.Currency}, not {request.Currency}.");
+        }
+
+        if (request.DocumentDate < invoice.DocumentDate)
+        {
+            return Error.Validation("Ar.CreditBeforeInvoice", $"The credit note cannot be dated before invoice {original} ({invoice.DocumentDate:yyyy-MM-dd}).");
+        }
+
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT 1 FROM trd.open_item WHERE id = {invoice.Id} FOR UPDATE", ct).ConfigureAwait(false);
+        decimal creditedBefore = await _db.OpenItems.Where(o => o.CompanyId == request.CompanyId && o.Ledger == TradingLedger.AccountsReceivable && o.TraderId == customer.Id
+            && o.ItemType == OpenItemType.CreditNote && o.ReferenceDocumentNumber == original).SumAsync(o => (decimal?)o.OriginalTransaction, ct).ConfigureAwait(false) ?? 0m;
+        decimal room = invoice.OriginalTransaction - creditedBefore;
+        if (gross > room)
+        {
+            return Error.Rule("Ar.CreditExceedsInvoice",
+                $"Invoice {original} was for {invoice.OriginalTransaction:N2} and {creditedBefore:N2} has already been credited: at most {Math.Max(room, 0m):N2} can be credited, not {gross:N2}.");
+        }
+
+        return invoice;
+    }
+
+    // A sales document's number: the one keyed (trimmed), else the next from the document type's sequence. Refused when another document of the
+    // same type already carries it (tax invoices and credit notes need unique serial numbers).
+    private async Task<Result<string>> ArDocumentNumberAsync(long companyId, OpenItemType itemType, string? keyed, DateOnly date, CancellationToken ct)
+    {
+        string number = (keyed ?? string.Empty).Trim();
+        if (number.Length == 0)
+        {
+            if (_numbers is null)
+            {
+                return Error.Validation("Ar.DocumentNumberRequired", "The document needs a number.");
+            }
+
+            string sequence = itemType switch
+            {
+                OpenItemType.CreditNote => CreditNoteSequence,
+                OpenItemType.DebitNote => DebitNoteSequence,
+                _ => InvoiceSequence,
+            };
+            Result<string> allocated = await _numbers.AllocateAsync(companyId, sequence, date, ct: ct).ConfigureAwait(false);
+            if (allocated.IsFailure)
+            {
+                return allocated.Error;
+            }
+
+            number = allocated.Value;
+        }
+
+        if (await _db.OpenItems.AnyAsync(o => o.CompanyId == companyId && o.Ledger == TradingLedger.AccountsReceivable && o.ItemType == itemType && o.DocumentNumber == number, ct)
+            .ConfigureAwait(false))
+        {
+            string kind = itemType switch
+            {
+                OpenItemType.CreditNote => "credit note",
+                OpenItemType.DebitNote => "debit note",
+                _ => "invoice",
+            };
+            return Error.Conflict("Ar.DuplicateDocument", $"A sales {kind} numbered {number} has already been posted.");
+        }
+
+        return number;
     }
 
     /// <inheritdoc />
@@ -1761,7 +1909,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     private async Task<Result<TradingPostingResult>> PostAndOpenAsync(
         long companyId, string module, TradingLedger ledger, long traderId, OpenItemType itemType, LedgerSign sign,
         string documentNumber, DateOnly documentDate, DateOnly dueDate, CurrencyCode currency, decimal rate,
-        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct, decimal tax = 0m)
+        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct, decimal tax = 0m, string? reference = null)
     {
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
@@ -1785,6 +1933,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         {
             JournalEntryId = posting.Value.JournalId,
             Narrative = narrative,
+            ReferenceDocumentNumber = reference,
         };
 
         // E-invoicing (brief §3.5): a sales ledger tax invoice or credit note is signed by the fiscal device like a till receipt; unreachable means it waits for the retry task.
@@ -1792,7 +1941,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         {
             string? buyerTaxNumber = await _db.Customers.AsNoTracking().Where(c => c.Id == traderId).Select(c => c.TaxRegistration).FirstOrDefaultAsync(ct).ConfigureAwait(false);
             FiscalReceiptResult? signed = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, documentNumber, amountTxn, tax, currency.Value, DateTimeOffset.UtcNow,
-                itemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice, null, buyerTaxNumber), ct).ConfigureAwait(false);
+                itemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice, reference, buyerTaxNumber), ct).ConfigureAwait(false);
             if (signed is FiscalReceiptResult result)
             {
                 (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (result.FiscalCode, result.SignatureOrQr, result.Queued || result.FiscalCode is null);

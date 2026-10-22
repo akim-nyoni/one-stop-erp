@@ -528,6 +528,18 @@ public static class Ops
         async c => (await c.Db.Customers.AsNoTracking().Where(x => x.CompanyId == c.CompanyId).OrderBy(x => x.Code).Take(2000).Select(x => new { x.Code, x.Name }).ToListAsync().ConfigureAwait(true))
             .Select(x => (x.Code, x.Name)).ToList());
 
+    /// <summary>A sales invoice lookup: the company's latest invoices (number - customer, date, gross and what is unpaid), optional; the service checks it is the chosen customer's.</summary>
+    /// <param name="name">The field name.</param>
+    /// <param name="label">The label.</param>
+    /// <returns>The field.</returns>
+    public static OperationField InvoicePick(string name, string label) => Lookup(name, label, required: false,
+        async c => (await c.Db.OpenItems.AsNoTracking()
+                .Where(x => x.CompanyId == c.CompanyId && x.Ledger == Core.Trading.TradingLedger.AccountsReceivable && x.ItemType == Core.Trading.OpenItemType.Invoice)
+                .Join(c.Db.Customers.AsNoTracking(), x => x.TraderId, cu => cu.Id, (x, cu) => new { x.Id, x.DocumentNumber, cu.Code, x.DocumentDate, x.Currency, x.OriginalTransaction, x.OutstandingTransaction })
+                .OrderByDescending(x => x.DocumentDate).ThenByDescending(x => x.Id).Take(2000).ToListAsync().ConfigureAwait(true))
+            .Select(x => (x.DocumentNumber, string.Create(CultureInfo.InvariantCulture,
+                $"{x.Code}, {x.DocumentDate:yyyy-MM-dd}, {x.Currency} {x.OriginalTransaction:N2} ({x.OutstandingTransaction:N2} unpaid)"))).ToList());
+
     /// <summary>A supplier lookup (code - name).</summary>
     /// <param name="name">The field name.</param>
     /// <param name="label">The label.</param>

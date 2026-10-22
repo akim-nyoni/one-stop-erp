@@ -16,6 +16,8 @@ internal sealed class PendingCreditNoteConfiguration : IEntityTypeConfiguration<
         b.Property(x => x.TaxAmount).HasPrecision(19, 4);
         b.Property(x => x.SalesAccountCode).HasMaxLength(20);
         b.Property(x => x.TaxAccountCode).HasMaxLength(20);
+        b.Property(x => x.TaxCode).HasMaxLength(20);
+        b.Property(x => x.OriginalInvoiceNumber).HasMaxLength(40);
         b.Property(x => x.Narrative).HasMaxLength(500);
         b.Property(x => x.ReasonCode).HasMaxLength(30);
         b.Property(x => x.JournalNumber).HasMaxLength(40);

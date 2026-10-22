@@ -239,9 +239,15 @@ internal static class TradingApiEndpoints
             return mapped.IsFailure ? Value(mapped) : Value(await sales.PostInvoiceAsync(mapped.Value, ct).ConfigureAwait(false));
         }).RequireAuthorization().WithName("PostSalesInvoice");
 
-        api.MapPost("/api/trading/sales-credit-notes", async (long companyId, SalesDocumentApi request, ISalesLedgerService sales, CancellationToken ct) =>
+        api.MapPost("/api/trading/sales-credit-notes", async (long companyId, SalesDocumentApi request, ISalesLedgerService sales, Application.Abstractions.Accounting.IFiscalDeviceProvider fiscal, CancellationToken ct) =>
         {
             Result<SalesCreditNoteRequest> mapped = TradingApiMapping.SalesCreditNote(companyId, request);
+            if (mapped.IsSuccess && fiscal.IsEnabled && string.IsNullOrWhiteSpace(mapped.Value.OriginalInvoiceNumber))
+            {
+                // The fiscal device signs a credit note against the invoice it reverses (FDMS needs the reference).
+                mapped = Error.Validation("Ar.OriginalInvoiceRequired", "Give the original invoice number: the fiscal device needs the invoice a credit note reverses.");
+            }
+
             return mapped.IsFailure ? Value(mapped) : Value(await sales.PostCreditNoteAsync(mapped.Value, ct).ConfigureAwait(false));
         }).RequireAuthorization().WithName("PostSalesCreditNote");
 

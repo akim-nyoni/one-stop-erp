@@ -51,7 +51,7 @@ public sealed record PriceApi(decimal UnitPrice, decimal MinimumQuantity = 1m, D
 
 /// <summary>A sales invoice or credit note as the REST API posts it.</summary>
 /// <param name="CustomerId">The customer.</param>
-/// <param name="DocumentNumber">The document number.</param>
+/// <param name="DocumentNumber">The document number (blank: the next serial number; a number already used is refused).</param>
 /// <param name="DocumentDate">The document date.</param>
 /// <param name="Currency">The ISO currency.</param>
 /// <param name="NetAmount">The net amount.</param>
@@ -64,8 +64,9 @@ public sealed record PriceApi(decimal UnitPrice, decimal MinimumQuantity = 1m, D
 /// <param name="CostCentre">The cost centre.</param>
 /// <param name="Department">The department.</param>
 /// <param name="ReasonCode">The reason code (credit note).</param>
+/// <param name="OriginalInvoiceNumber">The invoice a credit note reverses (required when a fiscal device signs credit notes).</param>
 public sealed record SalesDocumentApi(long CustomerId, string DocumentNumber, DateOnly DocumentDate, string Currency, decimal NetAmount, string SalesAccountCode, decimal TaxAmount = 0m, string? TaxAccountCode = null,
-    string? TaxCode = null, decimal? ExchangeRate = null, string? Narrative = null, string? CostCentre = null, string? Department = null, string? ReasonCode = null);
+    string? TaxCode = null, decimal? ExchangeRate = null, string? Narrative = null, string? CostCentre = null, string? Department = null, string? ReasonCode = null, string? OriginalInvoiceNumber = null);
 
 /// <summary>A customer receipt as the REST API posts it.</summary>
 /// <param name="CustomerId">The customer.</param>
@@ -167,7 +168,7 @@ public static class TradingApiMapping
         Result<CurrencyCode> currency = Currency(api.Currency);
         return currency.IsFailure ? currency.Error : new SalesInvoiceRequest
         {
-            CompanyId = companyId, CustomerId = api.CustomerId, DocumentNumber = api.DocumentNumber, DocumentDate = api.DocumentDate, Currency = currency.Value, NetAmount = api.NetAmount, TaxAmount = api.TaxAmount,
+            CompanyId = companyId, CustomerId = api.CustomerId, DocumentNumber = api.DocumentNumber ?? string.Empty, DocumentDate = api.DocumentDate, Currency = currency.Value, NetAmount = api.NetAmount, TaxAmount = api.TaxAmount,
             SalesAccountCode = api.SalesAccountCode, TaxAccountCode = api.TaxAccountCode, TaxCode = api.TaxCode, ExchangeRate = api.ExchangeRate, Narrative = api.Narrative, CostCentre = api.CostCentre, Department = api.Department,
         };
     }
@@ -182,8 +183,9 @@ public static class TradingApiMapping
         Result<CurrencyCode> currency = Currency(api.Currency);
         return currency.IsFailure ? currency.Error : new SalesCreditNoteRequest
         {
-            CompanyId = companyId, CustomerId = api.CustomerId, DocumentNumber = api.DocumentNumber, DocumentDate = api.DocumentDate, Currency = currency.Value, NetAmount = api.NetAmount, TaxAmount = api.TaxAmount,
-            SalesAccountCode = api.SalesAccountCode, TaxAccountCode = api.TaxAccountCode, ExchangeRate = api.ExchangeRate, Narrative = api.Narrative, CostCentre = api.CostCentre, Department = api.Department, ReasonCode = api.ReasonCode,
+            CompanyId = companyId, CustomerId = api.CustomerId, DocumentNumber = api.DocumentNumber ?? string.Empty, DocumentDate = api.DocumentDate, Currency = currency.Value, NetAmount = api.NetAmount,
+            TaxAmount = api.TaxAmount, SalesAccountCode = api.SalesAccountCode, TaxAccountCode = api.TaxAccountCode, TaxCode = api.TaxCode, OriginalInvoiceNumber = api.OriginalInvoiceNumber,
+            ExchangeRate = api.ExchangeRate, Narrative = api.Narrative, CostCentre = api.CostCentre, Department = api.Department, ReasonCode = api.ReasonCode,
         };
     }
 

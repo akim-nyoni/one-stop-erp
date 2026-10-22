@@ -328,9 +328,12 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = "Customers", Title = "Customer invoice or credit note", ListTitle = "Open customer items",
-            Description = "Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account).",
-            Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), CustomerPick("Customer", "Customer"), Req("Number", "Document number"), Today("Date", "Date"), Num("Net", "Net amount"),
-                Num("Tax", "Tax amount", "0"), Req("Account", "Sales account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"), Opt("Currency", "Currency (blank: the customer's)"),
+            Description = "Posts a sales invoice or credit note to a customer's account (the customer's currency unless another is given; tax at the tax code's account, worked out "
+                + "from the code when no tax amount is given). A blank number takes the next serial number; a number already used is refused. A credit note against an invoice "
+                + "cannot credit more than the invoice less earlier credits, settles what is unpaid on it, and is required when a fiscal device signs credit notes.",
+            Fields = [Pick("Document", "Document", ["Invoice", "Credit note"]), CustomerPick("Customer", "Customer"), Opt("Number", "Document number (blank: the next number)"), Today("Date", "Date"),
+                Num("Net", "Net amount"), Num("Tax", "Tax amount (0 with a tax code: worked out)", "0"), Req("Account", "Sales account"), Opt("TaxAccount", "Tax account"), Opt("TaxCode", "Tax code"),
+                Opt("Currency", "Currency (blank: the customer's)"), InvoicePick("Original", "Original invoice (credit note)"),
                 Opt("Reason", "Reason code (credit note)"), Opt("Narrative", "Narrative"), Opt("Override", "Supervisor allowing it over the credit limit (user name)"),
                 Opt("CostCentre", "Cost centre"), Opt("Department", "Department"), Opt("Project", "Project")],
             Run = async (c, i) =>
@@ -340,24 +343,32 @@ public static partial class OperationCatalogue
                     : await c.Db.Customers.AsNoTracking().Where(x => x.Id == customer).Select(x => x.Currency).SingleAsync().ConfigureAwait(true);
                 if (i.Text("Document") != "Invoice")
                 {
+                    // A fiscal device signs the credit note against the invoice it reverses (FDMS needs the reference).
+                    if (i.Optional("Original") is null && c.Get<Application.Abstractions.Accounting.IFiscalDeviceProvider>().IsEnabled)
+                    {
+                        throw new OperationException("Pick the original invoice: the fiscal device needs the invoice a credit note reverses.");
+                    }
+
                     // A credit note goes through the company's credit-note approval workflow when there is one.
                     CreditNoteSubmission credit = Check(await c.Get<ICreditNoteApprovalService>().SubmitAsync(new SalesCreditNoteRequest
                     {
-                        CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
-                        TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), ReasonCode = i.Optional("Reason"), Narrative = i.Optional("Narrative"),
+                        CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Optional("Number") ?? string.Empty, DocumentDate = i.Date("Date"), Currency = currency,
+                        NetAmount = i.Number("Net"), TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"),
+                        OriginalInvoiceNumber = i.Optional("Original"), ReasonCode = i.Optional("Reason"), Narrative = i.Optional("Narrative"),
                         CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"), Project = i.Optional("Project"),
                     }, c.UserId).ConfigureAwait(true));
-                    return credit.Posted ? $"Credit note {i.Text("Number")} posted (journal {credit.JournalNumber})." : $"Credit note {i.Text("Number")} is awaiting approval.";
+                    return credit.Posted ? $"Credit note {credit.DocumentNumber} posted (journal {credit.JournalNumber})." : $"Credit note {credit.DocumentNumber} is awaiting approval.";
                 }
 
                 TradingPostingResult posted = Check(await c.Get<ISalesLedgerService>().PostInvoiceAsync(new SalesInvoiceRequest
                 {
                     CostCentre = i.Optional("CostCentre"), Department = i.Optional("Department"), Project = i.Optional("Project"),
-                    CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Text("Number"), DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
+                    CompanyId = c.CompanyId, CustomerId = customer, DocumentNumber = i.Optional("Number") ?? string.Empty, DocumentDate = i.Date("Date"), Currency = currency, NetAmount = i.Number("Net"),
                     TaxAmount = i.Number("Tax"), SalesAccountCode = i.Text("Account"), TaxAccountCode = i.Optional("TaxAccount"), TaxCode = i.Optional("TaxCode"), Narrative = i.Optional("Narrative"),
                     EnteredByUserId = c.UserId, CreditLimitOverrideByUserId = await OptionalUserAsync(c, i.Optional("Override")).ConfigureAwait(true),
                 }).ConfigureAwait(true));
-                return $"Invoice {i.Text("Number")} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
+                string number = await c.Db.OpenItems.AsNoTracking().Where(x => x.Id == posted.OpenItemId).Select(x => x.DocumentNumber).SingleAsync().ConfigureAwait(true);
+                return $"Invoice {number} posted: {M(posted.BaseAmount)} base (journal {posted.JournalNumber}).";
             },
             List = c => OpenItemsAsync(c, TradingLedger.AccountsReceivable),
         };

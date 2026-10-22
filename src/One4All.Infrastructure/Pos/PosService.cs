@@ -1510,7 +1510,7 @@ public sealed class PosService : IPosService
         foreach (OpenItem item in await _db.OpenItems.Where(i => i.CompanyId == companyId && i.FiscalQueued).OrderBy(i => i.Id).Take(500).ToListAsync(ct).ConfigureAwait(false))
         {
             FiscalReceiptResult? result = await Accounting.FiscalSigning.SignAsync(_fiscal, new FiscalReceiptRequest(companyId, item.DocumentNumber, item.OriginalTransaction, 0m, item.Currency.Value,
-                _clock.UtcNow, item.ItemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice), ct).ConfigureAwait(false);
+                _clock.UtcNow, item.ItemType == OpenItemType.CreditNote ? FiscalDocumentKind.CreditNote : FiscalDocumentKind.Invoice, item.ReferenceDocumentNumber), ct).ConfigureAwait(false);
             if (result is { Queued: false, FiscalCode: not null } ok)
             {
                 (item.FiscalCode, item.FiscalVerification, item.FiscalQueued) = (ok.FiscalCode, ok.SignatureOrQr, false);
