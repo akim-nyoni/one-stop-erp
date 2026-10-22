@@ -52,7 +52,7 @@ public sealed class RestaurantTipPoolingAndMenuEngineeringTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), "1000", tipAmount: 30m, tipsPayableAccountCode: "2450");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), "1000", tipAmount: 30m, tipsPayableAccountCode: "2450", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Tip.Should().Be(30m);
         }
@@ -151,12 +151,12 @@ public sealed class RestaurantTipPoolingAndMenuEngineeringTests
             long t1 = (await res.CreateTableAsync(companyId, "ME1", 4)).Value;
             long o1 = (await res.OpenOrderAsync(companyId, t1, "ME-ORD-1", Waiter, new DateOnly(2026, 3, 5))).Value;
             await res.AddItemAsync(companyId, o1, burgerId, 5m);
-            (await res.BillOrderAsync(companyId, o1, warehouseId, new DateOnly(2026, 3, 5), "1000")).IsSuccess.Should().BeTrue();
+            (await res.BillOrderAsync(companyId, o1, warehouseId, new DateOnly(2026, 3, 5), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsSuccess.Should().BeTrue();
 
             long t2 = (await res.CreateTableAsync(companyId, "ME2", 4)).Value;
             long o2 = (await res.OpenOrderAsync(companyId, t2, "ME-ORD-2", Waiter, new DateOnly(2026, 3, 5))).Value;
             await res.AddItemAsync(companyId, o2, saladId, 1m);
-            (await res.BillOrderAsync(companyId, o2, warehouseId, new DateOnly(2026, 3, 5), "1000")).IsSuccess.Should().BeTrue();
+            (await res.BillOrderAsync(companyId, o2, warehouseId, new DateOnly(2026, 3, 5), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsSuccess.Should().BeTrue();
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

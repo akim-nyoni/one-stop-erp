@@ -92,7 +92,7 @@ public sealed class RestaurantVoidsAndCompsTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 22), "1000");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 22), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             // Only the burger is charged; fries voided (excluded), dessert comped (no revenue).
             bill.Value.Net.Should().Be(50m);
@@ -158,7 +158,7 @@ public sealed class RestaurantVoidsAndCompsTests
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
             (await res.CompLineAsync(companyId, orderId, lineId, "Service recovery")).IsSuccess.Should().BeTrue();
 
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 23), "1000");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 23), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Gross.Should().Be(0m);        // guest charged nothing
             bill.Value.CostOfSales.Should().Be(12m); // but the steak was still made

@@ -68,7 +68,7 @@ public sealed class RestaurantAutoAvailabilityTests
             tableId = (await res.CreateTableAsync(companyId, "AA1", 4)).Value;
             long orderId = (await res.OpenOrderAsync(companyId, tableId, "AA-ORD-1", Waiter, new DateOnly(2026, 4, 10))).Value;
             await res.AddItemAsync(companyId, orderId, burgerId, 2m); // uses both patties on billing
-            await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 10), "1000");
+            await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 10), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
 
             int changed = (await res.RefreshMenuAvailabilityAsync(companyId, warehouseId)).Value;
             changed.Should().Be(1); // the burger flipped to unavailable

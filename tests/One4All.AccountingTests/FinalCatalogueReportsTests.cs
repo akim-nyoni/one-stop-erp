@@ -88,6 +88,13 @@ public sealed class FinalCatalogueReportsTests
         db.Warehouses.Add(kitchen);
         Core.Security.User manager = new($"mgr{Guid.NewGuid():N}"[..12], "Final Manager");
         db.Add(manager);
+        Core.Security.Role voiders = new($"Final voiders {companyId}");
+        voiders.Grant("Pos.Restaurant", Core.Security.OperationFlags.VoidReverse);
+        db.Add(voiders);
+        await db.SaveChangesAsync();
+        Core.Security.User floorSupervisor = new($"sup{Guid.NewGuid():N}"[..12], "Final Supervisor");
+        floorSupervisor.AssignRole(voiders.Id);
+        db.Add(floorSupervisor);
         await db.SaveChangesAsync();
         IRestaurantService restaurant = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
         long dish = (await restaurant.CreateMenuItemAsync(companyId, "FC-DISH", "Dish", 30m, "4000", "5000", [])).Value;
@@ -98,8 +105,8 @@ public sealed class FinalCatalogueReportsTests
         (await restaurant.AddItemAsync(companyId, billed, dish, 1m)).IsSuccess.Should().BeTrue();
         (await restaurant.FireOrderAsync(companyId, billed, "KT-1", night)).IsSuccess.Should().BeTrue();
         long lastLine = (await db.TableOrders.AsNoTracking().Include(o => o.Lines).SingleAsync(o => o.Id == billed)).Lines.OrderBy(l => l.Id).Last().Id;
-        (await restaurant.VoidLineAsync(companyId, billed, lastLine, "Dropped", manager.Id)).IsSuccess.Should().BeTrue();
-        (await restaurant.BillOrderAsync(companyId, billed, kitchen.Id, night, "1000", tipAmount: 5m, tipsPayableAccountCode: "2100")).IsSuccess.Should().BeTrue();
+        (await restaurant.VoidLineAsync(companyId, billed, lastLine, "Dropped", floorSupervisor.Id)).IsSuccess.Should().BeTrue();
+        (await restaurant.BillOrderAsync(companyId, billed, kitchen.Id, night, "1000", tipAmount: 5m, tipsPayableAccountCode: "2100", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsSuccess.Should().BeTrue();
         long open = (await restaurant.OpenOrderAsync(companyId, table2, "FC-ORD-2", manager.Id, night, 2)).Value;
         (await restaurant.AddItemAsync(companyId, open, dish, 1m)).IsSuccess.Should().BeTrue();
 

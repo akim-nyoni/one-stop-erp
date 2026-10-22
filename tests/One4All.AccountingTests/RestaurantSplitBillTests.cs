@@ -59,16 +59,16 @@ public sealed class RestaurantSplitBillTests
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
             // First guest pays for 1 pizza (net 40).
-            var first = await res.BillPartialAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), [new SplitPortion(lineId, 1m)], "1000");
+            var first = await res.BillPartialAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), [new SplitPortion(lineId, 1m)], "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             first.IsSuccess.Should().BeTrue(first.IsFailure ? first.Error.ToString() : null);
             first.Value.Net.Should().Be(40m);
             first.Value.FullyBilled.Should().BeFalse();
 
             // Cannot split more than remains (3 left).
-            (await res.BillPartialAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), [new SplitPortion(lineId, 5m)], "1000")).IsFailure.Should().BeTrue();
+            (await res.BillPartialAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), [new SplitPortion(lineId, 5m)], "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsFailure.Should().BeTrue();
 
             // The rest (3 pizzas net 120) plus a 12 service charge → gross 132.
-            var rest = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), "1000", serviceChargeAmount: 12m, serviceChargeAccountCode: "4600");
+            var rest = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), "1000", serviceChargeAmount: 12m, serviceChargeAccountCode: "4600", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             rest.IsSuccess.Should().BeTrue(rest.IsFailure ? rest.Error.ToString() : null);
             rest.Value.Net.Should().Be(120m);
             rest.Value.ServiceCharge.Should().Be(12m);

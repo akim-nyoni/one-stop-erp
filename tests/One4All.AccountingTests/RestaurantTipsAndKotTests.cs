@@ -64,7 +64,7 @@ public sealed class RestaurantTipsAndKotTests
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
             // Bill the steak with a 10 tip (staff money → liability).
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), "1000", tipAmount: 10m, tipsPayableAccountCode: "2450");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 2), "1000", tipAmount: 10m, tipsPayableAccountCode: "2450", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Tip.Should().Be(10m);
             bill.Value.Gross.Should().Be(100m); // 90 + 10 tip

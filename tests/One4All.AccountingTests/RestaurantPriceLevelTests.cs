@@ -53,7 +53,7 @@ public sealed class RestaurantPriceLevelTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 6), "1000");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 6), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Net.Should().Be(20m); // 4 + 8 + 8
         }

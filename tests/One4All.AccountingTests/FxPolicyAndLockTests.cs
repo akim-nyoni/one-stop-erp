@@ -42,7 +42,7 @@ public sealed class FxPolicyAndLockTests
         (await engine.PostAsync(Journal(companyId, "1162", 200m))).IsSuccess.Should().BeTrue();
         (await engine.PostAsync(Journal(companyId, "1482", 100m))).IsSuccess.Should().BeTrue();
         DateOnly june30 = new(2026, 6, 30);
-        bank.SignOff(june30, 1);
+        bank.SignOff(june30, 1, 0m);
         await db.SaveChangesAsync();
 
         // An ordinary entry on the reconciled bank is refused; the revaluation, a valuation entry, is not.

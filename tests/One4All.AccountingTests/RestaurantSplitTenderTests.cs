@@ -48,11 +48,11 @@ public sealed class RestaurantSplitTenderTests
 
             // Tenders that do not sum to the gross are refused (order stays open).
             (await res.BillWithTendersAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 9),
-                [new TenderLine("1000", 50m), new TenderLine("1100", 50m)], "2200")).IsFailure.Should().BeTrue();
+                [new TenderLine("1000", 50m), new TenderLine("1100", 50m)], "2200", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsFailure.Should().BeTrue();
 
             // 70 cash + 45 bank = 115.
             var bill = await res.BillWithTendersAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 9),
-                [new TenderLine("1000", 70m), new TenderLine("1100", 45m)], "2200");
+                [new TenderLine("1000", 70m), new TenderLine("1100", 45m)], "2200", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Gross.Should().Be(115m);
             bill.Value.FullyBilled.Should().BeTrue();

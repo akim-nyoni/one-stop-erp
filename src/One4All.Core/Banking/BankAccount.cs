@@ -70,13 +70,18 @@ public sealed class BankAccount : SoftDeletableEntity, ICompanyScoped
     /// <summary>Who signed off the latest reconciliation.</summary>
     public long? ReconciledByUserId { get; private set; }
 
+    /// <summary>The bank statement's closing balance on <see cref="ReconciledTo"/>, as signed off (the next statement opens from it).</summary>
+    public decimal? ReconciledStatementBalance { get; private set; }
+
     /// <summary>Signs off the reconciliation to a date, locking the period up to it.</summary>
     /// <param name="asAt">The date reconciled to.</param>
     /// <param name="userId">Who signed it off.</param>
-    public void SignOff(DateOnly asAt, long userId)
+    /// <param name="statementClosingBalance">The bank statement's closing balance on that date.</param>
+    public void SignOff(DateOnly asAt, long userId, decimal statementClosingBalance)
     {
         ReconciledTo = asAt;
         ReconciledByUserId = userId;
+        ReconciledStatementBalance = statementClosingBalance;
     }
 }
 

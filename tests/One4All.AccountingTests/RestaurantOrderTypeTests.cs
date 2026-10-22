@@ -72,12 +72,12 @@ public sealed class RestaurantOrderTypeTests
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
             // All three bill through the same path; off-premise ones free no table.
-            (await res.BillOrderAsync(companyId, dineOrderId, warehouseId, new DateOnly(2026, 3, 31), "1000")).Value.Gross.Should().Be(60m);
-            var takeBill = await res.BillOrderAsync(companyId, takeawayId, warehouseId, new DateOnly(2026, 3, 31), "1000");
+            (await res.BillOrderAsync(companyId, dineOrderId, warehouseId, new DateOnly(2026, 3, 31), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).Value.Gross.Should().Be(60m);
+            var takeBill = await res.BillOrderAsync(companyId, takeawayId, warehouseId, new DateOnly(2026, 3, 31), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             takeBill.IsSuccess.Should().BeTrue(takeBill.IsFailure ? takeBill.Error.ToString() : null);
             takeBill.Value.Gross.Should().Be(120m);
             takeBill.Value.FullyBilled.Should().BeTrue();
-            (await res.BillOrderAsync(companyId, deliveryId, warehouseId, new DateOnly(2026, 3, 31), "1000")).Value.Gross.Should().Be(60m);
+            (await res.BillOrderAsync(companyId, deliveryId, warehouseId, new DateOnly(2026, 3, 31), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).Value.Gross.Should().Be(60m);
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

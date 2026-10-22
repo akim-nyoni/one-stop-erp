@@ -337,8 +337,22 @@ public sealed class TableOrder : AuditableEntity, ICompanyScoped
         JournalNumber = journalNumber;
     }
 
+    /// <summary>The supervisor who authorised cancelling an order the kitchen had already started, if any.</summary>
+    public long? CancelAuthorisedByUserId { get; private set; }
+
     /// <summary>Cancels the order (nothing was billed).</summary>
-    public void Cancel() => Status = TableOrderStatus.Cancelled;
+    /// <param name="authorisedByUserId">The supervisor authorising it; required when a fired (made) line is still unbilled.</param>
+    /// <exception cref="InvalidOperationException">Thrown when food fired to the kitchen would be cancelled without a supervisor.</exception>
+    public void Cancel(long? authorisedByUserId = null)
+    {
+        if (authorisedByUserId is null && _lines.Any(l => l.Fired && !l.IsVoided && l.RemainingQuantity > 0m))
+        {
+            throw new InvalidOperationException($"Order {OrderNumber} has food fired to the kitchen; cancelling it needs a supervisor.");
+        }
+
+        CancelAuthorisedByUserId = authorisedByUserId;
+        Status = TableOrderStatus.Cancelled;
+    }
 
     /// <summary>Moves the order to another table.</summary>
     /// <param name="tableId">The new table.</param>
@@ -510,11 +524,17 @@ public sealed class TableOrderLine : Entity
     /// <summary>The manager/user who authorised the void or comp, if recorded.</summary>
     public long? AuthorizedByUserId { get; private set; }
 
-    /// <summary>Voids the line (it will not be billed and does not consume stock).</summary>
+    /// <summary>Voids the line (it will not be billed; a line already fired to the kitchen is written off as kitchen wastage by the service).</summary>
     /// <param name="reason">The void reason.</param>
     /// <param name="authorizedByUserId">The authorising manager, if recorded.</param>
+    /// <exception cref="InvalidOperationException">Thrown when a line already fired to the kitchen is voided without an authoriser.</exception>
     public void Void(string reason, long? authorizedByUserId = null)
     {
+        if (Fired && authorizedByUserId is null)
+        {
+            throw new InvalidOperationException($"'{Description}' has been fired to the kitchen; voiding it needs a supervisor.");
+        }
+
         IsVoided = true;
         VoidReason = reason;
         AuthorizedByUserId = authorizedByUserId;

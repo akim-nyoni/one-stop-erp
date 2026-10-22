@@ -140,9 +140,18 @@ public sealed class BankReconciliationService : IBankReconciliationService
         }
 
         List<GlLine> glLines = await GlLinesAsync(companyId, accountResult.Value.GlAccountCode, null, ct).ConfigureAwait(false);
-        if (glLines.All(g => g.Id != journalLineId))
+        GlLine? posting = glLines.FirstOrDefault(g => g.Id == journalLineId);
+        if (posting is null)
         {
             return Result.Failure(Error.Rule("Bank.NotACashBookLine", "The journal line is not a posting on the bank's cash-book account."));
+        }
+
+        // A match says the bank and the books record the same money: the amounts must agree to the cent (there is no tolerance; a
+        // difference such as a bank charge is posted from the statement line on its own and matched separately).
+        if (decimal.Round(line.Amount, 2, MidpointRounding.ToEven) != decimal.Round(posting.Signed, 2, MidpointRounding.ToEven))
+        {
+            return Result.Failure(Error.Rule("Bank.AmountMismatch",
+                $"The statement line is {line.Amount:0.00} but the cash-book posting is {posting.Signed:0.00}; only equal amounts can be matched."));
         }
 
         bool alreadyTaken = await _db.Set<BankStatementLine>()
@@ -184,7 +193,7 @@ public sealed class BankReconciliationService : IBankReconciliationService
     }
 
     /// <inheritdoc />
-    public async Task<Result<BankReconciliationReport>> SignOffAsync(long companyId, long bankAccountId, DateOnly asAtDate, long userId, CancellationToken ct = default)
+    public async Task<Result<BankReconciliationReport>> SignOffAsync(long companyId, long bankAccountId, DateOnly asAtDate, decimal statementClosingBalance, long userId, CancellationToken ct = default)
     {
         Result<BankAccount> account = await LoadAccountAsync(companyId, bankAccountId, ct).ConfigureAwait(false);
         if (account.IsFailure)
@@ -203,15 +212,25 @@ public sealed class BankReconciliationService : IBankReconciliationService
             return report.Error;
         }
 
+        // The statement as the bank prints it: its closing balance must be the running balance of the lines imported (a line never
+        // imported, or imported twice, would otherwise reconcile the books to a statement that is not the bank's).
+        if (decimal.Round(statementClosingBalance, 2, MidpointRounding.ToEven) != decimal.Round(report.Value.StatementBalance, 2, MidpointRounding.ToEven))
+        {
+            return Error.Rule("Cb.StatementBalanceMismatch",
+                $"The statement closes at {statementClosingBalance:0.00} on {asAtDate:yyyy-MM-dd} but the imported statement lines run to {report.Value.StatementBalance:0.00} "
+                + $"(a difference of {statementClosingBalance - report.Value.StatementBalance:0.00}): a statement line is missing or imported twice.");
+        }
+
+        // Book balance - unpresented items + statement items not yet in the books = statement closing balance, to the cent.
         if (report.Value.UnmatchedStatementItems.Count > 0 || report.Value.Difference != 0m)
         {
             return Error.Rule("Cb.NotReconciled",
                 $"The reconciliation does not agree: {report.Value.UnmatchedStatementItems.Count} statement line(s) are not in the ledger and the difference is {report.Value.Difference:0.00}.");
         }
 
-        account.Value.SignOff(asAtDate, userId);
+        account.Value.SignOff(asAtDate, userId, statementClosingBalance);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
-        return report.Value;
+        return report.Value with { StatementClosingBalance = statementClosingBalance };
     }
 
     /// <inheritdoc />
@@ -308,6 +327,11 @@ public sealed class BankReconciliationService : IBankReconciliationService
             .Select(s => new ReconciliationItem(s.StatementDate, s.Description, s.Amount))
             .ToList();
 
-        return new BankReconciliationReport(account.Code, asAtDate, glBalance, statementBalance, unpresented, unmatchedStatement);
+        // Unpresented items long outstanding are flagged (a stale cheque, a deposit the bank never received) - a warning, not a refusal.
+        DateOnly staleBefore = asAtDate.AddDays(-BankReconciliationReport.StaleAfterDays);
+        return new BankReconciliationReport(account.Code, asAtDate, glBalance, statementBalance, unpresented, unmatchedStatement)
+        {
+            StaleUnpresentedItems = [.. unpresented.Where(i => i.Date < staleBefore)],
+        };
     }
 }

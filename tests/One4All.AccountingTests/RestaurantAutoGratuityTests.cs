@@ -68,7 +68,7 @@ public sealed class RestaurantAutoGratuityTests
 
             // Apply the quote as the service charge when billing the big party.
             var bill = await res.BillOrderAsync(companyId, bigOrderId, warehouseId, new DateOnly(2026, 3, 29), "1000",
-                serviceChargeAmount: bigQuote.Value.Amount, serviceChargeAccountCode: bigQuote.Value.ServiceChargeAccountCode);
+                serviceChargeAmount: bigQuote.Value.Amount, serviceChargeAccountCode: bigQuote.Value.ServiceChargeAccountCode, tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.ServiceCharge.Should().Be(20m);
             bill.Value.Gross.Should().Be(220m); // 200 + 20 gratuity

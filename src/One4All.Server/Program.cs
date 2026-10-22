@@ -889,8 +889,9 @@ api.MapPost("/api/banking/{bankAccountId:long}/statement/file", async (long comp
 .Accepts<string>("text/plain", "application/xml")
 .WithName("ImportStatementFile");
 
-api.MapPost("/api/banking/{bankAccountId:long}/reconciliation/sign-off", async (long bankAccountId, long companyId, DateOnly asAtDate, long userId, One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
-    ValueResponse(await banking.SignOffAsync(companyId, bankAccountId, asAtDate, userId, ct).ConfigureAwait(false)))
+api.MapPost("/api/banking/{bankAccountId:long}/reconciliation/sign-off", async (long bankAccountId, long companyId, DateOnly asAtDate, decimal statementClosingBalance, long userId,
+    One4All.Application.Abstractions.Banking.IBankReconciliationService banking, CancellationToken ct) =>
+    ValueResponse(await banking.SignOffAsync(companyId, bankAccountId, asAtDate, statementClosingBalance, userId, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("SignOffBankReconciliation");
 

@@ -47,10 +47,10 @@ public sealed class RestaurantDiscountTests
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
 
             // A discount bigger than the bill is refused.
-            (await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 25), "1000", discountAmount: 500m, discountAccountCode: "4700")).IsFailure.Should().BeTrue();
+            (await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 25), "1000", discountAmount: 500m, discountAccountCode: "4700", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsFailure.Should().BeTrue();
 
             // 20 off a 100 meal.
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 25), "1000", discountAmount: 20m, discountAccountCode: "4700");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 3, 25), "1000", discountAmount: 20m, discountAccountCode: "4700", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Net.Should().Be(100m);
             bill.Value.Discount.Should().Be(20m);

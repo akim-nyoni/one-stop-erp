@@ -141,13 +141,22 @@ public sealed class SplitBillRequest
 
 /// <summary>A till read (X mid-shift or Z end-of-shift).</summary>
 /// <param name="SaleCount">Number of sales.</param>
-/// <param name="TotalGross">Gross sales.</param>
+/// <param name="TotalGross">Gross sales, with the gross of the restaurant bills taken in the session.</param>
 /// <param name="TenderTotals">Gross per tender type.</param>
 /// <param name="ZReadNumber">The Z number (only on a Z-read/close).</param>
 public sealed record TillRead(int SaleCount, decimal TotalGross, IReadOnlyDictionary<TenderType, decimal> TenderTotals, int? ZReadNumber)
 {
-    /// <summary>Gets the tips taken with the shift's sales (in the tender totals, owed to staff).</summary>
+    /// <summary>Gets the tips taken with the shift's sales and restaurant bills (in the tender totals, owed to staff).</summary>
     public decimal Tips { get; init; }
+
+    /// <summary>Gets the number of restaurant bills whose cash went into this session (their gross is in <see cref="TotalGross"/>).</summary>
+    public int RestaurantBillCount { get; init; }
+
+    /// <summary>Gets the gross of the restaurant bills taken in this session.</summary>
+    public decimal RestaurantGross { get; init; }
+
+    /// <summary>Gets the cash taken for restaurant bills in this session (in the cash tender total and the expected cash).</summary>
+    public decimal RestaurantCash { get; init; }
 }
 
 /// <summary>A request to close a till with a cash-up (declared cash count).</summary>

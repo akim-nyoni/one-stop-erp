@@ -48,12 +48,13 @@ public sealed class BankWorkListTests
             (await recon.ImportStatementLinesAsync(companyId, bankAccountId,
             [
                 new StatementLineImport(new DateOnly(2026, 3, 3), "Deposit", 500m, "WL-DEP"),
-                new StatementLineImport(new DateOnly(2026, 3, 6), "Cheque (bank fee folded in)", -121m, "WL-CHQ"), // no exact amount: needs a manual match
+                new StatementLineImport(new DateOnly(2026, 3, 20), "Cheque presented late", -120m, "WL-CHQ"), // outside the auto-match window: needs a manual match
+                new StatementLineImport(new DateOnly(2026, 3, 20), "Bank fee", -1m, "WL-FEE"),
             ])).IsSuccess.Should().BeTrue();
             (await recon.AutoMatchAsync(companyId, bankAccountId)).Value.Should().Be(1);
 
             BankWorkList list = (await recon.WorkListAsync(companyId, bankAccountId, new DateOnly(2026, 3, 31))).Value;
-            list.StatementLines.Should().HaveCount(2);
+            list.StatementLines.Should().HaveCount(3);
             StatementWorkItem deposit = list.StatementLines.Single(s => s.Reference == "WL-DEP");
             deposit.MatchedJournalLineId.Should().NotBeNull();
             StatementWorkItem cheque = list.StatementLines.Single(s => s.Reference == "WL-CHQ");
@@ -61,7 +62,9 @@ public sealed class BankWorkListTests
             list.UnpresentedGlLines.Should().ContainSingle(g => g.DocumentNumber == "WL-CHQ" && g.Amount == -120m);
             GlWorkItem chequePosting = list.UnpresentedGlLines.Single();
 
-            // Operator matches the cheque by hand through the ids the work list gave them.
+            // A line of another amount cannot be matched to the cheque; the operator matches the cheque by hand through the ids the work list gave them.
+            StatementWorkItem fee = list.StatementLines.Single(s => s.Reference == "WL-FEE");
+            (await recon.MatchLineAsync(companyId, bankAccountId, fee.Id, chequePosting.Id)).Error.Code.Should().Be("Bank.AmountMismatch");
             (await recon.MatchLineAsync(companyId, bankAccountId, cheque.Id, chequePosting.Id)).IsSuccess.Should().BeTrue();
             BankWorkList after = (await recon.WorkListAsync(companyId, bankAccountId, new DateOnly(2026, 3, 31))).Value;
             after.UnpresentedGlLines.Should().BeEmpty();

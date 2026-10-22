@@ -32,10 +32,20 @@ public sealed class RestaurantBillReversalTests
         long menuId;
         long orderId;
         long billId;
+        long supervisorId;
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             companyId = await Scenario.SeedAsync(db);
+            Core.Security.Role supervisors = new($"Bill reversers {companyId}");
+            supervisors.Grant("Pos.Restaurant", Core.Security.OperationFlags.VoidReverse);
+            db.Roles.Add(supervisors);
+            await db.SaveChangesAsync();
+            Core.Security.User supervisor = new($"br-super-{companyId}", "Bill Supervisor");
+            supervisor.AssignRole(supervisors.Id);
+            db.Users.Add(supervisor);
+            await db.SaveChangesAsync();
+            supervisorId = supervisor.Id;
             Item steak = new(companyId, "BR-STEAK", "Steak meat") { CostOfSalesAccountCode = "5000", RevenueAccountCode = "4000" };
             db.Items.Add(steak);
             Warehouse wh = new(companyId, "BRKIT", "Kitchen");
@@ -53,7 +63,7 @@ public sealed class RestaurantBillReversalTests
             orderId = (await res.OpenOrderAsync(companyId, tableId, "BR-ORD-1", Waiter, new DateOnly(2026, 4, 18))).Value;
             await res.AddItemAsync(companyId, orderId, menuId, 1m, taxAmount: 15m);
 
-            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 18), "1000", "2200");
+            var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 18), "1000", "2200", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Gross.Should().Be(105m);
             bill.Value.CostOfSales.Should().Be(12m);
@@ -72,10 +82,10 @@ public sealed class RestaurantBillReversalTests
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
 
-            (await res.ReverseBillAsync(companyId, billId, new DateOnly(2026, 4, 19), "  ")).IsFailure.Should().BeTrue(); // reason required
-            (await res.ReverseBillAsync(companyId, billId, new DateOnly(2026, 4, 19), "Rung on wrong table")).IsSuccess.Should().BeTrue();
+            (await res.ReverseBillAsync(companyId, billId, new DateOnly(2026, 4, 19), "  ", Waiter, supervisorId)).IsFailure.Should().BeTrue(); // reason required
+            (await res.ReverseBillAsync(companyId, billId, new DateOnly(2026, 4, 19), "Rung on wrong table", Waiter, supervisorId)).IsSuccess.Should().BeTrue();
             // Cannot reverse twice.
-            (await res.ReverseBillAsync(companyId, billId, new DateOnly(2026, 4, 19), "again")).IsFailure.Should().BeTrue();
+            (await res.ReverseBillAsync(companyId, billId, new DateOnly(2026, 4, 19), "again", Waiter, supervisorId)).IsFailure.Should().BeTrue();
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

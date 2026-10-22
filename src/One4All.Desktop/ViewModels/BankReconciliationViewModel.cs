@@ -206,16 +206,24 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
     [ObservableProperty]
     private bool _isReconciled;
 
+    /// <summary>The closing balance printed on the bank statement at the as-at date, keyed for the sign-off.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SignOffCommand))]
+    private string _statementClosingBalance = string.Empty;
+
     /// <summary>A status line.</summary>
     [ObservableProperty]
     private string _statusMessage = "Loading…";
 
     /// <summary>True while working.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(ApplyRulesCommand), nameof(MatchCommand), nameof(UnmatchCommand), nameof(PostLineCommand))]
+    [NotifyCanExecuteChangedFor(nameof(LoadCommand), nameof(AutoMatchCommand), nameof(ApplyRulesCommand), nameof(MatchCommand), nameof(UnmatchCommand), nameof(PostLineCommand),
+        nameof(SignOffCommand))]
     private bool _isBusy;
 
     private bool CanLoad => SelectedBank is not null && !IsBusy;
+
+    private bool CanSignOff => CanLoad && !string.IsNullOrWhiteSpace(StatementClosingBalance);
 
     private bool CanMatch => SelectedStatementLine is { IsMatched: false } && SelectedGlLine is not null && !IsBusy;
 
@@ -368,6 +376,40 @@ public sealed partial class BankReconciliationViewModel : ObservableObject
         return s is null || g is null
             ? Task.CompletedTask
             : ActAsync((recon, bank) => recon.MatchLineAsync(_companyId, bank.Id, s.Id, g.Id), $"Matched statement line {s.Date} {s.Amount} to {g.Journal}.");
+    }
+
+    /// <summary>
+    /// Signs the reconciliation off as at the date against the statement's closing balance: refused unless the imported lines run to that
+    /// balance and the books reconcile to it; stale unpresented items are reported as a warning. Then reloads.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [RelayCommand(CanExecute = nameof(CanSignOff))]
+    public Task SignOffAsync()
+    {
+        if (!decimal.TryParse(StatementClosingBalance, NumberStyles.Number, CultureInfo.CurrentCulture, out decimal closing))
+        {
+            StatusMessage = "Key the statement's closing balance as a number.";
+            return Task.CompletedTask;
+        }
+
+        DateOnly asAt = DateOnly.FromDateTime(AsAt);
+        string summary = string.Empty;
+        return ActAsync(async (recon, bank) =>
+        {
+            await using AsyncServiceScope scope = _services.CreateAsyncScope();
+            long userId = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Security.ICurrentUser>().UserId ?? 0;
+            Result<BankReconciliationReport> signed = await recon.SignOffAsync(_companyId, bank.Id, asAt, closing, userId).ConfigureAwait(true);
+            if (signed.IsFailure)
+            {
+                return Result.Failure(signed.Error);
+            }
+
+            summary = $"Signed off as at {asAt:yyyy-MM-dd} at a statement balance of {Money(closing)}."
+                + (signed.Value.StaleUnpresentedItems.Count > 0
+                    ? $" Warning: {signed.Value.StaleUnpresentedItems.Count} unpresented item(s) are over {BankReconciliationReport.StaleAfterDays} days old - follow them up."
+                    : string.Empty);
+            return Result.Success();
+        }, () => summary);
     }
 
     /// <summary>Unmatches the selected statement line, then reloads.</summary>

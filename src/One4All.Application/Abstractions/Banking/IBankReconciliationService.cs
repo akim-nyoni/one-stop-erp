@@ -29,6 +29,18 @@ public sealed record BankReconciliationReport(
     /// <summary>The residual difference after accounting for the unreconciled items (should be zero when fully reconciled).</summary>
     public decimal Difference =>
         StatementBalance - GlBalance + UnpresentedGlItems.Sum(i => i.Amount) - UnmatchedStatementItems.Sum(i => i.Amount);
+
+    /// <summary>Gets the bank statement's closing balance given at sign-off (null on a plain reconciliation view).</summary>
+    public decimal? StatementClosingBalance { get; init; }
+
+    /// <summary>
+    /// Gets the unpresented cash-book items older than <see cref="StaleAfterDays"/> days at the as-at date: a warning (a cheque never
+    /// presented, a deposit the bank never received), not a reason to refuse the sign-off.
+    /// </summary>
+    public IReadOnlyList<ReconciliationItem> StaleUnpresentedItems { get; init; } = [];
+
+    /// <summary>The age in days after which an unpresented item is flagged as stale.</summary>
+    public const int StaleAfterDays = 90;
 }
 
 /// <summary>One bank account on the cash-position report.</summary>
@@ -167,9 +179,13 @@ public interface IBankReconciliationService
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="bankAccountId">The bank account.</param>
-    /// <param name="asAtDate">The date reconciled to; after any earlier sign-off.</param>
+    /// <param name="asAtDate">The date reconciled to (the statement's closing date); after any earlier sign-off.</param>
+    /// <param name="statementClosingBalance">
+    /// The closing balance printed on the bank statement at that date. It must equal the running balance of the imported statement lines
+    /// (so a line never imported, or imported twice, shows up), and the cash book plus the unpresented items must reconcile to it.
+    /// </param>
     /// <param name="userId">Who signs it off.</param>
     /// <param name="ct">Cancellation token.</param>
-    /// <returns>The reconciliation signed off, or why it cannot be.</returns>
-    Task<Result<BankReconciliationReport>> SignOffAsync(long companyId, long bankAccountId, DateOnly asAtDate, long userId, CancellationToken ct = default);
+    /// <returns>The reconciliation signed off (with any stale unpresented items flagged), or why it cannot be.</returns>
+    Task<Result<BankReconciliationReport>> SignOffAsync(long companyId, long bankAccountId, DateOnly asAtDate, decimal statementClosingBalance, long userId, CancellationToken ct = default);
 }

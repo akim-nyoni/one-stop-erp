@@ -1339,9 +1339,11 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Bank statement import and sign-off", ListTitle = "Bank accounts",
             Description = "Import the bank's statement file (CSV, MT940, CAMT.053 or OFX) into the account's unreconciled lines, or sign the reconciliation off as at a date: "
-                + "it must balance, and once signed the period's matched items are locked against change.",
+                + "the statement's closing balance must equal the imported lines' running balance and the books must reconcile to it, and once signed the period's "
+                + "matched items are locked against change. Unpresented items over 90 days old are flagged.",
             Fields = [Pick("Step", "Step", ["Import", "Sign off"]), Req("Bank", "Bank account code"), Opt("File", "Statement file (full path)"),
-                Pick("Format", "File format", Enum.GetNames<Application.Banking.StatementFileFormat>()), Today("AsAt", "Sign off as at")],
+                Pick("Format", "File format", Enum.GetNames<Application.Banking.StatementFileFormat>()), Today("AsAt", "Sign off as at (statement date)"),
+                OptNum("Closing", "Statement closing balance (sign off)")],
             Run = async (c, i) =>
             {
                 Application.Abstractions.Banking.IBankReconciliationService bank = c.Get<Application.Abstractions.Banking.IBankReconciliationService>();
@@ -1359,9 +1361,13 @@ public static partial class OperationCatalogue
                     return $"{imported} statement line(s) imported (lines already imported are skipped).";
                 }
 
-                Application.Abstractions.Banking.BankReconciliationReport report = Check(await bank.SignOffAsync(c.CompanyId, account, i.Date("AsAt"), c.UserId).ConfigureAwait(true));
+                decimal closing = i.OptionalNumber("Closing") ?? throw new OperationException("Give the closing balance printed on the bank statement.");
+                Application.Abstractions.Banking.BankReconciliationReport report = Check(await bank.SignOffAsync(c.CompanyId, account, i.Date("AsAt"), closing, c.UserId).ConfigureAwait(true));
                 return $"Reconciliation of {report.BankAccountCode} signed off as at {D(report.AsAtDate)}: ledger {M(report.GlBalance)}, statement {M(report.StatementBalance)}, "
-                    + $"{report.UnpresentedGlItems.Count} unpresented and {report.UnmatchedStatementItems.Count} unmatched item(s).";
+                    + $"{report.UnpresentedGlItems.Count} unpresented and {report.UnmatchedStatementItems.Count} unmatched item(s)."
+                    + (report.StaleUnpresentedItems.Count > 0
+                        ? $" Warning: {report.StaleUnpresentedItems.Count} unpresented item(s) are over {Application.Abstractions.Banking.BankReconciliationReport.StaleAfterDays} days old - follow them up."
+                        : string.Empty);
             },
             List = async c => Table(await c.Db.BankAccounts.AsNoTracking().Where(b => b.CompanyId == c.CompanyId).OrderBy(b => b.Code).ToListAsync().ConfigureAwait(true),
                 ("Bank", b => b.Code), ("Name", b => b.Name), ("Currency", b => b.Currency), ("Ledger account", b => b.GlAccountCode)),

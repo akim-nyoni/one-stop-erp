@@ -21,6 +21,7 @@ public sealed class RestaurantService : IRestaurantService
     private readonly IInventoryService _inventory;
     private readonly Application.Abstractions.Trading.ISalesLedgerService _sales;
     private readonly Application.Abstractions.Vouchers.IVoucherService _vouchers;
+    private readonly Application.Abstractions.Security.IPermissionService? _permissions;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
@@ -28,8 +29,11 @@ public sealed class RestaurantService : IRestaurantService
     /// <param name="inventory">The inventory service (recipe explosion → stock issues).</param>
     /// <param name="sales">The sales ledger (house-account / charge-to-room billing).</param>
     /// <param name="vouchers">The voucher service (gift-card tender).</param>
-    public RestaurantService(One4AllDbContext db, IPostingEngine posting, IInventoryService inventory, Application.Abstractions.Trading.ISalesLedgerService sales, Application.Abstractions.Vouchers.IVoucherService vouchers)
+    /// <param name="permissions">The permission service (a supervisor's right to void fired food or reverse a bill).</param>
+    public RestaurantService(One4AllDbContext db, IPostingEngine posting, IInventoryService inventory, Application.Abstractions.Trading.ISalesLedgerService sales, Application.Abstractions.Vouchers.IVoucherService vouchers,
+        Application.Abstractions.Security.IPermissionService? permissions = null)
     {
+        _permissions = permissions;
         _db = db;
         _posting = posting;
         _inventory = inventory;
@@ -262,10 +266,12 @@ public sealed class RestaurantService : IRestaurantService
 
     /// <inheritdoc />
     public Task<Result<decimal>> RecordWastageAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct = default)
-        => _db.AtomicAsync(() => RecordWastageCoreAsync(companyId, itemId, warehouseId, date, quantity, wastageAccountCode, reason, ct), ct);
+        => _db.AtomicAsync(() => RecordWastageCoreAsync(companyId, itemId, warehouseId, date, quantity, wastageAccountCode, reason, allowNegative: false, ct), ct);
 
     // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<decimal>> RecordWastageCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, CancellationToken ct)
+    // allowNegative: a dish already fired was made from what the kitchen had, so its write-off issues like billing does (wastage counted at the shelf passes false).
+    private async Task<Result<decimal>> RecordWastageCoreAsync(long companyId, long itemId, long warehouseId, DateOnly date, decimal quantity, string wastageAccountCode, string reason, bool allowNegative,
+        CancellationToken ct)
     {
         if (quantity <= 0m)
         {
@@ -300,7 +306,7 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         // Issue the stock (Dr cost of sales / Cr stock at moving average); wastage of stock you do not have is refused.
-        Result<StockMovementResult> issue = await IssueAsync(companyId, itemId, warehouseId, date, quantity, $"WASTE:{reason}", ct, allowNegative: false).ConfigureAwait(false);
+        Result<StockMovementResult> issue = await IssueAsync(companyId, itemId, warehouseId, date, quantity, $"WASTE:{reason}", ct, allowNegative).ConfigureAwait(false);
         if (issue.IsFailure)
         {
             return issue.Error;
@@ -378,11 +384,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => BillOrderCoreAsync(companyId, orderId, warehouseId, date, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+    public Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillOrderCoreAsync(companyId, orderId, warehouseId, date, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, tillSessionId, ct), ct);
 
     // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<BillResult>> BillOrderCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> BillOrderCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, long? tillSessionId, CancellationToken ct)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -401,15 +407,15 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.NothingToBill", "The order has nothing left to bill.");
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct, tillSessionId: tillSessionId, cashIntoTill: true).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => BillWithTendersCoreAsync(companyId, orderId, warehouseId, date, tenders, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+    public Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillWithTendersCoreAsync(companyId, orderId, warehouseId, date, tenders, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, tillSessionId, ct), ct);
 
     // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<BillResult>> BillWithTendersCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> BillWithTendersCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, long? tillSessionId, CancellationToken ct)
     {
         if (tenders.Count == 0)
         {
@@ -438,15 +444,15 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         // The first tender account is only a fallback label; PostBillAsync uses the tender list for the debits.
-        return await PostBillAsync(companyId, order, warehouseId, date, portions, tenders[0].AccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct, tenders).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, tenders[0].AccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct, tenders, tillSessionId, cashIntoTill: true).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => BillPartialCoreAsync(companyId, orderId, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+    public Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillPartialCoreAsync(companyId, orderId, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, tillSessionId, ct), ct);
 
     // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<BillResult>> BillPartialCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> BillPartialCoreAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, long? tillSessionId, CancellationToken ct)
     {
         if (portions.Count == 0)
         {
@@ -482,7 +488,7 @@ public sealed class RestaurantService : IRestaurantService
             resolved.Add((line, portion.Quantity));
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, resolved, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct, tillSessionId: tillSessionId, cashIntoTill: true).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -516,11 +522,11 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => BillSeatCoreAsync(companyId, orderId, seatNumber, warehouseId, date, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct), ct);
+    public Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => BillSeatCoreAsync(companyId, orderId, seatNumber, warehouseId, date, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, tillSessionId, ct), ct);
 
     // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<BillResult>> BillSeatCoreAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct)
+    private async Task<Result<BillResult>> BillSeatCoreAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, long? tillSessionId, CancellationToken ct)
     {
         Result<TableOrder> loaded = await LoadOpenOrderAsync(companyId, orderId, ct).ConfigureAwait(false);
         if (loaded.IsFailure)
@@ -538,7 +544,7 @@ public sealed class RestaurantService : IRestaurantService
             return Error.Rule("Res.NothingForSeat", $"Seat {seatNumber} has nothing left to bill.");
         }
 
-        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct).ConfigureAwait(false);
+        return await PostBillAsync(companyId, order, warehouseId, date, portions, cashAccountCode, taxAccountCode, serviceChargeAmount, serviceChargeAccountCode, tipAmount, tipsPayableAccountCode, discountAmount, discountAccountCode, ct, tillSessionId: tillSessionId, cashIntoTill: true).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -611,15 +617,21 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ReverseBillCoreAsync(companyId, billId, date, reason, ct), ct);
+    public Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseBillCoreAsync(companyId, billId, date, reason, operatorUserId, authorisedByUserId, ct), ct);
 
     // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<string>> ReverseBillCoreAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct)
+    private async Task<Result<string>> ReverseBillCoreAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
             return Error.Validation("Res.ReasonRequired", "Reversing a bill requires a reason.");
+        }
+
+        Result authorised = await SupervisorAsync(authorisedByUserId, operatorUserId, "Reversing a bill", ct).ConfigureAwait(false);
+        if (authorised.IsFailure)
+        {
+            return authorised.Error;
         }
 
         RestaurantBill? bill = await _db.Set<RestaurantBill>().Include(b => b.Postings).Include(b => b.Issues)
@@ -678,7 +690,7 @@ public sealed class RestaurantService : IRestaurantService
             }
         }
 
-        bill.MarkReversed(date, reversalJournal);
+        bill.MarkReversed(date, reversalJournal, authorisedByUserId);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return reversalJournal;
     }
@@ -800,6 +812,90 @@ public sealed class RestaurantService : IRestaurantService
         return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
     }
 
+    // The cash of a bill is taken in an open session of a till of the company: never in none, nor in one already cashed up (its count and Z are done).
+    private async Task<Result> OpenTillSessionAsync(long companyId, long? tillSessionId, CancellationToken ct)
+    {
+        if (tillSessionId is not long sessionId)
+        {
+            return Result.Failure(Error.Rule("Res.TillSessionRequired", "Cash for a bill is taken into a till: open a till session and bill from it."));
+        }
+
+        Core.Pos.TillSession? session = await _db.Set<Core.Pos.TillSession>().AsNoTracking().FirstOrDefaultAsync(s => s.Id == sessionId && s.CompanyId == companyId, ct).ConfigureAwait(false);
+        if (session is null)
+        {
+            return Result.Failure(Error.Rule("Res.TillSessionNotFound", $"Till session {sessionId} is not a till session of this company."));
+        }
+
+        return session.Status != Core.Pos.TillSessionStatus.Open
+            ? Result.Failure(Error.Rule("Res.TillSessionClosed", $"Till session {sessionId} has been cashed up; take the cash in an open session."))
+            : Result.Success();
+    }
+
+    // A supervisor's word stands only from someone other than the person asking, holding the restaurant void / reverse right.
+    private async Task<Result> SupervisorAsync(long? authorisedByUserId, long requesterUserId, string what, CancellationToken ct)
+    {
+        if (authorisedByUserId is not long supervisor)
+        {
+            return Result.Failure(Error.Forbidden("Res.SupervisorRequired", $"{what} needs a supervisor's authority."));
+        }
+
+        if (supervisor == requesterUserId)
+        {
+            return Result.Failure(Error.Forbidden("Res.SupervisorRequired", $"{what} must be authorised by someone else."));
+        }
+
+        if (_permissions is null
+            || !(await _permissions.ResolveAsync(supervisor, ct).ConfigureAwait(false)).Has("Pos.Restaurant", Core.Security.OperationFlags.VoidReverse))
+        {
+            return Result.Failure(Error.Forbidden("Res.SupervisorRequired", $"User {supervisor} may not authorise this: it needs the restaurant void / reverse right (Pos.Restaurant)."));
+        }
+
+        return Result.Success();
+    }
+
+    // Writes off the ingredients of food the kitchen already made (recipe and modifier ingredients) as kitchen wastage.
+    private async Task<Result> WriteOffFiredAsync(long companyId, TableOrder order, IEnumerable<(TableOrderLine Line, decimal Quantity)> fired, KitchenWastage? wastage, string reason, CancellationToken ct)
+    {
+        List<(TableOrderLine Line, decimal Quantity)> made = [.. fired.Where(f => f.Quantity > 0m)];
+        if (made.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        List<long> menuIds = [.. made.Select(m => m.Line.MenuItemId).Distinct()];
+        Dictionary<long, IReadOnlyList<RecipeLine>> recipes = (await _db.Set<MenuItem>().Include(m => m.Recipe)
+            .Where(m => m.CompanyId == companyId && menuIds.Contains(m.Id)).ToListAsync(ct).ConfigureAwait(false)).ToDictionary(m => m.Id, m => m.Recipe);
+        List<(TableOrderLine Line, long ItemId, decimal Quantity)> ingredients = [];
+        foreach ((TableOrderLine line, decimal quantity) in made)
+        {
+            ingredients.AddRange((recipes.GetValueOrDefault(line.MenuItemId) ?? []).Select(r => (line, r.IngredientItemId, r.Quantity * quantity)));
+            ingredients.AddRange(line.Modifiers.Where(m => m.IngredientItemId is not null && m.IngredientQuantity > 0m).Select(m => (line, m.IngredientItemId!.Value, m.IngredientQuantity * quantity)));
+        }
+
+        // A dish with no stocked ingredients has nothing to write off.
+        if (ingredients.Count == 0)
+        {
+            return Result.Success();
+        }
+
+        if (wastage is not KitchenWastage where || where.WarehouseId <= 0 || string.IsNullOrWhiteSpace(where.WastageAccountCode))
+        {
+            return Result.Failure(Error.Validation("Res.WastageRequired", "Food already fired to the kitchen is written off as wastage: give the kitchen warehouse and the wastage account."));
+        }
+
+        foreach ((TableOrderLine line, long itemId, decimal itemQuantity) in ingredients)
+        {
+            Result<decimal> wasted = await RecordWastageCoreAsync(companyId, itemId, where.WarehouseId, where.Date, itemQuantity, where.WastageAccountCode.Trim(),
+                $"{order.OrderNumber} {line.Description}: {reason.Trim()}", allowNegative: true, ct).ConfigureAwait(false);
+            if (wasted.IsFailure)
+            {
+                return Result.Failure(wasted.Error);
+            }
+        }
+
+        return Result.Success();
+    }
+
     private async Task<Result<TableOrder>> LoadOpenOrderAsync(long companyId, long orderId, CancellationToken ct)
     {
         TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
@@ -821,7 +917,8 @@ public sealed class RestaurantService : IRestaurantService
         return order;
     }
 
-    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct, IReadOnlyList<TenderLine>? tenders = null)
+    private async Task<Result<BillResult>> PostBillAsync(long companyId, TableOrder order, long warehouseId, DateOnly date, List<(TableOrderLine Line, decimal Quantity)> portions, string cashAccountCode, string? taxAccountCode, decimal serviceChargeAmount, string? serviceChargeAccountCode, decimal tipAmount, string? tipsPayableAccountCode, decimal discountAmount, string? discountAccountCode, CancellationToken ct, IReadOnlyList<TenderLine>? tenders = null,
+        long? tillSessionId = null, bool cashIntoTill = false)
     {
         if (serviceChargeAmount < 0m || tipAmount < 0m || discountAmount < 0m)
         {
@@ -879,6 +976,17 @@ public sealed class RestaurantService : IRestaurantService
         if (tenders is not null && decimal.Round(tenders.Sum(t => t.Amount), 4, MidpointRounding.ToEven) != decimal.Round(gross, 4, MidpointRounding.ToEven))
         {
             return Error.Rule("Res.TendersMismatch", $"The tenders ({tenders.Sum(t => t.Amount):0.00}) do not sum to the bill gross ({gross:0.00}).");
+        }
+
+        // Cash taken for a bill goes into an open till session's drawer (like a till sale), so the X/Z read and the cash-up count it.
+        decimal cashTaken = !cashIntoTill ? 0m : tenders is null ? Math.Max(gross, 0m) : tenders.Where(t => t.Type == Core.Pos.TenderType.Cash).Sum(t => t.Amount);
+        if (cashTaken > 0m)
+        {
+            Result tillOpen = await OpenTillSessionAsync(companyId, tillSessionId, ct).ConfigureAwait(false);
+            if (tillOpen.IsFailure)
+            {
+                return tillOpen.Error;
+            }
         }
 
         // Post the guest's charge only when there is one (a fully-comped/-discounted bill charges nothing but still costs).
@@ -956,6 +1064,11 @@ public sealed class RestaurantService : IRestaurantService
         foreach (long movementId in cost.Value.MovementIds)
         {
             billRecord.AddIssue(movementId);
+        }
+
+        if (cashTaken > 0m)
+        {
+            billRecord.TakeIntoTill(tillSessionId!.Value, cashTaken);
         }
 
         _db.Set<RestaurantBill>().Add(billRecord);
@@ -1046,21 +1159,22 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default)
-        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: false, authorizedByUserId, ct).ConfigureAwait(false);
+    public Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, KitchenWastage? wastage = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => MarkLineAsync(companyId, orderId, lineId, reason, comp: false, authorizedByUserId, wastage, ct), ct);
 
     /// <inheritdoc />
     public async Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default)
-        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: true, authorizedByUserId, ct).ConfigureAwait(false);
+        => await MarkLineAsync(companyId, orderId, lineId, reason, comp: true, authorizedByUserId, null, ct).ConfigureAwait(false);
 
-    private async Task<Result> MarkLineAsync(long companyId, long orderId, long lineId, string reason, bool comp, long? authorizedByUserId, CancellationToken ct)
+    // A void of a line the kitchen has already made is a loss, not a correction: a supervisor authorises it and its ingredients are written off as wastage (one unit of work).
+    private async Task<Result> MarkLineAsync(long companyId, long orderId, long lineId, string reason, bool comp, long? authorizedByUserId, KitchenWastage? wastage, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
             return Result.Failure(Error.Validation("Res.ReasonRequired", $"A {(comp ? "comp" : "void")} requires a reason."));
         }
 
-        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
         if (order is null)
         {
             return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
@@ -1093,6 +1207,21 @@ public sealed class RestaurantService : IRestaurantService
         }
         else
         {
+            if (line.Fired)
+            {
+                Result authorised = await SupervisorAsync(authorizedByUserId, order.WaiterUserId, $"Voiding '{line.Description}' (already fired to the kitchen)", ct).ConfigureAwait(false);
+                if (authorised.IsFailure)
+                {
+                    return authorised;
+                }
+
+                Result written = await WriteOffFiredAsync(companyId, order, [(line, line.RemainingQuantity)], wastage, reason, ct).ConfigureAwait(false);
+                if (written.IsFailure)
+                {
+                    return written;
+                }
+            }
+
             line.Void(reason, authorizedByUserId);
         }
 
@@ -1101,14 +1230,18 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public async Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, CancellationToken ct = default)
+    public Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, long? authorisedByUserId = null, KitchenWastage? wastage = null, CancellationToken ct = default)
+        => _db.AtomicAsync(() => CancelOrderCoreAsync(companyId, orderId, reason, authorisedByUserId, wastage, ct), ct);
+
+    // One unit of work: the fired food's wastage and the cancelled order commit together or not at all.
+    private async Task<Result> CancelOrderCoreAsync(long companyId, long orderId, string reason, long? authorisedByUserId, KitchenWastage? wastage, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
             return Result.Failure(Error.Validation("Res.ReasonRequired", "Cancelling an order requires a reason."));
         }
 
-        TableOrder? order = await _db.Set<TableOrder>().FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
+        TableOrder? order = await _db.Set<TableOrder>().Include(o => o.Lines).ThenInclude(l => l.Modifiers).FirstOrDefaultAsync(o => o.Id == orderId && o.CompanyId == companyId, ct).ConfigureAwait(false);
         if (order is null)
         {
             return Result.Failure(Error.NotFound("Res.OrderNotFound", $"Order {orderId} not found."));
@@ -1119,7 +1252,24 @@ public sealed class RestaurantService : IRestaurantService
             return Result.Failure(Error.Rule("Res.OrderNotOpen", "Only an open order can be cancelled."));
         }
 
-        order.Cancel();
+        // Food the kitchen has already made and nobody paid for is a loss: a supervisor authorises it and it is written off as wastage.
+        List<(TableOrderLine Line, decimal Quantity)> made = [.. order.Lines.Where(l => l.Fired && !l.IsVoided && l.RemainingQuantity > 0m).Select(l => (l, l.RemainingQuantity))];
+        if (made.Count > 0)
+        {
+            Result authorised = await SupervisorAsync(authorisedByUserId, order.WaiterUserId, $"Cancelling order {order.OrderNumber} (food already fired to the kitchen)", ct).ConfigureAwait(false);
+            if (authorised.IsFailure)
+            {
+                return authorised;
+            }
+
+            Result written = await WriteOffFiredAsync(companyId, order, made, wastage, reason, ct).ConfigureAwait(false);
+            if (written.IsFailure)
+            {
+                return written;
+            }
+        }
+
+        order.Cancel(made.Count > 0 ? authorisedByUserId : null);
         if (order.TableId is { } tableId)
         {
             RestaurantTable? table = await _db.Set<RestaurantTable>().FirstOrDefaultAsync(t => t.Id == tableId, ct).ConfigureAwait(false);
@@ -1230,7 +1380,7 @@ public sealed class RestaurantService : IRestaurantService
         }
 
         // Nothing billed on it: the merged-away tab closes and its table is free again; a part-billed tab stays to settle its billed part.
-        if (from.Lines.All(l => l.BilledQuantity == 0m))
+        if (from.Lines.All(l => l.BilledQuantity == 0m) && !from.Lines.Any(l => l.Fired && !l.IsVoided && l.RemainingQuantity > 0m))
         {
             from.Cancel();
             if (from.TableId is long tableId && tableId != into.TableId)

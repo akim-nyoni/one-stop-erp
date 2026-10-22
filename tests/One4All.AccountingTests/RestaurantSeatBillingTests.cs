@@ -57,13 +57,13 @@ public sealed class RestaurantSeatBillingTests
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
 
             // Bill seat 1 → 130, order not fully billed yet.
-            var seat1 = await res.BillSeatAsync(companyId, orderId, 1, warehouseId, new DateOnly(2026, 3, 27), "1000");
+            var seat1 = await res.BillSeatAsync(companyId, orderId, 1, warehouseId, new DateOnly(2026, 3, 27), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             seat1.IsSuccess.Should().BeTrue(seat1.IsFailure ? seat1.Error.ToString() : null);
             seat1.Value.Net.Should().Be(130m);
             seat1.Value.FullyBilled.Should().BeFalse();
 
             // Re-billing seat 1 → nothing left for that seat.
-            (await res.BillSeatAsync(companyId, orderId, 1, warehouseId, new DateOnly(2026, 3, 27), "1000")).IsFailure.Should().BeTrue();
+            (await res.BillSeatAsync(companyId, orderId, 1, warehouseId, new DateOnly(2026, 3, 27), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsFailure.Should().BeTrue();
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
@@ -73,7 +73,7 @@ public sealed class RestaurantSeatBillingTests
 
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
             // Bill seat 2 → 30, now fully billed and the table frees.
-            var seat2 = await res.BillSeatAsync(companyId, orderId, 2, warehouseId, new DateOnly(2026, 3, 27), "1000");
+            var seat2 = await res.BillSeatAsync(companyId, orderId, 2, warehouseId, new DateOnly(2026, 3, 27), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             seat2.IsSuccess.Should().BeTrue(seat2.IsFailure ? seat2.Error.ToString() : null);
             seat2.Value.Net.Should().Be(30m);
             seat2.Value.FullyBilled.Should().BeTrue();

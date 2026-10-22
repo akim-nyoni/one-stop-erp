@@ -85,6 +85,11 @@
         <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#D9E0D9" BorderThickness="1" CornerRadius="6" Padding="12,8" Margin="6,6,6,0">
             <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <TextBlock Text="Statement closing balance" Style="{StaticResource TileLabel}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBox Text="{Binding StatementClosingBalance, UpdateSourceTrigger=PropertyChanged}" Width="110" Padding="6,4" TextAlignment="Right"
+                             ToolTip="The closing balance printed on the bank statement at the as-at date: the imported lines must run to it and the books must reconcile to it." />
+                    <Button Content="Sign off" Style="{StaticResource ActionButton}" Command="{Binding SignOffCommand}" Margin="6,0,18,0"
+                            ToolTip="Locks the reconciliation to the as-at date once it agrees with the statement's closing balance." />
                     <Button Content="Unmatch" Style="{StaticResource ActionButton}" Command="{Binding UnmatchCommand}" />
                     <Button Content="Match selected" Style="{StaticResource ActionButton}" FontWeight="SemiBold" Background="#DDEFE0" Command="{Binding MatchCommand}" />
                 </StackPanel>

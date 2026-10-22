@@ -50,7 +50,7 @@ public sealed class RestaurantBillsTests
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
             // Bill with a 12 service charge and 8 discount.
             var bill = await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 14), "1000",
-                taxAccountCode: "2200", serviceChargeAmount: 12m, serviceChargeAccountCode: "4600", discountAmount: 8m, discountAccountCode: "4700");
+                taxAccountCode: "2200", serviceChargeAmount: 12m, serviceChargeAccountCode: "4600", discountAmount: 8m, discountAccountCode: "4700", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             bill.IsSuccess.Should().BeTrue(bill.IsFailure ? bill.Error.ToString() : null);
             bill.Value.Gross.Should().Be(119m); // 100 + 15 + 12 - 8
         }

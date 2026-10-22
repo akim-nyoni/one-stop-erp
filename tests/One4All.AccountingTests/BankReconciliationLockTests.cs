@@ -63,7 +63,7 @@ public sealed class BankReconciliationLockTests
         (await banking.AutoMatchAsync(companyId, bank.Id)).Value.Should().Be(1);
 
         DateOnly march = new(2026, 3, 31);
-        (await banking.SignOffAsync(companyId, bank.Id, march, 7)).Value.Difference.Should().Be(0m);
+        (await banking.SignOffAsync(companyId, bank.Id, march, 250m, 7)).Value.Difference.Should().Be(0m);
         (await db.Set<BankAccount>().AsNoTracking().SingleAsync(b => b.Id == bank.Id)).ReconciledTo.Should().Be(march);
 
         (await Deposit(new DateOnly(2026, 3, 20), 40m)).Error.Code.Should().Be("Posting.BankReconciled");
@@ -72,9 +72,11 @@ public sealed class BankReconciliationLockTests
         (await banking.ImportStatementLinesAsync(companyId, bank.Id, [new StatementLineImport(new DateOnly(2026, 3, 30), "Late charge", -5m, null)])).Error.Code.Should().Be("Cb.ReconciledLocked");
         long matched = await db.Set<BankStatementLine>().Where(l => l.BankAccountId == bank.Id && l.IsReconciled).Select(l => l.Id).SingleAsync();
         (await banking.UnmatchLineAsync(companyId, matched)).Error.Code.Should().Be("Cb.ReconciledLocked");
-        (await banking.SignOffAsync(companyId, bank.Id, march, 7)).Error.Code.Should().Be("Cb.AlreadyReconciled");
+        (await banking.SignOffAsync(companyId, bank.Id, march, 250m, 7)).Error.Code.Should().Be("Cb.AlreadyReconciled");
 
         (await banking.ImportStatementLinesAsync(companyId, bank.Id, [new StatementLineImport(new DateOnly(2026, 4, 3), "Bank charges", -10m, null)])).IsSuccess.Should().BeTrue();
-        (await banking.SignOffAsync(companyId, bank.Id, new DateOnly(2026, 4, 30), 7)).Error.Code.Should().Be("Cb.NotReconciled");
+        // The statement closes April at 240: given anything else the lines imported do not add up to the bank's statement.
+        (await banking.SignOffAsync(companyId, bank.Id, new DateOnly(2026, 4, 30), 250m, 7)).Error.Code.Should().Be("Cb.StatementBalanceMismatch");
+        (await banking.SignOffAsync(companyId, bank.Id, new DateOnly(2026, 4, 30), 240m, 7)).Error.Code.Should().Be("Cb.NotReconciled");
     }
 }

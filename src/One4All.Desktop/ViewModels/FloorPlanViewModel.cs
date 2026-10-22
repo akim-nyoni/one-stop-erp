@@ -254,8 +254,14 @@ public sealed partial class FloorPlanViewModel : ObservableObject
         One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
         string code = Warehouse.Trim().ToUpperInvariant();
         long warehouse = await db.Warehouses.Where(w => w.CompanyId == _companyId && w.Code.ToUpper() == code).Select(w => w.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+
+        // The cash goes into the signed-in user's open till session, so it is counted at that till's cash-up (billing refuses without one).
+        long? me = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Security.ICurrentUser>().UserId;
+        long? till = me is null ? null : await db.TillSessions.AsNoTracking()
+            .Where(s => s.CompanyId == _companyId && s.CashierUserId == me && s.Status == Core.Pos.TillSessionStatus.Open).OrderByDescending(s => s.Id).Select(s => (long?)s.Id)
+            .FirstOrDefaultAsync().ConfigureAwait(true);
         Core.Common.Result<BillResult> bill = await scope.ServiceProvider.GetRequiredService<IRestaurantService>().BillOrderAsync(_companyId, order, warehouse, DateOnly.FromDateTime(DateTime.Today),
-            PayAccount.Trim(), string.IsNullOrWhiteSpace(TaxAccount) ? null : TaxAccount.Trim()).ConfigureAwait(true);
+            PayAccount.Trim(), string.IsNullOrWhiteSpace(TaxAccount) ? null : TaxAccount.Trim(), tillSessionId: till).ConfigureAwait(true);
         Message = bill.IsSuccess ? $"Billed {bill.Value.Gross.ToString("N2", CultureInfo.CurrentCulture)}{(bill.Value.FullyBilled ? "; the table is free." : ".")}" : bill.Error.Message;
         await RefreshAsync().ConfigureAwait(true);
         await LoadOrderAsync().ConfigureAwait(true);

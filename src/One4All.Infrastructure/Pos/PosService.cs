@@ -1001,12 +1001,23 @@ public sealed class PosService : IPosService
             .Where(s => s.TillSessionId == tillSessionId && s.Status == SaleStatus.Completed)
             .ToListAsync(ct).ConfigureAwait(false);
 
-        decimal gross = sales.Sum(s => s.TotalGross);
+        // Restaurant bills whose cash went into this session's drawer read with its sales (a reversed bill drops out, like a voided sale).
+        List<Core.Restaurant.RestaurantBill> bills = await _db.Set<Core.Restaurant.RestaurantBill>().AsNoTracking()
+            .Where(b => b.TillSessionId == tillSessionId && !b.IsReversed)
+            .ToListAsync(ct).ConfigureAwait(false);
+
+        decimal restaurantGross = bills.Sum(b => b.Gross);
+        decimal gross = sales.Sum(s => s.TotalGross) + restaurantGross;
         Dictionary<TenderType, decimal> tenderTotals = sales
             .SelectMany(s => s.Tenders)
             .Where(t => !t.IsChange)
             .GroupBy(t => t.TenderType)
             .ToDictionary(g => g.Key, g => g.Sum(t => t.BaseAmount));
+        decimal restaurantCash = bills.Sum(b => b.CashAmount);
+        if (restaurantCash != 0m)
+        {
+            tenderTotals[TenderType.Cash] = tenderTotals.GetValueOrDefault(TenderType.Cash) + restaurantCash;
+        }
 
         int? zNumber = session.ZReadNumber;
         if (close && session.Status == TillSessionStatus.Open)
@@ -1020,7 +1031,10 @@ public sealed class PosService : IPosService
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         }
 
-        return new TillRead(sales.Count, gross, tenderTotals, zNumber) { Tips = sales.Sum(s => s.Tip) };
+        return new TillRead(sales.Count, gross, tenderTotals, zNumber)
+        {
+            Tips = sales.Sum(s => s.Tip) + bills.Sum(b => b.Tip), RestaurantBillCount = bills.Count, RestaurantGross = restaurantGross, RestaurantCash = restaurantCash,
+        };
     }
 
     /// <inheritdoc />
@@ -1353,6 +1367,9 @@ public sealed class PosService : IPosService
             .Where(t => t.TenderType == TenderType.Cash)
             .ToListAsync(ct).ConfigureAwait(false);
         decimal movements = (await _db.TillCashMovements.AsNoTracking().Where(m => m.TillSessionId == session.Id).ToListAsync(ct).ConfigureAwait(false)).Sum(m => m.DrawerEffect);
+
+        // Cash taken for restaurant bills in this session is in the drawer too (base currency); a reversed bill's cash went back out.
+        movements += await _db.Set<Core.Restaurant.RestaurantBill>().AsNoTracking().Where(b => b.TillSessionId == session.Id && !b.IsReversed).SumAsync(b => b.CashAmount, ct).ConfigureAwait(false);
 
         Dictionary<string, List<SaleTender>> byCurrency = cashTenders.GroupBy(t => t.Currency.Value, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
         SortedSet<string> currencies = new(StringComparer.Ordinal) { baseCurrency };

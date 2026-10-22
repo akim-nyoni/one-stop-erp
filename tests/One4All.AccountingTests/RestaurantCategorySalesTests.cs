@@ -58,7 +58,7 @@ public sealed class RestaurantCategorySalesTests
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
             IRestaurantService res = scope.ServiceProvider.GetRequiredService<IRestaurantService>();
-            (await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 7), "1000")).IsSuccess.Should().BeTrue();
+            (await res.BillOrderAsync(companyId, orderId, warehouseId, new DateOnly(2026, 4, 7), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsSuccess.Should().BeTrue();
         }
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())

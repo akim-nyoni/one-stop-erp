@@ -63,7 +63,7 @@ public sealed class RestaurantBillAtomicityTests
 
         await using (AsyncServiceScope scope = provider.CreateAsyncScope())
         {
-            (await scope.ServiceProvider.GetRequiredService<IRestaurantService>().BillOrderAsync(companyId, orderId, warehouseId, may5, "1000")).IsFailure.Should().BeTrue();
+            (await scope.ServiceProvider.GetRequiredService<IRestaurantService>().BillOrderAsync(companyId, orderId, warehouseId, may5, "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId))).IsFailure.Should().BeTrue();
             await scope.ServiceProvider.GetRequiredService<One4AllDbContext>().SaveChangesAsync();
         }
 
@@ -78,7 +78,7 @@ public sealed class RestaurantBillAtomicityTests
             (await scope.ServiceProvider.GetRequiredService<ILedgerIntegrityService>().CheckAsync(companyId)).Value.Issues.Should().BeEmpty();
 
             (await scope.ServiceProvider.GetRequiredService<IPeriodService>().SetStatusAsync(companyId, yearId, 5, "INV", PeriodStatus.Open)).IsSuccess.Should().BeTrue();
-            var billed = await scope.ServiceProvider.GetRequiredService<IRestaurantService>().BillOrderAsync(companyId, orderId, warehouseId, may5, "1000");
+            var billed = await scope.ServiceProvider.GetRequiredService<IRestaurantService>().BillOrderAsync(companyId, orderId, warehouseId, may5, "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
             billed.IsSuccess.Should().BeTrue(billed.IsFailure ? billed.Error.ToString() : null);
             (await db.StockBalances.AsNoTracking().SingleAsync(b => b.ItemId == pattyId)).QuantityOnHand.Should().Be(3m);
         }

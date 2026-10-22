@@ -2331,6 +2331,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("reconciled_by_user_id");
 
+                    b.Property<decimal?>("ReconciledStatementBalance")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("reconciled_statement_balance");
+
                     b.Property<DateOnly?>("ReconciledTo")
                         .HasColumnType("date")
                         .HasColumnName("reconciled_to");
@@ -28760,6 +28765,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<decimal>("CashAmount")
+                        .HasPrecision(19, 4)
+                        .HasColumnType("numeric(19,4)")
+                        .HasColumnName("cash_amount");
+
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")
                         .HasColumnName("company_id");
@@ -28814,6 +28824,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("character varying(30)")
                         .HasColumnName("revenue_journal_number");
 
+                    b.Property<long?>("ReversalAuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("reversal_authorised_by_user_id");
+
                     b.Property<string>("ReversalJournalNumber")
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)")
@@ -28847,6 +28861,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("tender_reversible");
 
+                    b.Property<long?>("TillSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("till_session_id");
+
                     b.Property<decimal>("Tip")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -28857,6 +28875,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("TableOrderId")
                         .HasDatabaseName("ix_bill_table_order_id");
+
+                    b.HasIndex("TillSessionId")
+                        .HasDatabaseName("ix_bill_till_session_id");
 
                     b.HasIndex("CompanyId", "Date")
                         .HasDatabaseName("ix_bill_company_id_date");
@@ -29180,6 +29201,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnName("id");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("CancelAuthorisedByUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("cancel_authorised_by_user_id");
 
                     b.Property<long>("CompanyId")
                         .HasColumnType("bigint")

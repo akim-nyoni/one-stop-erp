@@ -65,8 +65,8 @@ public sealed class RestaurantServerSalesTests
             One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
             (await db.Set<TableOrder>().FirstAsync(o => o.Id == handoverOrder)).WaiterUserId.Should().Be(benId);
 
-            await res.BillOrderAsync(companyId, anaOrder, warehouseId, new DateOnly(2026, 4, 2), "1000");
-            await res.BillOrderAsync(companyId, handoverOrder, warehouseId, new DateOnly(2026, 4, 2), "1000");
+            await res.BillOrderAsync(companyId, anaOrder, warehouseId, new DateOnly(2026, 4, 2), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
+            await res.BillOrderAsync(companyId, handoverOrder, warehouseId, new DateOnly(2026, 4, 2), "1000", tillSessionId: await RestaurantTill.SessionAsync(scope.ServiceProvider, companyId));
 
             // A billed order cannot be reassigned.
             (await res.ReassignWaiterAsync(companyId, anaOrder, benId)).IsFailure.Should().BeTrue();

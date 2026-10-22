@@ -89,6 +89,15 @@ public sealed class RestaurantBill : AuditableEntity, ICompanyScoped
     /// <summary>The reversal journal number, if reversed.</summary>
     public string? ReversalJournalNumber { get; private set; }
 
+    /// <summary>The till session the bill's cash went into (counted in that session's X/Z read and cash-up), or null when no cash was taken.</summary>
+    public long? TillSessionId { get; private set; }
+
+    /// <summary>The part of the gross taken in cash into the till session's drawer.</summary>
+    public decimal CashAmount { get; private set; }
+
+    /// <summary>The supervisor who authorised the reversal, if reversed.</summary>
+    public long? ReversalAuthorisedByUserId { get; private set; }
+
     /// <summary>The revenue journal lines posted (for exact reversal).</summary>
     public IReadOnlyList<RestaurantBillPosting> Postings => _postings.AsReadOnly();
 
@@ -105,11 +114,24 @@ public sealed class RestaurantBill : AuditableEntity, ICompanyScoped
     /// <param name="stockMovementId">The issue movement id.</param>
     public void AddIssue(long stockMovementId) => _issues.Add(new RestaurantBillIssue(stockMovementId));
 
+    /// <summary>Records the cash taken into a till session's drawer for this bill.</summary>
+    /// <param name="tillSessionId">The open till session.</param>
+    /// <param name="cashAmount">The cash part of the gross (zero or more).</param>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown for a negative amount.</exception>
+    public void TakeIntoTill(long tillSessionId, decimal cashAmount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(cashAmount);
+        TillSessionId = tillSessionId;
+        CashAmount = cashAmount;
+    }
+
     /// <summary>Marks the bill reversed.</summary>
     /// <param name="date">The reversal date.</param>
     /// <param name="reversalJournalNumber">The reversal journal number, if any.</param>
-    public void MarkReversed(DateOnly date, string? reversalJournalNumber)
+    /// <param name="authorisedByUserId">The supervisor who authorised the reversal.</param>
+    public void MarkReversed(DateOnly date, string? reversalJournalNumber, long? authorisedByUserId = null)
     {
+        ReversalAuthorisedByUserId = authorisedByUserId;
         IsReversed = true;
         ReversedOn = date;
         ReversalJournalNumber = reversalJournalNumber;

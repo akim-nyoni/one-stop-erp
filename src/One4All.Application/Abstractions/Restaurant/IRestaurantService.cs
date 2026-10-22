@@ -34,7 +34,14 @@ public readonly record struct TipShare(long StaffUserId, decimal Weight);
 /// <summary>One tender used to settle a bill (split payment).</summary>
 /// <param name="AccountCode">The cash/bank/liability account the tender debits.</param>
 /// <param name="Amount">The amount taken on this tender.</param>
-public readonly record struct TenderLine(string AccountCode, decimal Amount);
+/// <param name="Type">What the tender is; cash goes into the billing till session's drawer and is counted at its cash-up.</param>
+public readonly record struct TenderLine(string AccountCode, decimal Amount, Core.Pos.TenderType Type = Core.Pos.TenderType.Cash);
+
+/// <summary>Where food already fired to the kitchen is written off when it is voided or its order cancelled.</summary>
+/// <param name="WarehouseId">The kitchen warehouse the ingredients are issued from.</param>
+/// <param name="WastageAccountCode">The wastage expense account charged.</param>
+/// <param name="Date">The wastage date.</param>
+public readonly record struct KitchenWastage(long WarehouseId, string WastageAccountCode, DateOnly Date);
 
 /// <summary>A portion of an order to bill on a split.</summary>
 /// <param name="OrderLineId">The order line.</param>
@@ -205,9 +212,10 @@ public interface IRestaurantService
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from the bill.</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
+    /// <param name="tillSessionId">The open till session whose drawer takes the cash part of the bill (required when any cash is taken; counted in its X/Z read and cash-up).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillOrderAsync(long companyId, long orderId, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Bills part of an order (a split): only the specified line portions. Posts revenue and recipe cost of
@@ -226,9 +234,10 @@ public interface IRestaurantService
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from this split.</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
+    /// <param name="tillSessionId">The open till session whose drawer takes the cash part of the bill (required when any cash is taken; counted in its X/Z read and cash-up).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillPartialAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<SplitPortion> portions, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Pays out accumulated tips to staff (brief: tips are staff money, a liability): Dr tips payable, Cr the
@@ -292,9 +301,10 @@ public interface IRestaurantService
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue).</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
+    /// <param name="tillSessionId">The open till session whose drawer takes the cash part of the bill (required when any cash is taken; counted in its X/Z read and cash-up).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillWithTendersAsync(long companyId, long orderId, long warehouseId, DateOnly date, IReadOnlyList<TenderLine> tenders, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Settles an open order with a gift card: the tender debits the gift-card liability (Dr gift-card liability
@@ -333,15 +343,17 @@ public interface IRestaurantService
     /// Reverses a previously-posted, tender-settled bill (rung in error): posts the exact inverse of the bill's
     /// revenue journal (refunding the tender and unwinding revenue/tax/service/tip/discount) and reverses each
     /// cost-of-sales stock issue back into inventory at its original cost. Refuses a bill already reversed or one
-    /// charged to a house account (reverse that through the AR credit-note flow). Requires a reason.
+    /// charged to a house account (reverse that through the AR credit-note flow). Requires a reason and a supervisor's authority.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="billId">The bill to reverse.</param>
     /// <param name="date">The reversal date.</param>
     /// <param name="reason">The mandatory reason.</param>
+    /// <param name="operatorUserId">The user reversing the bill.</param>
+    /// <param name="authorisedByUserId">The supervisor authorising it: someone other than the operator, holding the restaurant void / reverse right (Pos.Restaurant).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reversal journal number (empty when the bill charged nothing).</returns>
-    Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, CancellationToken ct = default);
+    Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, CancellationToken ct = default);
 
     /// <summary>
     /// Bills one seat's share of an order (split by seat): every not-yet-billed, non-voided line assigned to
@@ -361,22 +373,25 @@ public interface IRestaurantService
     /// <param name="tipsPayableAccountCode">The tips-payable liability account (required when tipping).</param>
     /// <param name="discountAmount">An optional discount allowed (a contra-revenue) deducted from this seat.</param>
     /// <param name="discountAccountCode">The discounts-allowed account (required when discounting).</param>
+    /// <param name="tillSessionId">The open till session whose drawer takes the cash part of the bill (required when any cash is taken; counted in its X/Z read and cash-up).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The bill result.</returns>
-    Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, CancellationToken ct = default);
+    Task<Result<BillResult>> BillSeatAsync(long companyId, long orderId, int seatNumber, long warehouseId, DateOnly date, string cashAccountCode, string? taxAccountCode = null, decimal serviceChargeAmount = 0m, string? serviceChargeAccountCode = null, decimal tipAmount = 0m, string? tipsPayableAccountCode = null, decimal discountAmount = 0m, string? discountAccountCode = null, long? tillSessionId = null, CancellationToken ct = default);
 
     /// <summary>
     /// Voids an order line before it is billed (wrong order, kitchen error): it is excluded from the bill and
-    /// consumes no stock. Requires a reason; the order must be open and nothing on the line already billed.
+    /// consumes no stock - unless it was already fired to the kitchen: then a supervisor must authorise it and its
+    /// ingredients are written off as kitchen wastage. Requires a reason; the order must be open and nothing on the line already billed.
     /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="orderId">The order.</param>
     /// <param name="lineId">The order line to void.</param>
     /// <param name="reason">The mandatory void reason.</param>
-    /// <param name="authorizedByUserId">The authorising manager, recorded for oversight (optional).</param>
+    /// <param name="authorizedByUserId">The authorising manager; required for a line already fired to the kitchen (someone other than the waiter, holding Pos.Restaurant void / reverse).</param>
+    /// <param name="wastage">Where a fired line's ingredients are written off as kitchen wastage (required for a fired line).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
-    Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default);
+    Task<Result> VoidLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, KitchenWastage? wastage = null, CancellationToken ct = default);
 
     /// <summary>
     /// Comps an order line (complimentary): the item is still made and served - so billing recognises its cost
@@ -392,13 +407,18 @@ public interface IRestaurantService
     /// <returns>Success or an error.</returns>
     Task<Result> CompLineAsync(long companyId, long orderId, long lineId, string reason, long? authorizedByUserId = null, CancellationToken ct = default);
 
-    /// <summary>Cancels an open order (nothing was billed) and frees the table. Requires a reason.</summary>
+    /// <summary>
+    /// Cancels an open order (nothing was billed) and frees the table. Requires a reason; food already fired to the kitchen
+    /// needs a supervisor and is written off as kitchen wastage.
+    /// </summary>
     /// <param name="companyId">The company.</param>
     /// <param name="orderId">The order.</param>
     /// <param name="reason">The mandatory reason.</param>
+    /// <param name="authorisedByUserId">The supervisor authorising it; required when food fired to the kitchen is still unbilled (someone other than the waiter, holding Pos.Restaurant void / reverse).</param>
+    /// <param name="wastage">Where the fired food's ingredients are written off as kitchen wastage (required when fired food is still unbilled).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success or an error.</returns>
-    Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, CancellationToken ct = default);
+    Task<Result> CancelOrderAsync(long companyId, long orderId, string reason, long? authorisedByUserId = null, KitchenWastage? wastage = null, CancellationToken ct = default);
 
     /// <summary>Reassigns an open order to another waiter (shift change or section handover).</summary>
     /// <param name="companyId">The company.</param>

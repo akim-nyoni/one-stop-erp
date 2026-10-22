@@ -17,6 +17,40 @@ public static partial class OperationCatalogue
             $"{o.TicketNumber} → {o.Station}: " + (o.Printer is null ? "kitchen display only" : o.Error is null ? $"printed on {o.Printer}" : $"NOT printed on {o.Printer} ({o.Error})")));
     }
 
+    // The open till session a bill's cash goes into: the named till's, else the signed-in user's own open till (null when there is none - billing then says so).
+    private static async Task<long?> TillSessionAsync(OperationContext c, string? tillCode)
+    {
+        IQueryable<One4All.Core.Pos.TillSession> open = c.Db.TillSessions.AsNoTracking().Where(s => s.CompanyId == c.CompanyId && s.Status == One4All.Core.Pos.TillSessionStatus.Open);
+        if (!string.IsNullOrWhiteSpace(tillCode))
+        {
+            string code = tillCode.Trim().ToUpperInvariant();
+            long terminal = await FindAsync(c.Db.PosTerminals, t => t.CompanyId == c.CompanyId && t.Code == code, t => t.Id, "till", code).ConfigureAwait(true);
+            open = open.Where(s => s.TerminalId == terminal);
+        }
+        else
+        {
+            open = open.Where(s => s.CashierUserId == c.UserId);
+        }
+
+        return await open.OrderByDescending(s => s.Id).Select(s => (long?)s.Id).FirstOrDefaultAsync().ConfigureAwait(true);
+    }
+
+    // ACCOUNT:amount (cash) or ACCOUNT:amount:TYPE (CARD, MOBILEMONEY, ...) tenders, separated by semicolons.
+    private static IEnumerable<TenderLine> TenderLines(string? text)
+    {
+        foreach (string part in (text ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            string[] bits = part.Split(':', StringSplitOptions.TrimEntries);
+            if (bits.Length is < 2 or > 3 || !decimal.TryParse(bits[1], NumberStyles.Number, CultureInfo.InvariantCulture, out decimal amount)
+                || (bits.Length == 3 && !Enum.TryParse(bits[2], ignoreCase: true, out One4All.Core.Pos.TenderType _)))
+            {
+                throw new OperationException($"'{part}' is not ACCOUNT:amount or ACCOUNT:amount:TYPE.");
+            }
+
+            yield return new TenderLine(bits[0], amount, bits.Length == 3 ? Enum.Parse<One4All.Core.Pos.TenderType>(bits[2], ignoreCase: true) : One4All.Core.Pos.TenderType.Cash);
+        }
+    }
+
     private static IEnumerable<Operation> Restaurant()
     {
         const string module = "Restaurant";
@@ -215,14 +249,16 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Restaurant orders", ListTitle = "Open orders",
             Description = "Opens an order at a table or for takeaway / delivery, adds menu items (by course, seat and price level) and modifiers, voids or comps a line "
-                + "(with an authorising user), moves the order, sends it or a course to the kitchen, tracks a delivery, or shows its lines (with the line ids the other steps use).",
+                + "(with an authorising user; voiding a line already sent to the kitchen, or cancelling an order with one, needs a supervisor and writes the food off as wastage "
+                + "from the kitchen warehouse to the wastage account), moves the order, sends it or a course to the kitchen, tracks a delivery, or shows its lines (with the line ids the other steps use).",
             Fields = [Pick("Step", "Step", ["Show order", "Open at table", "Open takeaway / delivery", "Add item", "Modifier", "Seat a line", "Void line", "Comp line", "Spend limit", "Move to table",
                     "Move line to tab", "Merge into tab", "Change waiter", "Fire order", "Fire course", "Assign driver", "Delivery status", "Cancel order"]),
                 Req("Order", "Order number"), Opt("Table", "Table number"), Num("Party", "Party size", "2"), Pick("Type", "Order type", Enum.GetNames<OrderType>()), Opt("Customer", "Customer name"),
                 Opt("Phone", "Phone"), Opt("Address", "Delivery address"), Opt("Item", "Menu item code"), Num("Quantity", "Quantity", "1"), Pick("Course", "Course", Enum.GetNames<MenuCourse>()),
                 OptNum("Seat", "Seat number"), Opt("Level", "Price level"), OptNum("Line", "Line id"), Opt("Modifier", "Modifier description"), Num("Delta", "Modifier price change", "0"),
                 Opt("Ingredient", "Modifier ingredient item"), Num("IngredientQty", "Ingredient quantity", "0"), Opt("User", "Waiter / driver / authorised by (user name)"),
-                OptNum("Limit", "Spend limit (blank: none)"), Opt("ToOrder", "Other tab's order number (move line / merge)"), Opt("Ticket", "Kitchen ticket number"), Pick("Delivery", "Delivery status", Enum.GetNames<DeliveryStatus>()), Opt("Reason", "Reason"), Today()],
+                OptNum("Limit", "Spend limit (blank: none)"), Opt("ToOrder", "Other tab's order number (move line / merge)"), Opt("Ticket", "Kitchen ticket number"), Pick("Delivery", "Delivery status", Enum.GetNames<DeliveryStatus>()), Opt("Reason", "Reason"),
+                WarehousePick("Warehouse", "Kitchen warehouse (fired food written off)", required: false), Opt("WastageAccount", "Wastage account (fired food)"), Today()],
             Run = async (c, i) =>
             {
                 IRestaurantService restaurant = c.Get<IRestaurantService>();
@@ -230,6 +266,8 @@ public static partial class OperationCatalogue
                 long line = (long)(i.OptionalNumber("Line") ?? 0m);
                 async Task<long> UserOrMe() => i.Optional("User") is string name ? await UserAsync(c, name).ConfigureAwait(true) : c.UserId;
                 async Task<long?> Authoriser() => i.Optional("User") is string name ? await UserAsync(c, name).ConfigureAwait(true) : null;
+                async Task<KitchenWastage?> Wastage() => i.Optional("Warehouse") is string kitchen && i.Optional("WastageAccount") is string wasteAccount
+                    ? new KitchenWastage(await WarehouseAsync(c, kitchen).ConfigureAwait(true), wasteAccount.Trim(), i.Date("Date")) : null;
                 switch (i.Text("Step"))
                 {
                     case "Open at table":
@@ -261,7 +299,8 @@ public static partial class OperationCatalogue
                     case "Seat a line":
                         return Check(await restaurant.AssignLineToSeatAsync(c.CompanyId, order, line, i.OptionalNumber("Seat") is decimal s ? (int)s : null).ConfigureAwait(true), "Seat set.");
                     case "Void line":
-                        return Check(await restaurant.VoidLineAsync(c.CompanyId, order, line, i.Optional("Reason") ?? string.Empty, await Authoriser().ConfigureAwait(true)).ConfigureAwait(true), "Line voided.");
+                        return Check(await restaurant.VoidLineAsync(c.CompanyId, order, line, i.Optional("Reason") ?? string.Empty, await Authoriser().ConfigureAwait(true), await Wastage().ConfigureAwait(true))
+                            .ConfigureAwait(true), "Line voided.");
                     case "Comp line":
                         return Check(await restaurant.CompLineAsync(c.CompanyId, order, line, i.Optional("Reason") ?? string.Empty, await Authoriser().ConfigureAwait(true)).ConfigureAwait(true), "Line comped.");
                     case "Spend limit":
@@ -287,7 +326,8 @@ public static partial class OperationCatalogue
                     case "Delivery status":
                         return Check(await restaurant.AdvanceDeliveryAsync(c.CompanyId, order, Enum.Parse<DeliveryStatus>(i.Text("Delivery"))).ConfigureAwait(true), "Delivery updated.");
                     default:
-                        return Check(await restaurant.CancelOrderAsync(c.CompanyId, order, i.Optional("Reason") ?? string.Empty).ConfigureAwait(true), $"Order {number} cancelled.");
+                        return Check(await restaurant.CancelOrderAsync(c.CompanyId, order, i.Optional("Reason") ?? string.Empty, await Authoriser().ConfigureAwait(true), await Wastage().ConfigureAwait(true))
+                            .ConfigureAwait(true), $"Order {number} cancelled.");
                 }
             },
             List = async c => Table(await c.Db.Set<TableOrder>().AsNoTracking().Where(o => o.CompanyId == c.CompanyId && o.Status == TableOrderStatus.Open).OrderBy(o => o.Id).ToListAsync().ConfigureAwait(true),
@@ -298,18 +338,21 @@ public static partial class OperationCatalogue
         {
             Module = module, Title = "Bill an order", ListTitle = "Recent bills",
             Description = "Bills an order in full (cash or card), by seat, in part (LINE:quantity; …), across several tenders (ACCOUNT:amount; …), to a gift card or to a customer's "
-                + "house account - with service charge, tip and discount - issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill.",
+                + "house account - with service charge, tip and discount - issuing the recipe ingredients from stock; quotes the automatic gratuity; or reverses a bill (a supervisor authorises it). "
+                + "Cash goes into an open till session (the till named, else your own open till) and is counted at its cash-up; a tender is ACCOUNT:amount, or ACCOUNT:amount:CARD for a non-cash one.",
             Fields = [Pick("Step", "Step", ["Full", "Seat", "Split", "Tenders", "Gift card", "House account", "Quote gratuity", "Reverse bill"]), Opt("Order", "Order number"),
                 Opt("Warehouse", "Warehouse (stock issued)"), Opt("Cash", "Cash / card account"), Opt("Tax", "Tax account"), Num("Service", "Service charge", "0"), Opt("ServiceAccount", "Service charge account"),
                 Num("Tip", "Tip", "0"), Opt("Tips", "Tips payable account"), Num("Discount", "Discount", "0"), Opt("DiscountAccount", "Discount account"), OptNum("Seat", "Seat number"),
                 Opt("Portions", "Split: LINE:quantity; …"), Opt("Tenders", "Tenders: ACCOUNT:amount; …"), Opt("Card", "Gift card number"), Opt("Liability", "Gift card liability account"),
-                Opt("Customer", "House account customer"), Opt("Sales", "Sales account (house account)"), OptNum("Bill", "Bill id (reverse)"), Opt("Reason", "Reason (reverse)"), Today()],
+                Opt("Customer", "House account customer"), Opt("Sales", "Sales account (house account)"), OptNum("Bill", "Bill id (reverse)"), Opt("Reason", "Reason (reverse)"),
+                Opt("Till", "Till code taking the cash (blank: my open till)"), Opt("Authoriser", "Supervisor authorising the reversal (user name)"), Today()],
             Run = async (c, i) =>
             {
                 IRestaurantService restaurant = c.Get<IRestaurantService>();
                 if (i.Text("Step") == "Reverse bill")
                 {
-                    return Check(await restaurant.ReverseBillAsync(c.CompanyId, (long)(i.OptionalNumber("Bill") ?? 0m), i.Date("Date"), i.Optional("Reason") ?? string.Empty).ConfigureAwait(true),
+                    long? authoriser = i.Optional("Authoriser") is string supervisor ? await UserAsync(c, supervisor).ConfigureAwait(true) : null;
+                    return Check(await restaurant.ReverseBillAsync(c.CompanyId, (long)(i.OptionalNumber("Bill") ?? 0m), i.Date("Date"), i.Optional("Reason") ?? string.Empty, c.UserId, authoriser).ConfigureAwait(true),
                         j => $"Bill reversed ({j}); the ingredients are back in stock.");
                 }
 
@@ -324,24 +367,25 @@ public static partial class OperationCatalogue
                 string cash = i.Optional("Cash") ?? string.Empty;
                 string? tax = i.Optional("Tax"), serviceAccount = i.Optional("ServiceAccount"), tips = i.Optional("Tips"), discountAccount = i.Optional("DiscountAccount");
                 decimal service = i.Number("Service"), tip = i.Number("Tip"), discount = i.Number("Discount");
+                long? till = await TillSessionAsync(c, i.Optional("Till")).ConfigureAwait(true);
                 BillResult bill;
                 switch (i.Text("Step"))
                 {
                     case "Full":
-                        bill = Check(await restaurant.BillOrderAsync(c.CompanyId, order, warehouse, i.Date("Date"), cash, tax, service, serviceAccount, tip, tips, discount, discountAccount).ConfigureAwait(true));
+                        bill = Check(await restaurant.BillOrderAsync(c.CompanyId, order, warehouse, i.Date("Date"), cash, tax, service, serviceAccount, tip, tips, discount, discountAccount, till).ConfigureAwait(true));
                         break;
                     case "Seat":
                         bill = Check(await restaurant.BillSeatAsync(c.CompanyId, order, (int)(i.OptionalNumber("Seat") ?? 0m), warehouse, i.Date("Date"), cash, tax, service, serviceAccount, tip, tips, discount,
-                            discountAccount).ConfigureAwait(true));
+                            discountAccount, till).ConfigureAwait(true));
                         break;
                     case "Split":
                         List<SplitPortion> portions = [.. Pairs(i.Optional("Portions"), "LINE:quantity").Select(p => new SplitPortion(long.Parse(p.Key, CultureInfo.InvariantCulture), p.Value))];
-                        bill = Check(await restaurant.BillPartialAsync(c.CompanyId, order, warehouse, i.Date("Date"), portions, cash, tax, service, serviceAccount, tip, tips, discount, discountAccount)
+                        bill = Check(await restaurant.BillPartialAsync(c.CompanyId, order, warehouse, i.Date("Date"), portions, cash, tax, service, serviceAccount, tip, tips, discount, discountAccount, till)
                             .ConfigureAwait(true));
                         break;
                     case "Tenders":
-                        List<TenderLine> tenders = [.. Pairs(i.Optional("Tenders"), "ACCOUNT:amount").Select(p => new TenderLine(p.Key, p.Value))];
-                        bill = Check(await restaurant.BillWithTendersAsync(c.CompanyId, order, warehouse, i.Date("Date"), tenders, tax, service, serviceAccount, tip, tips, discount, discountAccount)
+                        List<TenderLine> tenders = [.. TenderLines(i.Optional("Tenders"))];
+                        bill = Check(await restaurant.BillWithTendersAsync(c.CompanyId, order, warehouse, i.Date("Date"), tenders, tax, service, serviceAccount, tip, tips, discount, discountAccount, till)
                             .ConfigureAwait(true));
                         break;
                     case "Gift card":
