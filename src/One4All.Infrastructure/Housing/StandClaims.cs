@@ -28,6 +28,17 @@ internal static class StandClaims
             || await db.Set<LandDispute>().AnyAsync(d => d.StandId != null && standIds.Contains(d.StandId.Value) && d.Stage != LandDisputeStage.Resolved, ct).ConfigureAwait(false)
             || await db.HousingStands.AnyAsync(s => standIds.Contains(s.Id) && s.Status == StandStatus.Withheld, ct).ConfigureAwait(false);
 
+    /// <summary>
+    /// The number of the stand's title application still in progress (applied for but not yet registered), if any: while
+    /// one is open the holder it was applied for must not change, so no transfer of the stand or a share of it may proceed.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="standId">The stand.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The open application's number, or null.</returns>
+    public static Task<string?> OpenTitleApplicationAsync(One4AllDbContext db, long standId, CancellationToken ct)
+        => db.Set<TitleDeed>().Where(t => t.StandId == standId && t.Stage < TitleStage.Registered).Select(t => t.ApplicationNumber).FirstOrDefaultAsync(ct);
+
     /// <summary>Every stand of a council that is blocked or already promised through any route (for picking free stands).</summary>
     /// <param name="db">The database context.</param>
     /// <param name="companyId">The council.</param>

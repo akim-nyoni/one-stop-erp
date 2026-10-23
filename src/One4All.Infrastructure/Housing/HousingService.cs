@@ -275,6 +275,11 @@ public sealed class HousingService : IHousingService
             return Result.Failure(Error.Rule("Housing.StandBlocked", $"Stand {stand.StandNumber} is blocked by a caveat or an open land dispute and cannot be transferred."));
         }
 
+        if (await StandClaims.OpenTitleApplicationAsync(_db, standId, ct).ConfigureAwait(false) is string titleApplication)
+        {
+            return Result.Failure(Error.Rule("Hse.TitleApplicationOpen", $"Stand {stand.StandNumber} has title application {titleApplication} in progress; it cannot be transferred until the deed is registered."));
+        }
+
         if (!housingAccountClear)
         {
             return Result.Failure(Error.Rule("Housing.AccountNotClear", "Transfer blocked: the outgoing holder's housing account is not clear (brief §4.10.6)."));

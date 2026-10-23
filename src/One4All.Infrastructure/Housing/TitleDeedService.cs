@@ -51,6 +51,11 @@ public sealed class TitleDeedService : ITitleDeedService
             return Error.Conflict("Hse.TitleApplied", $"Title has already been applied for on stand {stand.StandNumber}.");
         }
 
+        if (await _db.Set<TransferApplication>().AnyAsync(a => a.StandId == standId && a.UnitNumber == null && a.Status != TransferStatus.Completed && a.Status != TransferStatus.Rejected, ct).ConfigureAwait(false))
+        {
+            return Error.Rule("Hse.TransferOpen", $"Stand {stand.StandNumber} has a transfer application open; title can be applied for once it is completed or rejected.");
+        }
+
         // Fully paid: no instalment sale still running, and nothing owing on the holder's account.
         bool instalmentsRunning = await _db.Set<InstalmentAgreement>().AnyAsync(a => a.StandId == standId && a.Status == InstalmentAgreementStatus.Active, ct).ConfigureAwait(false);
         decimal owing = await _db.OpenItems.Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == holderId)
@@ -58,6 +63,21 @@ public sealed class TitleDeedService : ITitleDeedService
         if (instalmentsRunning || owing > 0m)
         {
             return Error.Rule("Hse.NotFullyPaid", $"Stand {stand.StandNumber} is not fully paid; title can be applied for once the holder's account is clear.");
+        }
+
+        // The development covenants met: every covenant on the stand complied with (construction completed).
+        List<string> unmet = await _db.Set<DevelopmentCovenant>().Where(c => c.CompanyId == companyId && c.StandId == standId && c.Status != CovenantStatus.Complied)
+            .OrderBy(c => c.CovenantNumber).Select(c => c.CovenantNumber + " (" + c.Status.ToString() + ")").ToListAsync(ct).ConfigureAwait(false);
+        if (unmet.Count > 0)
+        {
+            return Error.Rule("Hse.CovenantUnmet", $"Stand {stand.StandNumber}'s development covenants are not met: {string.Join(", ", unmet)}.");
+        }
+
+        // Rates clearance: the ratepayer of the stand's municipal property owes nothing past its due date.
+        string? arrears = await RatesArrearsAsync(companyId, stand.StandNumber, date, ct).ConfigureAwait(false);
+        if (arrears is not null)
+        {
+            return Error.Rule("Hse.RatesArrears", arrears);
         }
 
         Result<string> number = await _numbers.AllocateAsync(companyId, "TD", date, ct: ct).ConfigureAwait(false);
@@ -117,6 +137,12 @@ public sealed class TitleDeedService : ITitleDeedService
                 title.AssignConveyancer(step.Conveyancer!.Trim());
                 break;
             case TitleStage.Registered:
+                string? changed = await HolderChangedAsync(title, ct).ConfigureAwait(false);
+                if (changed is not null)
+                {
+                    return Result.Failure(Error.Conflict("Hse.TitleHolderChanged", $"{number}: {changed}; the deed cannot be registered to the holder it was applied for."));
+                }
+
                 title.Register(step.DeedNumber!.Trim(), step.Date);
                 break;
             case TitleStage.HandedOver:
@@ -136,6 +162,42 @@ public sealed class TitleDeedService : ITitleDeedService
         }
 
         return Result.Success();
+    }
+
+    // The stand must still be held as it was when title was applied for: the same holder, and no joint holding begun or
+    // ended since (a share transfer, survivorship or joint registration after the application changes who takes title).
+    private async Task<string?> HolderChangedAsync(TitleDeed title, CancellationToken ct)
+    {
+        long? holder = await _db.HousingStands.Where(s => s.Id == title.StandId).Select(s => s.CurrentHolderCustomerId).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (holder != title.HolderCustomerId)
+        {
+            return holder is null ? "the stand no longer has a holder" : $"the stand's holder is now customer {holder}, not customer {title.HolderCustomerId}";
+        }
+
+        DateOnly applied = title.AppliedOn;
+        bool jointChanged = await _db.Set<StandHolding>().AnyAsync(h => h.StandId == title.StandId
+            && ((h.HeldTo == null && h.HeldFrom > applied) || (h.HeldTo != null && h.HeldTo >= applied)), ct).ConfigureAwait(false);
+        return jointChanged ? "the stand's joint holders have changed since the application" : null;
+    }
+
+    // Rates clearance on the stand's municipal property (matched by stand number), if it is rated: nothing on the
+    // ratepayer's account past its due date, net of any unallocated credit.
+    private async Task<string?> RatesArrearsAsync(long companyId, string standNumber, DateOnly date, CancellationToken ct)
+    {
+        long? ratepayer = await _db.Properties.Where(p => p.CompanyId == companyId && p.StandNumber == standNumber)
+            .Select(p => (long?)p.RatepayerCustomerId).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (ratepayer is not long ratepayerId)
+        {
+            return null;
+        }
+
+        var items = await _db.OpenItems.Where(i => i.CompanyId == companyId && i.Ledger == TradingLedger.AccountsReceivable && i.TraderId == ratepayerId && i.OutstandingBase != 0m)
+            .Select(i => new { i.Sign, i.DueDate, i.OutstandingBase }).ToListAsync(ct).ConfigureAwait(false);
+        decimal overdue = items.Where(i => i.Sign == LedgerSign.Debit && i.DueDate < date).Sum(i => i.OutstandingBase)
+            - items.Where(i => i.Sign == LedgerSign.Credit).Sum(i => i.OutstandingBase);
+        return overdue > 0m
+            ? $"Stand {standNumber} has no rates clearance: {overdue:N2} is overdue on its municipal account."
+            : null;
     }
 
     /// <inheritdoc />

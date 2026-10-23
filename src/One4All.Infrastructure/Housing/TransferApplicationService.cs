@@ -140,6 +140,11 @@ public sealed class TransferApplicationService : ITransferApplicationService
             return Error.Conflict("Hse.TransferOpen", $"{(unitNumber is null ? $"Stand {stand.StandNumber}" : $"Unit {unitNumber}")} already has a transfer application open.");
         }
 
+        if (unitNumber is null && await StandClaims.OpenTitleApplicationAsync(_db, stand.Id, ct).ConfigureAwait(false) is string titleApplication)
+        {
+            return Error.Rule("Hse.TitleApplicationOpen", $"Stand {stand.StandNumber} has title application {titleApplication} in progress; it cannot be transferred until the deed is registered.");
+        }
+
         Result<string> number = await _numbers.AllocateAsync(lodgement.CompanyId, "TRF", lodgement.Date, ct: ct).ConfigureAwait(false);
         if (number.IsFailure)
         {
@@ -274,6 +279,12 @@ public sealed class TransferApplicationService : ITransferApplicationService
             return Result.Failure(Error.Rule("Hse.TransferNotSubmitted", $"{application.ApplicationNumber} is {application.Status}; only a submitted application can be approved."));
         }
 
+        Result titleOpen = await TitleOpenAsync(application, ct).ConfigureAwait(false);
+        if (titleOpen.IsFailure)
+        {
+            return titleOpen;
+        }
+
         if (await Workflow.WorkflowGate.InProgressAsync(_db, companyId, WorkflowDocumentTypes.OwnershipTransfer, application.ApplicationNumber, ct).ConfigureAwait(false))
         {
             return Result.Failure(Workflow.WorkflowGate.Governed(WorkflowDocumentTypes.OwnershipTransfer, application.ApplicationNumber));
@@ -318,6 +329,12 @@ public sealed class TransferApplicationService : ITransferApplicationService
         if (!partial && stand.CurrentHolderCustomerId != application.FromCustomerId)
         {
             return Result.Failure(Error.Conflict("Hse.HolderChanged", $"Stand {stand.StandNumber} no longer belongs to the transferor."));
+        }
+
+        Result titleOpen = await TitleOpenAsync(application, ct).ConfigureAwait(false);
+        if (titleOpen.IsFailure)
+        {
+            return titleOpen;
         }
 
         // The live checks again: nothing may have fallen into arrears, or the certificate lapsed, since submission.
@@ -600,6 +617,13 @@ public sealed class TransferApplicationService : ITransferApplicationService
 
         return application;
     }
+
+    // A transfer of the stand or a share of it waits while title is being processed for the holder (a unit passes on its
+    // own register and leaves the stand's holder unchanged).
+    private async Task<Result> TitleOpenAsync(TransferApplication application, CancellationToken ct)
+        => application.UnitNumber is null && await StandClaims.OpenTitleApplicationAsync(_db, application.StandId, ct).ConfigureAwait(false) is string titleApplication
+            ? Result.Failure(Error.Rule("Hse.TitleApplicationOpen", $"Title application {titleApplication} is in progress on the stand; {application.ApplicationNumber} cannot proceed until the deed is registered."))
+            : Result.Success();
 
     private sealed record Clearance(bool Satisfied, string Detail, string? CertificateNumber, long? PropertyId);
 }

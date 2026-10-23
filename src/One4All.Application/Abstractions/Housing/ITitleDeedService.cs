@@ -48,7 +48,10 @@ public sealed record TitlePipelineReport(IReadOnlyList<StageAgeing> Stages, IRea
 /// </summary>
 public interface ITitleDeedService
 {
-    /// <summary>Applies for title for a stand's current holder.</summary>
+    /// <summary>
+    /// Applies for title for a stand's current holder: the stand paid in full, no transfer open, every development covenant
+    /// complied with, and a rates clearance (nothing overdue on the stand's municipal account, if it is rated).
+    /// </summary>
     /// <param name="companyId">The council.</param>
     /// <param name="standId">The stand.</param>
     /// <param name="date">When.</param>
@@ -56,7 +59,7 @@ public interface ITitleDeedService
     /// <returns>The application number, or why it was refused.</returns>
     Task<Result<string>> ApplyAsync(long companyId, long standId, DateOnly date, CancellationToken ct = default);
 
-    /// <summary>Moves an application to its next stage.</summary>
+    /// <summary>Moves an application to its next stage; registration is refused if the stand's holders changed since the application.</summary>
     /// <param name="companyId">The council.</param>
     /// <param name="applicationNumber">The application.</param>
     /// <param name="step">The stage reached and its particulars.</param>

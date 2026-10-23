@@ -75,6 +75,11 @@ public sealed class JointOwnershipService : IJointOwnershipService
             return Result.Failure(Error.Rule("Hse.StandBlocked", "The stand is blocked by a caveat or an open land dispute; no share can be transferred."));
         }
 
+        if (await StandClaims.OpenTitleApplicationAsync(_db, standId, ct).ConfigureAwait(false) is string titleApplication)
+        {
+            return Result.Failure(Error.Rule("Hse.TitleApplicationOpen", $"Title application {titleApplication} is in progress on the stand; no share can be transferred until the deed is registered."));
+        }
+
         if (!await _db.Customers.AnyAsync(c => c.Id == toCustomerId && c.CompanyId == companyId, ct).ConfigureAwait(false))
         {
             return Result.Failure(Error.NotFound("Hse.HolderNotFound", $"Customer {toCustomerId} not found."));
