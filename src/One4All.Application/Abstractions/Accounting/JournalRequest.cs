@@ -82,6 +82,12 @@ public sealed class JournalRequest
 
     /// <summary>Gets the supervisor authorising a fund-control override (never the preparer).</summary>
     public long? BudgetOverrideAuthorisedByUserId { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the source document already passed the budget gate (and used up its own commitment), so fund control checks
+    /// only that the vote is appropriated and does not count the spend against the available balance a second time.
+    /// </summary>
+    public bool BudgetGatePassed { get; init; }
 }
 
 /// <summary>One line of a <see cref="JournalRequest"/>.</summary>

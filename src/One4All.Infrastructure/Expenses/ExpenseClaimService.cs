@@ -170,6 +170,7 @@ public sealed class ExpenseClaimService : IExpenseClaimService
             DocumentNumber = documentNumber,
             Narrative = $"Expense reimbursement ({claim.Reference})",
             Lines = lines,
+            BudgetGatePassed = _budget is not null, // checked against the vote when the claim was approved
         }, ct).ConfigureAwait(false);
 
         if (posted.IsFailure)

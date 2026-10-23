@@ -1273,7 +1273,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
         Result<TradingPostingResult> posted = await PostAndOpenAsync(request.CompanyId, "AP", TradingLedger.AccountsPayable, supplier.Id, OpenItemType.Invoice,
             LedgerSign.Credit, request.DocumentNumber, request.DocumentDate, supplier.DueDateFor(request.DocumentDate),
-            request.Currency, rate, gross, baseGross, request.Narrative, lines, ct).ConfigureAwait(false);
+            request.Currency, rate, gross, baseGross, request.Narrative, lines, ct, budgetGatePassed: _budget is not null && request.NetAmount > 0m).ConfigureAwait(false);
         if (posted.IsSuccess && job is not null)
         {
             // Charged to a job: its net (base) goes on the job's cost, with any overhead rate on purchases.
@@ -1928,10 +1928,12 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
     private async Task<Result<TradingPostingResult>> PostAndOpenAsync(
         long companyId, string module, TradingLedger ledger, long traderId, OpenItemType itemType, LedgerSign sign,
         string documentNumber, DateOnly documentDate, DateOnly dueDate, CurrencyCode currency, decimal rate,
-        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct, decimal tax = 0m, string? reference = null)
+        decimal amountTxn, decimal amountBase, string? narrative, List<JournalLineRequest> lines, CancellationToken ct, decimal tax = 0m, string? reference = null,
+        bool budgetGatePassed = false)
     {
         Result<PostingReceipt> posting = await _postingEngine.PostAsync(new JournalRequest
         {
+            BudgetGatePassed = budgetGatePassed,
             CompanyId = companyId,
             SourceModule = module,
             PostingDate = documentDate,

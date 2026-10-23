@@ -342,6 +342,7 @@ public sealed class ProcurementService : IProcurementService
                 {
                     CompanyId = request.CompanyId, ItemId = line.ItemId, WarehouseId = request.WarehouseId, Date = request.Date, Quantity = received.Quantity,
                     Reference = $"{request.GrnNumber} {job.ContractNumber}", ChargeAccountCode = line.ExpenseAccountCode!,
+                    BudgetGatePassed = _budget is not null, // the order committed it
                 }, ct).ConfigureAwait(false);
                 if (toJob.IsFailure)
                 {
@@ -621,6 +622,7 @@ public sealed class ProcurementService : IProcurementService
             DocumentNumber = request.InvoiceNumber,
             Narrative = $"3-way match {order.OrderNumber}",
             Lines = matchLines,
+            BudgetGatePassed = _budget is not null, // committed at the order and re-checked above for any excess; the commitment is used up below
         }, ct).ConfigureAwait(false);
 
         if (posting.IsFailure)

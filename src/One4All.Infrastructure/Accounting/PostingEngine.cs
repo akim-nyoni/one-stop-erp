@@ -124,8 +124,8 @@ public sealed class PostingEngine : IPostingEngine
             return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} is reconciled past {request.PostingDate:yyyy-MM-dd}; post the entry in an open period.");
         }
 
-        // Fund control: no expenditure against a vote without an appropriation.
-        if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, ct).ConfigureAwait(false) is { } unappropriated)
+        // Fund control: no expenditure against a vote without an appropriation, nor beyond what is still available on it.
+        if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, request.BudgetGatePassed, ct).ConfigureAwait(false) is { } unappropriated)
         {
             JournalLine refused = journal.Lines.First(l => l.AccountCode == unappropriated.Account && l.BaseDebit > 0m);
             BudgetControlEvent decision = new(request.CompanyId, BudgetControlOutcome.Blocked, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit,
@@ -824,7 +824,7 @@ public sealed class PostingEngine : IPostingEngine
         await log.SaveChangesAsync(ct).ConfigureAwait(false);
     }
 
-    private async Task<(Error Error, string Account)?> CheckAppropriationAsync(long companyId, long fiscalYearId, JournalEntry journal, CancellationToken ct)
+    private async Task<(Error Error, string Account)?> CheckAppropriationAsync(long companyId, long fiscalYearId, JournalEntry journal, bool gatePassed, CancellationToken ct)
     {
         List<JournalLine> debits = [.. journal.Lines.Where(l => l.BaseDebit > 0m)];
         List<string> codes = [.. debits.Select(l => l.AccountCode).Distinct()];
@@ -851,7 +851,48 @@ public sealed class PostingEngine : IPostingEngine
             }
         }
 
-        return null;
+        return gatePassed ? null : await CheckAvailableAsync(companyId, fiscalYearId, journal, votes, ct).ConfigureAwait(false);
+    }
+
+    // Vote control on every journal (petty cash, vouchers, bank postings, standing orders, manual journals...): each vote's net debit must fit what the
+    // budget gate says is still available (approved budget less the year's actuals and open commitments). A department with no budget of its own
+    // spends against the company-wide one. Documents that already passed the gate (and had their commitment used up) say so on the request.
+    private async Task<(Error Error, string Account)?> CheckAvailableAsync(long companyId, long fiscalYearId, JournalEntry journal, List<string> votes, CancellationToken ct)
+    {
+        List<Application.Abstractions.Budgeting.BudgetDemand> demands = [];
+        foreach (var spend in journal.Lines.Where(l => votes.Contains(l.AccountCode))
+                     .GroupBy(l => (l.AccountCode, Department: string.IsNullOrEmpty(l.Department) ? null : l.Department, Fund: string.IsNullOrEmpty(l.Fund) ? null : l.Fund)))
+        {
+            decimal net = spend.Sum(l => l.BaseDebit - l.BaseCredit);
+            if (net <= 0m)
+            {
+                continue;
+            }
+
+            string? department = spend.Key.Department;
+            if (department is not null && !await _db.Budgets.AnyAsync(b => b.CompanyId == companyId && b.FiscalYearId == fiscalYearId && b.IsActive && b.Department == department
+                    && (b.Type == Core.Budgeting.BudgetType.OriginalApproved || b.Type == Core.Budgeting.BudgetType.SupplementaryRevised), ct).ConfigureAwait(false))
+            {
+                department = null;
+            }
+
+            demands.Add(new Application.Abstractions.Budgeting.BudgetDemand(spend.Key.AccountCode, department, net, spend.Key.Fund));
+        }
+
+        if (demands.Count == 0)
+        {
+            return null;
+        }
+
+        Result<Application.Abstractions.Budgeting.BudgetGateResult> check = await new Budgeting.BudgetGateService(_db).CheckAsync(companyId, journal.PostingDate, demands, ct).ConfigureAwait(false);
+        if (check.IsFailure || check.Value.Lines.FirstOrDefault(l => l.Shortfall > 0m) is not { } over)
+        {
+            return null;
+        }
+
+        return (Error.Rule("Posting.VoteExceeded",
+            $"Account '{over.AccountCode}'{(over.Fund is null ? string.Empty : $" (fund {over.Fund})")} has {Math.Max(0m, over.Available):N2} available in this year's vote; "
+            + $"{over.Amount:N2} would overspend it by {over.Shortfall:N2}. Fund control needs an authorised override."), over.AccountCode);
     }
 
     // Each line's reporting amount: given (a reversal), the transaction amount when the line is in the reporting currency, the base

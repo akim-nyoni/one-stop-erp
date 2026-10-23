@@ -72,6 +72,9 @@ public sealed class IssueStockRequest
     /// <summary>Whether this is a till sale (let through under the control, recorded for review).</summary>
     public bool FromTill { get; init; }
 
+    /// <summary>Whether the charge was already committed against the budget (goods ordered for a job): fund control then does not count it twice.</summary>
+    public bool BudgetGatePassed { get; init; }
+
     /// <summary>The sales-order line despatching the stock (its own reservation may be used); every other issue leaves reserved stock alone.</summary>
     public long? SalesOrderLineId { get; init; }
 

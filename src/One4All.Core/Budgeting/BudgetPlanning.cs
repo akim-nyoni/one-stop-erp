@@ -149,7 +149,7 @@ public sealed class DepartmentUnit : Entity, ICompanyScoped
 /// <summary>What fund control did with a posting.</summary>
 public enum BudgetControlOutcome
 {
-    /// <summary>Refused: no appropriation and no override.</summary>
+    /// <summary>Refused: no appropriation, or not enough of it left, and no override.</summary>
     Blocked = 1,
 
     /// <summary>Let through on a supervisor's override.</summary>
