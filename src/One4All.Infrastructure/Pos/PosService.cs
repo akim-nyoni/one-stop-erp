@@ -120,6 +120,26 @@ public sealed class PosService : IPosService
             return existing;
         }
 
+        // The same one-open-session rule as a till opened online: the till's open session (opened online before the line dropped, or offline and already
+        // synced) is resumed by the same cashier - it takes the offline key so the sales rung up under it land there - and refused to anyone else.
+        TillSession? open = await _db.Set<TillSession>()
+            .Where(s => s.CompanyId == companyId && s.TerminalId == terminalId && s.Status == TillSessionStatus.Open).OrderByDescending(s => s.Id).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (open is not null)
+        {
+            if (open.CashierUserId != cashierUserId)
+            {
+                return Error.Conflict("Pos.TillAlreadyOpen", $"This till already has an open session (opened {open.OpenedOnUtc.ToLocalTime():yyyy-MM-dd HH:mm} by another cashier): cash it up, or switch the cashier.");
+            }
+
+            if (open.OfflineKey is null)
+            {
+                open.OfflineKey = key;
+                await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            }
+
+            return open.Id;
+        }
+
         TillSession session = new(companyId, terminalId, cashierUserId, openedUtc, openingFloat) { OfflineKey = key };
         _db.Set<TillSession>().Add(session);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
@@ -154,11 +174,19 @@ public sealed class PosService : IPosService
         List<PosSaleLineRequest> lines = [];
         List<string> disagreements = [];
         List<string> overridden = [];
+        bool api = request.Source == SaleSource.Api;
         foreach (PosSaleLineRequest line in request.Lines)
         {
             if (line.ItemId == 0)
             {
-                lines.Add(line); // a non-stock sellable (a menu item) has no item to hold it to
+                // A non-stock sellable (a menu item) has no item to hold it to: its figures stand, on a revenue account the company has.
+                string account = (line.RevenueAccountCode ?? string.Empty).Trim();
+                if (account.Length == 0 || !await _db.Accounts.AnyAsync(a => a.CompanyId == request.CompanyId && a.AccountCode == account, ct).ConfigureAwait(false))
+                {
+                    return Error.Validation("Pos.RevenueAccount", $"{line.Description}: revenue account '{account}' is not an account of this company.");
+                }
+
+                lines.Add(line);
                 continue;
             }
 
@@ -169,9 +197,22 @@ public sealed class PosService : IPosService
 
             // A gift card load posts to the gift card liability the till names; it and a deposit (untaxed, on its liability) have their own checks below.
             bool giftCard = !string.IsNullOrWhiteSpace(line.GiftCardNumber);
+            bool priced = !giftCard && item.ItemType != ItemType.Deposit;
             string revenue = giftCard || string.IsNullOrWhiteSpace(item.RevenueAccountCode) ? line.RevenueAccountCode : item.RevenueAccountCode.Trim();
-            decimal? rate = giftCard || item.ItemType == ItemType.Deposit ? null
+            decimal? rate = !priced ? null
                 : item.TaxCode is string taxCode && rates.TryGetValue(taxCode.Trim(), out decimal known) ? known : null;
+
+            // An outside caller's tax is never taken on trust: a tax code with no rate on the day is refused, and an item with no tax code at all is
+            // untaxed (the company has no default rate - the tax code is the only source of one). A till's own tax tables stand where the server has none.
+            if (api && priced && rate is null)
+            {
+                if (!string.IsNullOrWhiteSpace(item.TaxCode))
+                {
+                    return Error.Rule("Pos.TaxCode", $"{line.Description}: tax code {item.TaxCode.Trim()} of item {item.Code} has no rate on {request.SaleDate:yyyy-MM-dd}.");
+                }
+
+                rate = 0m;
+            }
 
             decimal gross = PosMoney.Round(line.Quantity * line.UnitPrice);
             if (line.PromotionDiscount < 0m || line.PromotionDiscount > Math.Abs(gross) || Math.Abs(line.LineNet + line.PromotionDiscount - gross) > 0.01m)
@@ -197,16 +238,25 @@ public sealed class PosService : IPosService
                 disagreements.Add(problem);
             }
 
-            if (!giftCard && await PriceInForceAsync(request, line, item, rate ?? 0m, ct).ConfigureAwait(false) is decimal listed)
+            if (priced)
             {
-                string problem = $"{line.Description}: {line.UnitPrice:0.00} where the price is {listed:0.00}";
-                if (request.OfflineReplay)
+                (decimal? listed, bool unpriced) = await PriceInForceAsync(request, line, item, rate ?? 0m, ct).ConfigureAwait(false);
+                if (listed is decimal inForce)
                 {
-                    disagreements.Add(problem);
+                    string problem = $"{line.Description}: {line.UnitPrice:0.00} where the price is {inForce:0.00}";
+                    if (request.OfflineReplay)
+                    {
+                        disagreements.Add(problem);
+                    }
+                    else
+                    {
+                        overridden.Add(problem);
+                    }
                 }
-                else
+                else if (unpriced && api)
                 {
-                    overridden.Add(problem);
+                    // An item on no price list has no price for an outside caller to meet: whatever it asks is an off-list price, on a supervisor's word.
+                    overridden.Add($"{line.Description}: {line.UnitPrice:0.00} for an item with no price on any list");
                 }
             }
 
@@ -237,17 +287,17 @@ public sealed class PosService : IPosService
             SaleDate = request.SaleDate, WarehouseId = request.WarehouseId, CustomerId = request.CustomerId, SalesRepId = request.SalesRepId, TaxAccountCode = request.TaxAccountCode,
             Lines = lines, AgeVerified = request.AgeVerified, PrescriptionReference = request.PrescriptionReference, Tenders = request.Tenders, Tip = request.Tip,
             TipsAccountCode = request.TipsAccountCode, PriceOverrideAuthorisedByUserId = request.PriceOverrideAuthorisedByUserId, OfflineReplay = request.OfflineReplay,
-            LoyaltyMemberNumber = request.LoyaltyMemberNumber,
+            LoyaltyMemberNumber = request.LoyaltyMemberNumber, Source = request.Source,
         };
     }
 
-    // The price the line should have been sold at when its unit price is none the till could have rung up; null when the price stands (or the item has no
-    // price anywhere to hold it to).
-    private async Task<decimal?> PriceInForceAsync(CompleteSaleRequest request, PosSaleLineRequest line, Item item, decimal rate, CancellationToken ct)
+    // The price the line should have been sold at when its unit price is none the till could have rung up; no price when it stands. Unpriced says the
+    // item has no price anywhere to hold it to (so the line's price stood for want of one, not because it was met).
+    private async Task<(decimal? Listed, bool Unpriced)> PriceInForceAsync(CompleteSaleRequest request, PosSaleLineRequest line, Item item, decimal rate, CancellationToken ct)
     {
         if (_pricing is null)
         {
-            return null;
+            return (null, false);
         }
 
         // A scale's price label: the label's price (tax included) for this item, as the till reads it.
@@ -256,7 +306,7 @@ public sealed class PosService : IPosService
                 || string.Equals(item.Barcode?.Trim(), label.ItemCode, StringComparison.Ordinal) || string.Equals(item.Code, label.ItemCode, StringComparison.OrdinalIgnoreCase))
             && Math.Abs(PosMoney.Round(label.Value / (1m + rate)) - line.UnitPrice) < 0.005m)
         {
-            return null;
+            return (null, false);
         }
 
         // The till prices a scanned line for the customer and the quantity on the pad, a tapped tile at the price of one off the default list.
@@ -278,13 +328,13 @@ public sealed class PosService : IPosService
 
             if (Math.Abs(price.Value.UnitPrice - line.UnitPrice) < 0.005m)
             {
-                return null;
+                return (null, false);
             }
 
             first ??= price.Value.UnitPrice;
         }
 
-        return first;
+        return (first, first is null);
     }
 
     // A price other than the one in force stands only on a supervisor's word: someone other than the cashier, active, holding Pos.PriceOverride.
@@ -700,6 +750,7 @@ public sealed class PosService : IPosService
                     Quantity = quantity,
                     Reference = request.SaleNumber,
                     AllowNegative = true, FromTill = true, // the sale is committed; let stock go negative (recorded under the company's control) and reconcile by stocktake
+                    NotVoteControlled = true, // the cost of a sale already made is not discretionary spending: the vote never stops a sale mid-shift
                 }, ct).ConfigureAwait(false);
 
                 if (issue.IsFailure)
@@ -1009,9 +1060,10 @@ public sealed class PosService : IPosService
             .Where(s => s.TillSessionId == tillSessionId && s.Status == SaleStatus.Completed)
             .ToListAsync(ct).ConfigureAwait(false);
 
-        // Restaurant bills whose cash went into this session's drawer read with its sales (a reversed bill drops out, like a voided sale).
+        // Restaurant bills whose cash went into this session's drawer read with its sales. A bill reversed while the session was open drops out, like a
+        // voided sale; one reversed after the session was cashed up stays (its Z is signed off) - its cash went back out of a later session as a refund.
         List<Core.Restaurant.RestaurantBill> bills = await _db.Set<Core.Restaurant.RestaurantBill>().AsNoTracking()
-            .Where(b => b.TillSessionId == tillSessionId && !b.IsReversed)
+            .Where(b => b.TillSessionId == tillSessionId && (!b.IsReversed || b.RefundTillSessionId != null))
             .ToListAsync(ct).ConfigureAwait(false);
 
         decimal restaurantGross = bills.Sum(b => b.Gross);
@@ -1376,8 +1428,10 @@ public sealed class PosService : IPosService
             .ToListAsync(ct).ConfigureAwait(false);
         decimal movements = (await _db.TillCashMovements.AsNoTracking().Where(m => m.TillSessionId == session.Id).ToListAsync(ct).ConfigureAwait(false)).Sum(m => m.DrawerEffect);
 
-        // Cash taken for restaurant bills in this session is in the drawer too (base currency); a reversed bill's cash went back out.
-        movements += await _db.Set<Core.Restaurant.RestaurantBill>().AsNoTracking().Where(b => b.TillSessionId == session.Id && !b.IsReversed).SumAsync(b => b.CashAmount, ct).ConfigureAwait(false);
+        // Cash taken for restaurant bills in this session is in the drawer too (base currency); a bill reversed in this session had its cash go back out,
+        // one reversed after the cash-up paid it out of a later session (a refund movement there), so it still counts here.
+        movements += await _db.Set<Core.Restaurant.RestaurantBill>().AsNoTracking().Where(b => b.TillSessionId == session.Id && (!b.IsReversed || b.RefundTillSessionId != null))
+            .SumAsync(b => b.CashAmount, ct).ConfigureAwait(false);
 
         Dictionary<string, List<SaleTender>> byCurrency = cashTenders.GroupBy(t => t.Currency.Value, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.ToList(), StringComparer.Ordinal);
         SortedSet<string> currencies = new(StringComparer.Ordinal) { baseCurrency };

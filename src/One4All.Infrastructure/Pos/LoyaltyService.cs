@@ -287,6 +287,7 @@ public sealed class LoyaltyService : ILoyaltyService
         return await _posting.PostAsync(new JournalRequest
         {
             CompanyId = companyId, SourceModule = "GL", PostingDate = date, TransactionCurrency = company.BaseCurrency, DocumentType = "LOYALTY", DocumentNumber = document, Narrative = narrative,
+            NotVoteControlled = true, // the cost of points earned on a sale already made is not discretionary spending
             Lines =
             [
                 new JournalLineRequest { AccountCode = debit, Side = JournalSide.Debit, TransactionAmount = amount },

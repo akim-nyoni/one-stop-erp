@@ -289,6 +289,7 @@ public sealed class InventoryService : IInventoryService
             DocumentNumber = request.Reference,
             Narrative = $"Stock issue {item.Code}",
             BudgetGatePassed = request.BudgetGatePassed,
+            NotVoteControlled = request.NotVoteControlled,
             Lines =
             [
                 new JournalLineRequest { AccountCode = chargeAccount, CostCentre = request.CostCentre, Side = JournalSide.Debit, TransactionAmount = cost },

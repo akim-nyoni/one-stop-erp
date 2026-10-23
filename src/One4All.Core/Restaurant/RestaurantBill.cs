@@ -95,6 +95,16 @@ public sealed class RestaurantBill : AuditableEntity, ICompanyScoped
     /// <summary>The part of the gross taken in cash into the till session's drawer.</summary>
     public decimal CashAmount { get; private set; }
 
+    /// <summary>The cash account the cash part was taken into (the drawer's account), or null when no cash was taken.</summary>
+    public string? CashAccountCode { get; private set; }
+
+    /// <summary>
+    /// The open till session the cash was paid back out of when the bill was reversed after its own session had been cashed up (a refund movement
+    /// in that session); null when the bill was reversed while its session was still open (it then simply drops out of that session) or took no cash.
+    /// The bill stays in its own session's X/Z read and cash-up when this is set, so a signed-off Z still ties.
+    /// </summary>
+    public long? RefundTillSessionId { get; private set; }
+
     /// <summary>The supervisor who authorised the reversal, if reversed.</summary>
     public long? ReversalAuthorisedByUserId { get; private set; }
 
@@ -117,24 +127,28 @@ public sealed class RestaurantBill : AuditableEntity, ICompanyScoped
     /// <summary>Records the cash taken into a till session's drawer for this bill.</summary>
     /// <param name="tillSessionId">The open till session.</param>
     /// <param name="cashAmount">The cash part of the gross (zero or more).</param>
+    /// <param name="cashAccountCode">The cash account the drawer posts to.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown for a negative amount.</exception>
-    public void TakeIntoTill(long tillSessionId, decimal cashAmount)
+    public void TakeIntoTill(long tillSessionId, decimal cashAmount, string? cashAccountCode = null)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(cashAmount);
         TillSessionId = tillSessionId;
         CashAmount = cashAmount;
+        CashAccountCode = string.IsNullOrWhiteSpace(cashAccountCode) ? null : cashAccountCode.Trim();
     }
 
     /// <summary>Marks the bill reversed.</summary>
     /// <param name="date">The reversal date.</param>
     /// <param name="reversalJournalNumber">The reversal journal number, if any.</param>
     /// <param name="authorisedByUserId">The supervisor who authorised the reversal.</param>
-    public void MarkReversed(DateOnly date, string? reversalJournalNumber, long? authorisedByUserId = null)
+    /// <param name="refundTillSessionId">The open session the cash was paid back out of, when the bill's own session had already been cashed up.</param>
+    public void MarkReversed(DateOnly date, string? reversalJournalNumber, long? authorisedByUserId = null, long? refundTillSessionId = null)
     {
         ReversalAuthorisedByUserId = authorisedByUserId;
         IsReversed = true;
         ReversedOn = date;
         ReversalJournalNumber = reversalJournalNumber;
+        RefundTillSessionId = refundTillSessionId;
     }
 }
 

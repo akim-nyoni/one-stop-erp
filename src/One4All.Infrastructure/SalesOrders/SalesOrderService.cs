@@ -381,6 +381,7 @@ public sealed class SalesOrderService : ISalesOrderService
                     Quantity = issued,
                     Reference = request.Reference,
                     SalesOrderLineId = line.Id,
+                    NotVoteControlled = true, // the cost of goods sold on the order is not discretionary spending
                 }, ct).ConfigureAwait(false);
 
                 if (issue.IsFailure)

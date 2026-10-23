@@ -80,6 +80,7 @@ internal sealed class RestaurantBillConfiguration : IEntityTypeConfiguration<Res
         b.Property(x => x.Gross).HasPrecision(19, 4);
         b.Property(x => x.CostOfSales).HasPrecision(19, 4);
         b.Property(x => x.CashAmount).HasPrecision(19, 4);
+        b.Property(x => x.CashAccountCode).HasMaxLength(8);
         b.Property(x => x.RevenueJournalNumber).HasMaxLength(30);
         b.Property(x => x.ReversalJournalNumber).HasMaxLength(30);
         b.HasMany(x => x.Postings).WithOne().HasForeignKey(x => x.RestaurantBillId).OnDelete(DeleteBehavior.Cascade);

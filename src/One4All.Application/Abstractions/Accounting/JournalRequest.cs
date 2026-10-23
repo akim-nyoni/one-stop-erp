@@ -88,6 +88,14 @@ public sealed class JournalRequest
     /// only that the vote is appropriated and does not count the spend against the available balance a second time.
     /// </summary>
     public bool BudgetGatePassed { get; init; }
+
+    /// <summary>
+    /// Gets a value indicating whether the posting is the cost of a sale already made (a till or restaurant sale's cost of sales, a despatch, a layby
+    /// release, loyalty points earned on a sale) rather than discretionary spending: fund control neither refuses it for an exhausted or missing vote
+    /// nor records a block for it. Its actuals still count against the account like any other posting. Manual journals, petty cash, vouchers and
+    /// purchases never set this.
+    /// </summary>
+    public bool NotVoteControlled { get; init; }
 }
 
 /// <summary>One line of a <see cref="JournalRequest"/>.</summary>

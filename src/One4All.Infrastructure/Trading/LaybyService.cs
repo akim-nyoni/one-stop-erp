@@ -142,6 +142,7 @@ public sealed class LaybyService : ILaybyService
                     Result<StockMovementResult> issued = await _inventory.IssueAsync(new IssueStockRequest
                     {
                         CompanyId = companyId, ItemId = itemId, WarehouseId = plan.WarehouseId, Date = date, Quantity = quantity, Reference = plan.PlanNumber,
+                        NotVoteControlled = true, // the cost of goods sold on the layby is not discretionary spending
                     }, ct).ConfigureAwait(false);
                     if (issued.IsFailure)
                     {

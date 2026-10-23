@@ -617,11 +617,13 @@ public sealed class RestaurantService : IRestaurantService
     }
 
     /// <inheritdoc />
-    public Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, CancellationToken ct = default)
-        => _db.AtomicAsync(() => ReverseBillCoreAsync(companyId, billId, date, reason, operatorUserId, authorisedByUserId, ct), ct);
+    public Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, long? refundTillSessionId = null,
+        CancellationToken ct = default)
+        => _db.AtomicAsync(() => ReverseBillCoreAsync(companyId, billId, date, reason, operatorUserId, authorisedByUserId, refundTillSessionId, ct), ct);
 
-    // One unit of work: the bill's journal(s), stock issues, tender and order updates commit together or not at all.
-    private async Task<Result<string>> ReverseBillCoreAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, CancellationToken ct)
+    // One unit of work: the bill's journal(s), stock issues, tender, till and order updates commit together or not at all.
+    private async Task<Result<string>> ReverseBillCoreAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, long? refundTillSessionId,
+        CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
@@ -680,6 +682,13 @@ public sealed class RestaurantService : IRestaurantService
             reversalJournal = reversal.Value.JournalNumber;
         }
 
+        // The cash goes back out of the drawer: of the bill's own session while it is open, else of an open session of the same till.
+        Result<long?> refundedFrom = await RefundBillCashAsync(bill, refundTillSessionId, operatorUserId, authorisedByUserId, date, reversalJournal, ct).ConfigureAwait(false);
+        if (refundedFrom.IsFailure)
+        {
+            return refundedFrom.Error;
+        }
+
         // Reverse each cost-of-sales stock issue back into inventory.
         foreach (RestaurantBillIssue issue in bill.Issues)
         {
@@ -690,7 +699,7 @@ public sealed class RestaurantService : IRestaurantService
             }
         }
 
-        bill.MarkReversed(date, reversalJournal, authorisedByUserId);
+        bill.MarkReversed(date, reversalJournal, authorisedByUserId, refundedFrom.Value);
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return reversalJournal;
     }
@@ -812,8 +821,9 @@ public sealed class RestaurantService : IRestaurantService
         return posted.IsFailure ? posted.Error : posted.Value.JournalNumber;
     }
 
-    // The cash of a bill is taken in an open session of a till of the company: never in none, nor in one already cashed up (its count and Z are done).
-    private async Task<Result> OpenTillSessionAsync(long companyId, long? tillSessionId, CancellationToken ct)
+    // The cash of a bill is taken in an open session of a till of the company: never in none, nor in one already cashed up (its count and Z are done),
+    // nor - where the caller names them - in another till's session or another cashier's.
+    private async Task<Result> OpenTillSessionAsync(long companyId, long? tillSessionId, CancellationToken ct, long? terminalId = null, long? cashierUserId = null)
     {
         if (tillSessionId is not long sessionId)
         {
@@ -826,9 +836,52 @@ public sealed class RestaurantService : IRestaurantService
             return Result.Failure(Error.Rule("Res.TillSessionNotFound", $"Till session {sessionId} is not a till session of this company."));
         }
 
+        if (terminalId is long terminal && session.TerminalId != terminal)
+        {
+            return Result.Failure(Error.Rule("Res.TillSessionOtherTill", $"Till session {sessionId} is a session of another till."));
+        }
+
+        if (cashierUserId is long cashier && session.CashierUserId != cashier)
+        {
+            return Result.Failure(Error.Rule("Res.TillSessionOtherCashier", $"Till session {sessionId} is another cashier's session."));
+        }
+
         return session.Status != Core.Pos.TillSessionStatus.Open
             ? Result.Failure(Error.Rule("Res.TillSessionClosed", $"Till session {sessionId} has been cashed up; take the cash in an open session."))
             : Result.Success();
+    }
+
+    // The cash of a reversed bill goes back out of the drawer it went into. While that session is still open the bill simply drops out of its read; once
+    // it has been cashed up (its count and Z are signed off) the cash is paid out of an open session of the same till as a refund movement, counted at
+    // that session's cash-up, and the bill stays in its own session's figures.
+    private async Task<Result<long?>> RefundBillCashAsync(RestaurantBill bill, long? refundTillSessionId, long operatorUserId, long? authorisedByUserId, DateOnly date, string journalNumber,
+        CancellationToken ct)
+    {
+        if (bill.TillSessionId is not long sessionId || bill.CashAmount <= 0m)
+        {
+            return (long?)null;
+        }
+
+        Core.Pos.TillSession? own = await _db.Set<Core.Pos.TillSession>().AsNoTracking().FirstOrDefaultAsync(s => s.Id == sessionId, ct).ConfigureAwait(false);
+        if (own is null || own.Status == Core.Pos.TillSessionStatus.Open)
+        {
+            return (long?)null;
+        }
+
+        if (refundTillSessionId is not long refundSession)
+        {
+            return Error.Rule("Res.SessionClosed", $"Till session {sessionId} has been cashed up; pay the bill's cash back out of an open session of the same till.");
+        }
+
+        Result open = await OpenTillSessionAsync(bill.CompanyId, refundSession, ct, terminalId: own.TerminalId).ConfigureAwait(false);
+        if (open.IsFailure)
+        {
+            return open.Error.Code == "Res.TillSessionClosed" ? Error.Rule("Res.SessionClosed", open.Error.Message) : open.Error;
+        }
+
+        _db.TillCashMovements.Add(new Core.Pos.TillCashMovement(bill.CompanyId, refundSession, Core.Pos.TillCashKind.Refund, bill.CashAmount, bill.CashAccountCode ?? string.Empty,
+            $"Reverse bill {bill.Id} ({bill.RevenueJournalNumber})", operatorUserId, authorisedByUserId, date, journalNumber));
+        return refundSession;
     }
 
     // A supervisor's word stands only from someone other than the person asking, holding the restaurant void / reverse right.
@@ -1068,7 +1121,7 @@ public sealed class RestaurantService : IRestaurantService
 
         if (cashTaken > 0m)
         {
-            billRecord.TakeIntoTill(tillSessionId!.Value, cashTaken);
+            billRecord.TakeIntoTill(tillSessionId!.Value, cashTaken, tenders is null ? cashAccountCode : tenders.First(t => t.Type == Core.Pos.TenderType.Cash && t.Amount > 0m).AccountCode);
         }
 
         _db.Set<RestaurantBill>().Add(billRecord);
@@ -1138,6 +1191,7 @@ public sealed class RestaurantService : IRestaurantService
             Quantity = quantity,
             Reference = reference,
             AllowNegative = allowNegative, // billing COGS = food already served; wastage passes false
+            NotVoteControlled = allowNegative, // the cost of food already served is not discretionary spending; wastage stays under the vote
         }, ct).ConfigureAwait(false);
 
     /// <summary>Marks the order billed and frees its table (if any) when everything billable has been billed.</summary>

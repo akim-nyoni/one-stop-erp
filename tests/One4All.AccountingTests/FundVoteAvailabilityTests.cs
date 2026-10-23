@@ -136,4 +136,58 @@ public sealed class FundVoteAvailabilityTests
         (await engine.PostAsync(Spend("FVA-J1", 961m))).Error.Code.Should().Be("Posting.VoteExceeded");
         (await engine.PostAsync(Spend("FVA-J2", 960m))).IsSuccess.Should().BeTrue();
     }
+
+    [SkippableFact]
+    public async Task A_till_sale_is_not_held_back_by_the_cost_of_sales_vote()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        (await db.Companies.SingleAsync(c => c.Id == companyId)).FundControlEnabled = true;
+        (await db.Accounts.SingleAsync(a => a.CompanyId == companyId && a.AccountCode == "5000")).BudgetEnabled = true;
+        Core.System.Branch branch = new(companyId, "FVA-BR", "Shop");
+        Item soda = new(companyId, "FVA-SODA", "Soda") { RevenueAccountCode = "4000", CostOfSalesAccountCode = "5000" };
+        Warehouse shop = new(companyId, "FVA-SHOP", "Shop");
+        db.AddRange(branch, soda, shop);
+        await db.SaveChangesAsync();
+        Core.Pos.PosTerminal terminal = new(companyId, branch.Id, "FVA-TILL", "Till");
+        db.Add(terminal);
+        await db.SaveChangesAsync();
+        long yearId = await db.FiscalYears.Where(y => y.CompanyId == companyId).Select(y => y.Id).FirstAsync();
+        IBudgetingService budgets = scope.ServiceProvider.GetRequiredService<IBudgetingService>();
+        long budget = (await budgets.CreateBudgetAsync(companyId, yearId, "2026", BudgetType.OriginalApproved, null, [new NewBudgetLine("5000", 3, 1m)])).Value;
+        (await budgets.ActivateAsync(companyId, budget)).IsSuccess.Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<Application.Abstractions.Inventory.IInventoryService>().ReceiveAsync(new Application.Abstractions.Inventory.ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = soda.Id, WarehouseId = shop.Id, Date = new DateOnly(2026, 3, 1), Quantity = 10m, UnitCost = 5m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+
+        // The vote on cost of sales is all but exhausted (1 left); a sale costing 10 still completes - its cost is not discretionary spending.
+        Application.Abstractions.Pos.IPosService pos = scope.ServiceProvider.GetRequiredService<Application.Abstractions.Pos.IPosService>();
+        const long cashier = 900_801;
+        long session = (await pos.OpenTillAsync(companyId, terminal.Id, cashier, openingFloat: 0m)).Value;
+        var sold = await pos.CompleteSaleAsync(new Application.Abstractions.Pos.CompleteSaleRequest
+        {
+            CompanyId = companyId, TerminalId = terminal.Id, TillSessionId = session, CashierUserId = cashier, SaleNumber = "FVA-S1", SaleDate = new DateOnly(2026, 3, 5), WarehouseId = shop.Id,
+            TaxAccountCode = "2200", Lines = [new Application.Abstractions.Pos.PosSaleLineRequest(soda.Id, "Soda", 2m, 8m, 16m, 0m, "4000")],
+            Tenders = [new Application.Abstractions.Pos.PosTenderRequest(Core.Pos.TenderType.Cash, Scenario.Usd, 16m, "1000", IsChange: false)],
+        });
+        sold.IsSuccess.Should().BeTrue(sold.IsFailure ? sold.Error.ToString() : null);
+        (await db.Set<StockMovement>().AsNoTracking().Where(m => m.CompanyId == companyId && m.ItemId == soda.Id && m.Reference == "FVA-S1").SumAsync(m => m.Value)).Should().Be(-10m);
+        (await db.Set<BudgetControlEvent>().AsNoTracking().AnyAsync(e => e.CompanyId == companyId)).Should().BeFalse("a sale's cost is neither blocked nor overridden");
+
+        // A manual journal to the same account is still held to the vote.
+        IPostingEngine engine = scope.ServiceProvider.GetRequiredService<IPostingEngine>();
+        (await engine.PostAsync(new JournalRequest
+        {
+            CompanyId = companyId, SourceModule = "GL", PostingDate = new DateOnly(2026, 3, 6), TransactionCurrency = Scenario.Usd, DocumentType = "Journal", DocumentNumber = "FVA-J5",
+            Lines =
+            [
+                new JournalLineRequest { AccountCode = "5000", Side = JournalSide.Debit, TransactionAmount = 10m },
+                new JournalLineRequest { AccountCode = "1100", Side = JournalSide.Credit, TransactionAmount = 10m },
+            ],
+        })).Error.Code.Should().Be("Posting.VoteExceeded");
+    }
 }

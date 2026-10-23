@@ -351,9 +351,15 @@ public interface IRestaurantService
     /// <param name="reason">The mandatory reason.</param>
     /// <param name="operatorUserId">The user reversing the bill.</param>
     /// <param name="authorisedByUserId">The supervisor authorising it: someone other than the operator, holding the restaurant void / reverse right (Pos.Restaurant).</param>
+    /// <param name="refundTillSessionId">
+    /// The open till session (of the same till) the bill's cash is paid back out of when the session it went into has already been cashed up: a refund
+    /// movement counted at that session's cash-up, while the bill stays in its own session's signed-off figures. Not needed while the bill's own session
+    /// is open (the bill drops out of it); refused (<c>Res.SessionClosed</c>) when the own session is closed and none is given or open.
+    /// </param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The reversal journal number (empty when the bill charged nothing).</returns>
-    Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, CancellationToken ct = default);
+    Task<Result<string>> ReverseBillAsync(long companyId, long billId, DateOnly date, string reason, long operatorUserId, long? authorisedByUserId, long? refundTillSessionId = null,
+        CancellationToken ct = default);
 
     /// <summary>
     /// Bills one seat's share of an order (split by seat): every not-yet-billed, non-voided line assigned to

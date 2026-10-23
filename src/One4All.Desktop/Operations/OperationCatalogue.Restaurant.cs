@@ -352,8 +352,10 @@ public static partial class OperationCatalogue
                 if (i.Text("Step") == "Reverse bill")
                 {
                     long? authoriser = i.Optional("Authoriser") is string supervisor ? await UserAsync(c, supervisor).ConfigureAwait(true) : null;
-                    return Check(await restaurant.ReverseBillAsync(c.CompanyId, (long)(i.OptionalNumber("Bill") ?? 0m), i.Date("Date"), i.Optional("Reason") ?? string.Empty, c.UserId, authoriser).ConfigureAwait(true),
-                        j => $"Bill reversed ({j}); the ingredients are back in stock.");
+                    // A bill whose session is already cashed up pays its cash back out of the till named (else my own open till).
+                    long? refundTill = await TillSessionAsync(c, i.Optional("Till")).ConfigureAwait(true);
+                    return Check(await restaurant.ReverseBillAsync(c.CompanyId, (long)(i.OptionalNumber("Bill") ?? 0m), i.Date("Date"), i.Optional("Reason") ?? string.Empty, c.UserId, authoriser, refundTill)
+                        .ConfigureAwait(true), j => $"Bill reversed ({j}); the ingredients are back in stock.");
                 }
 
                 long order = await OrderAsync(c, i.Optional("Order") ?? string.Empty).ConfigureAwait(true);

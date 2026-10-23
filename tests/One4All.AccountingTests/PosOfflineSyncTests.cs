@@ -167,6 +167,50 @@ public sealed class PosOfflineSyncTests
     }
 
     [SkippableFact]
+    public async Task A_till_opened_offline_resumes_the_same_cashiers_open_session_and_is_refused_to_another()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        Branch branch = new(companyId, "HO", "Head Office");
+        db.Branches.Add(branch);
+        await db.SaveChangesAsync();
+        PosTerminal terminal = new(companyId, branch.Id, "OFFTILL3", "Offline Till 3");
+        Item item = new(companyId, "OFFJUICE", "Juice") { CostOfSalesAccountCode = "5000", RevenueAccountCode = "4000" };
+        Warehouse wh = new(companyId, "OFFWH3", "Shop");
+        db.AddRange(terminal, item, wh);
+        await db.SaveChangesAsync();
+        (await scope.ServiceProvider.GetRequiredService<IInventoryService>().ReceiveAsync(new ReceiveStockRequest
+        {
+            CompanyId = companyId, ItemId = item.Id, WarehouseId = wh.Id, Date = new DateOnly(2026, 3, 1), Quantity = 10m, UnitCost = 1m, CreditAccountCode = "1100",
+        })).IsSuccess.Should().BeTrue();
+
+        // The till was opened online, then the line dropped and the till opened itself again offline: the same cashier carries on in the open session.
+        const long cashier = 900_811;
+        IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
+        long online = (await pos.OpenTillAsync(companyId, terminal.Id, cashier, 20m)).Value;
+        string key = $"OFF3-{companyId}";
+        DateTimeOffset opened = new(2026, 3, 2, 7, 0, 0, TimeSpan.Zero);
+        (await pos.OpenTillOfflineAsync(companyId, terminal.Id, cashier, 50m, opened, key)).Value.Should().Be(online);
+        (await pos.OpenTillOfflineAsync(companyId, terminal.Id, cashier, 50m, opened, key)).Value.Should().Be(online, "replaying the key again finds the same session");
+        (await db.Set<TillSession>().AsNoTracking().SingleAsync(s => s.Id == online)).OfflineKey.Should().Be(key);
+
+        // The sales rung up offline under that key land in the resumed session.
+        PosSaleEnvelope sale = new(companyId, terminal.Id, 0, cashier, $"OFFS3-{companyId}", new DateOnly(2026, 3, 2), wh.Id, "USD", "2200",
+            [new PosSaleLineEnvelope(item.Id, "Juice", 2m, 2m, 4m, 0m, "4000")], [new PosTenderEnvelope(TenderType.Cash, "USD", 4m, "1000", IsChange: false)], OfflineSessionKey: key);
+        (await scope.ServiceProvider.GetRequiredService<IOfflineOutbox>().EnqueueAsync(new OfflineOperation(companyId, Guid.NewGuid(), PosSaleEnvelope.Kind, JsonSerializer.Serialize(sale), opened.AddMinutes(5))))
+            .Should().BeTrue();
+        (await scope.ServiceProvider.GetRequiredService<IOfflineSyncService>().SyncPendingAsync()).Synced.Should().Be(1);
+        (await db.Set<Sale>().AsNoTracking().SingleAsync(s => s.CompanyId == companyId && s.SaleNumber == $"OFFS3-{companyId}")).TillSessionId.Should().Be(online);
+
+        // Another cashier's offline open is refused while the session is open, so no second session is opened beside it.
+        (await pos.OpenTillOfflineAsync(companyId, terminal.Id, 900_812, 0m, opened, $"OFF3B-{companyId}")).Error.Code.Should().Be("Pos.TillAlreadyOpen");
+        (await db.Set<TillSession>().AsNoTracking().CountAsync(s => s.TerminalId == terminal.Id && s.Status == TillSessionStatus.Open)).Should().Be(1);
+    }
+
+    [SkippableFact]
     public async Task A_void_a_refund_and_the_cash_up_captured_offline_replay_after_their_sales()
     {
         Skip.IfNot(_fixture.Available, _fixture.SkipReason);

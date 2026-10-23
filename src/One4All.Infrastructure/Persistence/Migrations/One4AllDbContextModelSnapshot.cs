@@ -28937,6 +28937,11 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
 
+                    b.Property<string>("CashAccountCode")
+                        .HasMaxLength(8)
+                        .HasColumnType("character varying(8)")
+                        .HasColumnName("cash_account_code");
+
                     b.Property<decimal>("CashAmount")
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
@@ -28989,6 +28994,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasPrecision(19, 4)
                         .HasColumnType("numeric(19,4)")
                         .HasColumnName("net");
+
+                    b.Property<long?>("RefundTillSessionId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("refund_till_session_id");
 
                     b.Property<string>("RevenueJournalNumber")
                         .IsRequired()

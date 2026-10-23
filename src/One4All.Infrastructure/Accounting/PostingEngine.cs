@@ -124,8 +124,9 @@ public sealed class PostingEngine : IPostingEngine
             return Error.Rule("Posting.BankReconciled", $"Bank account {lockedBank} is reconciled past {request.PostingDate:yyyy-MM-dd}; post the entry in an open period.");
         }
 
-        // Fund control: no expenditure against a vote without an appropriation, nor beyond what is still available on it.
-        if (company.FundControlEnabled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, request.BudgetGatePassed, ct).ConfigureAwait(false) is { } unappropriated)
+        // Fund control: no expenditure against a vote without an appropriation, nor beyond what is still available on it. The cost of a sale already
+        // made (a till sale's stock issue, loyalty points earned on it) is not discretionary spending and is never held back by the vote.
+        if (company.FundControlEnabled && !request.NotVoteControlled && await CheckAppropriationAsync(request.CompanyId, fiscalYear.Id, journal, request.BudgetGatePassed, ct).ConfigureAwait(false) is { } unappropriated)
         {
             JournalLine refused = journal.Lines.First(l => l.AccountCode == unappropriated.Account && l.BaseDebit > 0m);
             BudgetControlEvent decision = new(request.CompanyId, BudgetControlOutcome.Blocked, request.PostingDate, refused.AccountCode, refused.Department, refused.BaseDebit,

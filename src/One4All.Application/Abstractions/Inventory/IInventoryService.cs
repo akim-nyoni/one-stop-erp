@@ -75,6 +75,12 @@ public sealed class IssueStockRequest
     /// <summary>Whether the charge was already committed against the budget (goods ordered for a job): fund control then does not count it twice.</summary>
     public bool BudgetGatePassed { get; init; }
 
+    /// <summary>
+    /// Whether the issue is the cost of a sale already made (a till or restaurant sale, a sales-order despatch, a layby release): not discretionary
+    /// spending, so fund control does not hold it back on the cost-of-sales vote. Internal consumption and wastage leave this false.
+    /// </summary>
+    public bool NotVoteControlled { get; init; }
+
     /// <summary>The sales-order line despatching the stock (its own reservation may be used); every other issue leaves reserved stock alone.</summary>
     public long? SalesOrderLineId { get; init; }
 

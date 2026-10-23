@@ -37,11 +37,28 @@ public readonly record struct PosSaleLineRequest(long ItemId, string Description
 public readonly record struct PosTenderRequest(TenderType TenderType, CurrencyCode Currency, decimal Amount, string AccountCode, bool IsChange, decimal? ExchangeRate = null, long? StaffEmployeeId = null,
     string? VoucherNumber = null);
 
+/// <summary>Where a sale request comes from.</summary>
+public enum SaleSource
+{
+    /// <summary>A till of the company (the desktop till, a restaurant bill, an exchange): its catalogue and tax tables are the server's own.</summary>
+    Till = 0,
+
+    /// <summary>The public API: an outside caller whose figures are held to the item in full.</summary>
+    Api = 1,
+}
+
 /// <summary>A request to complete a POS sale.</summary>
 public sealed class CompleteSaleRequest
 {
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }
+
+    /// <summary>
+    /// Gets where the request comes from. An API sale is held to the item in full: an item with no price on any list sells only on a supervisor's
+    /// price-override authority (<c>Pos.PriceOverride</c>), an item whose tax code has no rate on the sale date is refused (<c>Pos.TaxCode</c>) and an
+    /// item with no tax code at all sells untaxed (<c>Pos.LineTax</c>). A till's own figures stand where the server has nothing to hold them to.
+    /// </summary>
+    public SaleSource Source { get; init; }
 
     /// <summary>The terminal.</summary>
     public long TerminalId { get; init; }
@@ -222,7 +239,8 @@ public interface IPosService
 
     /// <summary>
     /// Opens the till a terminal opened offline, at the time it was opened there, under its offline key; replaying the same key again returns the
-    /// session already opened.
+    /// session already opened. One open session per till, as online: the till's open session is resumed by the same cashier (it takes the offline key,
+    /// so the sales replayed under it land there) and refused to another (<c>Pos.TillAlreadyOpen</c>).
     /// </summary>
     Task<Result<long>> OpenTillOfflineAsync(long companyId, long terminalId, long cashierUserId, decimal openingFloat, DateTimeOffset openedUtc, string offlineKey, CancellationToken ct = default);
 

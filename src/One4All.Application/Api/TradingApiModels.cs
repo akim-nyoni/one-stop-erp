@@ -148,8 +148,12 @@ public sealed record PosTenderApi(string TenderType, string Currency, decimal Am
 /// <param name="Tenders">The tenders.</param>
 /// <param name="TaxAccountCode">The output tax account.</param>
 /// <param name="CustomerId">The account customer, when any.</param>
+/// <param name="PriceOverrideAuthorisedByUserId">
+/// The supervisor (other than the cashier, holding Pos.PriceOverride) authorising a unit price other than the item's price in force - or any price at
+/// all for an item with no price on any list.
+/// </param>
 public sealed record PosSaleApi(long TerminalId, long TillSessionId, long CashierUserId, string SaleNumber, DateOnly SaleDate, long WarehouseId, IReadOnlyList<PosSaleLineApi> Lines, IReadOnlyList<PosTenderApi> Tenders,
-    string? TaxAccountCode = null, long? CustomerId = null);
+    string? TaxAccountCode = null, long? CustomerId = null, long? PriceOverrideAuthorisedByUserId = null);
 
 /// <summary>Turns the REST API's documents into the application's requests (currencies and enums parsed, the company stamped on).</summary>
 public static class TradingApiMapping
@@ -304,7 +308,7 @@ public static class TradingApiMapping
         return new CompleteSaleRequest
         {
             CompanyId = companyId, TerminalId = api.TerminalId, TillSessionId = api.TillSessionId, CashierUserId = cashierUserId ?? api.CashierUserId, SaleNumber = api.SaleNumber, SaleDate = api.SaleDate, WarehouseId = api.WarehouseId,
-            CustomerId = api.CustomerId, TaxAccountCode = api.TaxAccountCode,
+            CustomerId = api.CustomerId, TaxAccountCode = api.TaxAccountCode, Source = SaleSource.Api, PriceOverrideAuthorisedByUserId = api.PriceOverrideAuthorisedByUserId,
             Lines = [.. api.Lines.Select(l => new PosSaleLineRequest(l.ItemId, l.Description, l.Quantity, l.UnitPrice, l.LineNet, l.TaxAmount, l.RevenueAccountCode, Note: l.Note, SerialNumber: l.SerialNumber, GiftWrap: l.GiftWrap))],
             Tenders = tenders,
         };

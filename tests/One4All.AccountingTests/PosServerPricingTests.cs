@@ -95,4 +95,62 @@ public sealed class PosServerPricingTests
         (await db.PosEvents.AsNoTracking().Where(e => e.CompanyId == companyId && e.SaleNumber == "PSP-4").Select(e => e.Description).SingleAsync())
             .Should().Contain("18.00 where the price is 20.00");
     }
+
+    [SkippableFact]
+    public async Task An_api_sale_is_held_to_the_item_in_full()
+    {
+        Skip.IfNot(_fixture.Available, _fixture.SkipReason);
+        await using ServiceProvider provider = _fixture.BuildServiceProvider();
+        await using AsyncServiceScope scope = provider.CreateAsyncScope();
+        One4AllDbContext db = scope.ServiceProvider.GetRequiredService<One4AllDbContext>();
+        long companyId = await Scenario.SeedAsync(db);
+        (await scope.ServiceProvider.GetRequiredService<IMasterDataService>().CreateTaxCodeAsync(new NewTaxCode(companyId, "PSA15", "Standard 15%", TaxType.Standard, 15m,
+            new DateOnly(2026, 1, 1), "2200", "2200"))).IsSuccess.Should().BeTrue();
+        Branch branch = new(companyId, "PSA-BR", "Shop");
+        db.Branches.Add(branch);
+        Item mug = new(companyId, "PSA-MUG", "Mug") { RevenueAccountCode = "4400", CostOfSalesAccountCode = "5000" }; // no price, no tax code
+        Item cup = new(companyId, "PSA-CUP", "Cup") { RevenueAccountCode = "4400", CostOfSalesAccountCode = "5000", TaxCode = "PSA-NONE" }; // a tax code the company has not
+        Item jug = new(companyId, "PSA-JUG", "Jug") { RevenueAccountCode = "4400", CostOfSalesAccountCode = "5000", TaxCode = "PSA15" };
+        Warehouse shop = new(companyId, "PSA-WH", "Shop");
+        db.AddRange(mug, cup, jug, shop);
+        await db.SaveChangesAsync();
+        PosTerminal terminal = new(companyId, branch.Id, "PSA-TILL", "Till");
+        db.Add(terminal);
+        await db.SaveChangesAsync();
+        long supervisor = await Scenario.UserWithAsync(db, "psa-super", "Pos.PriceOverride", OperationFlags.OverridePrice);
+        IPricingService pricing = scope.ServiceProvider.GetRequiredService<IPricingService>();
+        long list = (await pricing.CreatePriceListAsync(companyId, "PSA-RET", "Retail", Scenario.Usd, isDefault: true)).Value;
+        (await pricing.SetPriceAsync(companyId, list, jug.Id, 1m, 10m)).IsSuccess.Should().BeTrue();
+
+        IPosService pos = scope.ServiceProvider.GetRequiredService<IPosService>();
+        const long cashier = 900_821;
+        long session = (await pos.OpenTillAsync(companyId, terminal.Id, cashier, openingFloat: 0m)).Value;
+        CompleteSaleRequest Sale(string number, PosSaleLineRequest line, SaleSource source = SaleSource.Api, long? authorisedBy = null) => new()
+        {
+            CompanyId = companyId, TerminalId = terminal.Id, TillSessionId = session, CashierUserId = cashier, SaleNumber = number, SaleDate = new DateOnly(2026, 6, 2), WarehouseId = shop.Id,
+            TaxAccountCode = "2200", Lines = [line], Tenders = [new PosTenderRequest(TenderType.Cash, Scenario.Usd, line.LineNet + line.TaxAmount, "1000", IsChange: false)],
+            PriceOverrideAuthorisedByUserId = authorisedBy, Source = source,
+        };
+
+        // An item on no price list: an outside caller cannot name its own price - a supervisor's override authority is needed, as for any off-list price.
+        PosSaleLineRequest cheapMug = new(mug.Id, "Mug", 1m, 0.01m, 0.01m, 0m, "4400");
+        (await pos.CompleteSaleAsync(Sale("PSA-1", cheapMug))).Error.Code.Should().Be("Pos.PriceOverride");
+        (await pos.CompleteSaleAsync(Sale("PSA-1", cheapMug, authorisedBy: cashier))).Error.Code.Should().Be("Pos.PriceOverride");
+        var authorised = await pos.CompleteSaleAsync(Sale("PSA-1", cheapMug, authorisedBy: supervisor));
+        authorised.IsSuccess.Should().BeTrue(authorised.IsFailure ? authorised.Error.ToString() : null);
+        var fromTill = await pos.CompleteSaleAsync(Sale("PSA-2", cheapMug, SaleSource.Till));
+        fromTill.IsSuccess.Should().BeTrue(fromTill.IsFailure ? fromTill.Error.ToString() : null); // the till's own catalogue stands
+
+        // Tax: an item with no tax code sells untaxed; one whose tax code has no rate is refused; one with a rate is held to it.
+        (await pos.CompleteSaleAsync(Sale("PSA-3", new PosSaleLineRequest(mug.Id, "Mug", 1m, 0.01m, 0.01m, 0.15m, "4400"), authorisedBy: supervisor))).Error.Code.Should().Be("Pos.LineTax");
+        (await pos.CompleteSaleAsync(Sale("PSA-4", new PosSaleLineRequest(cup.Id, "Cup", 1m, 5m, 5m, 0m, "4400"), authorisedBy: supervisor))).Error.Code.Should().Be("Pos.TaxCode");
+        (await pos.CompleteSaleAsync(Sale("PSA-5", new PosSaleLineRequest(jug.Id, "Jug", 1m, 10m, 10m, 0m, "4400")))).Error.Code.Should().Be("Pos.LineTax");
+        var jugSale = await pos.CompleteSaleAsync(Sale("PSA-5", new PosSaleLineRequest(jug.Id, "Jug", 1m, 10m, 10m, 1.5m, "4400")));
+        jugSale.IsSuccess.Should().BeTrue(jugSale.IsFailure ? jugSale.Error.ToString() : null);
+
+        // A line with no item (a menu line) keeps its figures but must name a revenue account the company has.
+        (await pos.CompleteSaleAsync(Sale("PSA-6", new PosSaleLineRequest(0, "Soup of the day", 1m, 6m, 6m, 0m, "9999")))).Error.Code.Should().Be("Pos.RevenueAccount");
+        var menuLine = await pos.CompleteSaleAsync(Sale("PSA-6", new PosSaleLineRequest(0, "Soup of the day", 1m, 6m, 6m, 0m, "4000")));
+        menuLine.IsSuccess.Should().BeTrue(menuLine.IsFailure ? menuLine.Error.ToString() : null);
+    }
 }
