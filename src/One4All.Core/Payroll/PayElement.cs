@@ -236,6 +236,9 @@ public sealed class PayElement : SoftDeletableEntity, ICompanyScoped
     /// <summary>Gets or sets how the amount is rounded to <see cref="RoundTo"/>.</summary>
     public PayRounding Rounding { get; set; }
 
+    /// <summary>Gets or sets the statutory return line the element is (PAYE, AIDS levy, social security, medical aid); none: recognised by its name.</summary>
+    public StatutoryKind StatutoryKind { get; set; }
+
     /// <summary>Gets or sets the expense account per department, as "DEPT=ACCOUNT;…" (the element's own account elsewhere).</summary>
     public string? DepartmentAccounts { get; set; }
 
@@ -304,6 +307,28 @@ public enum PayRounding
 
     /// <summary>Down to the unit below.</summary>
     Down = 2,
+}
+
+/// <summary>
+/// The statutory return line a pay element is (PAYE return, tax certificates): flagged on the element so a levy or contribution is counted whatever it is
+/// called. An element left at <see cref="None"/> is recognised by its code and name, as before.
+/// </summary>
+public enum StatutoryKind
+{
+    /// <summary>Not flagged: recognised by name (a deduction naming PAYE or tax is income tax, one naming AIDS the AIDS levy).</summary>
+    None = 0,
+
+    /// <summary>Income tax (PAYE).</summary>
+    Paye = 1,
+
+    /// <summary>The AIDS levy on PAYE.</summary>
+    AidsLevy = 2,
+
+    /// <summary>Social security (NSSA): the employee's deduction or the employer's contribution.</summary>
+    SocialSecurity = 3,
+
+    /// <summary>Medical aid contributions.</summary>
+    MedicalAid = 4,
 }
 
 /// <summary>A balance a payroll deduction recovers from the employee (brief §4.15.4).</summary>

@@ -124,8 +124,12 @@ public sealed class EmployeeSelfService : IEmployeeSelfService
         DateOnly from = new(year, 1, 1), to = new(year, 12, 31);
         List<PayslipLine> lines = await _db.Payslips.AsNoTracking().Where(p => p.CompanyId == e.CompanyId && p.EmployeeId == e.Id && p.PayDate >= from && p.PayDate <= to).SelectMany(p => p.Lines)
             .ToListAsync(ct).ConfigureAwait(false);
+        Dictionary<string, StatutoryKind> flagged = (await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter])
+                .Where(x => x.CompanyId == e.CompanyId && x.StatutoryKind != StatutoryKind.None).Select(x => new { x.Code, x.StatutoryKind }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().StatutoryKind, StringComparer.OrdinalIgnoreCase);
         return new TaxCertificate(year, e.EmployeeNumber, e.FullName, e.TaxNumber, lines.Where(l => l.Type == PayElementType.Earning).Sum(l => l.Amount),
-            lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount), lines.Where(l => TaxLines.IsTax(l.Type, l.ElementCode, l.Description)).Sum(l => l.Amount));
+            lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount),
+            lines.Where(l => TaxLines.IsTax(l.Type, l.ElementCode, l.Description, flagged.GetValueOrDefault(l.ElementCode))).Sum(l => l.Amount));
     }
 
     /// <inheritdoc />

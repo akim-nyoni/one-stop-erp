@@ -145,12 +145,17 @@ public static class PayrollReports
         yield return Listing("PR20", "Deductions vs Remittances", "Payroll", "Per scheme and period: what the payroll deducted and contributed against what was paid over, with the gap.",
             "PyrlRemittances", [new Column("Scheme", "Scheme", 120), new Column("Period", "Period", 70), new Column("Deducted", "Deducted + contributed", 120), new Column("Remitted", "Remitted", 100),
              new Column("Status", "Status", 90), new Column("Outstanding", "Outstanding", 100, true)], Period);
-        yield return Listing("PR27", "PAYE Remittance Return", "Payroll", "Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference.",
-            "PyrlPayeReturn", [new Column("Month", "Month", 70), new Column("Employees", "Employees", 65), new Column("Taxable", "Taxable", 100), new Column("ByTable", "Per tax table", 100), new Column("Difference", "Difference", 90),
+        yield return Listing("PR27", "PAYE Remittance Return", "Payroll", "Per month and currency the earnings were paid in: employees, taxable earnings, PAYE by the tax table in force and as deducted with any difference, "
+            + "and the AIDS levy - in base, and in the currency itself at the pay date's rate.",
+            "PyrlPayeReturn", [new Column("Month", "Month", 70), new Column("Currency", "Currency", 55), new Column("Employees", "Employees", 65), new Column("Taxable", "Taxable", 100),
+             new Column("ByTable", "Per tax table", 100), new Column("Difference", "Difference", 90), new Column("Levy", "AIDS levy", 85), new Column("Rate", "Rate", 70),
+             new Column("TaxableInCurrency", "Taxable in currency", 100), new Column("PayeInCurrency", "PAYE in currency", 95), new Column("LevyInCurrency", "Levy in currency", 85),
              new Column("Deducted", "PAYE deducted", 100, true)], Period);
-        yield return Listing("PR28", "Annual Tax Certificates", "Payroll", "Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE - the certificate data.",
+        yield return Listing("PR28", "Annual Tax Certificates", "Payroll", "Per employee for the tax year: ID and tax numbers, gross, taxable, pension, medical aid, social security (employee and employer), "
+            + "AIDS levy and PAYE - the certificate (P2 / ITF16) data.",
             "PyrlCertificates", [new Column("Employee", "Employee", 160), new Column("NationalId", "National ID", 100), new Column("TaxNumber", "Tax no.", 80), new Column("Gross", "Gross", 95), new Column("Taxable", "Taxable", 95),
-             new Column("Pension", "Pension", 85), new Column("Paye", "PAYE", 95, true)], Period);
+             new Column("Pension", "Pension", 85), new Column("Medical", "Medical aid", 85), new Column("SocialSecurity", "Social security", 85),
+             new Column("SocialSecurityEmployer", "Social security (employer)", 95), new Column("AidsLevy", "AIDS levy", 80), new Column("Paye", "PAYE", 95, true)], Period);
         yield return Listing("PR30", "Social Security Contribution Schedule", "Payroll", "Social security members with the period's employee and employer contributions.",
             "PyrlSchemeSocial", [new Column("Scheme", "Scheme", 110), new Column("Employee", "Employee", 160), new Column("Member", "Member no.", 90), new Column("EmployeePart", "Employee", 90),
              new Column("EmployerPart", "Employer", 90), new Column("Total", "Total", 95, true)], Period);

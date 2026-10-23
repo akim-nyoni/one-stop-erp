@@ -99,7 +99,7 @@ public sealed class PayrollReportsTests
         (await Render("PR7")).Should().Contain("2026-01,2026-01-25,2,\"3,306.45\",280.00,JNL-");
         (await Render("PR19")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
         (await Render("PR20")).Should().Contain("PEN Pension Fund,2026-01,100.00,100.00,Remitted,0");
-        (await Render("PR27")).Should().Contain("2026-01,2,\"3,306.45\",261.29,-81.29,180"); // the formula relieves pension; the table does not
+        (await Render("PR27")).Should().Contain("2026-01,USD,2,\"3,306.45\",261.29,-81.29,0.00,1,\"3,306.45\",180.00,0.00,180"); // the formula relieves pension; the table does not
         (await Render("PR31")).Should().Contain("PEN Pension Fund,PR-EMP Pat Payee,PF-77,100.00,0.00,100");
         (await Render("PR36")).Should().Contain("TAX26,2026-01-01,0.00,\"1,000.00\",0,0.00").And.Contain("and above");
 

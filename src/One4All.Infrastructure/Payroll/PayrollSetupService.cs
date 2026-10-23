@@ -493,6 +493,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
         target.DepartmentAccounts = Clean(element.DepartmentAccounts);
         target.LookupVariable = Clean(element.LookupVariable)?.ToUpperInvariant();
         target.LookupBands = Clean(element.LookupBands);
+        target.StatutoryKind = element.StatutoryKind;
         return Apply(target, new PayElementOptions(element.Recovers, element.BenefitCategory, element.PaidInCurrency, element.CumulativeTax, element.SplitCurrencyTax, element.IsAnnualPayment,
             element.AmountsInPaidCurrency));
     }
@@ -825,7 +826,7 @@ public sealed class PayrollSetupService : IPayrollSetupService
             Earn("OVERTIME", "Overtime", CalculationBasis.RatePerUnit, 2),
             Earn("HOUSING", "Housing allowance", CalculationBasis.FixedAmount, 3) with { BenefitCategory = "Housing" },
             Earn("TRANSPORT", "Transport allowance", CalculationBasis.FixedAmount, 4) with { BenefitCategory = "Transport" },
-            Deduct("PAYE", "PAYE", CalculationBasis.TaxTable, 50) with { TaxTableCode = taxTableCode },
+            Deduct("PAYE", "PAYE", CalculationBasis.TaxTable, 50) with { TaxTableCode = taxTableCode, StatutoryKind = StatutoryKind.Paye },
             Earn("OVERTIME2", "Overtime at double time", CalculationBasis.RatePerUnit, 5),
             Earn("OVERTIMEPH", "Public-holiday overtime", CalculationBasis.RatePerUnit, 6),
             Earn("ACTING", "Acting allowance", CalculationBasis.Formula, 7) with { Formula = "ACTINGALLOWANCE" },
@@ -842,8 +843,8 @@ public sealed class PayrollSetupService : IPayrollSetupService
             Earn("SEVERANCE", "Severance pay", CalculationBasis.FixedAmount, 18),
             Earn("NOTICEPAY", "Notice pay", CalculationBasis.FixedAmount, 19),
             Deduct("PENSION", "Pension fund", CalculationBasis.PercentOfBasic, 51),
-            Deduct("SOCIALSEC", "Social security", CalculationBasis.PercentOfBasic, 52),
-            Deduct("MEDICAL", "Medical aid", CalculationBasis.FixedAmount, 53),
+            Deduct("SOCIALSEC", "Social security", CalculationBasis.PercentOfBasic, 52) with { StatutoryKind = StatutoryKind.SocialSecurity },
+            Deduct("MEDICAL", "Medical aid", CalculationBasis.FixedAmount, 53) with { StatutoryKind = StatutoryKind.MedicalAid },
             Deduct("UNION", "Union dues", CalculationBasis.FixedAmount, 54),
             Deduct("ADVANCE", "Salary advance recovery", CalculationBasis.FixedAmount, 55),
             Deduct("GARNISHEE", "Garnishee and court orders", CalculationBasis.FixedAmount, 56),

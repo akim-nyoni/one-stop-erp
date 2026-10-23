@@ -346,6 +346,7 @@ public static partial class OperationCatalogue
                 OptNum("Balance", "Balance to recover (assign; balance-driven element)"),
                 Pick("Recovers", "Recovers (deduction)", Enum.GetNames<PayRecovery>()), Opt("BenefitCategory", "Taxable-benefit category (PR34), e.g. Housing"), Opt("PaidIn", "Paid in currency (blank: base)"),
                 Tick("AmountsInCurrency", "Amounts keyed in the paid-in currency"), Tick("CumulativeTax", "Cumulative tax (year to date)"), Tick("SplitTax", "Tax per currency (split-currency pay)"), Tick("Annual", "Annual payment (bonus tax spread)"),
+                Pick("Statutory", "Statutory return line (PAYE, AIDS levy, social security, medical aid; None: by its name)", Enum.GetNames<StatutoryKind>()),
                 Opt("TableCurrency", "Tax table currency (blank: base; one table per currency for split-currency tax)"),
                 Opt("BasisGroup", "Percentage of group (percent-of-group)"), OptNum("Floor", "Floor"), OptNum("Ceiling", "Ceiling"), OptNum("RoundTo", "Round to (unit)"),
                 Pick("Rounding", "Rounding", Enum.GetNames<PayRounding>()), Opt("Expense", "Expense account (contribution / provision)"), Opt("DeptAccounts", "Accounts by department: DEPT=ACCOUNT; …"),
@@ -425,7 +426,7 @@ public static partial class OperationCatalogue
                 ("Expense", e => e.ContributionExpenseAccountCode ?? string.Empty), ("Dept accounts", e => e.DepartmentAccounts ?? string.Empty),
                 ("Lookup variable", e => e.LookupVariable ?? string.Empty), ("Lookup bands", e => e.LookupBands ?? string.Empty), ("Recovers", e => e.Recovers),
                 ("Benefit category", e => e.BenefitCategory ?? string.Empty), ("Paid in", e => e.PaidInCurrency?.ToString() ?? string.Empty), ("Amounts keyed in the paid-in currency", e => e.AmountsInPaidCurrency), ("Cumulative tax", e => e.CumulativeTax),
-                ("Split tax", e => e.SplitCurrencyTax), ("Annual", e => e.IsAnnualPayment)),
+                ("Split tax", e => e.SplitCurrencyTax), ("Annual", e => e.IsAnnualPayment), ("Statutory", e => e.StatutoryKind)),
         };
         yield return new Operation
         {
@@ -2392,5 +2393,6 @@ public static partial class OperationCatalogue
             LookupVariable = i.Optional("LookupVariable"), LookupBands = i.Optional("LookupBands"),
             Recovers = Enum.Parse<PayRecovery>(i.Text("Recovers")), BenefitCategory = i.Optional("BenefitCategory"), PaidInCurrency = i.Optional("PaidIn"),
             CumulativeTax = i.Flag("CumulativeTax"), SplitCurrencyTax = i.Flag("SplitTax"), IsAnnualPayment = i.Flag("Annual"), AmountsInPaidCurrency = i.Flag("AmountsInCurrency"),
+            StatutoryKind = i.Optional("Statutory") is string statutory ? Enum.Parse<StatutoryKind>(statutory) : StatutoryKind.None,
         };
 }

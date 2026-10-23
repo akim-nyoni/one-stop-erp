@@ -284,6 +284,9 @@ public sealed record NewPayElement(string Code, string Name, PayElementType Type
     /// <summary>An annual payment (bonus) whose tax is spread over the year.</summary>
     public bool IsAnnualPayment { get; init; }
 
+    /// <summary>The statutory return line the element is (PAYE, AIDS levy, social security, medical aid); none: recognised by its name.</summary>
+    public StatutoryKind StatutoryKind { get; init; }
+
     /// <summary>The element group an earning adds to.</summary>
     public string? Group { get; init; }
 

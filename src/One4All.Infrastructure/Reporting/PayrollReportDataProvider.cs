@@ -33,6 +33,9 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         DateOnly asAt = DateParameter(parameters, "AsAtDate") ?? today;
         DateOnly toDate = DateParameter(parameters, "ToDate") ?? today;
         DateOnly fromDate = DateParameter(parameters, "FromDate") ?? new DateOnly(toDate.Year, 1, 1);
+        _statutory = (await _db.PayElements.AsNoTracking().IgnoreQueryFilters([Persistence.One4AllDbContext.SoftDeleteFilter])
+                .Where(e => e.CompanyId == companyId && e.StatutoryKind != StatutoryKind.None).Select(e => new { e.Code, e.StatutoryKind }).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(e => e.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().StatutoryKind, StringComparer.OrdinalIgnoreCase);
         return command.ToUpperInvariant() switch
         {
             "PYRLSUMMARY" => await SummaryAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false),
@@ -275,8 +278,14 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
                 ("Amount", g.Sum(x => x.Line.Amount))))];
     }
 
-    // PAYE is any deduction whose code or description names tax.
-    private static bool IsTax(PayslipLine line) => TaxLines.IsTax(line.Type, line.ElementCode, line.Description);
+    // The company's pay elements flagged as a statutory line (PAYE, AIDS levy, social security, medical aid), by code; loaded with each request.
+    private Dictionary<string, StatutoryKind> _statutory = new(StringComparer.OrdinalIgnoreCase);
+
+    // A line's statutory kind: its element's flag, or for an unflagged element what its code or description names.
+    private StatutoryKind KindOf(PayslipLine line) => TaxLines.KindOf(line.Type, line.ElementCode, line.Description, _statutory.GetValueOrDefault(line.ElementCode));
+
+    // PAYE: a deduction flagged as income tax, or an unflagged one whose code or description names tax.
+    private bool IsTax(PayslipLine line) => KindOf(line) == StatutoryKind.Paye;
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> TaxAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
@@ -703,8 +712,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CurrencySplitAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
         CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
-        Dictionary<string, CurrencyCode> paidIn = (await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null).ToListAsync(ct).ConfigureAwait(false))
-            .GroupBy(e => e.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, CurrencyCode> paidIn = await PaidInAsync(companyId, ct).ConfigureAwait(false);
         List<TaxTable> tables = await TaxTablesAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
         Dictionary<(CurrencyCode, DateOnly), decimal?> rates = [];
@@ -787,8 +795,7 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         CancellationToken ct)
     {
         CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
-        Dictionary<string, CurrencyCode> paidIn = (await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null).ToListAsync(ct).ConfigureAwait(false))
-            .GroupBy(e => e.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, CurrencyCode> paidIn = await PaidInAsync(companyId, ct).ConfigureAwait(false);
         List<Payslip> slips = runReference is null
             ? await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)
             : await _db.Payslips.AsNoTracking().Include(p => p.Lines).Where(p => p.CompanyId == companyId && p.RunReference.ToUpper() == runReference.ToUpper()).OrderBy(p => p.PayDate)
@@ -1348,34 +1355,173 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
 
     private static decimal FinalPayTaxable(Termination t) => t.ProRataSalary + t.Notice + t.Leave + t.Gratuity + t.Severance;
 
+    // PR27: per month and currency the earnings were paid in, the employees, the taxable earnings, PAYE by the tax table in force (each payslip's
+    // table tax shared by its taxable earnings' currencies) and as deducted, and the AIDS levy - in base, the tax and levy split by the lines' currency
+    // splits (the base taking the rest of each line), and each in the currency itself at the pay date's rate. A leaver's final pay is in base.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> PayeReturnAsync(long companyId, DateOnly fromDate, DateOnly toDate, CancellationToken ct)
     {
+        CurrencyCode baseCurrency = await _db.Companies.AsNoTracking().Where(c => c.Id == companyId).Select(c => c.BaseCurrency).FirstAsync(ct).ConfigureAwait(false);
+        Dictionary<string, CurrencyCode> paidIn = await PaidInAsync(companyId, ct).ConfigureAwait(false);
         List<TaxTable> tables = await TaxTablesAsync(companyId, ct).ConfigureAwait(false);
         List<Payslip> slips = await PayslipsAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false);
         ILookup<string, Termination> finals = (await FinalPaysAsync(companyId, fromDate, toDate, ct).ConfigureAwait(false)).ToLookup(t => t.LastDay.ToString("yyyy-MM", CultureInfo.InvariantCulture));
-        return [.. slips.Select(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)).Concat(finals.Select(f => f.Key)).Distinct().Order(StringComparer.Ordinal)
-            .Select(month =>
+        Dictionary<(CurrencyCode, DateOnly), decimal?> rates = [];
+        async Task<decimal?> RateAsync(CurrencyCode currency, DateOnly date)
+        {
+            if (currency == baseCurrency)
             {
-                List<Payslip> g = [.. slips.Where(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture) == month)];
-                List<Termination> leavers = [.. finals[month]];
-                decimal finalTax = leavers.Sum(x => x.OrdinaryTax + x.TerminalTax);
-                decimal taxable = g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount) + leavers.Sum(FinalPayTaxable);
-                decimal deducted = g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount) + finalTax;
-                // Final pay was taxed on its own rules (ordinary pay on the table, benefits on the terminal rate or table), so it counts as taxed as due.
-                decimal? byTable = g.All(p => InForce(tables, p.PayDate) is not null)
-                    ? g.Sum(p => PayeTable.Tax(InForce(tables, p.PayDate)!.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), p.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount)))
-                        + finalTax
-                    : null;
-                return (IReadOnlyDictionary<string, object?>)Row(("Month", month), ("Employees", g.Select(p => p.EmployeeId).Concat(leavers.Select(x => x.EmployeeId)).Distinct().Count()),
-                    ("Taxable", Money(taxable)), ("ByTable", byTable is decimal t ? Money(t) : "no table"), ("Difference", byTable is decimal d ? Money(deducted - d) : "-"), ("Deducted", deducted));
-            })];
+                return 1m;
+            }
+
+            if (!rates.TryGetValue((currency, date), out decimal? rate))
+            {
+                rate = await Accounting.ExchangeRateResolver.FindAsync(_db, currency, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+                rate = rate is > 0m ? rate : null;
+                rates[(currency, date)] = rate;
+            }
+
+            return rate;
+        }
+
+        List<IReadOnlyDictionary<string, object?>> rows = [];
+        foreach (string month in slips.Select(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture)).Concat(finals.Select(f => f.Key)).Distinct().Order(StringComparer.Ordinal))
+        {
+            Dictionary<CurrencyCode, PayeReturnTotal> totals = new() { [baseCurrency] = new PayeReturnTotal() };
+            PayeReturnTotal For(CurrencyCode currency) => totals.TryGetValue(currency, out PayeReturnTotal? total) ? total : totals[currency] = new PayeReturnTotal();
+            bool tabled = true;
+            foreach (Payslip slip in slips.Where(p => p.PayDate.ToString("yyyy-MM", CultureInfo.InvariantCulture) == month))
+            {
+                async Task AddAsync(CurrencyCode currency, decimal amount, StatutoryKind kind)
+                {
+                    decimal? rate = await RateAsync(currency, slip.PayDate).ConfigureAwait(false);
+                    For(currency).Add(slip.EmployeeId, kind, amount, rate);
+                }
+
+                // Taxable earnings by the currency each element is paid in ("" for base, as the run keys them).
+                Dictionary<string, decimal> taxableByCurrency = new(StringComparer.Ordinal);
+                foreach (PayslipLine line in slip.Lines.Where(l => l.Type == PayElementType.Earning && l.Taxable))
+                {
+                    CurrencyCode currency = paidIn.TryGetValue(line.ElementCode, out CurrencyCode c) ? c : baseCurrency;
+                    string key = currency == baseCurrency ? string.Empty : currency.Value;
+                    taxableByCurrency[key] = taxableByCurrency.GetValueOrDefault(key) + line.Amount;
+                    await AddAsync(currency, line.Amount, StatutoryKind.None).ConfigureAwait(false);
+                }
+
+                foreach (PayslipLine line in slip.Lines)
+                {
+                    StatutoryKind kind = KindOf(line);
+                    if (kind is not (StatutoryKind.Paye or StatutoryKind.AidsLevy))
+                    {
+                        continue;
+                    }
+
+                    decimal foreign = 0m;
+                    foreach ((string code, decimal portion) in PayslipCurrencySplit.Parse(line.CurrencySplit))
+                    {
+                        await AddAsync(CurrencyCode.Parse(code), portion, kind).ConfigureAwait(false);
+                        foreign += portion;
+                    }
+
+                    await AddAsync(baseCurrency, line.Amount - foreign, kind).ConfigureAwait(false);
+                }
+
+                if (InForce(tables, slip.PayDate) is not TaxTable table)
+                {
+                    tabled = false;
+                    continue;
+                }
+
+                decimal byTable = PayeTable.Tax(table.Bands.Select(b => new PayeBand(b.From, b.To, b.RatePercent)), taxableByCurrency.Values.Sum());
+                foreach ((string code, decimal share) in PayslipCurrencySplit.Apportion(byTable, taxableByCurrency))
+                {
+                    For(code.Length == 0 ? baseCurrency : CurrencyCode.Parse(code)).ByTable += share;
+                }
+            }
+
+            // Final pay was taxed on its own rules (ordinary pay on the table, benefits on the terminal rate or table), so it counts as taxed as due.
+            foreach (Termination leaver in finals[month])
+            {
+                PayeReturnTotal total = For(baseCurrency);
+                total.Add(leaver.EmployeeId, StatutoryKind.None, FinalPayTaxable(leaver), 1m);
+                total.Add(leaver.EmployeeId, StatutoryKind.Paye, leaver.OrdinaryTax + leaver.TerminalTax, 1m);
+                total.ByTable += leaver.OrdinaryTax + leaver.TerminalTax;
+            }
+
+            foreach ((CurrencyCode currency, PayeReturnTotal total) in totals.OrderBy(t => t.Key == baseCurrency ? 0 : 1).ThenBy(t => t.Key.Value, StringComparer.Ordinal))
+            {
+                string InCurrency(decimal amount) => total.Rates.Contains(null) ? "no rate" : Money(amount);
+                List<decimal?> used = [.. total.Rates];
+                rows.Add(Row(("Month", month), ("Currency", currency.Value), ("Employees", total.Employees.Count), ("Taxable", Money(total.Taxable)),
+                    ("ByTable", tabled ? Money(total.ByTable) : "no table"), ("Difference", tabled ? Money(total.Paye - total.ByTable) : "-"), ("Levy", Money(total.Levy)),
+                    ("Rate", currency == baseCurrency ? "1" : used.Contains(null) ? "no rate" : used.Count > 1 ? "various" : used[0]!.Value.ToString("0.######", CultureInfo.InvariantCulture)),
+                    ("TaxableInCurrency", InCurrency(total.TaxableInCurrency)), ("PayeInCurrency", InCurrency(total.PayeInCurrency)), ("LevyInCurrency", InCurrency(total.LevyInCurrency)),
+                    ("Deducted", total.Paye)));
+            }
+        }
+
+        return rows;
     }
 
+    // One month and currency of the PAYE return: base amounts, and the same in the currency at each payslip's pay date rate.
+    private sealed class PayeReturnTotal
+    {
+        public HashSet<long> Employees { get; } = [];
+
+        public HashSet<decimal?> Rates { get; } = [];
+
+        public decimal Taxable { get; private set; }
+
+        public decimal ByTable { get; set; }
+
+        public decimal Paye { get; private set; }
+
+        public decimal Levy { get; private set; }
+
+        public decimal TaxableInCurrency { get; private set; }
+
+        public decimal PayeInCurrency { get; private set; }
+
+        public decimal LevyInCurrency { get; private set; }
+
+        // Taxable earnings (kind None), PAYE or the AIDS levy, in base and at the rate (null: no rate, the currency amounts then unknown).
+        public void Add(long employeeId, StatutoryKind kind, decimal amount, decimal? rate)
+        {
+            Employees.Add(employeeId);
+            Rates.Add(rate);
+            decimal inCurrency = rate is decimal r ? decimal.Round(amount / r, 2, MidpointRounding.AwayFromZero) : 0m;
+            switch (kind)
+            {
+                case StatutoryKind.Paye:
+                    (Paye, PayeInCurrency) = (Paye + amount, PayeInCurrency + inCurrency);
+                    break;
+                case StatutoryKind.AidsLevy:
+                    (Levy, LevyInCurrency) = (Levy + amount, LevyInCurrency + inCurrency);
+                    break;
+                default:
+                    (Taxable, TaxableInCurrency) = (Taxable + amount, TaxableInCurrency + inCurrency);
+                    break;
+            }
+        }
+    }
+
+    // The currency each element paid in a foreign currency is paid in, by code.
+    private async Task<Dictionary<string, CurrencyCode>> PaidInAsync(long companyId, CancellationToken ct)
+        => (await _db.PayElements.AsNoTracking().Where(e => e.CompanyId == companyId && e.PaidInCurrency != null).ToListAsync(ct).ConfigureAwait(false))
+            .GroupBy(e => e.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().PaidInCurrency!.Value, StringComparer.OrdinalIgnoreCase);
+
+    // PR28: per employee for the tax year, the certificate (P2 / ITF16) data: gross, taxable, pension, medical aid, social security (the employee's
+    // and the employer's), the AIDS levy and PAYE. Contributions are the statutory schemes' elements and any element flagged as one.
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> CertificatesAsync(long companyId, DateOnly toDate, CancellationToken ct)
     {
         Dictionary<long, Employee> employees = await EmployeesAsync(companyId, ct).ConfigureAwait(false);
-        HashSet<string> pension = [.. await _db.Set<StatutoryScheme>().AsNoTracking().Where(s => s.CompanyId == companyId && s.Kind == SchemeKind.Pension && s.EmployeeElementCode != null)
-            .Select(s => s.EmployeeElementCode!).ToListAsync(ct).ConfigureAwait(false)];
+        List<StatutoryScheme> schemes = await _db.Set<StatutoryScheme>().AsNoTracking().Where(s => s.CompanyId == companyId).ToListAsync(ct).ConfigureAwait(false);
+        HashSet<string> Codes(SchemeKind kind, bool employer) => new(schemes.Where(s => s.Kind == kind).Select(s => employer ? s.EmployerElementCode : s.EmployeeElementCode).OfType<string>(),
+            StringComparer.OrdinalIgnoreCase);
+        HashSet<string> pension = Codes(SchemeKind.Pension, false), medical = Codes(SchemeKind.MedicalAid, false);
+        HashSet<string> social = Codes(SchemeKind.SocialSecurity, false), socialEmployer = Codes(SchemeKind.SocialSecurity, true);
+        bool Is(PayslipLine line, HashSet<string> schemeCodes, StatutoryKind kind, PayElementType type)
+            => line.Type == type && (schemeCodes.Contains(line.ElementCode) || KindOf(line) == kind);
+
         // The tax year the company keeps (brief §4.15.3), which need not be the calendar year; a leaver's final pay is on their certificate.
         DateOnly yearStart = await TaxYearStartAsync(companyId, toDate, ct).ConfigureAwait(false);
         ILookup<long, Payslip> slips = (await PayslipsAsync(companyId, yearStart, toDate, ct).ConfigureAwait(false)).ToLookup(p => p.EmployeeId);
@@ -1383,12 +1529,17 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
         return [.. slips.Select(g => g.Key).Concat(finals.Select(f => f.Key)).Distinct().OrderBy(id => Name(employees, id), StringComparer.Ordinal).Select(id =>
         {
             List<Payslip> g = [.. slips[id]];
+            List<PayslipLine> lines = [.. g.SelectMany(p => p.Lines)];
             List<Termination> leaver = [.. finals[id]];
             return (IReadOnlyDictionary<string, object?>)Row(("Employee", Name(employees, id)), ("NationalId", employees.GetValueOrDefault(id)?.NationalIdNumber ?? "MISSING"),
                 ("TaxNumber", employees.GetValueOrDefault(id)?.TaxNumber ?? "MISSING"), ("Gross", Money(g.Sum(p => p.GrossEarnings) + leaver.Sum(FinalPayTaxable))),
-                ("Taxable", Money(g.SelectMany(p => p.Lines).Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount) + leaver.Sum(FinalPayTaxable))),
-                ("Pension", Money(g.SelectMany(p => p.Lines).Where(l => pension.Contains(l.ElementCode)).Sum(l => l.Amount))),
-                ("Paye", g.SelectMany(p => p.Lines).Where(IsTax).Sum(l => l.Amount) + leaver.Sum(x => x.OrdinaryTax + x.TerminalTax)));
+                ("Taxable", Money(lines.Where(l => l.Type == PayElementType.Earning && l.Taxable).Sum(l => l.Amount) + leaver.Sum(FinalPayTaxable))),
+                ("Pension", Money(lines.Where(l => pension.Contains(l.ElementCode)).Sum(l => l.Amount))),
+                ("Medical", Money(lines.Where(l => Is(l, medical, StatutoryKind.MedicalAid, PayElementType.Deduction)).Sum(l => l.Amount))),
+                ("SocialSecurity", Money(lines.Where(l => Is(l, social, StatutoryKind.SocialSecurity, PayElementType.Deduction)).Sum(l => l.Amount))),
+                ("SocialSecurityEmployer", Money(lines.Where(l => Is(l, socialEmployer, StatutoryKind.SocialSecurity, PayElementType.EmployerContribution)).Sum(l => l.Amount))),
+                ("AidsLevy", Money(lines.Where(l => KindOf(l) == StatutoryKind.AidsLevy).Sum(l => l.Amount))),
+                ("Paye", lines.Where(IsTax).Sum(l => l.Amount) + leaver.Sum(x => x.OrdinaryTax + x.TerminalTax)));
         })];
     }
 

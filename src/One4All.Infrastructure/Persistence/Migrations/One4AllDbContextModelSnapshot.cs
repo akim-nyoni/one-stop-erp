@@ -22025,6 +22025,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("split_currency_tax");
 
+                    b.Property<int>("StatutoryKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("statutory_kind");
+
                     b.Property<bool>("SubjectToSocialSecurity")
                         .HasColumnType("boolean")
                         .HasColumnName("subject_to_social_security");
