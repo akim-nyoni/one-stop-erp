@@ -11,7 +11,9 @@ namespace One4All.Infrastructure.Trading;
 
 /// <summary>
 /// Retranslates foreign-currency receivables or payables at the closing rate as at a date and books the unrealised
-/// difference on the control account against FX gain / loss (see <see cref="ITradingRevaluationService"/>).
+/// difference against FX gain / loss on the control account each item actually sits on: a customer with its own
+/// receivables control (a tenure control, say) is revalued on that control, everyone else on the main one (see
+/// <see cref="ITradingRevaluationService"/>).
 /// </summary>
 public sealed class TradingRevaluationService : ITradingRevaluationService
 {
@@ -38,7 +40,7 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
             return computed.Error;
         }
 
-        return new TradingRevaluationResult(asAtDate, ledger, computed.Value.Items, computed.Value.Target, computed.Value.Booked, null, null);
+        return new TradingRevaluationResult(asAtDate, ledger, computed.Value.Items, computed.Value.Target, computed.Value.BookedTotal, null, null);
     }
 
     /// <inheritdoc />
@@ -54,29 +56,40 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
             return computed.Error;
         }
 
-        (Company company, string controlCode, string gainCode, string lossCode, LedgerSign natural, List<OpenItemRevaluation> items, decimal target, decimal booked) = computed.Value;
-        decimal delta = target - booked;
-        if (delta == 0m)
+        (Company company, string gainCode, string lossCode, LedgerSign natural, List<OpenItemRevaluation> items, IReadOnlyList<ControlRevaluation> controls) = computed.Value;
+        decimal target = computed.Value.Target;
+        decimal booked = computed.Value.BookedTotal;
+        if (controls.All(c => c.Target == c.Booked))
         {
             return new TradingRevaluationResult(asAtDate, ledger, items, target, booked, null, null);
         }
 
-        // In the control's natural sign, a positive delta raises the balance: an asset (AR) going up is a gain, a
-        // liability (AP) going up is a loss.
-        bool controlUp = delta > 0m;
-        bool gain = ledger == TradingLedger.AccountsReceivable ? controlUp : !controlUp;
+        // Each control's own difference against FX gain / loss. In the control's natural sign, a positive delta raises
+        // the balance: an asset (AR) going up is a gain, a liability (AP) going up is a loss.
         JournalSide naturalSide = natural == LedgerSign.Debit ? JournalSide.Debit : JournalSide.Credit;
         JournalSide otherSide = naturalSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
-        JournalSide controlSide = controlUp ? naturalSide : otherSide;
-        JournalSide fxSide = controlSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
-        string fxCode = gain ? gainCode : lossCode;
-        decimal magnitude = Math.Abs(delta);
+        List<JournalLineRequest> lines = [];
+        List<JournalLineRequest> reversed = [];
+        foreach (ControlRevaluation control in controls.Where(c => c.Target != c.Booked))
+        {
+            decimal delta = control.Target - control.Booked;
+            bool controlUp = delta > 0m;
+            bool gain = ledger == TradingLedger.AccountsReceivable ? controlUp : !controlUp;
+            JournalSide controlSide = controlUp ? naturalSide : otherSide;
+            JournalSide fxSide = controlSide == JournalSide.Debit ? JournalSide.Credit : JournalSide.Debit;
+            string fxCode = gain ? gainCode : lossCode;
+            decimal magnitude = Math.Abs(delta);
+            lines.Add(new JournalLineRequest { AccountCode = control.ControlCode, Side = controlSide, TransactionAmount = magnitude });
+            lines.Add(new JournalLineRequest { AccountCode = fxCode, Side = fxSide, TransactionAmount = magnitude });
+            reversed.Add(new JournalLineRequest { AccountCode = control.ControlCode, Side = fxSide, TransactionAmount = magnitude });
+            reversed.Add(new JournalLineRequest { AccountCode = fxCode, Side = controlSide, TransactionAmount = magnitude });
+        }
+
         string module = ledger == TradingLedger.AccountsReceivable ? "AR" : "AP";
 
         // The revaluation and its reversal stand or fall together.
         Result<PostingReceipt> posted = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate,
-            ITradingRevaluationService.RevaluationDocumentType, $"Unrealised FX revaluation of {module} as at {asAtDate:yyyy-MM-dd}",
-            controlCode, controlSide, fxCode, fxSide, magnitude), ct).ConfigureAwait(false);
+            ITradingRevaluationService.RevaluationDocumentType, $"Unrealised FX revaluation of {module} as at {asAtDate:yyyy-MM-dd}", lines), ct).ConfigureAwait(false);
         if (posted.IsFailure)
         {
             return posted.Error;
@@ -86,8 +99,7 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
         if (autoReverse)
         {
             Result<PostingReceipt> reversal = await _posting.PostAsync(Journal(companyId, company.BaseCurrency, module, asAtDate.AddDays(1),
-                ITradingRevaluationService.ReversalDocumentType, $"Reversal of {module} FX revaluation of {asAtDate:yyyy-MM-dd}",
-                controlCode, fxSide, fxCode, controlSide, magnitude), ct).ConfigureAwait(false);
+                ITradingRevaluationService.ReversalDocumentType, $"Reversal of {module} FX revaluation of {asAtDate:yyyy-MM-dd}", reversed), ct).ConfigureAwait(false);
             if (reversal.IsFailure)
             {
                 return reversal.Error;
@@ -107,7 +119,9 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
         }
 
         ControlAccountType controlType = ledger == TradingLedger.AccountsReceivable ? ControlAccountType.AccountsReceivable : ControlAccountType.AccountsPayable;
-        string? controlCode = await ControlCodeAsync(companyId, controlType, ct).ConfigureAwait(false);
+        List<string> controlCodes = await _db.Accounts.Where(a => a.CompanyId == companyId && a.ControlAccountType == controlType)
+            .OrderBy(a => a.AccountCode).Select(a => a.AccountCode).ToListAsync(ct).ConfigureAwait(false);
+        string? controlCode = controlCodes.FirstOrDefault();
         string? gainCode = await ControlCodeAsync(companyId, ControlAccountType.FxGain, ct).ConfigureAwait(false);
         string? lossCode = await ControlCodeAsync(companyId, ControlAccountType.FxLoss, ct).ConfigureAwait(false);
         if (controlCode is null || gainCode is null || lossCode is null)
@@ -143,13 +157,37 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
                 outstandingForeign, bookedBase, rate, revalued, revalued - bookedBase));
         }
 
-        decimal target = items.Sum(i => i.Difference);
-        decimal booked = await BookedAsync(_db, companyId, ledger, controlCode, asAtDate, ct).ConfigureAwait(false);
-        return new Computation(company, controlCode, gainCode, lossCode, natural, items, target, booked);
+        // Each item on the control it was posted to: a customer's own receivables control, else the main control.
+        // Every control is visited, so a revaluation still booked on one whose items have since cleared is unwound.
+        Dictionary<long, string> ownControl = ledger == TradingLedger.AccountsReceivable
+            ? await _db.Customers.Where(c => c.CompanyId == companyId && c.ReceivableControlAccountCode != null)
+                .ToDictionaryAsync(c => c.Id, c => c.ReceivableControlAccountCode!, ct).ConfigureAwait(false)
+            : [];
+        Dictionary<string, decimal> targets = items
+            .GroupBy(i => ownControl.GetValueOrDefault(i.TraderId) ?? controlCode, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Difference), StringComparer.OrdinalIgnoreCase);
+        List<ControlRevaluation> controls = [];
+        foreach (string code in controlCodes.Union(targets.Keys, StringComparer.OrdinalIgnoreCase))
+        {
+            decimal booked = await BookedAsync(_db, companyId, ledger, code, asAtDate, ct).ConfigureAwait(false);
+            controls.Add(new ControlRevaluation(code, targets.GetValueOrDefault(code), booked));
+        }
+
+        return new Computation(company, gainCode, lossCode, natural, items, controls);
     }
 
     /// <summary>The revaluation worked out but not yet posted.</summary>
-    private sealed record Computation(Company Company, string ControlCode, string GainCode, string LossCode, LedgerSign Natural, List<OpenItemRevaluation> Items, decimal Target, decimal Booked);
+    private sealed record Computation(Company Company, string GainCode, string LossCode, LedgerSign Natural, List<OpenItemRevaluation> Items, IReadOnlyList<ControlRevaluation> Controls)
+    {
+        /// <summary>The total the controls should carry.</summary>
+        public decimal Target => Controls.Sum(c => c.Target);
+
+        /// <summary>The total already booked on them.</summary>
+        public decimal BookedTotal => Controls.Sum(c => c.Booked);
+    }
+
+    /// <summary>One control account's share of the revaluation: what it should carry and what it already carries.</summary>
+    private sealed record ControlRevaluation(string ControlCode, decimal Target, decimal Booked);
 
     /// <summary>
     /// The unrealised revaluation carried on a trading control account at a date, in its natural sign: the net of the
@@ -179,7 +217,7 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
     }
 
     private static JournalRequest Journal(long companyId, CurrencyCode baseCurrency, string module, DateOnly date, string documentType, string narrative,
-        string controlCode, JournalSide controlSide, string fxCode, JournalSide fxSide, decimal amount) => new()
+        List<JournalLineRequest> lines) => new()
     {
         CompanyId = companyId,
         SourceModule = module,
@@ -189,11 +227,7 @@ public sealed class TradingRevaluationService : ITradingRevaluationService
         DocumentType = documentType,
         DocumentNumber = $"REVAL-{module}-{date:yyyyMMdd}",
         Narrative = narrative,
-        Lines =
-        [
-            new JournalLineRequest { AccountCode = controlCode, Side = controlSide, TransactionAmount = amount },
-            new JournalLineRequest { AccountCode = fxCode, Side = fxSide, TransactionAmount = amount },
-        ],
+        Lines = lines,
     };
 
     private async Task<string?> ControlCodeAsync(long companyId, ControlAccountType type, CancellationToken ct)
