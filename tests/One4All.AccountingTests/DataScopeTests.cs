@@ -10,7 +10,8 @@ namespace One4All.AccountingTests;
 
 /// <summary>
 /// Covers row-level scopes in use: a storeman limited to one warehouse (by code) reaches it and not the other, through the scope
-/// service and API requests naming the warehouse; a ward code is checked by code; joining a group with roles opens the scope.
+/// service and API requests naming the warehouse; a ward code is checked by code; joining a group with roles keeps the user's own scopes,
+/// and only a member with no direct assignments is unrestricted by the group.
 /// </summary>
 [Collection(AccountingCollection.Name)]
 public sealed class DataScopeTests
@@ -56,10 +57,17 @@ public sealed class DataScopeTests
         (await Ask("/api/municipal/arrears", ("companyId", $"{companyId}"), ("ward", "W7"))).Allowed.Should().BeTrue();
         (await Ask("/api/municipal/arrears", ("companyId", $"{companyId}"), ("ward", "W8"))).StatusCode.Should().Be(403);
 
-        // A group with roles carries no scopes, so it opens the warehouses.
+        // A group's roles inherit the member's own scopes: the scoped storeman stays limited to their warehouse after joining.
         long group = (await admin.CreateGroupAsync($"Stores {tag}", null)).Value;
         (await admin.AddRoleToGroupAsync(group, role)).IsSuccess.Should().BeTrue();
         (await admin.SetGroupMembershipAsync(storeman, group, true)).IsSuccess.Should().BeTrue();
-        (await scopes.AllowsAsync(storeman, ScopeDimension.Warehouse, theirs.Id)).Should().BeTrue();
+        (await scopes.AllowsAsync(storeman, ScopeDimension.Warehouse, theirs.Id)).Should().BeFalse();
+        (await scopes.AllowsAsync(storeman, ScopeDimension.Warehouse, mine.Id)).Should().BeTrue();
+        (await Ask("/api/stock/replenishment", ("companyId", $"{companyId}"), ("warehouseId", $"{theirs.Id}"))).StatusCode.Should().Be(403);
+
+        // Only a member with no direct assignments at all is unrestricted by the group's roles.
+        long newcomer = (await admin.CreateUserAsync($"new.{tag}", "Newcomer", null, "Warehouse2026x")).Value;
+        (await admin.SetGroupMembershipAsync(newcomer, group, true)).IsSuccess.Should().BeTrue();
+        (await scopes.AllowsAsync(newcomer, ScopeDimension.Warehouse, theirs.Id)).Should().BeTrue();
     }
 }

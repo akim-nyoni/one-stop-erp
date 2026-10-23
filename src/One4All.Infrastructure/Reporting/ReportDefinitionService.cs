@@ -5,6 +5,7 @@ using One4All.Application.Reporting;
 using One4All.Core.Common;
 using One4All.Core.Reporting;
 using One4All.Infrastructure.Persistence;
+using One4All.Reporting.Engine;
 using One4All.Reporting.Model;
 
 namespace One4All.Infrastructure.Reporting;
@@ -205,6 +206,30 @@ public sealed class ReportDefinitionService : IReportDefinitionService
         return (versions[fromVersion], versions[toVersion]);
     }
 
+    // A SQL source or a parameter lookup that the runner would refuse is refused at save, with the same checks, so a bad report is never stored.
+    private static string? SourceProblem(ReportDefinition definition)
+    {
+        foreach (ReportDataSource source in definition.DataSources.Where(s => s.Kind is DataSourceKind.Sql or DataSourceKind.View or DataSourceKind.Function))
+        {
+            (string? _, string? refusal) = SqlReportDataProvider.Statement(ReportCommands.For(new ReportDefinition { Code = definition.Code, DataSources = [source] }), [.. definition.Parameters.Select(p => p.Name)]);
+            if (refusal is not null)
+            {
+                return $"Data source {source.Name}: {refusal}";
+            }
+        }
+
+        foreach (ReportParameter parameter in definition.Parameters.Where(p => !string.IsNullOrWhiteSpace(p.LookupQuery)))
+        {
+            (string? _, string? refusal) = SqlReportDataProvider.Statement("sql:" + parameter.LookupQuery, [.. definition.Parameters.Select(p => p.Name)]);
+            if (refusal is not null)
+            {
+                return $"The list for parameter {parameter.Name}: {refusal}";
+            }
+        }
+
+        return null;
+    }
+
     private static string? Validate(string? json)
     {
         try
@@ -214,8 +239,8 @@ public sealed class ReportDefinitionService : IReportDefinitionService
                 return "The definition must be a JSON object.";
             }
 
-            _ = ReportDefinitionSerializer.Deserialize(json);
-            return null;
+            ReportDefinition definition = ReportDefinitionSerializer.Deserialize(json);
+            return SourceProblem(definition);
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or InvalidOperationException or NotSupportedException or ArgumentException)
         {

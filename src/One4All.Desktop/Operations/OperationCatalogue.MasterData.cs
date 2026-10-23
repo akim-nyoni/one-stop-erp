@@ -530,7 +530,8 @@ public static partial class OperationCatalogue
             Module = module, Title = "Report subscription", ListTitle = "Report subscriptions",
             Description = "A report emailed every time the report-subscriptions job runs: to a list of addresses, or burst by a field to each customer's or supplier's contacts (or the address in "
                 + "a field); and/or saved to a folder or printed on a printer. Parameters may use date tokens (@Today, @MonthStart, @PrevMonthEnd ...). An existing code changes that "
-                + "subscription (and starts it again if it was stopped); Delete stops it, keeping its delivery log.",
+                + "subscription (and starts it again if it was stopped); Delete stops it, keeping its delivery log. The subscription runs as you: you must be able to run the report now, "
+                + "and each run applies your data scope and report rights (it fails if you lose them or are deactivated).",
             Fields = [Req("Code", "Subscription code"), Req("Report", "Report code"), Pick("Format", "Format", ["Pdf", "Xlsx", "Csv", "Html"]), Opt("Recipients", "Email addresses (; separated)"),
                 Opt("Key", "Burst by field"), Opt("EmailField", "Field holding the email (burst)"), Pick("Ledger", "Or burst to the contacts of", ["(email field)", "Customers", "Suppliers"]),
                 Opt("Parameters", "Parameters (Name=value; ...)"), Opt("Folder", "Also save to this folder (inside the delivery root)"), Opt("Printer", "Also print on this printer")],
@@ -545,7 +546,7 @@ public static partial class OperationCatalogue
 
                 _ = Check(await c.Get<Application.Abstractions.Reporting.IReportSubscriptionService>().SubscribeAsync(new Application.Abstractions.Reporting.SubscriptionRequest
                 {
-                    CompanyId = c.CompanyId, Code = i.Text("Code"), ReportCode = i.Text("Report"), Format = Enum.Parse<Application.Abstractions.Reporting.ReportFormat>(i.Text("Format")),
+                    CompanyId = c.CompanyId, UserId = c.UserId, Code = i.Text("Code"), ReportCode = i.Text("Report"), Format = Enum.Parse<Application.Abstractions.Reporting.ReportFormat>(i.Text("Format")),
                     Recipients = [.. (i.Optional("Recipients") ?? string.Empty).Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)], Parameters = parameters,
                     BurstKeyField = i.Optional("Key"), BurstRecipientField = i.Optional("EmailField"), DeliveryFolder = i.Optional("Folder"), DeliveryPrinter = i.Optional("Printer"),
                     BurstLedger = i.Text("Ledger") switch { "Customers" => Core.Trading.TradingLedger.AccountsReceivable, "Suppliers" => Core.Trading.TradingLedger.AccountsPayable, _ => null },
@@ -1389,7 +1390,8 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Create a group or add a role to it", ListTitle = "Groups",
-            Description = "Groups bundle roles; users who join inherit them. Give a role to add it to the group (creating the group if new).",
+            Description = "Groups bundle roles; users who join inherit them. Give a role to add it to the group (creating the group if new). A role that comes through a group inherits "
+                + "the member's own data scopes: a user whose direct roles are limited to a branch or warehouse stays limited; only a user with no direct roles at all is unrestricted.",
             Fields = [Req("Group", "Group name"), Opt("Role", "Role to add")],
             Run = async (c, i) =>
             {

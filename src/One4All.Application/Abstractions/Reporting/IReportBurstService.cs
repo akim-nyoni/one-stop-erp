@@ -21,7 +21,7 @@ public sealed record BurstRequest(long CompanyId, string ReportCode, string KeyF
     /// <summary>The output (PDF by default).</summary>
     public ReportFormat Format { get; init; } = ReportFormat.Pdf;
 
-    /// <summary>Who runs it (their report rights and scope apply); null for a system run.</summary>
+    /// <summary>Who runs it: their report rights, data scope and restricted columns apply. Required; a burst with no user is refused.</summary>
     public long? UserId { get; init; }
 }
 

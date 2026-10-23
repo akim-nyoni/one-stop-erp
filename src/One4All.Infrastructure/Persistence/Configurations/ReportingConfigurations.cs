@@ -31,6 +31,7 @@ internal sealed class ReportSubscriptionConfiguration : IEntityTypeConfiguration
         b.Property(x => x.ReportCode).HasMaxLength(60);
         b.Property(x => x.ParametersJson).HasColumnType("jsonb");
         b.HasIndex(x => new { x.CompanyId, x.Code }).IsUnique();
+        b.HasIndex(x => x.OwnerUserId);
     }
 }
 

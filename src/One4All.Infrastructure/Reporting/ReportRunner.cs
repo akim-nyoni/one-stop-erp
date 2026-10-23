@@ -80,9 +80,10 @@ public sealed class ReportRunner : IReportRunner
             return Error.NotFound("Report.NotFound", $"No report definition found for code '{reportCode}'.");
         }
 
-        if (!access.MayRun(definition.Module, definition.RequiredPermission))
+        Result allowed = await MayRunAsync(reportCode, definition, access, ct).ConfigureAwait(false);
+        if (allowed.IsFailure)
         {
-            return Error.Forbidden("Rpt.ModuleNotAuthorised", $"Report {reportCode} needs the {definition.RequiredPermission ?? definition.Module + " reports"} permission.");
+            return allowed.Error;
         }
 
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = Application.Reporting.ReportRowScope.Apply(
@@ -123,9 +124,10 @@ public sealed class ReportRunner : IReportRunner
             return Error.NotFound("Report.NotFound", $"No report definition found for code '{reportCode}'.");
         }
 
-        if (!access.MayRun(definition.Module, definition.RequiredPermission))
+        Result allowed = await MayRunAsync(reportCode, definition, access, ct).ConfigureAwait(false);
+        if (allowed.IsFailure)
         {
-            return Error.Forbidden("Rpt.ModuleNotAuthorised", $"Report {reportCode} needs the {definition.RequiredPermission ?? definition.Module + " reports"} permission.");
+            return allowed.Error;
         }
 
         IReadOnlyList<IReadOnlyDictionary<string, object?>> rows = Application.Reporting.ReportRowScope.Apply(
@@ -161,6 +163,41 @@ public sealed class ReportRunner : IReportRunner
         }
 
         return slices;
+    }
+
+    /// <inheritdoc />
+    public async Task<Result> MayRunAsync(long companyId, string reportCode, Application.Reporting.ReportAccess access, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(access);
+        string code = (reportCode ?? string.Empty).Trim();
+        ReportDefinition? definition = await ResolveDefinitionAsync(companyId, code, ct).ConfigureAwait(false) ?? BuiltInDefinition(code);
+        return definition is null ? Result.Failure(Error.NotFound("Report.NotFound", $"No report definition found for code '{code}'.")) : await MayRunAsync(code, definition, access, ct).ConfigureAwait(false);
+    }
+
+    // The permission a report needs comes from the system definition of its code (else, for a code of the company's own, from the data provider's
+    // module), never from what a company or user copy saved: a copy cannot relax the right by naming another module.
+    private async Task<Result> MayRunAsync(string reportCode, ReportDefinition definition, Application.Reporting.ReportAccess access, CancellationToken ct)
+    {
+        (string? module, string? required) = await RequirementAsync(reportCode, definition, ct).ConfigureAwait(false);
+        return access.MayRun(module, required)
+            ? Result.Success()
+            : Result.Failure(Error.Forbidden("Rpt.ModuleNotAuthorised", $"Report {reportCode} needs the {required ?? module + " reports"} permission."));
+    }
+
+    /// <summary>The module and permission a report needs: the system definition's, or the data provider's module for a code with no system definition.</summary>
+    /// <param name="reportCode">The report.</param>
+    /// <param name="definition">The definition that will run (possibly a company or user copy).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The module and the required permission.</returns>
+    internal async Task<(string? Module, string? RequiredPermission)> RequirementAsync(string reportCode, ReportDefinition definition, CancellationToken ct)
+    {
+        string? json = await _db.ReportDefinitions.AsNoTracking().Where(r => r.Code == reportCode && r.Scope == ReportScope.System).Select(r => r.DefinitionJson).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        ReportDefinition? system = (json is null ? null : ReportDefinitionSerializer.Deserialize(json)) ?? BuiltInDefinition(reportCode);
+        string command = definition.DataSources.Count == 0 ? reportCode : ReportCommands.For(definition);
+        string? providerModule = _providers.FirstOrDefault(p => p.CanHandle(command))?.Module;
+        return system is not null
+            ? (system.Module ?? providerModule, system.RequiredPermission)
+            : (providerModule ?? definition.Module, definition.RequiredPermission);
     }
 
     private async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> RowsAsync(long companyId, string reportCode, ReportDefinition definition, IReadOnlyDictionary<string, object?> parameters,
@@ -215,7 +252,7 @@ public sealed class ReportRunner : IReportRunner
                     continue;
                 }
 
-                if (child is null || budget.Remaining <= 0 || !access.MayRun(child.Module, child.RequiredPermission))
+                if (child is null || budget.Remaining <= 0 || (await MayRunAsync(code, child, access, ct).ConfigureAwait(false)).IsFailure)
                 {
                     fetched[key] = null;
                     continue;

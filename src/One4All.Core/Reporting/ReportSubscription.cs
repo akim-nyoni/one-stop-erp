@@ -56,6 +56,9 @@ public sealed class ReportSubscription : AuditableEntity, ICompanyScoped
     /// <summary>Whether it runs.</summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>The user the subscription runs as: each run uses their report rights, data scope and restricted columns (null on rows saved before owners were kept; such a subscription cannot run until it is saved again).</summary>
+    public long? OwnerUserId { get; set; }
+
     /// <summary>When set, each run is split by this field and each part sent to its own recipients (bursting) instead of the distribution list.</summary>
     public string? BurstKeyField { get; set; }
 

@@ -24,8 +24,11 @@ public sealed class SqlReportSourceTests
 
     [Theory]
     [InlineData("sql:SELECT account_code FROM gl.account WHERE company_id = @CompanyId", true, null)]
-    [InlineData("sql:WITH t AS (SELECT 1 AS x) SELECT x FROM t WHERE @CompanyId > 0", true, null)]
+    [InlineData("sql:WITH t AS (SELECT 1 AS x, @CompanyId AS company_id) SELECT x FROM t WHERE company_id = @CompanyId", true, null)]
+    [InlineData("sql:WITH t AS (SELECT 1 AS x) SELECT x FROM t WHERE @CompanyId > 0", false, "company_id = @CompanyId")]
     [InlineData("sql:SELECT * FROM gl.account", false, "@CompanyId")]
+    [InlineData("sql:SELECT * FROM \"sec\".\"user\" WHERE company_id = @CompanyId", false, "sec")]
+    [InlineData("sql:SELECT * FROM gl.account WHERE company_id = @CompanyId AND set_config('role', 'postgres', true) IS NOT NULL", false, "set_config")]
     [InlineData("sql:DELETE FROM gl.account WHERE company_id = @CompanyId", false, "SELECT")]
     [InlineData("sql:SELECT 1 WHERE @CompanyId > 0; DROP TABLE gl.account", false, "one statement")]
     [InlineData("sql:SELECT password_hash FROM sec.user_account WHERE @CompanyId > 0", false, "sec")]
@@ -69,25 +72,41 @@ public sealed class SqlReportSourceTests
 
         (await sql.GetRowsAsync(companyId, "view:rpt.aged_debt", new Dictionary<string, object?>())).Should().NotContain(r => (long)r["company_id"]! != companyId);
 
+        // A WHERE that names the company but does not bind it (1 = 1 OR ...) is cut to the company again on the way out.
+        (await sql.GetRowsAsync(companyId, "sql:SELECT account_code, company_id FROM gl.account WHERE 1 = 1 OR company_id = @CompanyId", new Dictionary<string, object?>()))
+            .Should().NotBeEmpty().And.OnlyContain(r => (long)r["company_id"]! == companyId);
+
+        // The statement runs as the reporting role, which may read the business schemas only: a schema outside them is denied by the database itself.
+        (await sql.GetRowsAsync(companyId, "sql:SELECT current_user::text AS who FROM gl.account WHERE company_id = @CompanyId LIMIT 1", new Dictionary<string, object?>()))
+            .Should().ContainSingle().Which["who"].Should().Be(SqlReportDataProvider.ReportRole);
+        Func<Task> messages = () => sql.GetRowsAsync(companyId, "sql:SELECT * FROM msg.outbound_message WHERE company_id = @CompanyId", new Dictionary<string, object?>());
+        (await messages.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be("42501", "the reporting role has no rights on the messaging schema");
+
         // A source past the cap ends with a visible notice row rather than stopping short in silence.
         IReadOnlyList<IReadOnlyDictionary<string, object?>> capped = await sql.GetRowsAsync(companyId,
-            $"sql:SELECT n AS number, 'x' AS label FROM generate_series(1, {SqlReportDataProvider.MaxRows + 5}) AS s(n) WHERE @CompanyId > 0", new Dictionary<string, object?>());
+            $"sql:SELECT n AS number, 'x' AS label FROM generate_series(1, {SqlReportDataProvider.MaxRows + 5}) AS s(n), (SELECT @CompanyId AS company_id) c WHERE c.company_id = @CompanyId", new Dictionary<string, object?>());
         capped.Should().HaveCount(SqlReportDataProvider.MaxRows + 1);
         capped[^1]["number"].Should().Be(SqlReportDataProvider.CapNoticeText);
         capped[^1]["label"].Should().BeNull();
-        (await sql.GetRowsAsync(companyId, $"sql:SELECT n FROM generate_series(1, {SqlReportDataProvider.MaxRows}) AS s(n) WHERE @CompanyId > 0", new Dictionary<string, object?>()))
+        (await sql.GetRowsAsync(companyId, $"sql:SELECT n FROM generate_series(1, {SqlReportDataProvider.MaxRows}) AS s(n), (SELECT @CompanyId AS company_id) c WHERE c.company_id = @CompanyId", new Dictionary<string, object?>()))
             .Should().HaveCount(SqlReportDataProvider.MaxRows);
 
         Func<Task> sneaky = () => sql.GetRowsAsync(companyId, "sql:WITH gone AS (DELETE FROM gl.account WHERE company_id = @CompanyId RETURNING 1) SELECT * FROM gone",
             new Dictionary<string, object?>());
         (await sneaky.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().BeOneOf("25006", "0A000");
-        Func<Task> writes = () => sql.GetRowsAsync(companyId, "sql:SELECT nextval('gl.account_id_seq') AS n WHERE @CompanyId > 0", new Dictionary<string, object?>());
-        (await writes.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be("25006", "the transaction is read-only");
+        Func<Task> writes = () => sql.GetRowsAsync(companyId, "sql:SELECT nextval('gl.account_id_seq') AS n FROM gl.account WHERE company_id = @CompanyId", new Dictionary<string, object?>());
+        (await writes.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().BeOneOf(["25006", "42501"], "the transaction is read-only and the reporting role cannot use sequences");
         Func<Task> refused = () => sql.GetRowsAsync(companyId, "sql:SELECT * FROM gl.account", new Dictionary<string, object?>());
         await refused.Should().ThrowAsync<InvalidOperationException>().WithMessage("*@CompanyId*");
 
-        ReportDefinition authored = new() { Code = "SQLX", Name = "SQL", DataSources = [new ReportDataSource { Kind = DataSourceKind.Sql, Command = "SELECT 1 WHERE @CompanyId > 0" }] };
-        ReportCommands.For(authored).Should().Be("sql:SELECT 1 WHERE @CompanyId > 0");
+        ReportDefinition authored = new() { Code = "SQLX", Name = "SQL", DataSources = [new ReportDataSource { Kind = DataSourceKind.Sql, Command = "SELECT 1 WHERE company_id = @CompanyId" }] };
+        ReportCommands.For(authored).Should().Be("sql:SELECT 1 WHERE company_id = @CompanyId");
+
+        // A report whose source would be refused is refused at save, with the same checks.
+        IReportDefinitionService definitions = scope.ServiceProvider.GetRequiredService<IReportDefinitionService>();
+        ReportDefinition unsafeReport = new() { Code = "SQLX", Name = "SQL", DataSources = [new ReportDataSource { Kind = DataSourceKind.Sql, Command = "SELECT * FROM \"pay\".\"employee\" WHERE company_id = @CompanyId" }] };
+        (await definitions.SaveAsync(companyId, "SQLX", "SQL", "GL", ReportDefinitionSerializer.Serialize(unsafeReport), 900_001, null)).Error.Message.Should().Contain("pay");
+        (await definitions.SaveAsync(companyId, "SQLX", "SQL", "GL", ReportDefinitionSerializer.Serialize(authored), 900_001, null)).IsSuccess.Should().BeTrue();
     }
 
     [SkippableFact]

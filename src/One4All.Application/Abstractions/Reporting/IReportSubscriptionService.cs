@@ -8,6 +8,9 @@ public sealed class SubscriptionRequest
     /// <summary>The company.</summary>
     public long CompanyId { get; init; }
 
+    /// <summary>The user setting it up, who becomes its owner: they must be able to run the report now, and every run uses their rights and scope.</summary>
+    public long? UserId { get; init; }
+
     /// <summary>The subscription code.</summary>
     public string Code { get; init; } = string.Empty;
 
@@ -54,7 +57,10 @@ public sealed record DeliveryLogEntry(DateTimeOffset RunAt, string Recipient, st
 /// </summary>
 public interface IReportSubscriptionService
 {
-    /// <summary>Sets up a subscription, or changes the one with the same code (and starts it again if it was stopped).</summary>
+    /// <summary>
+    /// Sets up a subscription, or changes the one with the same code (and starts it again if it was stopped). The requesting user becomes its owner
+    /// and must be able to run the report (the module's reports right, the report's own permission); each run then applies their scope and rights.
+    /// </summary>
     /// <param name="request">The subscription.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Success, or why it was refused.</returns>

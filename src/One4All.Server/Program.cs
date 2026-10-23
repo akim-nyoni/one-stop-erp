@@ -2799,8 +2799,14 @@ api.MapPost("/api/reports/{code}/rollback", async (string code, long companyId, 
 .RequireAuthorization()
 .WithName("RollbackReportVersion");
 
-api.MapPost("/api/reports/subscriptions", async (One4All.Application.Abstractions.Reporting.SubscriptionRequest request, One4All.Application.Abstractions.Reporting.IReportSubscriptionService subscriptions, CancellationToken ct) =>
-    ActionResponse(await subscriptions.SubscribeAsync(request, ct).ConfigureAwait(false)))
+// The signed-in user owns the subscription: it runs with their rights and scope, whatever user id the body names.
+api.MapPost("/api/reports/subscriptions", async (One4All.Application.Abstractions.Reporting.SubscriptionRequest request, One4All.Application.Abstractions.Reporting.IReportSubscriptionService subscriptions,
+    One4All.Application.Abstractions.Security.ICurrentUser caller, CancellationToken ct) =>
+    ActionResponse(await subscriptions.SubscribeAsync(new One4All.Application.Abstractions.Reporting.SubscriptionRequest
+    {
+        CompanyId = request.CompanyId, UserId = caller.UserId, Code = request.Code, ReportCode = request.ReportCode, Format = request.Format, Parameters = request.Parameters, Recipients = request.Recipients,
+        BurstKeyField = request.BurstKeyField, BurstRecipientField = request.BurstRecipientField, BurstLedger = request.BurstLedger, DeliveryFolder = request.DeliveryFolder, DeliveryPrinter = request.DeliveryPrinter,
+    }, ct).ConfigureAwait(false)))
 .RequireAuthorization()
 .WithName("SubscribeToReport");
 

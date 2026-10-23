@@ -12,6 +12,12 @@ public interface IReportDataProvider
     /// <returns>True when this provider handles the command.</returns>
     bool CanHandle(string command);
 
+    /// <summary>
+    /// The permission module whose reports right a report on this provider's data needs (e.g. <c>Payroll</c>), or null when the data needs no module
+    /// right of its own. A user-defined report cannot relax it by naming another module in its saved definition.
+    /// </summary>
+    string? Module => null;
+
     /// <summary>Produces the rows for a report data-source command.</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="command">The data-source command.</param>

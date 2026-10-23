@@ -53,8 +53,11 @@ public sealed class ReportParameterLookupTests
             DataSources = [new ReportDataSource { Kind = DataSourceKind.Sql, Command = "SELECT code, name FROM ar.customer WHERE company_id = @CompanyId AND code = ANY(@Codes) ORDER BY code" }],
             Bands = [new ReportBand { Type = BandType.Detail, Height = 16, Elements = [new ReportElement { Kind = ElementKind.Field, Name = "c", FieldName = "code", Width = 100, Height = 14 }] }],
         };
-        (await scope.ServiceProvider.GetRequiredService<IReportDefinitionService>().SaveAsync(company, code, definition.Name, "AR", ReportDefinitionSerializer.Serialize(definition), null, null))
-            .IsSuccess.Should().BeTrue();
+        // A lookup that does not bind the company is refused when the report is saved, with the same check the lookup itself applies.
+        IReportDefinitionService definitions = scope.ServiceProvider.GetRequiredService<IReportDefinitionService>();
+        (await definitions.SaveAsync(company, code, definition.Name, "AR", ReportDefinitionSerializer.Serialize(definition), null, null)).Error.Message.Should().Contain("Leaky");
+        definition.Parameters.RemoveAll(p => p.Name == "Leaky");
+        (await definitions.SaveAsync(company, code, definition.Name, "AR", ReportDefinitionSerializer.Serialize(definition), null, null)).IsSuccess.Should().BeTrue();
 
         IReportParameterLookupService lookups = scope.ServiceProvider.GetRequiredService<IReportParameterLookupService>();
         (await lookups.OptionsAsync(company, code, "Prefix", new Dictionary<string, string>())).Value.Select(o => o.Value).Should().Contain(["N", "S"]);
@@ -63,7 +66,6 @@ public sealed class ReportParameterLookupTests
         IReadOnlyList<ParameterOption> north = (await lookups.OptionsAsync(company, code, "Codes", new Dictionary<string, string> { ["Prefix"] = $"N{tag}" })).Value;
         north.Select(o => (o.Value, o.Label)).Should().Equal(($"N{tag}1", "North One"), ($"N{tag}2", "North Two"));
 
-        (await lookups.OptionsAsync(company, code, "Leaky", new Dictionary<string, string>())).Error.Code.Should().Be("Report.LookupRefused");
         (await lookups.OptionsAsync(company, code, "Nope", new Dictionary<string, string>())).Error.Code.Should().Be("Report.NoParameter");
 
         RenderedDocument csv = (await scope.ServiceProvider.GetRequiredService<IReportRunner>().RenderAsync(company, code,

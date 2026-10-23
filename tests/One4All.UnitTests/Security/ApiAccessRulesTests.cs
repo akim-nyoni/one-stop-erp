@@ -15,6 +15,7 @@ public sealed partial class ApiAccessRulesTests
         ApiAccessRules.Requirement("GET", "/api/gl/accounts/1000/activity").Should().BeEquivalentTo(new ApiRequirement(["GeneralLedger"], false));
         ApiAccessRules.Requirement("POST", "/api/housing/stands").Should().BeEquivalentTo(new ApiRequirement(["Housing"], true));
         ApiAccessRules.Requirement("POST", "/api/reports/GL1/run")!.IsWrite.Should().BeFalse();
+        ApiAccessRules.Requirement("POST", "/api/reports/subscriptions/TB-MONTH/run")!.IsWrite.Should().BeTrue("running a subscription delivers documents and logs them");
         ApiAccessRules.Requirement("GET", "/api/ess/profile")!.Modules.Should().BeEmpty();
         ApiAccessRules.Requirement("GET", "/api/unknown/thing").Should().BeNull();
         ApiAccessRules.UserIdIsTarget("/api/municipal/faults/F-1/assign").Should().BeTrue();

@@ -27,6 +27,9 @@ public sealed class PayrollReportDataProvider : IReportDataProvider
     public bool CanHandle(string command) => command.StartsWith("Pyrl", StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
+    public string? Module => "Payroll";
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
     {
         DateOnly today = DateOnly.FromDateTime(DateTime.Today);

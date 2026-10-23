@@ -9,9 +9,11 @@ namespace One4All.Infrastructure.Reporting;
 
 /// <summary>
 /// Rows for user-authored reports from SQL, a reporting view or a reporting function (brief §13.1 data sources), made safe: a single
-/// SELECT / WITH statement that must filter by <c>@CompanyId</c>, never touching the security, payroll, licensing, audit or system
-/// schemas or the catalogues; views and functions only from the <c>rpt</c> schema; run on its own connection in a read-only
-/// transaction with a statement timeout, report parameters bound by name, and at most <see cref="MaxRows"/> rows.
+/// SELECT / WITH statement that must bind <c>company_id = @CompanyId</c> (checked on its tokens, so quoting, comments and literals hide
+/// nothing), never naming the security, payroll, licensing, audit, system or sync schemas or the catalogues; views and functions only from
+/// the <c>rpt</c> schema; run on its own connection in a read-only transaction with a statement timeout as the <see cref="ReportRole"/>
+/// role (SELECT on the reportable schemas only, so a reference the text checks miss is still denied by the database); the rows cut to
+/// the company again when they carry a <c>company_id</c> column; report parameters bound by name; and at most <see cref="MaxRows"/> rows.
 /// </summary>
 public sealed partial class SqlReportDataProvider : IReportDataProvider, IReportFieldDiscovery
 {
@@ -51,28 +53,57 @@ public sealed partial class SqlReportDataProvider : IReportDataProvider, IReport
                 return ($"SELECT * FROM {body}(@CompanyId{string.Concat((parameterNames ?? []).Where(n => Identifier().IsMatch(n)).Select(n => $", @{n}"))})", null);
             default:
                 string sql = body.TrimEnd().TrimEnd(';');
-                string scan = Comments().Replace(StringLiterals().Replace(sql, "''"), " ");
-                if (!StartsWithSelect().IsMatch(scan))
-                {
-                    return (null, "Only a SELECT (or WITH … SELECT) query may be used.");
-                }
+                string? refusal = Application.Reporting.SqlReportStatement.Refusal(sql);
+                return refusal is null ? (sql, null) : (null, refusal);
+        }
+    }
 
-                if (scan.Contains(';', StringComparison.Ordinal))
-                {
-                    return (null, "Only one statement may be used.");
-                }
+    /// <summary>The read-only database role report queries run as: SELECT on the reportable business schemas only, nothing on security, payroll, audit, licensing, system or sync.</summary>
+    public const string ReportRole = "one4all_report";
 
-                if (!scan.Contains("@CompanyId", StringComparison.OrdinalIgnoreCase))
-                {
-                    return (null, "The query must filter by @CompanyId so it only reads this company's data.");
-                }
+    /// <summary>The schemas the reporting role may read (granted by the ReportRole migration); everything else is denied by the database whatever the text checks miss.</summary>
+    public static readonly IReadOnlyList<string> ReportableSchemas =
+        ["gl", "ar", "ap", "trd", "cb", "inv", "pos", "res", "vou", "pop", "sop", "mun", "hse", "sch", "job", "fa", "hr", "exp", "bud", "crm", "rcp", "rpt", "wf"];
 
-                if (Blocked().Match(scan) is { Success: true } blocked)
-                {
-                    return (null, $"The query may not read {blocked.Value.Trim().TrimEnd('.')}.");
-                }
+    // Opens the guarded transaction: read only, a statement timeout, and the reporting role (failing closed when the role is missing or cannot be taken).
+    private static async Task<NpgsqlTransaction> BeginGuardedAsync(NpgsqlConnection connection, CancellationToken ct)
+    {
+        NpgsqlTransaction transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, ct).ConfigureAwait(false);
+        try
+        {
+            await using NpgsqlCommand guard = new($"SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15s'; SET LOCAL ROLE {ReportRole}", connection, transaction);
+            await guard.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
+            return transaction;
+        }
+        catch (PostgresException ex) when (ex.SqlState is "42704" or "42501" or "22023")
+        {
+            await transaction.DisposeAsync().ConfigureAwait(false);
+            throw new InvalidOperationException($"Report queries cannot run: the database role {ReportRole} is missing or the application user may not take it ({ex.MessageText}). Apply the database migrations and grant the role.", ex);
+        }
+    }
 
-                return (sql, null);
+    // The statement cut to the company again when its result carries a company_id column: the WHERE the author wrote cannot widen it (WHERE 1=1 OR ...).
+    private static async Task<string> CompanyBoundAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string sql, Action<NpgsqlParameterCollection> bind, CancellationToken ct)
+    {
+        await using NpgsqlCommand describe = new($"SELECT * FROM ({sql}) AS report_rows LIMIT 0", connection, transaction);
+        bind(describe.Parameters);
+        await using NpgsqlDataReader reader = await describe.ExecuteReaderAsync(System.Data.CommandBehavior.SchemaOnly, ct).ConfigureAwait(false);
+        string? company = (await reader.GetColumnSchemaAsync(ct).ConfigureAwait(false)).Select(c => c.ColumnName)
+            .FirstOrDefault(n => string.Equals(n, Application.Reporting.SqlReportStatement.CompanyColumn, StringComparison.OrdinalIgnoreCase));
+        return company is null ? sql : $"SELECT * FROM ({sql}) AS company_rows WHERE company_rows.\"{company.Replace("\"", "\"\"", StringComparison.Ordinal)}\" = @CompanyId";
+    }
+
+    private static void Bind(NpgsqlParameterCollection target, long companyId, IReadOnlyDictionary<string, object?> parameters)
+    {
+        target.AddWithValue("CompanyId", companyId);
+        foreach ((string name, object? value) in parameters.Where(p => Identifier().IsMatch(p.Key) && !p.Key.Equals("CompanyId", StringComparison.OrdinalIgnoreCase)))
+        {
+            target.AddWithValue(name, value switch
+            {
+                null => DBNull.Value,
+                DateOnly date => date.ToDateTime(TimeOnly.MinValue),
+                _ => value,
+            });
         }
     }
 
@@ -95,8 +126,12 @@ public sealed partial class SqlReportDataProvider : IReportDataProvider, IReport
 
         await using NpgsqlConnection connection = new(_connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
-        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(System.Data.IsolationLevel.RepeatableRead, ct).ConfigureAwait(false);
-        await connection.ExecuteAsync(new CommandDefinition("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15s'", transaction: transaction, cancellationToken: ct)).ConfigureAwait(false);
+        await using NpgsqlTransaction transaction = await BeginGuardedAsync(connection, ct).ConfigureAwait(false);
+        if (command.StartsWith("sql:", StringComparison.OrdinalIgnoreCase))
+        {
+            sql = await CompanyBoundAsync(connection, transaction, sql, p => Bind(p, companyId, parameters), ct).ConfigureAwait(false);
+        }
+
         // One row past the cap tells us whether the cap cut the result; the reader then sees a notice row instead of a silently short report.
         IEnumerable<dynamic> rows = await connection.QueryAsync(new CommandDefinition($"SELECT * FROM ({sql}) AS report_rows LIMIT {MaxRows + 1}", bound, transaction, cancellationToken: ct))
             .ConfigureAwait(false);
@@ -146,24 +181,11 @@ public sealed partial class SqlReportDataProvider : IReportDataProvider, IReport
 
         await using NpgsqlConnection connection = new(_connectionString);
         await connection.OpenAsync(ct).ConfigureAwait(false);
-        await using NpgsqlTransaction transaction = await connection.BeginTransactionAsync(ct).ConfigureAwait(false);
-        await using (NpgsqlCommand guard = new("SET TRANSACTION READ ONLY; SET LOCAL statement_timeout = '15s'", connection, transaction))
-        {
-            await guard.ExecuteNonQueryAsync(ct).ConfigureAwait(false);
-        }
+        await using NpgsqlTransaction transaction = await BeginGuardedAsync(connection, ct).ConfigureAwait(false);
 
-        // SELECT … LIMIT 0: the shape of the result, no rows read.
+        // SELECT ... LIMIT 0: the shape of the result, no rows read.
         await using NpgsqlCommand describe = new($"SELECT * FROM ({sql}) AS report_rows LIMIT 0", connection, transaction);
-        describe.Parameters.AddWithValue("CompanyId", companyId);
-        foreach ((string name, object? value) in parameters.Where(p => Identifier().IsMatch(p.Key) && !p.Key.Equals("CompanyId", StringComparison.OrdinalIgnoreCase)))
-        {
-            describe.Parameters.AddWithValue(name, value switch
-            {
-                null => DBNull.Value,
-                DateOnly date => date.ToDateTime(TimeOnly.MinValue),
-                _ => value,
-            });
-        }
+        Bind(describe.Parameters, companyId, parameters);
 
         try
         {
@@ -182,16 +204,4 @@ public sealed partial class SqlReportDataProvider : IReportDataProvider, IReport
 
     [GeneratedRegex(@"^[A-Za-z_][A-Za-z0-9_]*$")]
     private static partial Regex Identifier();
-
-    [GeneratedRegex(@"^\s*(select|with)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex StartsWithSelect();
-
-    [GeneratedRegex(@"'([^']|'')*'")]
-    private static partial Regex StringLiterals();
-
-    [GeneratedRegex(@"--[^\n]*|/\*.*?\*/", RegexOptions.Singleline)]
-    private static partial Regex Comments();
-
-    [GeneratedRegex(@"\b(sec|pay|lic|audit|sys|pg_catalog|information_schema)\s*\.|\bpg_[a-z_]+\b|\b(dblink|lo_import|lo_export|pg_read_file|copy)\b", RegexOptions.IgnoreCase)]
-    private static partial Regex Blocked();
 }

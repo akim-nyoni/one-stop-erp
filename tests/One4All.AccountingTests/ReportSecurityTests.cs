@@ -1,5 +1,6 @@
 using System.Text;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using One4All.Application.Abstractions.Payroll;
 using One4All.Application.Abstractions.Reporting;
@@ -8,6 +9,7 @@ using One4All.Core.Reporting;
 using One4All.Core.Security;
 using One4All.Infrastructure.Persistence;
 using One4All.Infrastructure.Persistence.Seeding;
+using One4All.Reporting.Model;
 using Xunit;
 
 namespace One4All.AccountingTests;
@@ -67,5 +69,16 @@ public sealed class ReportSecurityTests
         string scoped = await Run(financeHr);
         scoped.Should().Contain("Finance Clerk").And.NotContain("Works Labourer");
         (await Run(headHr)).Should().Contain("Finance Clerk").And.Contain("Works Labourer");
+
+        // A company copy of the report saved under another module still needs the payroll reports right: the permission comes from the system definition.
+        IReportDefinitionService definitions = scope.ServiceProvider.GetRequiredService<IReportDefinitionService>();
+        string systemJson = await db.ReportDefinitions.AsNoTracking().Where(r => r.Code == "PR4" && r.Scope == ReportScope.System).Select(r => r.DefinitionJson).SingleAsync();
+        One4All.Reporting.Model.ReportDefinition relaxed = ReportDefinitionSerializer.Deserialize(systemJson);
+        relaxed.Module = "Sales";
+        relaxed.RequiredPermission = null;
+        relaxed.Name = "Payroll (relaxed copy)";
+        (await definitions.SaveAsync(companyId, "PR4", relaxed.Name, "Sales", ReportDefinitionSerializer.Serialize(relaxed), 900_001, "relaxed")).IsSuccess.Should().BeTrue();
+        (await reports.RunAsync(companyId, "PR4", parameters, ReportFormat.Csv, ReportRunPurpose.View, clerk)).Error.Code.Should().Be("Rpt.ModuleNotAuthorised");
+        (await Run(headHr)).Should().Contain("Works Labourer");
     }
 }

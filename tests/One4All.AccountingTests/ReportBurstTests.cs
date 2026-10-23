@@ -51,11 +51,13 @@ public sealed class ReportBurstTests
         }
 
         IReportBurstService burst = scope.ServiceProvider.GetRequiredService<IReportBurstService>();
+        long owner = await ReportUsers.CreateAsync(scope.ServiceProvider, "burster");
         Dictionary<string, object?> parameters = new() { ["AsAtDate"] = new DateOnly(2026, 6, 30) };
-        (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "Customer") { Parameters = parameters })).Error.Code.Should().Be("Rpt.BurstRecipients");
-        (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "NoSuchField") { Parameters = parameters, Ledger = TradingLedger.AccountsReceivable })).Error.Code.Should().Be("Rpt.BurstKey");
+        (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "Customer") { Parameters = parameters, UserId = owner })).Error.Code.Should().Be("Rpt.BurstRecipients");
+        (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "Customer") { Parameters = parameters, Ledger = TradingLedger.AccountsReceivable })).Error.Code.Should().Be("Rpt.BurstOwner");
+        (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "NoSuchField") { Parameters = parameters, Ledger = TradingLedger.AccountsReceivable, UserId = owner })).Error.Code.Should().Be("Rpt.BurstKey");
 
-        IReadOnlyList<BurstDelivery> sent = (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "Customer") { Parameters = parameters, Ledger = TradingLedger.AccountsReceivable })).Value;
+        IReadOnlyList<BurstDelivery> sent = (await burst.BurstAsync(new BurstRequest(companyId, "AR29", "Customer") { Parameters = parameters, Ledger = TradingLedger.AccountsReceivable, UserId = owner })).Value;
         sent.Select(d => d.Key).Should().Equal(contactCustomer.Name, emailCustomer.Name, silent.Name);
         sent[0].Recipients.Should().Equal("anesu@alpha.example");
         sent[1].Recipients.Should().Equal("accounts@beta.example");
@@ -74,10 +76,10 @@ public sealed class ReportBurstTests
         // A subscription bursting on every run.
         IReportSubscriptionService subscriptions = scope.ServiceProvider.GetRequiredService<IReportSubscriptionService>();
         string code = $"RB-SUB-{tag}";
-        (await subscriptions.SubscribeAsync(new SubscriptionRequest { CompanyId = companyId, Code = code, ReportCode = "AR29", BurstKeyField = "Customer" })).Error.Code.Should().Be("Rpt.BurstRecipients");
+        (await subscriptions.SubscribeAsync(new SubscriptionRequest { CompanyId = companyId, UserId = owner, Code = code, ReportCode = "AR29", BurstKeyField = "Customer" })).Error.Code.Should().Be("Rpt.BurstRecipients");
         (await subscriptions.SubscribeAsync(new SubscriptionRequest
         {
-            CompanyId = companyId, Code = code, ReportCode = "AR29", BurstKeyField = "Customer", BurstLedger = TradingLedger.AccountsReceivable,
+            CompanyId = companyId, UserId = owner, Code = code, ReportCode = "AR29", BurstKeyField = "Customer", BurstLedger = TradingLedger.AccountsReceivable,
             Parameters = new Dictionary<string, string> { ["AsAtDate"] = "2026-06-30" },
         })).IsSuccess.Should().BeTrue();
         (await subscriptions.RunAsync(companyId, code, DateTimeOffset.UtcNow)).Value.Should().Be(2);

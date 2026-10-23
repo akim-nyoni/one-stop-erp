@@ -28382,6 +28382,10 @@ namespace One4All.Infrastructure.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("modified_on_utc");
 
+                    b.Property<long?>("OwnerUserId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("owner_user_id");
+
                     b.Property<string>("ParametersJson")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -28405,6 +28409,9 @@ namespace One4All.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_report_subscription");
+
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_report_subscription_owner_user_id");
 
                     b.HasIndex("CompanyId", "Code")
                         .IsUnique()

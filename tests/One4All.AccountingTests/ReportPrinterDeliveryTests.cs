@@ -32,15 +32,16 @@ public sealed class ReportPrinterDeliveryTests
         await scope.ServiceProvider.GetRequiredService<ReportCatalogueSeeder>().SeedAsync();
 
         IReportSubscriptionService subscriptions = scope.ServiceProvider.GetRequiredService<IReportSubscriptionService>();
+        long owner = await ReportUsers.CreateAsync(scope.ServiceProvider, "printer");
         Dictionary<string, string> monthEnd = new() { ["AsAtDate"] = "@PrevMonthEnd" };
         (await subscriptions.SubscribeAsync(new SubscriptionRequest
         {
-            CompanyId = companyId, Code = "TB-BURST", ReportCode = SystemReports.TrialBalanceCode, Parameters = monthEnd, BurstKeyField = "AccountCode", BurstRecipientField = "Email",
+            CompanyId = companyId, UserId = owner, Code = "TB-BURST", ReportCode = SystemReports.TrialBalanceCode, Parameters = monthEnd, BurstKeyField = "AccountCode", BurstRecipientField = "Email",
             DeliveryPrinter = "Finance",
         })).Error.Code.Should().Be("Rpt.DeliveryPrinter");
         (await subscriptions.SubscribeAsync(new SubscriptionRequest
         {
-            CompanyId = companyId, Code = "TB-PRINT", ReportCode = SystemReports.TrialBalanceCode, Format = ReportFormat.Html, Parameters = monthEnd, DeliveryPrinter = "Finance Laser",
+            CompanyId = companyId, UserId = owner, Code = "TB-PRINT", ReportCode = SystemReports.TrialBalanceCode, Format = ReportFormat.Html, Parameters = monthEnd, DeliveryPrinter = "Finance Laser",
         })).IsSuccess.Should().BeTrue();
 
         DateTimeOffset june = new(2026, 6, 3, 6, 0, 0, TimeSpan.Zero);

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using One4All.Application.Abstractions.Communications;
 using One4All.Application.Abstractions.Reporting;
 using One4All.Application.Abstractions.Scheduling;
+using One4All.Application.Abstractions.Security;
 using One4All.Application.Reporting;
 using One4All.Core.Common;
 using One4All.Core.Communications;
@@ -11,25 +12,38 @@ using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Reporting;
 
-/// <summary>Report subscriptions: render on a run and email to the distribution list, logging each delivery.</summary>
+/// <summary>
+/// Report subscriptions: render on a run and email to the distribution list, logging each delivery. A subscription belongs to the user who
+/// set it up and runs with their rights: they must be able to run the report when they subscribe, and each run checks again that they are
+/// still active and still allowed, cutting the rows to their data scope and leaving out the columns they may not see.
+/// </summary>
 public sealed class ReportSubscriptionService : IReportSubscriptionService
 {
+    private const string ReportPermission = "Reporting.Report";
+
     private readonly One4AllDbContext _db;
     private readonly IReportRunner _runner;
     private readonly INotificationService _messages;
     private readonly IReportBurstService? _burst;
     private readonly ReportDeliveryOptions _delivery;
     private readonly IReportPrinter? _printer;
+    private readonly IPermissionService _permissions;
+    private readonly IDataScopeService? _scopes;
 
     /// <summary>Creates the service.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="runner">The report runner.</param>
     /// <param name="messages">The notification service.</param>
+    /// <param name="permissions">Resolves the owner's rights.</param>
+    /// <param name="burst">Bursts the subscriptions that split by a key.</param>
     /// <param name="delivery">Where file deliveries may go.</param>
     /// <param name="printer">The printer subscriptions with a printer print on.</param>
-    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IReportBurstService? burst = null, ReportDeliveryOptions? delivery = null,
-        IReportPrinter? printer = null)
+    /// <param name="scopes">Resolves the owner's data scope.</param>
+    public ReportSubscriptionService(One4AllDbContext db, IReportRunner runner, INotificationService messages, IPermissionService permissions, IReportBurstService? burst = null,
+        ReportDeliveryOptions? delivery = null, IReportPrinter? printer = null, IDataScopeService? scopes = null)
     {
+        _permissions = permissions;
+        _scopes = scopes;
         _printer = printer;
         _delivery = delivery ?? new ReportDeliveryOptions();
         _burst = burst;
@@ -80,6 +94,18 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
             return Result.Failure(Error.NotFound("Rpt.ReportNotFound", $"No report {reportCode}."));
         }
 
+        // The subscriber owns the subscription and must be able to run the report now, by the same rule the report viewer applies.
+        if (request.UserId is not long owner)
+        {
+            return Result.Failure(Error.Validation("Rpt.SubscriptionOwner", "A subscription needs the user it runs as."));
+        }
+
+        Result<ReportAccess> access = await OwnerAccessAsync(request.CompanyId, owner, reportCode, ct).ConfigureAwait(false);
+        if (access.IsFailure)
+        {
+            return Result.Failure(access.Error);
+        }
+
         string code = request.Code.Trim().ToUpperInvariant();
 
         // An existing code changes that subscription (what it runs, its format, parameters and delivery) and starts it again if it was stopped.
@@ -91,6 +117,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
             existing.BurstLedger = bursting ? (int?)request.BurstLedger : null;
             existing.DeliveryFolder = folder;
             existing.DeliveryPrinter = printer;
+            existing.OwnerUserId = owner;
             await _db.SaveChangesAsync(ct).ConfigureAwait(false);
             return Result.Success();
         }
@@ -98,7 +125,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         _db.Set<ReportSubscription>().Add(new ReportSubscription(request.CompanyId, code, reportCode, (int)request.Format, JsonSerializer.Serialize(request.Parameters), recipients)
         {
             BurstKeyField = bursting ? request.BurstKeyField!.Trim() : null, BurstRecipientField = bursting ? request.BurstRecipientField?.Trim() : null,
-            BurstLedger = bursting ? (int?)request.BurstLedger : null, DeliveryFolder = folder, DeliveryPrinter = printer,
+            BurstLedger = bursting ? (int?)request.BurstLedger : null, DeliveryFolder = folder, DeliveryPrinter = printer, OwnerUserId = owner,
         });
         await _db.SaveChangesAsync(ct).ConfigureAwait(false);
         return Result.Success();
@@ -157,11 +184,31 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
     {
         Dictionary<string, string> stored = JsonSerializer.Deserialize<Dictionary<string, string>>(subscription.ParametersJson) ?? [];
         IReadOnlyDictionary<string, object?> parameters = ReportParameterTokens.Resolve(stored, DateOnly.FromDateTime(runAt.UtcDateTime));
+
+        // Every run is the owner's run: no owner, an owner since deactivated or one who lost the right fails the run and says so in the log.
+        Result<ReportAccess> access = subscription.OwnerUserId is long owner
+            ? await OwnerAccessAsync(subscription.CompanyId, owner, subscription.ReportCode, ct).ConfigureAwait(false)
+            : Error.Rule("Rpt.SubscriptionOwner", $"Subscription {subscription.Code} has no owner; save it again so it runs with a user's rights.");
+        if (access.IsFailure)
+        {
+            IEnumerable<string> targets = subscription.BurstKeyField is not null ? ["(burst)"]
+                : subscription.Recipients.Count > 0 ? subscription.Recipients
+                : [subscription.DeliveryFolder is string f ? $"folder:{f}" : $"printer:{subscription.DeliveryPrinter}"];
+            foreach (string target in targets)
+            {
+                _db.Set<ReportDelivery>().Add(new ReportDelivery(subscription.CompanyId, subscription.Id, runAt, target, string.Empty, false, access.Error.Message));
+            }
+
+            await _db.SaveChangesAsync(ct).ConfigureAwait(false);
+            return access.Error;
+        }
+
         if (subscription.BurstKeyField is string keyField && _burst is not null)
         {
             Result<IReadOnlyList<BurstDelivery>> burst = await _burst.BurstAsync(new BurstRequest(subscription.CompanyId, subscription.ReportCode, keyField)
             {
                 Parameters = parameters, RecipientField = subscription.BurstRecipientField, Ledger = (One4All.Core.Trading.TradingLedger?)subscription.BurstLedger, Format = (ReportFormat)subscription.Format,
+                UserId = subscription.OwnerUserId,
             }, ct).ConfigureAwait(false);
             if (burst.IsFailure)
             {
@@ -187,7 +234,7 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
             return burst.Value.Sum(d => d.Recipients.Count);
         }
 
-        Result<RenderedDocument> rendered = await _runner.RenderAsync(subscription.CompanyId, subscription.ReportCode, parameters, (ReportFormat)subscription.Format, ct).ConfigureAwait(false);
+        Result<RenderedDocument> rendered = await _runner.RenderAsync(subscription.CompanyId, subscription.ReportCode, parameters, (ReportFormat)subscription.Format, access.Value, ct).ConfigureAwait(false);
         if (rendered.IsFailure)
         {
             foreach (string recipient in subscription.Recipients)
@@ -269,6 +316,26 @@ public sealed class ReportSubscriptionService : IReportSubscriptionService
         null => "(none)",
         _ => Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty,
     };
+
+    // What the owner may run and see today: active, allowed to export reports, allowed the report's module and permission, and their scope.
+    private async Task<Result<ReportAccess>> OwnerAccessAsync(long companyId, long userId, string reportCode, CancellationToken ct)
+    {
+        bool? active = await _db.Users.AsNoTracking().Where(u => u.Id == userId).Select(u => (bool?)u.IsActive).FirstOrDefaultAsync(ct).ConfigureAwait(false);
+        if (active is not true)
+        {
+            return Error.Rule("Rpt.OwnerInactive", active is null ? $"User {userId} does not exist, so the subscription cannot run as them." : $"User {userId} is no longer active, so the subscription cannot run as them.");
+        }
+
+        Core.Security.EffectivePermissions permissions = await _permissions.ResolveAsync(userId, ct).ConfigureAwait(false);
+        if (!permissions.Has(ReportPermission, Core.Security.OperationFlags.Export))
+        {
+            return Error.Forbidden("Rpt.NotAuthorised", $"User {userId} may not export reports, so the subscription cannot run as them.");
+        }
+
+        ReportAccess access = ReportAccess.For(permissions, _scopes is null ? Application.Security.DataScope.Everything : await _scopes.ForUserAsync(userId, ct).ConfigureAwait(false));
+        Result allowed = await _runner.MayRunAsync(companyId, reportCode, access, ct).ConfigureAwait(false);
+        return allowed.IsFailure ? allowed.Error : access;
+    }
 
     private async Task<Result<ReportSubscription>> FindAsync(long companyId, string code, CancellationToken ct)
     {

@@ -32,9 +32,10 @@ public sealed class ReportFolderDeliveryTests
         string folder = Path.Combine("tests", tag);
         IReportSubscriptionService subscriptions = scope.ServiceProvider.GetRequiredService<IReportSubscriptionService>();
 
+        long owner = await ReportUsers.CreateAsync(scope.ServiceProvider, "filer");
         SubscriptionRequest Request(string code, string target) => new()
         {
-            CompanyId = companyId, Code = code, ReportCode = "AR29", Format = ReportFormat.Csv, DeliveryFolder = target,
+            CompanyId = companyId, UserId = owner, Code = code, ReportCode = "AR29", Format = ReportFormat.Csv, DeliveryFolder = target,
             Parameters = new Dictionary<string, string> { ["AsAtDate"] = "2026-06-30" },
         };
         (await subscriptions.SubscribeAsync(Request($"FD-OUT-{tag}", Path.Combine("..", "..", "elsewhere")))).Error.Code.Should().Be("Rpt.DeliveryFolder");

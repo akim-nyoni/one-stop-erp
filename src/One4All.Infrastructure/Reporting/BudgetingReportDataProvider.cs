@@ -35,6 +35,9 @@ public sealed class BudgetingReportDataProvider : IReportDataProvider
     public bool CanHandle(string command) => command.StartsWith("Bgt", StringComparison.OrdinalIgnoreCase);
 
     /// <inheritdoc />
+    public string? Module => "Budget";
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetRowsAsync(long companyId, string command, IReadOnlyDictionary<string, object?> parameters, CancellationToken ct = default)
     {
         DateOnly asAt = parameters.TryGetValue("AsAtDate", out object? value) && value is DateOnly date ? date : DateOnly.FromDateTime(DateTime.Today);

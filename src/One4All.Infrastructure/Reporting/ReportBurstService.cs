@@ -10,7 +10,7 @@ using One4All.Infrastructure.Persistence;
 
 namespace One4All.Infrastructure.Reporting;
 
-/// <summary>Bursts a report by a key and queues each part by email.</summary>
+/// <summary>Bursts a report by a key and queues each part by email, always as a named user whose rights and scope apply.</summary>
 public sealed class ReportBurstService : IReportBurstService
 {
     private readonly One4AllDbContext _db;
@@ -42,17 +42,19 @@ public sealed class ReportBurstService : IReportBurstService
             return Error.Validation("Rpt.BurstRecipients", "Say where each part goes: a field of the rows holding the email, or the ledger whose contacts receive it.");
         }
 
-        ReportAccess access = ReportAccess.Unrestricted;
-        if (request.UserId is long user && _permissions is not null)
+        // A burst always runs as a user: their report rights, data scope and restricted columns apply to every part.
+        if (request.UserId is not long user || _permissions is null)
         {
-            Core.Security.EffectivePermissions permissions = await _permissions.ResolveAsync(user, ct).ConfigureAwait(false);
-            if (!permissions.Has("Reporting.Report", Core.Security.OperationFlags.Export))
-            {
-                return Error.Rule("Rpt.NotAuthorised", "You may not export reports.");
-            }
-
-            access = ReportAccess.For(permissions, _scopes is null ? Application.Security.DataScope.Everything : await _scopes.ForUserAsync(user, ct).ConfigureAwait(false));
+            return Error.Forbidden("Rpt.BurstOwner", "A burst needs the user it runs as.");
         }
+
+        Core.Security.EffectivePermissions permissions = await _permissions.ResolveAsync(user, ct).ConfigureAwait(false);
+        if (!permissions.Has("Reporting.Report", Core.Security.OperationFlags.Export))
+        {
+            return Error.Forbidden("Rpt.NotAuthorised", $"User {user} may not export reports.");
+        }
+
+        ReportAccess access = ReportAccess.For(permissions, _scopes is null ? Application.Security.DataScope.Everything : await _scopes.ForUserAsync(user, ct).ConfigureAwait(false));
 
         Result<IReadOnlyList<BurstSlice>> slices = await _runner.BurstAsync(request.CompanyId, request.ReportCode.Trim(), request.Parameters, request.Format, request.KeyField, access, ct).ConfigureAwait(false);
         if (slices.IsFailure)

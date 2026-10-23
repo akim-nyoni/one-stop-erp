@@ -8,8 +8,9 @@ using One4All.Infrastructure.Persistence;
 namespace One4All.Infrastructure.Security;
 
 /// <summary>
-/// Resolves row-level data scopes from a user's role assignments (brief §5.1). Roles that come through a group carry no scopes, so a user
-/// who belongs to a group that has roles is unrestricted for those roles.
+/// Resolves row-level data scopes from a user's role assignments (brief §5.1). Roles that come through a group carry no scopes of their own:
+/// they inherit the user's direct scopes, so a user whose direct assignments are limited to a branch or warehouse stays limited when they
+/// join a group, and only a user with no direct assignments at all is unrestricted by a group's roles.
 /// </summary>
 public sealed class DataScopeService : IDataScopeService
 {
@@ -31,8 +32,9 @@ public sealed class DataScopeService : IDataScopeService
         List<IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>> assignments =
             [.. user.Roles.Select(r => (IReadOnlyDictionary<ScopeDimension, IReadOnlyList<string>>)r.Scopes.GroupBy(s => s.Dimension)
                 .ToDictionary(g => g.Key, g => (IReadOnlyList<string>)[.. g.SelectMany(s => s.Values)]))];
+        // A group's roles take the user's own scopes; only with no direct assignments does a group with roles open everything.
         List<long> groupIds = [.. user.Groups.Select(g => g.GroupId)];
-        if (groupIds.Count > 0 && await _db.Groups.AnyAsync(g => groupIds.Contains(g.Id) && g.Roles.Any(), ct).ConfigureAwait(false))
+        if (assignments.Count == 0 && groupIds.Count > 0 && await _db.Groups.AnyAsync(g => groupIds.Contains(g.Id) && g.Roles.Any(), ct).ConfigureAwait(false))
         {
             assignments.Add(new Dictionary<ScopeDimension, IReadOnlyList<string>>());
         }

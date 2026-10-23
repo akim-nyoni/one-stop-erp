@@ -61,6 +61,18 @@ public interface IReportRunner
         One4All.Application.Reporting.ReportAccess access, CancellationToken ct = default)
         => Task.FromResult(Result<IReadOnlyList<BurstSlice>>.Failure(Error.Rule("Rpt.BurstUnsupported", "This report runner cannot burst.")));
 
+    /// <summary>
+    /// Whether a user may run a report: the module's reports right and the report's own permission, taken from the system definition of the
+    /// code (a company or user copy cannot relax them). Used before a subscription is saved, so a user never schedules what they cannot view.
+    /// </summary>
+    /// <param name="companyId">The company.</param>
+    /// <param name="reportCode">The report.</param>
+    /// <param name="access">What the user may run.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Success, or the refusal (the report unknown, or the right missing).</returns>
+    Task<Result> MayRunAsync(long companyId, string reportCode, One4All.Application.Reporting.ReportAccess access, CancellationToken ct = default)
+        => Task.FromResult(Result.Success());
+
     /// <summary>Runs a report and returns its pages as pictures (for a document that is then wrapped and protected, such as a designed payslip).</summary>
     /// <param name="companyId">The company.</param>
     /// <param name="reportCode">The report.</param>

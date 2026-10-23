@@ -99,8 +99,8 @@ public static partial class ApiAccessRules
 
     private static readonly HashSet<string> HttpMethods = new(StringComparer.OrdinalIgnoreCase) { "GET", "HEAD", "OPTIONS" };
 
-    // POSTs that only read: running or previewing a report or template.
-    [GeneratedRegex(@"^/api/(reports/[^/]+/run|reports/subscriptions/[^/]+/run|messages/templates/[^/]+/preview)$", RegexOptions.IgnoreCase)]
+    // POSTs that only read: running or previewing a report or template. Running a subscription is a write: it delivers documents and logs deliveries.
+    [GeneratedRegex(@"^/api/(reports/[^/]+/run|messages/templates/[^/]+/preview)$", RegexOptions.IgnoreCase)]
     private static partial Regex ReadOnlyPost();
 
     [GeneratedRegex(@"^/api/municipal/faults/[^/]+/assign$", RegexOptions.IgnoreCase)]
