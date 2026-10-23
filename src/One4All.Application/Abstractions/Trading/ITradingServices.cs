@@ -231,9 +231,11 @@ public interface IPurchaseLedgerService
     /// <param name="documentNumber">The payment document number.</param>
     /// <param name="taxAccountCode">The input tax account: when given, the tax share of the discount (in the invoice's tax-to-gross proportion) comes off input tax.</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="enteredByUserId">The user keying the payment: it is then held to the single-payment controls (a payment approval where the company requires one).</param>
+    /// <param name="approvedByUserId">Who approved the payment, someone other than <paramref name="enteredByUserId"/>, where the company requires payment approval.</param>
     /// <returns>The posting result of the cash payment.</returns>
     Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
-        string documentNumber, string? taxAccountCode = null, CancellationToken ct = default);
+        string documentNumber, string? taxAccountCode = null, CancellationToken ct = default, long? enteredByUserId = null, long? approvedByUserId = null);
 }
 
 /// <summary>Matches credit items against debit items and realises FX (brief §4.5 allocation/matching).</summary>

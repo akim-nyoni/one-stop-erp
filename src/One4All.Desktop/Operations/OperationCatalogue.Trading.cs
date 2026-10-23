@@ -428,7 +428,7 @@ public static partial class OperationCatalogue
                 + "the invoice's tax share of the discount comes back off output (or input) tax.",
             Fields = [Pick("Step", "Step", ["Suggest", "Settle", "Pay"]), Req("Invoice", "Invoice number"), Num("Cash", "Cash received / paid", "0"), Num("Discount", "Discount", "0"),
                 Opt("Bank", "Bank account"), Opt("DiscountAccount", "Discount allowed / received account"), Opt("TaxAccount", "Tax account (adjusts the tax on the discount)"),
-                Opt("Number", "Receipt / payment number"), Today()],
+                Opt("Number", "Receipt / payment number"), Opt("ApprovedBy", "Approved by (pay; user name, where payment approval is required)"), Today()],
             Run = async (c, i) =>
             {
                 TradingLedger ledger = i.Text("Step") == "Pay" ? TradingLedger.AccountsPayable : TradingLedger.AccountsReceivable;
@@ -448,7 +448,7 @@ public static partial class OperationCatalogue
                         break;
                     default:
                         posted = Check(await c.Get<IPurchaseLedgerService>().PayWithDiscountAsync(c.CompanyId, invoice, i.Date("Date"), i.Number("Cash"), i.Number("Discount"), Need("Bank"), Need("DiscountAccount"),
-                            Need("Number"), i.Optional("TaxAccount")).ConfigureAwait(true));
+                            Need("Number"), i.Optional("TaxAccount"), enteredByUserId: c.UserId, approvedByUserId: await OptionalUserAsync(c, i.Optional("ApprovedBy")).ConfigureAwait(true)).ConfigureAwait(true));
                         break;
                 }
 

@@ -1473,12 +1473,13 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
 
     /// <inheritdoc />
     public Task<Result<TradingPostingResult>> PayWithDiscountAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
-        string documentNumber, string? taxAccountCode = null, CancellationToken ct = default)
-        => _db.AtomicAsync(() => PayWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountReceivedAccountCode, documentNumber, taxAccountCode, ct), ct);
+        string documentNumber, string? taxAccountCode = null, CancellationToken ct = default, long? enteredByUserId = null, long? approvedByUserId = null)
+        => _db.AtomicAsync(() => PayWithDiscountCoreAsync(companyId, invoiceOpenItemId, date, cashAmount, discountAmount, bankAccountCode, discountReceivedAccountCode, documentNumber, taxAccountCode,
+            enteredByUserId, approvedByUserId, ct), ct);
 
     // One unit of work: the journal, the open item and any allocation commit together (retried on a lost race).
     private async Task<Result<TradingPostingResult>> PayWithDiscountCoreAsync(long companyId, long invoiceOpenItemId, DateOnly date, decimal cashAmount, decimal discountAmount, string bankAccountCode, string discountReceivedAccountCode,
-        string documentNumber, string? taxAccountCode, CancellationToken ct)
+        string documentNumber, string? taxAccountCode, long? enteredByUserId, long? approvedByUserId, CancellationToken ct)
     {
         if (cashAmount <= 0m || discountAmount <= 0m)
         {
@@ -1508,12 +1509,12 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
             return held;
         }
 
-        // Cash payment: Dr AP control / Cr bank.
+        // Cash payment: Dr AP control / Cr bank. Keyed by a user it is a single payment like any other: with payment approval required it needs a second person.
         Result<TradingPostingResult> cash = await PostPaymentAsync(new PaymentRequest
         {
             CompanyId = companyId, SupplierId = invoice.TraderId, DocumentNumber = documentNumber, PaymentDate = date,
             Currency = invoice.Currency, Amount = cashAmount, BankAccountCode = bankAccountCode, ExchangeRate = invoice.ExchangeRate,
-            Narrative = $"Payment with settlement discount for {invoice.DocumentNumber}",
+            Narrative = $"Payment with settlement discount for {invoice.DocumentNumber}", EnteredByUserId = enteredByUserId, ApprovedByUserId = approvedByUserId,
         }, ct).ConfigureAwait(false);
         if (cash.IsFailure)
         {
@@ -1531,7 +1532,7 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         {
             CompanyId = companyId, SupplierId = invoice.TraderId, DocumentNumber = $"{documentNumber}-DISC", PaymentDate = date,
             Currency = invoice.Currency, Amount = discountAmount, BankAccountCode = discountReceivedAccountCode, ExchangeRate = invoice.ExchangeRate,
-            Narrative = $"Settlement discount received for {invoice.DocumentNumber}",
+            Narrative = $"Settlement discount received for {invoice.DocumentNumber}", NoCashPaid = true,
         }, ct).ConfigureAwait(false);
         if (discount.IsFailure)
         {
