@@ -2062,10 +2062,10 @@ public sealed class TradingService : ISalesLedgerService, IPurchaseLedgerService
         decimal? rate = traderRateType is ExchangeRateType own && own != ExchangeRateType.Daily
             ? await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, own, date, ct).ConfigureAwait(false)
             : null;
-        rate ??= await Accounting.ExchangeRateResolver.FindAsync(_db, currency, company.BaseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+        rate ??= await Accounting.ExchangeRateResolver.FindAnyAsync(_db, currency, company.BaseCurrency, null, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
-            return Error.Rule("Trading.NoRate", $"No daily rate from {currency} to {company.BaseCurrency} on or before {date:yyyy-MM-dd}.");
+            return Error.Rule("Trading.NoRate", $"No exchange rate from {currency} to {company.BaseCurrency} on or before {date:yyyy-MM-dd}: set one under Setup, Exchange rates.");
         }
 
         return rate.Value;

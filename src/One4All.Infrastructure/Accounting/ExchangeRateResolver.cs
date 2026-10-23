@@ -22,6 +22,31 @@ internal static class ExchangeRateResolver
     /// <param name="date">The date the rate must be in force on.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The rate, or null.</returns>
+    /// <summary>
+    /// The rate by the preferred type, else by any other type captured (daily, spot, closing, then period average): a counter taking a
+    /// currency should not turn it away because the rate was captured under another heading.
+    /// </summary>
+    /// <param name="db">The database context.</param>
+    /// <param name="from">The currency converted from.</param>
+    /// <param name="to">The currency converted to.</param>
+    /// <param name="preferred">The rate type to look for first (null: daily).</param>
+    /// <param name="date">The date the rate must be in force on.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>The rate, or null when no rate of any type is captured.</returns>
+    public static async Task<decimal?> FindAnyAsync(One4AllDbContext db, CurrencyCode from, CurrencyCode to, ExchangeRateType? preferred, DateOnly date, CancellationToken ct)
+    {
+        ExchangeRateType first = preferred ?? ExchangeRateType.Daily;
+        foreach (ExchangeRateType type in new[] { first, ExchangeRateType.Daily, ExchangeRateType.Spot, ExchangeRateType.ClosingRate, ExchangeRateType.PeriodAverage }.Distinct())
+        {
+            if (await FindAsync(db, from, to, type, date, ct).ConfigureAwait(false) is decimal rate && rate > 0m)
+            {
+                return rate;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>The rate type the company's exchange-rate policy names for a document type (else its source module), or null when there is no policy.</summary>
     /// <param name="db">The database context.</param>
     /// <param name="companyId">The company.</param>

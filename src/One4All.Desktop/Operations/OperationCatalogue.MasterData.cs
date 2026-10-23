@@ -992,9 +992,22 @@ public static partial class OperationCatalogue
         yield return new Operation
         {
             Module = module, Title = "Set an exchange rate", ListTitle = "Exchange rates (latest 200)", Description = "A rate from a date; one already set for that day and type is replaced.",
-            Fields = [Req("From", "From currency"), Req("To", "To currency"), Pick("Type", "Rate type", Enum.GetNames<ExchangeRateType>()), Today(), Num("Rate", "Rate")],
-            Run = async (c, i) => Check(await c.Get<IMasterDataService>().SetExchangeRateAsync(CurrencyCode.Parse(i.Text("From")), CurrencyCode.Parse(i.Text("To")),
-                Enum.Parse<ExchangeRateType>(i.Text("Type")), i.Date("Date"), i.Number("Rate")).ConfigureAwait(true), "Rate set."),
+            Fields = [CurrencyPick("From", "From currency (the one quoted, e.g. ZWG)"), CurrencyPick("To", "To currency (usually base, e.g. USD)"), Pick("Type", "Rate type (the till takes Daily first, then any other)", Enum.GetNames<ExchangeRateType>()), Today(), Num("Rate", "Rate (units of To per one From)")],
+            Run = async (c, i) =>
+            {
+                if (i.Optional("From") is not string from || i.Optional("To") is not string to)
+                {
+                    return "Pick both currencies.";
+                }
+
+                if (from == to)
+                {
+                    return "Pick two different currencies.";
+                }
+
+                return Check(await c.Get<IMasterDataService>().SetExchangeRateAsync(CurrencyCode.Parse(from), CurrencyCode.Parse(to),
+                    Enum.Parse<ExchangeRateType>(i.Text("Type")), i.Date("Date"), i.Number("Rate")).ConfigureAwait(true), "Rate set.");
+            },
             List = async c => Table(await c.Db.ExchangeRates.AsNoTracking().OrderByDescending(x => x.EffectiveFrom).Page(c, 200).ToListAsync().ConfigureAwait(true),
                 ("From", x => x.FromCurrency.Value), ("To", x => x.ToCurrency.Value), ("Type", x => x.RateType), ("Effective", x => D(x.EffectiveFrom)), ("Rate", x => x.Rate.ToString("0.######", CultureInfo.InvariantCulture))),
         };

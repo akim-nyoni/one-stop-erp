@@ -389,9 +389,10 @@ public sealed class TellerWindow : Window
 
     private void NextCurrency()
     {
-        if (_rates.Count > 1)
+        List<TillCurrency> usable = [.. _rates.Where(r => r.HasRate)];
+        if (usable.Count > 1)
         {
-            _currency = _rates[(_currency is null ? 0 : _rates.IndexOf(_currency) + 1) % _rates.Count];
+            _currency = usable[(_currency is null ? 0 : usable.IndexOf(_currency) + 1) % usable.Count];
             Refresh();
         }
     }
@@ -414,9 +415,12 @@ public sealed class TellerWindow : Window
             {
                 Content = currency.Code.Value, MinWidth = 64, Height = 36, Margin = new Thickness(2), FontSize = 14, FontWeight = FontWeights.SemiBold, Cursor = Cursors.Hand,
                 Background = chosen ? new SolidColorBrush(Color.FromRgb(0x1F, 0x61, 0x8D)) : new SolidColorBrush(Color.FromRgb(0xE6, 0xEB, 0xF0)),
-                Foreground = chosen ? Brushes.White : Ink, BorderThickness = new Thickness(0),
-                ToolTip = currency.Code == _base ? $"{currency.Code.Value} (base)" : $"{currency.Code.Value} at {currency.Rate.ToString("0.######", CultureInfo.CurrentCulture)}",
+                Foreground = chosen ? Brushes.White : Ink, BorderThickness = new Thickness(0), IsEnabled = currency.HasRate,
+                ToolTip = currency.Code == _base ? $"{currency.Code.Value} (base)"
+                    : !currency.HasRate ? $"{currency.Code.Value}: no exchange rate captured yet. Set one under Setup, Exchange rates (any rate type), then reopen this screen."
+                    : $"{currency.Code.Value} at {currency.Rate.ToString("0.######", CultureInfo.CurrentCulture)}",
             };
+            ToolTipService.SetShowOnDisabled(chip, true);
             chip.Click += (_, _) =>
             {
                 _currency = currency;

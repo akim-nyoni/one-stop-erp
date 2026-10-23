@@ -568,7 +568,7 @@ public sealed class PosService : IPosService
         List<JournalLineRequest> journalLines = [];
         foreach (PosTenderRequest tender in request.Tenders)
         {
-            Result<decimal> rateResult = await ResolveRateAsync(baseCurrency, tender.Currency, tender.ExchangeRate, request.SaleDate, ct).ConfigureAwait(false);
+            Result<decimal> rateResult = await ResolveRateAsync(request.CompanyId, baseCurrency, tender.Currency, tender.ExchangeRate, request.SaleDate, ct).ConfigureAwait(false);
             if (rateResult.IsFailure)
             {
                 return rateResult.Error;
@@ -667,7 +667,7 @@ public sealed class PosService : IPosService
             {
                 CurrencyCode changeCurrency = CurrencyCode.Parse(changeCode);
                 decimal? given = request.Tenders.Where(t => t.IsChange && t.Currency == changeCurrency).Select(t => t.ExchangeRate).FirstOrDefault();
-                Result<decimal> changeRate = await ResolveRateAsync(baseCurrency, changeCurrency, given, request.SaleDate, ct).ConfigureAwait(false);
+                Result<decimal> changeRate = await ResolveRateAsync(request.CompanyId, baseCurrency, changeCurrency, given, request.SaleDate, ct).ConfigureAwait(false);
                 decimal? smallest = await _db.Currencies.AsNoTracking().Include(c => c.Denominations).Where(c => c.Code == changeCurrency).Select(c => (decimal?)c.SmallestCashUnit)
                     .FirstOrDefaultAsync(ct).ConfigureAwait(false);
                 if (changeRate.IsSuccess && smallest is decimal unit)
@@ -1456,7 +1456,7 @@ public sealed class PosService : IPosService
                 }
                 else
                 {
-                    Result<decimal> day = await ResolveRateAsync(CurrencyCode.Parse(baseCurrency), CurrencyCode.Parse(currency), null, date, ct).ConfigureAwait(false);
+                    Result<decimal> day = await ResolveRateAsync(session.CompanyId, CurrencyCode.Parse(baseCurrency), CurrencyCode.Parse(currency), null, date, ct).ConfigureAwait(false);
                     if (day.IsFailure)
                     {
                         return day.Error;
@@ -1505,7 +1505,7 @@ public sealed class PosService : IPosService
         return value.IsFailure ? value.Error : Result<string>.Success(scheme.LiabilityAccountCode);
     }
 
-    private async Task<Result<decimal>> ResolveRateAsync(CurrencyCode baseCurrency, CurrencyCode tenderCurrency, decimal? explicitRate, DateOnly date, CancellationToken ct)
+    private async Task<Result<decimal>> ResolveRateAsync(long companyId, CurrencyCode baseCurrency, CurrencyCode tenderCurrency, decimal? explicitRate, DateOnly date, CancellationToken ct)
     {
         if (tenderCurrency == baseCurrency)
         {
@@ -1517,25 +1517,34 @@ public sealed class PosService : IPosService
             return r;
         }
 
-        decimal? rate = await Accounting.ExchangeRateResolver.FindAsync(_db, tenderCurrency, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false);
+        decimal? rate = await TillRateAsync(companyId, tenderCurrency, baseCurrency, date, ct).ConfigureAwait(false);
         if (rate is null)
         {
-            return Error.Rule("Pos.NoRate", $"No daily rate from {tenderCurrency} to {baseCurrency} on or before {date:yyyy-MM-dd}.");
+            return Error.Rule("Pos.NoRate", $"No exchange rate from {tenderCurrency} to {baseCurrency} on or before {date:yyyy-MM-dd}: set one under Setup, Exchange rates.");
         }
 
         return rate.Value;
+    }
+
+    // The till's rate: the company's policy type for POS sales when it names one, else any rate captured (daily, spot, closing, average).
+    private async Task<decimal?> TillRateAsync(long companyId, CurrencyCode from, CurrencyCode to, DateOnly date, CancellationToken ct)
+    {
+        ExchangeRateType? preferred = await Accounting.ExchangeRateResolver.PolicyTypeAsync(_db, companyId, "PosSale", "POS", ct).ConfigureAwait(false);
+        return await Accounting.ExchangeRateResolver.FindAnyAsync(_db, from, to, preferred, date, ct).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<TillCurrency>> TenderCurrenciesAsync(long companyId, DateOnly date, CancellationToken ct = default)
     {
         CurrencyCode baseCurrency = await _db.Companies.Where(c => c.Id == companyId).Select(c => c.BaseCurrency).SingleAsync(ct).ConfigureAwait(false);
+        // Every currency in the currency table, base first: one with a rate (of any type) is taken at it, one without is listed at 0 so the
+        // till can show it greyed with the reason instead of hiding it.
         List<TillCurrency> currencies = [new TillCurrency(baseCurrency, 1m)];
-        foreach (CurrencyCode code in await _db.Currencies.AsNoTracking().Select(c => c.Code).ToListAsync(ct).ConfigureAwait(false))
+        foreach (CurrencyCode code in (await _db.Currencies.AsNoTracking().Select(c => c.Code).ToListAsync(ct).ConfigureAwait(false)).Distinct().OrderBy(c => c.Value, StringComparer.Ordinal))
         {
-            if (code != baseCurrency && await Accounting.ExchangeRateResolver.FindAsync(_db, code, baseCurrency, ExchangeRateType.Daily, date, ct).ConfigureAwait(false) is decimal rate && rate > 0m)
+            if (code != baseCurrency)
             {
-                currencies.Add(new TillCurrency(code, rate));
+                currencies.Add(new TillCurrency(code, await TillRateAsync(companyId, code, baseCurrency, date, ct).ConfigureAwait(false) ?? 0m));
             }
         }
 
@@ -1575,7 +1584,7 @@ public sealed class PosService : IPosService
         }
 
         CurrencyCode currency = CurrencyCode.Parse(code);
-        Result<decimal> rate = await ResolveRateAsync(company.BaseCurrency, currency, null, date, ct).ConfigureAwait(false);
+        Result<decimal> rate = await ResolveRateAsync(companyId, company.BaseCurrency, currency, null, date, ct).ConfigureAwait(false);
         if (rate.IsFailure)
         {
             return rate.Error;

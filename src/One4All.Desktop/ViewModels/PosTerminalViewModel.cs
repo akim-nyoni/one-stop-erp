@@ -367,8 +367,9 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     /// The currency buttons on the till: one per currency taken today, the selected one highlighted, each one's tooltip giving its rate and
     /// the balance due in it - one click (or F9 to cycle) switches the currency the next tender is in.
     /// </summary>
-    public IReadOnlyList<CurrencyButton> CurrencyButtons => [.. TenderCurrencies.Select(c => new CurrencyButton(c, c.Code.Value, c == SelectedTenderCurrency,
+    public IReadOnlyList<CurrencyButton> CurrencyButtons => [.. TenderCurrencies.Select(c => new CurrencyButton(c, c.Code.Value, c == SelectedTenderCurrency, c.HasRate,
         c.Code == _currency ? $"{c.Code.Value} (base): {_ticket.BalanceDue.ToString("N2", CultureInfo.CurrentCulture)} due"
+            : !c.HasRate ? $"{c.Code.Value}: no exchange rate captured yet. Set one under Setup, Exchange rates (any rate type), then reopen the till."
             : $"{c.Code.Value} at {c.Rate.ToString("0.######", CultureInfo.CurrentCulture)}: {_ticket.BalanceDueIn(c.Rate).ToString("N2", CultureInfo.CurrentCulture)} {c.Code.Value} due"))];
 
     /// <summary>The currency the next tender is in, as shown on the till.</summary>
@@ -381,6 +382,12 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     {
         if (TenderCurrencies.FirstOrDefault(c => c.Code.Value == code) is { } currency)
         {
+            if (!currency.HasRate)
+            {
+                StatusMessage = $"{currency.Code.Value} has no exchange rate yet: set one under Setup, Exchange rates, then reopen the till.";
+                return;
+            }
+
             SelectedTenderCurrency = currency;
         }
     }
@@ -389,10 +396,11 @@ public sealed partial class PosTerminalViewModel : ObservableObject
     [RelayCommand]
     private void NextCurrency()
     {
-        if (TenderCurrencies.Count > 1)
+        List<TillCurrency> usable = [.. TenderCurrencies.Where(c => c.HasRate)];
+        if (usable.Count > 1)
         {
-            int at = SelectedTenderCurrency is null ? -1 : TenderCurrencies.IndexOf(SelectedTenderCurrency);
-            SelectedTenderCurrency = TenderCurrencies[(at + 1) % TenderCurrencies.Count];
+            int at = SelectedTenderCurrency is null ? -1 : usable.IndexOf(SelectedTenderCurrency);
+            SelectedTenderCurrency = usable[(at + 1) % usable.Count];
         }
     }
 
@@ -3091,4 +3099,4 @@ public sealed partial class PosTerminalViewModel : ObservableObject
 /// <param name="Code">Its code (the button's label).</param>
 /// <param name="IsSelected">Whether the next tender is in it.</param>
 /// <param name="Tip">Its rate and the balance due in it.</param>
-public sealed record CurrencyButton(TillCurrency Currency, string Code, bool IsSelected, string Tip);
+public sealed record CurrencyButton(TillCurrency Currency, string Code, bool IsSelected, bool IsEnabled, string Tip);

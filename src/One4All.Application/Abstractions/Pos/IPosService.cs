@@ -137,7 +137,11 @@ public readonly record struct CompleteSaleResult(long SaleId, string JournalNumb
 /// <summary>A currency the till can take, with the units of base currency one unit of it buys today.</summary>
 /// <param name="Code">The currency.</param>
 /// <param name="Rate">Its rate to base.</param>
-public sealed record TillCurrency(CurrencyCode Code, decimal Rate);
+public sealed record TillCurrency(CurrencyCode Code, decimal Rate)
+{
+    /// <summary>Whether the till can take the currency: a rate to base is captured (base itself is 1). Without one it is shown but cannot be chosen.</summary>
+    public bool HasRate => Rate > 0m;
+}
 
 /// <summary>
 /// One basket split into several sales, each paid on its own (brief §4.1 split bill). The basket and its checks are as for
