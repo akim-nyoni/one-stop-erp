@@ -312,14 +312,15 @@ The list beside the form shows: Roles.
 
 ### Assign a role
 
-Gives a user a role, limited by scopes such as Company:ACME;Branch:HO,NORTH (blank: unrestricted). Warns of segregation-of-duties conflicts.
+Gives a user a role, limited by scopes such as Company:ACME;Branch:HO,NORTH (blank: unrestricted). Nobody gives a role to themselves. A role that would break a segregation-of-duties rule is held until a second administrator (not the one who asked, nor the user) approves or rejects it here.
 
 | Field | Required | Notes |
 | --- | --- | --- |
+| Step | yes | One of: Assign, Remove, Approve held grant, Reject held grant; default Assign |
 | Login name | yes | Text |
 | Role name | yes | Text |
 | Scopes (Dimension:values;...) | no | Text |
-| Remove the role instead | no | Flag; default False |
+| Note (reject: why) | no | Text |
 
 The list beside the form shows: Users and their roles.
 

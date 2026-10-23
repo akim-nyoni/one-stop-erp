@@ -223,7 +223,7 @@ Shows what the running promotions take off a basket at a date and time.
 | Field | Required | Notes |
 | --- | --- | --- |
 | Lines: ITEM:quantity; … (at the default price list) | yes | Text |
-| When (yyyy-MM-dd HH:mm) | yes | Text; default 2026-10-22 18:17 |
+| When (yyyy-MM-dd HH:mm) | yes | Text; default 2026-10-23 04:09 |
 | Loyalty member | no | Flag; default False |
 | Customer type | no | Text |
 | Coupon codes (',') | no | Text |

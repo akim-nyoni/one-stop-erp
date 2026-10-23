@@ -779,6 +779,7 @@ Create a pay element or edit one (every field but its code and type, entered in 
 | Cumulative tax (year to date) | no | Flag; default False |
 | Tax per currency (split-currency pay) | no | Flag; default False |
 | Annual payment (bonus tax spread) | no | Flag; default False |
+| Statutory return line (PAYE, AIDS levy, social security, medical aid; None: by its name) | yes | One of: None, Paye, AidsLevy, SocialSecurity, MedicalAid; default None |
 | Tax table currency (blank: base; one table per currency for split-currency tax) | no | Text |
 | Percentage of group (percent-of-group) | no | Text |
 | Floor | no | Number |
@@ -930,8 +931,8 @@ The old system's figures for a period, compared line by line in report PR8. Repl
 | PR24 | Housing Rent Deduction Reconciliation | Per employee tenant: rent billed, rent deducted from pay and receipted to the tenancy account, the account balance, and any deduction not receipted. |
 | PR25 | Overtime Analysis | Overtime in the period by department, employee and multiplier: hours, approved and unapproved hours, and the cost at the basic hourly rate. |
 | PR26 | Allowance Analysis | Earnings other than basic salary in the period, per employee and allowance. |
-| PR27 | PAYE Remittance Return | Per month: employees, taxable earnings, PAYE deducted and PAYE by the tax table in force, with any difference. |
-| PR28 | Annual Tax Certificates | Per employee for the year: ID and tax numbers, gross, taxable, pension contributions and PAYE - the certificate data. |
+| PR27 | PAYE Remittance Return | Per month and currency the earnings were paid in: employees, taxable earnings, PAYE by the tax table in force and as deducted with any difference, and the AIDS levy - in base, and in the currency itself at the pay date's rate. |
+| PR28 | Annual Tax Certificates | Per employee for the tax year: ID and tax numbers, gross, taxable, pension, medical aid, social security (employee and employer), AIDS levy and PAYE - the certificate (P2 / ITF16) data. |
 | PR29 | Tax Reconciliation | Per employee over the period: taxable earnings, PAYE deducted and the effective rate. |
 | PR3 | Payroll Journal | The payroll postings of the period by account, with debits and credits. |
 | PR30 | Social Security Contribution Schedule | Social security members with the period's employee and employer contributions. |

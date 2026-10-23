@@ -76,11 +76,11 @@ The list beside the form shows: Meters.
 
 ### Valuation roll
 
-Import a general valuation roll (a CSV file: stand,value) effective from a date; record a supplementary valuation on one stand (bills since re-rated); lodge an objection and decide it (a revised value re-rates the bills); History lists a stand's valuations.
+Import a general valuation roll (a CSV file: stand,value) effective from a date; record a supplementary valuation on one stand (bills since re-rated); lodge an objection and decide it (a revised value re-rates the bills); History lists a stand's valuations. A supplementary value may go back no further than the council's limit (by default the start of the financial year); a rates credit above the council's threshold waits in the credit-note approval workflow. Policy sets both (blank months: start of the financial year; blank threshold: every credit is approved).
 
 | Field | Required | Notes |
 | --- | --- | --- |
-| Step | yes | One of: Import roll, Supplementary, Objection, Decide objection, History; default Import roll |
+| Step | yes | One of: Import roll, Supplementary, Objection, Decide objection, History, Policy; default Import roll |
 | Roll CSV file (stand,value) | no | Text |
 | Roll name | no | Text |
 | Stand number | no | Text |
@@ -89,6 +89,8 @@ Import a general valuation roll (a CSV file: stand,value) effective from a date;
 | Objection number (decide) | no | Text |
 | Effective from | yes | Date |
 | Date | yes | Date |
+| Back-dating limit in months (policy) | no | Number |
+| Credit approval threshold (policy) | no | Number |
 
 The list beside the form shows: Open objections.
 
